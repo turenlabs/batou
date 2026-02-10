@@ -1,0 +1,41 @@
+{
+  "nodes": {
+    "/app/proxy.go:HandleProxy": {
+      "id": "/app/proxy.go:HandleProxy",
+      "file_path": "/app/proxy.go",
+      "name": "HandleProxy",
+      "package": "vulnerable",
+      "start_line": 11,
+      "end_line": 23,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "tainted_params": {
+          "1": [
+            "user_input"
+          ]
+        },
+        "source_params": {
+          "0": "external",
+          "1": "user_input"
+        },
+        "sink_calls": [
+          {
+            "category": "url_fetch",
+            "method": "http.Get",
+            "line": 14,
+            "arg_from_param": 1
+          }
+        ]
+      },
+      "content_hash": "899105eadb58d801",
+      "last_scan_at": "2026-02-10T15:47:37.148385-06:00",
+      "language": "go",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/ssrf",
+  "session_id": "",
+  "last_updated": "2026-02-10T16:16:49.02005-06:00",
+  "version": 1
+}

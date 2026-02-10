@@ -1,0 +1,99 @@
+{
+  "nodes": {
+    "/app/app.ts:app.use": {
+      "id": "/app/app.ts:app.use",
+      "file_path": "/app/app.ts",
+      "name": "app.use",
+      "package": "",
+      "start_line": 1,
+      "end_line": 1,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "504cfdd5923bc885",
+      "last_scan_at": "2026-02-10T15:47:35.810842-06:00",
+      "language": "typescript",
+      "finding_count": 0
+    },
+    "/app/auth.py:login": {
+      "id": "/app/auth.py:login",
+      "file_path": "/app/auth.py",
+      "name": "login",
+      "package": "",
+      "start_line": 1,
+      "end_line": 7,
+      "calls": [
+        "/app/auth.py:login"
+      ],
+      "called_by": [
+        "/app/auth.py:login"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1f53d6844baa7067",
+      "last_scan_at": "2026-02-10T16:16:47.438374-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/routes.ts:app.get": {
+      "id": "/app/routes.ts:app.get",
+      "file_path": "/app/routes.ts",
+      "name": "app.get",
+      "package": "",
+      "start_line": 2,
+      "end_line": 4,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "59dc319694ece79c",
+      "last_scan_at": "2026-02-10T16:16:47.417975-06:00",
+      "language": "typescript",
+      "finding_count": 0
+    },
+    "/app/server.go:main": {
+      "id": "/app/server.go:main",
+      "file_path": "/app/server.go",
+      "name": "main",
+      "package": "main",
+      "start_line": 3,
+      "end_line": 5,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "156ce33d631ad48a",
+      "last_scan_at": "2026-02-10T15:47:35.800884-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "/app/views.py:admin_dashboard": {
+      "id": "/app/views.py:admin_dashboard",
+      "file_path": "/app/views.py",
+      "name": "admin_dashboard",
+      "package": "",
+      "start_line": 1,
+      "end_line": 2,
+      "calls": [],
+      "called_by": [
+        "/app/views.py:admin_dashboard"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1a0e96f41f22be70",
+      "last_scan_at": "2026-02-10T15:47:35.80699-06:00",
+      "language": "python",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/auth",
+  "session_id": "",
+  "last_updated": "2026-02-10T16:16:47.446875-06:00",
+  "version": 1
+}

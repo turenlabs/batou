@@ -1,0 +1,147 @@
+package ssrf
+
+import (
+	"testing"
+
+	"github.com/turen/gtss/internal/testutil"
+)
+
+// --- GTSS-SSRF-001: URL From User Input ---
+
+func TestSSRF001_Go_HTTPGet(t *testing.T) {
+	content := `url := r.URL.Query().Get("url")
+resp, _ := http.Get(targetURL)`
+	result := testutil.ScanContent(t, "/app/proxy.go", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_Python_Requests(t *testing.T) {
+	content := `url = request.args.get('url')
+resp = requests.get(url)`
+	result := testutil.ScanContent(t, "/app/proxy.py", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_JS_Fetch(t *testing.T) {
+	content := `const url = req.query.url;
+const response = await fetch(url);`
+	result := testutil.ScanContent(t, "/app/proxy.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_JS_Axios(t *testing.T) {
+	content := `const url = req.query.target;
+const resp = await axios.get(url);`
+	result := testutil.ScanContent(t, "/app/proxy.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_PHP_Curl(t *testing.T) {
+	content := `<?php
+curl_setopt($ch, CURLOPT_URL, $_GET['url']);`
+	result := testutil.ScanContent(t, "/app/proxy.php", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_Fixture_Go(t *testing.T) {
+	content := testutil.LoadFixture(t, "go/vulnerable/ssrf_basic.go")
+	result := testutil.ScanContent(t, "/app/proxy.go", content)
+	hasSSRF := testutil.HasFinding(result, "GTSS-SSRF-001") || testutil.HasFinding(result, "GTSS-SSRF-004")
+	if !hasSSRF {
+		t.Errorf("expected SSRF finding in ssrf_basic.go, got: %v", testutil.FindingRuleIDs(result))
+	}
+}
+
+func TestSSRF001_Fixture_JS(t *testing.T) {
+	content := testutil.LoadFixture(t, "javascript/vulnerable/ssrf_basic.ts")
+	result := testutil.ScanContent(t, "/app/proxy.ts", content)
+	hasSSRF := testutil.HasFinding(result, "GTSS-SSRF-001") || testutil.HasFinding(result, "GTSS-SSRF-004")
+	if !hasSSRF {
+		t.Errorf("expected SSRF finding in ssrf_basic.ts, got: %v", testutil.FindingRuleIDs(result))
+	}
+}
+
+// --- GTSS-SSRF-002: Internal Network Access ---
+
+func TestSSRF002_CloudMetadata(t *testing.T) {
+	content := `resp = requests.get("http://169.254.169.254/latest/meta-data/")`
+	result := testutil.ScanContent(t, "/app/cloud.py", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-002")
+}
+
+func TestSSRF002_InternalIP_JS(t *testing.T) {
+	content := `const resp = await fetch("http://192.168.1.100:8080/admin");`
+	result := testutil.ScanContent(t, "/app/internal.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-002")
+}
+
+// --- GTSS-SSRF-003: DNS Rebinding ---
+
+func TestSSRF003_Go_DNSLookupThenRequest(t *testing.T) {
+	content := `ips, _ := net.LookupHost(hostname)
+// validate IPs
+resp, _ := http.Get("http://" + hostname + "/api")`
+	result := testutil.ScanContent(t, "/app/resolver.go", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-003")
+}
+
+func TestSSRF003_Python_SocketResolve(t *testing.T) {
+	content := `ip = socket.gethostbyname(hostname)
+resp = requests.get("http://" + hostname + "/api")`
+	result := testutil.ScanContent(t, "/app/resolver.py", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-003")
+}
+
+func TestSSRF003_JS_DNSResolve(t *testing.T) {
+	content := `dns.resolve(hostname, (err, ips) => {
+	fetch("http://" + hostname + "/api");
+});`
+	result := testutil.ScanContent(t, "/app/resolver.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-003")
+}
+
+// --- GTSS-SSRF-004: Redirect Following ---
+
+func TestSSRF004_Go_NoCheckRedirect(t *testing.T) {
+	content := `func proxy(w http.ResponseWriter, r *http.Request) {
+	url := r.URL.Query().Get("url")
+	client := &http.Client{}
+	resp, _ := client.Get(url)
+}`
+	result := testutil.ScanContent(t, "/app/proxy.go", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-004")
+}
+
+func TestSSRF004_Python_AllowRedirects(t *testing.T) {
+	content := `url = request.args.get('url')
+resp = requests.get(url, allow_redirects=True)`
+	result := testutil.ScanContent(t, "/app/proxy.py", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-004")
+}
+
+func TestSSRF004_JS_FollowRedirects(t *testing.T) {
+	content := `const url = req.query.url;
+const resp = await got(url, { followRedirects: true });`
+	result := testutil.ScanContent(t, "/app/proxy.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-004")
+}
+
+// --- Safe fixture tests ---
+
+func TestSSRF_Safe_Go(t *testing.T) {
+	if !testutil.FixtureExists("go/safe/ssrf_safe.go") {
+		t.Skip("safe SSRF fixture not available")
+	}
+	content := testutil.LoadFixture(t, "go/safe/ssrf_safe.go")
+	result := testutil.ScanContent(t, "/app/proxy.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF_Safe_JS(t *testing.T) {
+	if !testutil.FixtureExists("javascript/safe/ssrf_safe.ts") {
+		t.Skip("safe SSRF fixture not available")
+	}
+	content := testutil.LoadFixture(t, "javascript/safe/ssrf_safe.ts")
+	result := testutil.ScanContent(t, "/app/proxy.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-SSRF-001")
+}

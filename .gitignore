@@ -1,0 +1,26 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+coverage.out
+coverage.html
+
+# Cache
+.gtss/callgraph.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test binaries
+*.test

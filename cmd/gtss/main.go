@@ -1,0 +1,71 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/turen/gtss/internal/hook"
+	"github.com/turen/gtss/internal/ledger"
+	"github.com/turen/gtss/internal/reporter"
+	"github.com/turen/gtss/internal/scanner"
+
+	// Import all rule packages to trigger init() registrations
+	_ "github.com/turen/gtss/internal/rules/injection"
+	_ "github.com/turen/gtss/internal/rules/secrets"
+	_ "github.com/turen/gtss/internal/rules/crypto"
+	_ "github.com/turen/gtss/internal/rules/xss"
+	_ "github.com/turen/gtss/internal/rules/traversal"
+	_ "github.com/turen/gtss/internal/rules/ssrf"
+	_ "github.com/turen/gtss/internal/rules/auth"
+	_ "github.com/turen/gtss/internal/rules/generic"
+	_ "github.com/turen/gtss/internal/rules/logging"
+	_ "github.com/turen/gtss/internal/rules/validation"
+	_ "github.com/turen/gtss/internal/rules/memory"
+	_ "github.com/turen/gtss/internal/analyzer/goast"
+
+	// Taint analysis engine and language catalogs
+	_ "github.com/turen/gtss/internal/taint"
+	_ "github.com/turen/gtss/internal/taint/languages"
+	_ "github.com/turen/gtss/internal/taint/goflow"
+)
+
+func main() {
+	input, err := hook.ReadInput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "GTSS: failed to read input: %v\n", err)
+		os.Exit(1)
+	}
+
+	result := scanner.Scan(input)
+
+	// Record to ledger synchronously — it's a single JSON line append, very fast.
+	// A fire-and-forget goroutine would be killed on os.Exit, losing blocked-write records.
+	ledger.Record(input.SessionID, result)
+
+	// ALWAYS output hints as additionalContext — this is the key innovation.
+	// Even clean code gets a "looks good" message so Claude knows GTSS is active.
+	context := result.HintsOutput
+
+	// If no hints were generated, fall back to the traditional finding report
+	if context == "" && result.HasFindings() {
+		context = reporter.FormatForClaude(result)
+	}
+
+	if input.IsPreToolUse() {
+		// Output context BEFORE a potential BlockWrite, since BlockWrite calls os.Exit(2).
+		// This ensures Claude always receives the additionalContext hints.
+		if context != "" {
+			hook.OutputPreTool("allow", "GTSS: security analysis complete", context)
+		}
+
+		if result.ShouldBlock() {
+			// Block critical vulnerabilities BEFORE they're written
+			hook.BlockWrite(reporter.FormatBlockMessage(result))
+		}
+	} else {
+		// PostToolUse: always provide hints
+		if context != "" {
+			hook.OutputPostTool(context)
+		}
+	}
+}

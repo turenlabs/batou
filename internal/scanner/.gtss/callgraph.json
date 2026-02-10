@@ -1,0 +1,82 @@
+{
+  "nodes": {
+    "Test.java:search": {
+      "id": "Test.java:search",
+      "file_path": "Test.java",
+      "name": "search",
+      "package": "",
+      "start_line": 1,
+      "end_line": 5,
+      "calls": [],
+      "called_by": [
+        "Test.java:search"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "6f996e30646432bc",
+      "last_scan_at": "2026-02-10T15:39:36.911571-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "test.go:HandleFileDownload": {
+      "id": "test.go:HandleFileDownload",
+      "file_path": "test.go",
+      "name": "HandleFileDownload",
+      "package": "safe",
+      "start_line": 14,
+      "end_line": 37,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {},
+      "content_hash": "f7ef246e2f4b380b",
+      "last_scan_at": "2026-02-10T16:16:50.681326-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "test.js:render": {
+      "id": "test.js:render",
+      "file_path": "test.js",
+      "name": "render",
+      "package": "",
+      "start_line": 1,
+      "end_line": 4,
+      "calls": [
+        "test.js:render"
+      ],
+      "called_by": [
+        "test.js:render"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "85257876af4f35de",
+      "last_scan_at": "2026-02-10T16:16:50.070967-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "test.py:run": {
+      "id": "test.py:run",
+      "file_path": "test.py",
+      "name": "run",
+      "package": "",
+      "start_line": 2,
+      "end_line": 5,
+      "calls": [],
+      "called_by": [
+        "test.py:run"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "c96535e21d71e738",
+      "last_scan_at": "2026-02-10T15:39:36.905811-06:00",
+      "language": "python",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/scanner",
+  "session_id": "",
+  "last_updated": "2026-02-10T16:16:50.681327-06:00",
+  "version": 1
+}
