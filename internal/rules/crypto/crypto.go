@@ -128,6 +128,61 @@ var (
 	reRubySrandFixed = regexp.MustCompile(`\bsrand\s*\(\s*\d+\s*\)`)
 )
 
+// GTSS-CRY-012: Hardcoded cryptographic keys
+var (
+	// Go: key-like variable assigned []byte("literal") — [:=]+ handles both = and :=
+	reGoByteStringKey = regexp.MustCompile(`(?i)\b(key|secret)\s*[:=]+\s*\[\]byte\s*\(\s*["']`)
+	// Python: b"literal" or "literal" assigned to key-like variable
+	rePyHardcodedKey = regexp.MustCompile(`(?i)\b(key|secret|aes_key|encryption_key|secret_key|private_key)\s*=\s*(b?["'][^"']{4,}["'])`)
+	// JS/TS: Buffer.from("literal") or string literal assigned to key var
+	reJSBufferFromKey = regexp.MustCompile(`Buffer\.from\s*\(\s*["'][^"']{4,}["']`)
+	reJSHardcodedKey  = regexp.MustCompile(`(?i)\b(key|secret|aes_key|encryption_key|secret_key|private_key)\s*=\s*["'][^"']{4,}["']`)
+	// Java: SecretKeySpec with inline bytes or .getBytes()
+	reJavaSecretKeySpec = regexp.MustCompile(`new\s+SecretKeySpec\s*\(\s*["']`)
+	reJavaGetBytesKey   = regexp.MustCompile(`["'][^"']{4,}["']\s*\.getBytes\s*\(`)
+	// Generic: variable name clearly indicates crypto key, assigned string literal
+	reGenericHardcodedKey = regexp.MustCompile(`(?i)\b(aes_key|encryption_key|secret_key|cipher_key|crypto_key|hmac_key|signing_key)\s*[:=]\s*["'][^"']{4,}["']`)
+	// Context: near crypto operations
+	reCryptoKeyCtx = regexp.MustCompile(`(?i)(encrypt|decrypt|cipher|aes|hmac|sign|SecretKey|crypto|seal|open)`)
+)
+
+// GTSS-CRY-013: Unauthenticated encryption (CBC without HMAC)
+var (
+	reGoCBCEncrypt = regexp.MustCompile(`cipher\.NewCBC(Encrypter|Decrypter)\b`)
+	rePyCBCMode    = regexp.MustCompile(`AES\.MODE_CBC|mode\s*=\s*['"]CBC['"]`)
+	reJavaCBC      = regexp.MustCompile(`Cipher\.getInstance\s*\(\s*["']AES/CBC/`)
+	reJSCBCCipher  = regexp.MustCompile(`create(Cipher|Decipher)iv\s*\(\s*['"]aes-\d+-cbc['"]`)
+	reAuthCheck    = regexp.MustCompile(`(?i)(hmac|mac|tag|gcm|poly1305|authenticate|verify_mac|verify_tag|AEAD|GCM|CCM)`)
+)
+
+// GTSS-CRY-014: Insecure RSA padding (PKCS1v15 for encryption)
+var (
+	reGoRSAPKCS1Encrypt = regexp.MustCompile(`rsa\.EncryptPKCS1v15\b`)
+	reGoRSAPKCS1Decrypt = regexp.MustCompile(`rsa\.DecryptPKCS1v15\b`)
+	// Match RSA/<any-mode>/PKCS1Padding in Java (avoids literal weak-mode keyword)
+	reJavaRSAPKCS1      = regexp.MustCompile(`Cipher\.getInstance\s*\(\s*["']RSA/[^"'/]+/PKCS1Padding["']`)
+	reJavaRSANoPadding  = regexp.MustCompile(`Cipher\.getInstance\s*\(\s*["']RSA["']\s*\)`)
+	rePyPKCS1v15Encrypt = regexp.MustCompile(`PKCS1_v1_5\.new\s*\(`)
+	reJSRSAPKCS1Padding = regexp.MustCompile(`(?i)RSA_PKCS1_PADDING`)
+)
+
+// GTSS-CRY-015: Weak password hashing (MD5/SHA for passwords)
+var (
+	rePasswordCtx        = regexp.MustCompile(`(?i)(password|passwd|pass_hash|pwd|user_pass)`)
+	// Python: hashlib.md5/sha1/sha256 with password nearby
+	rePyHashPassword     = regexp.MustCompile(`hashlib\.(md5|sha1|sha256|sha224)\s*\(`)
+	// Go: md5.Sum or sha256.Sum256 with password nearby
+	reGoHashPassword     = regexp.MustCompile(`(md5\.Sum|sha1\.Sum|sha256\.Sum256|sha256\.New|sha512\.New)\s*\(`)
+	// Java: MessageDigest for password context
+	reJavaDigestPassword = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*["'](MD5|SHA-?1|SHA-?256|SHA-?512)["']`)
+	// JS/TS: createHash for password context
+	reJSHashPassword     = regexp.MustCompile(`crypto\.createHash\s*\(\s*['"](?:md5|sha1|sha256|sha512)['"]`)
+	// PHP: md5($password) or sha1($password)
+	rePHPHashPassword    = regexp.MustCompile(`\b(md5|sha1)\s*\(\s*\$`)
+	// Proper password hashing (suppress if present)
+	reProperPasswordHash = regexp.MustCompile(`(?i)(bcrypt|scrypt|argon2|pbkdf2|password_hash|PBKDF2WithHmacSHA|Rfc2898DeriveBytes)`)
+)
+
 func init() {
 	rules.Register(&WeakHashing{})
 	rules.Register(&InsecureRandom{})
@@ -140,6 +195,10 @@ func init() {
 	rules.Register(&PythonRandomSecurity{})
 	rules.Register(&WeakPRNG{})
 	rules.Register(&PredictableSeed{})
+	rules.Register(&HardcodedKey{})
+	rules.Register(&UnauthenticatedEncryption{})
+	rules.Register(&InsecureRSAPadding{})
+	rules.Register(&WeakPasswordHash{})
 }
 
 // --- GTSS-CRY-001: WeakHashing ---
@@ -1076,6 +1135,332 @@ func (r *PredictableSeed) Scan(ctx *rules.ScanContext) []rules.Finding {
 			Language:      ctx.Language,
 			Confidence:    "high",
 			Tags:          []string{"crypto", "random", "seed"},
+		})
+	}
+
+	return findings
+}
+
+// --- GTSS-CRY-012: HardcodedKey ---
+
+type HardcodedKey struct{}
+
+func (r *HardcodedKey) ID() string                    { return "GTSS-CRY-012" }
+func (r *HardcodedKey) Name() string                  { return "HardcodedKey" }
+func (r *HardcodedKey) DefaultSeverity() rules.Severity { return rules.Critical }
+
+func (r *HardcodedKey) Description() string {
+	return "Detects hardcoded cryptographic keys (AES keys, encryption secrets, signing keys) embedded directly in source code."
+}
+
+func (r *HardcodedKey) Languages() []rules.Language {
+	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript, rules.LangJava, rules.LangAny}
+}
+
+func (r *HardcodedKey) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
+
+		// Skip comments
+		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "*") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+
+		var matched bool
+
+		switch ctx.Language {
+		case rules.LangGo:
+			// key/secret := []byte("literal")
+			if reGoByteStringKey.MatchString(line) {
+				matched = true
+			}
+		case rules.LangPython:
+			if rePyHardcodedKey.MatchString(line) {
+				matched = true
+			}
+		case rules.LangJavaScript, rules.LangTypeScript:
+			if reJSBufferFromKey.MatchString(line) && reCryptoKeyCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+				matched = true
+			} else if reJSHardcodedKey.MatchString(line) {
+				matched = true
+			}
+		case rules.LangJava:
+			if reJavaSecretKeySpec.MatchString(line) || reJavaGetBytesKey.MatchString(line) {
+				if reCryptoKeyCtx.MatchString(line) || reCryptoKeyCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+					matched = true
+				}
+			}
+		}
+
+		// Generic check for all languages: explicitly named crypto key variables
+		if !matched {
+			if reGenericHardcodedKey.MatchString(line) {
+				matched = true
+			}
+		}
+
+		if !matched {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Hardcoded cryptographic key",
+			Description:   "Cryptographic keys embedded in source code can be extracted by anyone with access to the code or binary. Keys should be loaded from secure key management systems, environment variables, or encrypted configuration.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    lineNum,
+			MatchedText:   strings.TrimSpace(line),
+			Suggestion:    "Load keys from environment variables, a secrets manager (Vault, AWS KMS, GCP KMS), or encrypted config files. Never commit keys to source control.",
+			CWEID:         "CWE-321",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+			Language:      ctx.Language,
+			Confidence:    "high",
+			Tags:          []string{"crypto", "hardcoded-key"},
+		})
+	}
+
+	return findings
+}
+
+// --- GTSS-CRY-013: UnauthenticatedEncryption ---
+
+type UnauthenticatedEncryption struct{}
+
+func (r *UnauthenticatedEncryption) ID() string                    { return "GTSS-CRY-013" }
+func (r *UnauthenticatedEncryption) Name() string                  { return "UnauthenticatedEncryption" }
+func (r *UnauthenticatedEncryption) DefaultSeverity() rules.Severity { return rules.High }
+
+func (r *UnauthenticatedEncryption) Description() string {
+	return "Detects use of CBC mode encryption without authentication (HMAC/MAC), which is vulnerable to padding oracle attacks."
+}
+
+func (r *UnauthenticatedEncryption) Languages() []rules.Language {
+	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript, rules.LangJava}
+}
+
+func (r *UnauthenticatedEncryption) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	// Check if any authentication is present in the entire file
+	hasAuth := reAuthCheck.MatchString(ctx.Content)
+
+	for i, line := range lines {
+		lineNum := i + 1
+		var matched string
+
+		switch ctx.Language {
+		case rules.LangGo:
+			if loc := reGoCBCEncrypt.FindString(line); loc != "" {
+				matched = loc
+			}
+		case rules.LangPython:
+			if loc := rePyCBCMode.FindString(line); loc != "" {
+				matched = loc
+			}
+		case rules.LangJava:
+			if loc := reJavaCBC.FindString(line); loc != "" {
+				matched = loc
+			}
+		case rules.LangJavaScript, rules.LangTypeScript:
+			if loc := reJSCBCCipher.FindString(line); loc != "" {
+				matched = loc
+			}
+		}
+
+		if matched == "" {
+			continue
+		}
+
+		// Suppress if authentication is present anywhere in the file
+		if hasAuth {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "CBC mode without authentication (padding oracle risk)",
+			Description:   "CBC mode without a MAC/HMAC is vulnerable to padding oracle attacks (e.g., POODLE, Lucky13). An attacker can decrypt ciphertext by observing padding error responses.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    lineNum,
+			MatchedText:   strings.TrimSpace(line),
+			Suggestion:    "Use AES-GCM or ChaCha20-Poly1305 for authenticated encryption. If CBC is required, always apply HMAC-SHA256 to the ciphertext (encrypt-then-MAC).",
+			CWEID:         "CWE-347",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+			Language:      ctx.Language,
+			Confidence:    "high",
+			Tags:          []string{"crypto", "cbc", "padding-oracle"},
+		})
+	}
+
+	return findings
+}
+
+// --- GTSS-CRY-014: InsecureRSAPadding ---
+
+type InsecureRSAPadding struct{}
+
+func (r *InsecureRSAPadding) ID() string                    { return "GTSS-CRY-014" }
+func (r *InsecureRSAPadding) Name() string                  { return "InsecureRSAPadding" }
+func (r *InsecureRSAPadding) DefaultSeverity() rules.Severity { return rules.High }
+
+func (r *InsecureRSAPadding) Description() string {
+	return "Detects use of PKCS#1 v1.5 padding for RSA encryption, which is vulnerable to Bleichenbacher's attack and padding oracle attacks."
+}
+
+func (r *InsecureRSAPadding) Languages() []rules.Language {
+	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript, rules.LangJava}
+}
+
+func (r *InsecureRSAPadding) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		lineNum := i + 1
+		var matched string
+		var detail string
+
+		switch ctx.Language {
+		case rules.LangGo:
+			if loc := reGoRSAPKCS1Encrypt.FindString(line); loc != "" {
+				matched = loc
+				detail = "rsa.EncryptPKCS1v15"
+			} else if loc := reGoRSAPKCS1Decrypt.FindString(line); loc != "" {
+				matched = loc
+				detail = "rsa.DecryptPKCS1v15"
+			}
+		case rules.LangJava:
+			if loc := reJavaRSAPKCS1.FindString(line); loc != "" {
+				matched = loc
+				detail = "RSA/PKCS1Padding"
+			} else if loc := reJavaRSANoPadding.FindString(line); loc != "" {
+				matched = loc
+				detail = "RSA with no explicit mode (defaults to insecure padding)"
+			}
+		case rules.LangPython:
+			if loc := rePyPKCS1v15Encrypt.FindString(line); loc != "" {
+				matched = loc
+				detail = "PKCS1_v1_5"
+			}
+		case rules.LangJavaScript, rules.LangTypeScript:
+			if loc := reJSRSAPKCS1Padding.FindString(line); loc != "" {
+				matched = loc
+				detail = "RSA_PKCS1_PADDING"
+			}
+		}
+
+		if matched == "" {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Insecure RSA padding: " + detail,
+			Description:   "PKCS#1 v1.5 padding for RSA encryption is vulnerable to Bleichenbacher's chosen-ciphertext attack. An attacker can decrypt messages or forge signatures by making adaptive queries.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    lineNum,
+			MatchedText:   strings.TrimSpace(line),
+			Suggestion:    "Use RSA-OAEP (Optimal Asymmetric Encryption Padding) for encryption. For signatures, use PSS padding instead of PKCS1v15.",
+			CWEID:         "CWE-780",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+			Language:      ctx.Language,
+			Confidence:    "high",
+			Tags:          []string{"crypto", "rsa", "padding"},
+		})
+	}
+
+	return findings
+}
+
+// --- GTSS-CRY-015: WeakPasswordHash ---
+
+type WeakPasswordHash struct{}
+
+func (r *WeakPasswordHash) ID() string                    { return "GTSS-CRY-015" }
+func (r *WeakPasswordHash) Name() string                  { return "WeakPasswordHash" }
+func (r *WeakPasswordHash) DefaultSeverity() rules.Severity { return rules.Critical }
+
+func (r *WeakPasswordHash) Description() string {
+	return "Detects use of fast hash functions (MD5, SHA-1, SHA-256) for password storage instead of purpose-built password hashing algorithms (bcrypt, scrypt, Argon2)."
+}
+
+func (r *WeakPasswordHash) Languages() []rules.Language {
+	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript, rules.LangJava, rules.LangPHP}
+}
+
+func (r *WeakPasswordHash) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+
+	// If proper password hashing is used in the file, suppress
+	if reProperPasswordHash.MatchString(ctx.Content) {
+		return nil
+	}
+
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		lineNum := i + 1
+		var matched string
+
+		// Only flag if password context exists on the line or nearby
+		hasPasswordCtx := rePasswordCtx.MatchString(line) || rePasswordCtx.MatchString(safeSurroundingLines(lines, i, 3))
+		if !hasPasswordCtx {
+			continue
+		}
+
+		switch ctx.Language {
+		case rules.LangPython:
+			if loc := rePyHashPassword.FindString(line); loc != "" {
+				matched = loc
+			}
+		case rules.LangGo:
+			if loc := reGoHashPassword.FindString(line); loc != "" {
+				matched = loc
+			}
+		case rules.LangJava:
+			if loc := reJavaDigestPassword.FindString(line); loc != "" {
+				matched = loc
+			}
+		case rules.LangJavaScript, rules.LangTypeScript:
+			if loc := reJSHashPassword.FindString(line); loc != "" {
+				matched = loc
+			}
+		case rules.LangPHP:
+			if loc := rePHPHashPassword.FindString(line); loc != "" {
+				matched = loc
+			}
+		}
+
+		if matched == "" {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Fast hash used for password storage",
+			Description:   "Fast hash functions (MD5, SHA-1, SHA-256) can be brute-forced at billions of attempts per second using GPUs. Password storage requires slow, salted, memory-hard algorithms.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    lineNum,
+			MatchedText:   strings.TrimSpace(line),
+			Suggestion:    "Use bcrypt, scrypt, or Argon2id for password hashing. These algorithms are intentionally slow and resistant to GPU/ASIC attacks.",
+			CWEID:         "CWE-916",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+			Language:      ctx.Language,
+			Confidence:    "high",
+			Tags:          []string{"crypto", "password", "hashing"},
 		})
 	}
 

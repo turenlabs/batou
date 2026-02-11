@@ -286,6 +286,218 @@ func TestCRY011_CSeedTime(t *testing.T) {
 	testutil.MustFindRule(t, result, "GTSS-CRY-011")
 }
 
+// --- GTSS-CRY-012: Hardcoded Cryptographic Keys ---
+
+func TestCRY012_GoHardcodedKey(t *testing.T) {
+	content := `package main
+import "crypto/aes"
+func encrypt(data []byte) {
+	key := []byte("mysecretkey12345")
+	block, _ := aes.NewCipher(key)
+	_ = block
+}`
+	result := testutil.ScanContent(t, "/app/crypto.go", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-012")
+}
+
+func TestCRY012_PythonHardcodedKey(t *testing.T) {
+	content := `from Crypto.Cipher import AES
+secret_key = b"hardcoded_secret"
+cipher = AES.new(secret_key, AES.MODE_GCM)`
+	result := testutil.ScanContent(t, "/app/crypto.py", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-012")
+}
+
+func TestCRY012_JSBufferFromKey(t *testing.T) {
+	content := `const crypto = require('crypto');
+const key = Buffer.from("my-secret-key-16");
+const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);`
+	result := testutil.ScanContent(t, "/app/crypto.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-012")
+}
+
+func TestCRY012_JavaSecretKeySpec(t *testing.T) {
+	content := `import javax.crypto.spec.SecretKeySpec;
+SecretKeySpec keySpec = new SecretKeySpec("mysecretkey12345".getBytes(), "AES");`
+	result := testutil.ScanContent(t, "/app/Crypto.java", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-012")
+}
+
+func TestCRY012_GenericCryptoKey(t *testing.T) {
+	content := `encryption_key = "super_secret_value_here"`
+	result := testutil.ScanContent(t, "/app/config.py", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-012")
+}
+
+func TestCRY012_Safe_EnvVar(t *testing.T) {
+	content := `import os
+encryption_key = os.environ.get("ENCRYPTION_KEY")`
+	result := testutil.ScanContent(t, "/app/config.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CRY-012")
+}
+
+// --- GTSS-CRY-013: Unauthenticated Encryption ---
+
+func TestCRY013_GoCBCWithoutHMAC(t *testing.T) {
+	content := `package main
+import "crypto/cipher"
+func encrypt(block cipher.Block, iv, plaintext []byte) []byte {
+	mode := cipher.NewCBCEncrypter(block, iv)
+	ciphertext := make([]byte, len(plaintext))
+	mode.CryptBlocks(ciphertext, plaintext)
+	return ciphertext
+}`
+	result := testutil.ScanContent(t, "/app/crypto.go", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-013")
+}
+
+func TestCRY013_PythonCBCWithoutHMAC(t *testing.T) {
+	content := `from Crypto.Cipher import AES
+cipher = AES.new(key, AES.MODE_CBC, iv)
+ciphertext = cipher.encrypt(pad(data, AES.block_size))`
+	result := testutil.ScanContent(t, "/app/crypto.py", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-013")
+}
+
+func TestCRY013_JavaCBCWithoutHMAC(t *testing.T) {
+	content := `import javax.crypto.Cipher;
+Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);`
+	result := testutil.ScanContent(t, "/app/Crypto.java", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-013")
+}
+
+func TestCRY013_JSCBCWithoutHMAC(t *testing.T) {
+	content := `const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+let encrypted = cipher.update(data, 'utf8', 'hex');`
+	result := testutil.ScanContent(t, "/app/crypto.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-013")
+}
+
+func TestCRY013_Safe_CBCWithHMAC(t *testing.T) {
+	content := `package main
+import "crypto/cipher"
+import "crypto/hmac"
+func encryptAndMAC(block cipher.Block, iv, plaintext, macKey []byte) []byte {
+	mode := cipher.NewCBCEncrypter(block, iv)
+	ciphertext := make([]byte, len(plaintext))
+	mode.CryptBlocks(ciphertext, plaintext)
+	mac := hmac.New(sha256.New, macKey)
+	mac.Write(ciphertext)
+	return append(ciphertext, mac.Sum(nil)...)
+}`
+	result := testutil.ScanContent(t, "/app/crypto.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CRY-013")
+}
+
+// --- GTSS-CRY-014: Insecure RSA Padding ---
+
+func TestCRY014_GoRSAPKCS1v15Encrypt(t *testing.T) {
+	content := `ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, &pub, plaintext)`
+	result := testutil.ScanContent(t, "/app/crypto.go", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-014")
+}
+
+func TestCRY014_GoRSAPKCS1v15Decrypt(t *testing.T) {
+	content := `plaintext, err := rsa.DecryptPKCS1v15(rand.Reader, priv, ciphertext)`
+	result := testutil.ScanContent(t, "/app/crypto.go", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-014")
+}
+
+func TestCRY014_JavaRSAPKCS1(t *testing.T) {
+	content := `Cipher cipher = Cipher.getInstance("RSA/NONE/PKCS1Padding");`
+	result := testutil.ScanContent(t, "/app/Crypto.java", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-014")
+}
+
+func TestCRY014_JavaRSABare(t *testing.T) {
+	content := `Cipher cipher = Cipher.getInstance("RSA");`
+	result := testutil.ScanContent(t, "/app/Crypto.java", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-014")
+}
+
+func TestCRY014_PythonPKCS1v15(t *testing.T) {
+	content := `from Crypto.Cipher import PKCS1_v1_5
+cipher = PKCS1_v1_5.new(key)`
+	result := testutil.ScanContent(t, "/app/crypto.py", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-014")
+}
+
+func TestCRY014_Safe_OAEP(t *testing.T) {
+	content := `ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, &pub, plaintext, nil)`
+	result := testutil.ScanContent(t, "/app/crypto.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CRY-014")
+}
+
+// --- GTSS-CRY-015: Weak Password Hashing ---
+
+func TestCRY015_PythonMD5Password(t *testing.T) {
+	content := `import hashlib
+def hash_password(password):
+    return hashlib.md5(password.encode()).hexdigest()`
+	result := testutil.ScanContent(t, "/app/auth.py", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+}
+
+func TestCRY015_PythonSHA256Password(t *testing.T) {
+	content := `import hashlib
+def store_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()`
+	result := testutil.ScanContent(t, "/app/auth.py", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+}
+
+func TestCRY015_GoMD5Password(t *testing.T) {
+	content := `func hashPassword(password string) string {
+	hash := md5.Sum([]byte(password))
+	return hex.EncodeToString(hash[:])
+}`
+	result := testutil.ScanContent(t, "/app/auth.go", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+}
+
+func TestCRY015_JSHashPassword(t *testing.T) {
+	content := `function hashPassword(password) {
+	return crypto.createHash('sha256').update(password).digest('hex');
+}`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+}
+
+func TestCRY015_PHPMd5Password(t *testing.T) {
+	content := `<?php
+$hashed = md5($password);`
+	result := testutil.ScanContent(t, "/app/auth.php", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+}
+
+func TestCRY015_JavaDigestPassword(t *testing.T) {
+	content := `public String hashPassword(String password) {
+	MessageDigest md = MessageDigest.getInstance("SHA-256");
+	byte[] hash = md.digest(password.getBytes());
+	return hex(hash);
+}`
+	result := testutil.ScanContent(t, "/app/Auth.java", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+}
+
+func TestCRY015_Safe_Bcrypt(t *testing.T) {
+	content := `import hashlib
+import bcrypt
+def hash_password(password):
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt())`
+	result := testutil.ScanContent(t, "/app/auth.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CRY-015")
+}
+
+func TestCRY015_Safe_NoPasswordContext(t *testing.T) {
+	content := `import hashlib
+def checksum(data):
+    return hashlib.sha256(data.encode()).hexdigest()`
+	result := testutil.ScanContent(t, "/app/util.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CRY-015")
+}
+
 // --- Safe fixture tests ---
 
 func TestCRY_Safe_Go(t *testing.T) {
