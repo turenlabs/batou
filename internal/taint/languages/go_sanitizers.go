@@ -35,15 +35,6 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Description: "URL path segment escaping",
 		},
 		{
-			ID:          "go.filepath.clean",
-			Language:    rules.LangGo,
-			Pattern:     `filepath\.Clean\(`,
-			ObjectType:  "",
-			MethodName:  "Clean",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
-			Description: "File path cleaning (removes ../ etc.)",
-		},
-		{
 			ID:          "go.filepath.base",
 			Language:    rules.LangGo,
 			Pattern:     `filepath\.Base\(`,
@@ -69,18 +60,6 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			MethodName:  "ParseInt",
 			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
 			Description: "Integer parsing (restricts to numeric values)",
-		},
-		{
-			ID:       "go.regexp.matchstring",
-			Language: rules.LangGo,
-			Pattern:  `regexp\.MatchString\(`,
-			ObjectType: "",
-			MethodName:  "MatchString",
-			Neutralizes: []taint.SinkCategory{
-				taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite,
-				taint.SnkHTMLOutput, taint.SnkRedirect,
-			},
-			Description: "Regex validation (effectiveness depends on pattern)",
 		},
 		{
 			ID:          "go.prepared.stmt",
@@ -152,17 +131,6 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			MethodName:  "ReplaceAll (newline strip)",
 			Neutralizes: []taint.SinkCategory{taint.SnkHeader},
 			Description: "Stripping newlines prevents header injection in SMTP/HTTP",
-		},
-
-		// --- URL parsing for SSRF validation ---
-		{
-			ID:          "go.net.url.parse",
-			Language:    rules.LangGo,
-			Pattern:     `url\.Parse\(`,
-			ObjectType:  "",
-			MethodName:  "Parse",
-			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
-			Description: "URL parsing enables host/scheme validation for SSRF prevention",
 		},
 
 		// --- regexp QuoteMeta for ReDoS ---

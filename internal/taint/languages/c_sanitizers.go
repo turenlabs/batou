@@ -199,15 +199,6 @@ func (c *CCatalog) Sanitizers() []taint.SanitizerDef {
 
 		// --- Path validation ---
 		{
-			ID:          "c.path.realpath",
-			Language:    rules.LangC,
-			Pattern:     `\brealpath\s*\(`,
-			ObjectType:  "",
-			MethodName:  "realpath",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
-			Description: "Canonical path resolution (prevents path traversal)",
-		},
-		{
 			ID:          "c.path.basename",
 			Language:    rules.LangC,
 			Pattern:     `\bbasename\s*\(`,

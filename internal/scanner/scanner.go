@@ -1,12 +1,14 @@
 package scanner
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/turen/gtss/internal/analyzer"
+	"github.com/turen/gtss/internal/fpfilter"
 	"github.com/turen/gtss/internal/graph"
 	"github.com/turen/gtss/internal/hints"
 	"github.com/turen/gtss/internal/hook"
@@ -46,17 +48,36 @@ func Scan(input *hook.Input) *reporter.ScanResult {
 		return result
 	}
 
-	// Run the scan with a timeout to prevent hanging on malicious/huge input.
+	// Skip generated / vendored files — they are not authored by the user
+	// and produce noise.
+	if fpfilter.IsGeneratedFile(filePath, content) {
+		result.ScanTimeMs = time.Since(start).Milliseconds()
+		return result
+	}
+
+	// Run the scan with a context-based timeout to prevent hanging on
+	// malicious/huge input. The goroutine writes to its own coreResult so
+	// that on timeout we never read a concurrently-mutated struct (no data
+	// race). The context is threaded into scanCore so the goroutine can
+	// exit early on cancellation instead of leaking.
+	ctx, cancel := context.WithTimeout(context.Background(), scanTimeout)
+	defer cancel()
+
+	coreResult := &reporter.ScanResult{
+		FilePath: filePath,
+		Language: lang,
+		Event:    input.HookEventName,
+	}
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		scanCore(input, content, filePath, lang, start, result)
+		scanCore(ctx, input, content, filePath, lang, start, coreResult)
 	}()
 
 	select {
 	case <-done:
-		// Normal completion
-	case <-time.After(scanTimeout):
+		return coreResult
+	case <-ctx.Done():
 		result.ScanTimeMs = time.Since(start).Milliseconds()
 		result.Findings = append(result.Findings, rules.Finding{
 			RuleID:        "GTSS-TIMEOUT",
@@ -68,23 +89,24 @@ func Scan(input *hook.Input) *reporter.ScanResult {
 			Confidence:    "low",
 			Tags:          []string{"timeout", "performance"},
 		})
+		return result
 	}
-
-	return result
 }
 
-// scanCore performs the actual scan work. It is run in a goroutine with a timeout.
-func scanCore(input *hook.Input, content, filePath string, lang rules.Language, start time.Time, result *reporter.ScanResult) {
+// scanCore performs the actual scan work. It is run in a goroutine with a
+// context-based timeout. The context is checked between phases so the
+// goroutine can exit early on cancellation instead of leaking.
+func scanCore(ctx context.Context, input *hook.Input, content, filePath string, lang rules.Language, start time.Time, result *reporter.ScanResult) {
 	// Build scan context
-	ctx := &rules.ScanContext{
+	sctx := &rules.ScanContext{
 		FilePath: filePath,
 		Content:  content,
 		Language: lang,
 		IsNew:    input.IsWriteOperation(),
 	}
 	if input.IsEditOperation() {
-		ctx.OldText = input.ToolInput.OldString
-		ctx.NewText = input.ToolInput.NewString
+		sctx.OldText = input.ToolInput.OldString
+		sctx.NewText = input.ToolInput.NewString
 	}
 
 	// Phase 1: Run all registered rules concurrently (regex + taint)
@@ -98,17 +120,20 @@ func scanCore(input *hook.Input, content, filePath string, lang rules.Language, 
 	)
 
 	for _, r := range applicable {
+		if ctx.Err() != nil {
+			break
+		}
 		wg.Add(1)
 		go func(rule rules.Rule) {
 			defer wg.Done()
 			defer func() {
-				if r := recover(); r != nil {
+				if rec := recover(); rec != nil {
 					// A rule panicked — don't crash the whole scan.
 					mu.Lock()
 					findings = append(findings, rules.Finding{
 						RuleID:      "GTSS-PANIC",
 						Severity:    rules.Medium,
-						Title:       fmt.Sprintf("Rule %s panicked: %v", rule.ID(), r),
+						Title:       fmt.Sprintf("Rule %s panicked: %v", rule.ID(), rec),
 						Description: "A scan rule panicked during analysis. This finding is informational and indicates a bug in the rule implementation.",
 						FilePath:    filePath,
 						Confidence:  "low",
@@ -117,7 +142,7 @@ func scanCore(input *hook.Input, content, filePath string, lang rules.Language, 
 					mu.Unlock()
 				}
 			}()
-			founds := rule.Scan(ctx)
+			founds := rule.Scan(sctx)
 			if len(founds) > 0 {
 				mu.Lock()
 				findings = append(findings, founds...)
@@ -126,6 +151,13 @@ func scanCore(input *hook.Input, content, filePath string, lang rules.Language, 
 		}(r)
 	}
 	wg.Wait()
+
+	// Exit early if the context was cancelled (timeout).
+	if ctx.Err() != nil {
+		result.Findings = findings
+		result.ScanTimeMs = time.Since(start).Milliseconds()
+		return
+	}
 
 	// Phase 2: Call graph update and interprocedural analysis
 	var callGraph *graph.CallGraph
@@ -164,6 +196,18 @@ func scanCore(input *hook.Input, content, filePath string, lang rules.Language, 
 		graph.SaveGraph(callGraph)
 	}
 
+	// Reduce severity for findings in test / fixture files.
+	// Test code intentionally contains vulnerable patterns so we downgrade
+	// rather than suppress entirely — the hints are still useful.
+	if fpfilter.IsTestFile(filePath) {
+		for i := range findings {
+			if findings[i].Severity > rules.Low {
+				findings[i].Severity = rules.Low
+			}
+			findings[i].Tags = appendUnique(findings[i].Tags, "test-file")
+		}
+	}
+
 	// Populate severity labels and file paths
 	for i := range findings {
 		findings[i].SeverityLabel = findings[i].Severity.String()
@@ -177,6 +221,13 @@ func scanCore(input *hook.Input, content, filePath string, lang rules.Language, 
 
 	result.Findings = findings
 	result.ScanTimeMs = time.Since(start).Milliseconds()
+
+	// Exit early if the context was cancelled (timeout).
+	if ctx.Err() != nil {
+		result.Findings = findings
+		result.ScanTimeMs = time.Since(start).Milliseconds()
+		return
+	}
 
 	// Phase 3: Generate hints (always — even for clean code)
 	// Run taint analysis to get raw TaintFlow structs for rich hint output.
@@ -219,4 +270,14 @@ func lastIndexByte(s string, c byte) int {
 		}
 	}
 	return -1
+}
+
+// appendUnique appends tag to tags only if it is not already present.
+func appendUnique(tags []string, tag string) []string {
+	for _, t := range tags {
+		if t == tag {
+			return tags
+		}
+	}
+	return append(tags, tag)
 }

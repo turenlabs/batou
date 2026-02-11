@@ -22,8 +22,7 @@ func (phpCatalog) Sanitizers() []taint.SanitizerDef {
 
 		// Path sanitization
 		{ID: "php.basename", Language: rules.LangPHP, Pattern: `\bbasename\s*\(`, MethodName: "basename", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Basename extraction"},
-		{ID: "php.realpath", Language: rules.LangPHP, Pattern: `\brealpath\s*\(`, MethodName: "realpath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Canonical path resolution"},
-
+	
 		// SQL escaping
 		{ID: "php.mysqli_real_escape_string", Language: rules.LangPHP, Pattern: `\bmysqli_real_escape_string\s*\(`, MethodName: "mysqli_real_escape_string", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery}, Description: "MySQL string escaping"},
 		{ID: "php.pdo.quote", Language: rules.LangPHP, Pattern: `->quote\s*\(`, ObjectType: "PDO", MethodName: "quote", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery}, Description: "PDO string quoting"},
@@ -67,6 +66,5 @@ func (phpCatalog) Sanitizers() []taint.SanitizerDef {
 		// Infrastructure / Network Sanitizers
 		{ID: "php.filter_var.validate_url", Language: rules.LangPHP, Pattern: `filter_var\s*\(.*FILTER_VALIDATE_URL`, MethodName: "filter_var(FILTER_VALIDATE_URL)", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect}, Description: "URL validation via filter_var FILTER_VALIDATE_URL"},
 		{ID: "php.filter_var.validate_ip", Language: rules.LangPHP, Pattern: `filter_var\s*\(.*FILTER_VALIDATE_IP`, MethodName: "filter_var(FILTER_VALIDATE_IP)", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch}, Description: "IP address validation via filter_var FILTER_VALIDATE_IP (SSRF prevention)"},
-		{ID: "php.parse_url.host", Language: rules.LangPHP, Pattern: `parse_url\s*\(`, MethodName: "parse_url", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect}, Description: "URL parsing for hostname extraction and domain allowlist validation"},
-	}
+		}
 }

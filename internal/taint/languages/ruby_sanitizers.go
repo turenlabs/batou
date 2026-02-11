@@ -62,6 +62,5 @@ func (rubyCatalog) Sanitizers() []taint.SanitizerDef {
 		// Infrastructure / Network Sanitizers
 		{ID: "ruby.ipaddr.validate", Language: rules.LangRuby, Pattern: `IPAddr\.new\s*\(|\.include\?\s*\(`, ObjectType: "IPAddr", MethodName: "IPAddr.new/include?", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch}, Description: "IP address parsing and CIDR range validation (SSRF prevention)"},
 		{ID: "ruby.uri.parse.host", Language: rules.LangRuby, Pattern: `URI\.parse\s*\(.*\.host`, ObjectType: "URI", MethodName: "URI.parse.host", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect}, Description: "URL hostname extraction for domain allowlist validation"},
-		{ID: "ruby.addressable.uri", Language: rules.LangRuby, Pattern: `Addressable::URI\.parse\s*\(`, ObjectType: "Addressable::URI", MethodName: "parse", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect}, Description: "Addressable URL parsing for validation (SSRF prevention)"},
-	}
+		}
 }

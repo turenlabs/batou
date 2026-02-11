@@ -53,15 +53,6 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			Description: "Extract base filename (strips directory traversal)",
 		},
 		{
-			ID:          "py.os.path.abspath",
-			Language:    rules.LangPython,
-			Pattern:     `os\.path\.abspath\(`,
-			ObjectType:  "",
-			MethodName:  "os.path.abspath",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
-			Description: "Resolve to absolute path (normalize traversal)",
-		},
-		{
 			ID:          "py.parameterized",
 			Language:    rules.LangPython,
 			Pattern:     `%s.*\(.*,`,
@@ -259,15 +250,6 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			MethodName:  "ip_address/ip_network",
 			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch},
 			Description: "IP address validation and parsing (SSRF prevention)",
-		},
-		{
-			ID:          "py.urllib.parse.urlparse",
-			Language:    rules.LangPython,
-			Pattern:     `urllib\.parse\.urlparse\(|urlparse\(`,
-			ObjectType:  "urllib.parse",
-			MethodName:  "urlparse",
-			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
-			Description: "URL parsing for hostname/scheme validation (SSRF prevention)",
 		},
 		{
 			ID:          "py.validators.url",

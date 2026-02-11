@@ -21,7 +21,6 @@ func (javaCatalog) Sanitizers() []taint.SanitizerDef {
 		{ID: "java.long.parselong", Language: rules.LangJava, Pattern: `Long\.parseLong\s*\(`, ObjectType: "Long", MethodName: "parseLong", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand}, Description: "Long parsing (type coercion)"},
 
 		// Path traversal
-		{ID: "java.paths.normalize", Language: rules.LangJava, Pattern: `Paths\.get\s*\([^)]*\)\s*\.normalize\s*\(`, ObjectType: "Path", MethodName: "normalize", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Path normalization"},
 		{ID: "java.filenameutils.getname", Language: rules.LangJava, Pattern: `FilenameUtils\.getName\s*\(`, ObjectType: "FilenameUtils", MethodName: "getName", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Filename extraction via FilenameUtils"},
 
 		// URL encoding
@@ -43,9 +42,6 @@ func (javaCatalog) Sanitizers() []taint.SanitizerDef {
 
 		// JNDI/LDAP sanitization
 		{ID: "java.esapi.encodeforldap", Language: rules.LangJava, Pattern: `ESAPI\.encoder\s*\(\s*\)\s*\.encodeForLDAP\s*\(`, ObjectType: "ESAPI", MethodName: "encodeForLDAP", Neutralizes: []taint.SinkCategory{taint.SnkLDAP}, Description: "ESAPI LDAP encoding"},
-
-		// Path canonicalization
-		{ID: "java.file.getcanonicalpath", Language: rules.LangJava, Pattern: `\.getCanonicalPath\s*\(`, ObjectType: "File", MethodName: "getCanonicalPath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "File canonical path resolution (prevents traversal)"},
 
 		// Spring Security CSRF token validation
 		{ID: "java.spring.csrf.token", Language: rules.LangJava, Pattern: `CsrfToken`, ObjectType: "CsrfToken", MethodName: "CsrfToken", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkSQLQuery}, Description: "Spring Security CSRF token validation"},

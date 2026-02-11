@@ -39,7 +39,6 @@ func (cppCatalog) Sanitizers() []taint.SanitizerDef {
 
 		// ── Input validation / type coercion ──────────────────────────
 		{ID: "cpp.stoi", Language: rules.LangCPP, Pattern: `std::sto[ilfdu]\s*\(`, ObjectType: "std", MethodName: "stoi/stol/stof/stod", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand}, Description: "String to numeric conversion (type coercion/validation)"},
-		{ID: "cpp.regex.match", Language: rules.LangCPP, Pattern: `std::regex_match\s*\(|std::regex_search\s*\(`, ObjectType: "std", MethodName: "regex_match/regex_search", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput}, Description: "Regex validation of input"},
 
 		// ── SQL parameterization ──────────────────────────────────────
 		{ID: "cpp.sqlite3.bind", Language: rules.LangCPP, Pattern: `sqlite3_bind_(?:text|int|double|blob|int64)\s*\(`, ObjectType: "sqlite3", MethodName: "sqlite3_bind_*", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery}, Description: "SQLite parameterized query binding"},
@@ -51,10 +50,6 @@ func (cppCatalog) Sanitizers() []taint.SanitizerDef {
 		{ID: "cpp.crow.mustache", Language: rules.LangCPP, Pattern: `crow::mustache::`, ObjectType: "crow::mustache", MethodName: "mustache", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "Crow Mustache template engine (auto-escapes by default)"},
 
 		// ── Path sanitization ─────────────────────────────────────────
-		{ID: "cpp.filesystem.canonical", Language: rules.LangCPP, Pattern: `std::filesystem::canonical\s*\(`, ObjectType: "std::filesystem", MethodName: "canonical", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Filesystem canonical path resolution (prevents traversal)"},
-		{ID: "cpp.filesystem.weakly_canonical", Language: rules.LangCPP, Pattern: `std::filesystem::weakly_canonical\s*\(`, ObjectType: "std::filesystem", MethodName: "weakly_canonical", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Filesystem weakly canonical path resolution"},
-		{ID: "cpp.boost.filesystem.canonical", Language: rules.LangCPP, Pattern: `boost::filesystem::canonical\s*\(`, ObjectType: "boost::filesystem", MethodName: "canonical", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Boost.Filesystem canonical path resolution"},
-		{ID: "cpp.realpath", Language: rules.LangCPP, Pattern: `\brealpath\s*\(`, ObjectType: "", MethodName: "realpath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "POSIX realpath resolves symlinks and relative paths"},
 		{ID: "cpp.basename", Language: rules.LangCPP, Pattern: `\bbasename\s*\(`, ObjectType: "", MethodName: "basename", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Strip directory component from path (prevents traversal)"},
 
 		// ── Crypto sanitizers ─────────────────────────────────────────

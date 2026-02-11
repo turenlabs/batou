@@ -169,7 +169,7 @@ func TestAnalyzeFlowConnectivity(t *testing.T) {
 func TestSanitizerBreaksFlow(t *testing.T) {
 	code := `func handler(w http.ResponseWriter, r *http.Request) {
 	userPath := r.FormValue("path")
-	cleanPath := filepath.Clean(userPath)
+	cleanPath := filepath.Base(userPath)
 	f, err := os.Open(cleanPath)
 	_ = f
 	_ = err
