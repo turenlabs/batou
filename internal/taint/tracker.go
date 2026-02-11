@@ -8,6 +8,11 @@ import (
 	"github.com/turen/gtss/internal/rules"
 )
 
+// unknownFunctionDecay is the confidence multiplier applied when taint
+// propagates through an unknown (non-sanitizer) function call. Slightly
+// below 1.0 because the function might sanitize the data.
+const unknownFunctionDecay = 0.8
+
 // reJavaCSharpTypedDecl matches Java/C# typed declarations: Type varName = expr;
 // Compiled once at package level to avoid re-compiling on every parseAssignment call.
 var reJavaCSharpTypedDecl = regexp.MustCompile(`^\s*(?:final\s+)?([A-Z][\w<>,.\s]*?)\s+([a-zA-Z_][\w]*)\s*=\s*(.+?);\s*$`)
@@ -103,13 +108,13 @@ func TrackTaint(
 						// a known sanitizer, propagate with reduced confidence.
 						if isFunctionCall(rhs) && !isKnownSanitizer(rhs, sanitizers) {
 							propagates = true
-							propConf = 0.8
+							propConf = unknownFunctionDecay
 						}
 					} else if !ruleMatched && isFunctionCall(rhs) && !isKnownSanitizer(rhs, sanitizers) {
 						// No propagation rule matched but default fallthrough
 						// returned (true, 1.0). For unknown function calls,
 						// reduce confidence since the function might sanitize.
-						propConf = 0.8
+						propConf = unknownFunctionDecay
 					}
 					if !propagates {
 						continue
@@ -172,6 +177,13 @@ func TrackTaint(
 		if snks, ok := sinkByLine[absLine]; ok {
 			for _, sink := range snks {
 				foundForSink := false
+
+				// Skip SQL injection flows for parameterized queries.
+				// Parameterized queries use bind parameters ($1, ?, :name, %s)
+				// instead of string interpolation, making them safe from SQLi.
+				if sink.Def.Category == SnkSQLQuery && isParameterizedQuery(line, sink.ArgExprs) {
+					continue
+				}
 
 				// Determine which args to check based on DangerousArgs.
 				dangerousArgs := filterDangerousArgs(sink.ArgExprs, sink.Def.DangerousArgs)
@@ -545,6 +557,71 @@ type assignRecord struct {
 	line    int    // Line where the assignment occurred
 	rhs     string // The RHS expression
 }
+
+// --- Parameterized Query Detection ---
+
+// parameterizedPlaceholderRe matches SQL parameterized query placeholders:
+//   - $1, $2, etc. (PostgreSQL positional)
+//   - ? as a placeholder (MySQL, Go database/sql, JDBC)
+//   - :name named parameters (Oracle, SQLAlchemy)
+//   - %s with separate args (Python DB-API)
+var parameterizedPlaceholderRe = regexp.MustCompile(
+	`\$\d+` + // $1, $2 (PostgreSQL)
+		`|(?:^|[^\\])\?` + // ? placeholder (MySQL, Go, JDBC)  - not preceded by backslash
+		`|:\w+` + // :name (Oracle, SQLAlchemy named params)
+		`|%s`, // %s (Python DB-API)
+)
+
+// knexBuilderRe matches Knex-style query builder method chains that are
+// inherently parameterized: .where('col', val) or .where({key: val}).
+var knexBuilderRe = regexp.MustCompile(
+	`\.where\s*\(\s*['"]` + // .where('column', ...
+		`|\.where\s*\(\s*\{` + // .where({key: val})
+		`|\.andWhere\s*\(` + // .andWhere(...)
+		`|\.orWhere\s*\(`, // .orWhere(...)
+)
+
+// isParameterizedQuery checks whether a SQL sink call uses parameterized
+// queries (bind parameters) instead of string interpolation. This is used
+// to suppress false positives: parameterized queries are safe from SQL
+// injection even when tainted data flows to the call.
+//
+// It checks two signals:
+// 1. The first argument (query string) contains placeholders ($1, ?, :name, %s)
+// 2. The call has multiple arguments (query string + bind parameters)
+// 3. The line uses a query builder pattern (Knex .where('col', val))
+func isParameterizedQuery(sinkLine string, allArgs []string) bool {
+	// Check for Knex-style query builders on the sink line.
+	if knexBuilderRe.MatchString(sinkLine) {
+		return true
+	}
+
+	// If the first argument (query string) contains placeholders, it's parameterized.
+	if len(allArgs) > 0 && parameterizedPlaceholderRe.MatchString(allArgs[0]) {
+		return true
+	}
+
+	// If there are multiple arguments AND the first looks like a SQL string,
+	// the extra arguments are likely bind parameters.
+	if len(allArgs) >= 2 {
+		first := strings.TrimSpace(allArgs[0])
+		if (strings.HasPrefix(first, `"`) || strings.HasPrefix(first, "'") || strings.HasPrefix(first, "`")) &&
+			sqlKeywordRe.MatchString(first) {
+			return true
+		}
+	}
+
+	// Check the entire sink line for placeholders (handles multi-line calls
+	// where the query string might be on a previous line).
+	if parameterizedPlaceholderRe.MatchString(sinkLine) {
+		return true
+	}
+
+	return false
+}
+
+// sqlKeywordRe matches common SQL statement keywords.
+var sqlKeywordRe = regexp.MustCompile(`(?i)\b(?:SELECT|INSERT|UPDATE|DELETE|MERGE)\b`)
 
 // filterDangerousArgs returns only the argument expressions at the indices
 // specified by dangerousArgs. If dangerousArgs contains -1, all args are

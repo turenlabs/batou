@@ -176,11 +176,15 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
 			if loc := jsFileOpUserInput.FindString(line); loc != "" {
-				matched = loc
+				if !hasTraversalGuard(lines, i) {
+					matched = loc
+				}
 			}
 		case rules.LangPHP:
 			if loc := phpFileOpUserInput.FindString(line); loc != "" {
-				matched = loc
+				if !hasTraversalGuard(lines, i) {
+					matched = loc
+				}
 			}
 		case rules.LangRuby:
 			if loc := rubyFileOpUserInput.FindString(line); loc != "" {
@@ -238,34 +242,157 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// hasTraversalGuard checks surrounding lines (within 15 lines) for filepath.Clean + HasPrefix guard.
+// hasTraversalGuard checks the enclosing function scope for path traversal guards.
+// It recognises two categories of guard:
+//  1. Standalone guards that are sufficient on their own (e.g. filepath.Base, basename()).
+//  2. Multi-step guards: a normalisation call (filepath.Clean, realpath, path.resolve, etc.)
+//     combined with a containment check (strings.HasPrefix, .startsWith, str_starts_with, etc.).
+//
+// It also recognises allowlist patterns (allowed[, in_array, .includes()) as guards.
 func hasTraversalGuard(lines []string, idx int) bool {
-	start := idx - 15
-	if start < 0 {
-		start = 0
-	}
-	end := idx + 15
-	if end > len(lines) {
-		end = len(lines)
+	start, end := functionScope(lines, idx)
+
+	for _, l := range lines[start:end] {
+		// --- Category 1: Standalone basename guard ---
+		// filepath.Base / os.path.basename / path.basename / basename() strip
+		// all directory components, which is sufficient to prevent traversal.
+		if strings.Contains(l, "filepath.Base(") ||
+			strings.Contains(l, "os.path.basename(") ||
+			strings.Contains(l, "path.basename(") ||
+			(strings.Contains(l, "basename(") && !strings.Contains(l, "os.path.basename")) {
+			return true
+		}
+
+		// --- Category 1: Allowlist guard ---
+		// If the function checks against an allowlist, traversal is not possible.
+		if isAllowlistGuard(l) {
+			return true
+		}
 	}
 
-	hasClean := false
-	hasPrefix := false
+	// --- Category 2: Multi-step normalise + containment guard ---
+	hasNormalise := false
+	hasContainment := false
+
 	for _, l := range lines[start:end] {
+		// Normalisation patterns (any language).
 		if strings.Contains(l, "filepath.Clean") || strings.Contains(l, "filepath.Abs") ||
 			strings.Contains(l, "path.Clean") || strings.Contains(l, "filepath.EvalSymlinks") ||
-			strings.Contains(l, "os.path.realpath") || strings.Contains(l, "path.resolve") ||
-			strings.Contains(l, ".normalize()") || strings.Contains(l, ".toRealPath()") ||
-			strings.Contains(l, ".getCanonicalPath()") || strings.Contains(l, "os.path.abspath") ||
-			strings.Contains(l, "os.path.basename") {
-			hasClean = true
+			strings.Contains(l, "os.path.realpath") || strings.Contains(l, "os.path.abspath") ||
+			strings.Contains(l, ".resolve(") || // Python pathlib .resolve() and JS path.resolve()
+			strings.Contains(l, "path.resolve") ||
+			strings.Contains(l, ".normalize()") ||
+			strings.Contains(l, ".toRealPath()") || strings.Contains(l, ".getCanonicalPath()") ||
+			strings.Contains(l, "File.realpath") ||   // Ruby
+			strings.Contains(l, "File.expand_path") || // Ruby
+			strings.Contains(l, "realpath(") {         // PHP realpath()
+			hasNormalise = true
 		}
-		if strings.Contains(l, "strings.HasPrefix") || strings.Contains(l, "strings.Contains") ||
-			strings.Contains(l, ".startswith(") || strings.Contains(l, ".startsWith(") {
-			hasPrefix = true
+
+		// Containment / prefix-check patterns (any language).
+		if strings.Contains(l, "strings.HasPrefix") ||
+			strings.Contains(l, "strings.Contains") ||
+			strings.Contains(l, ".startswith(") ||     // Python
+			strings.Contains(l, ".startsWith(") ||     // JS/Java
+			strings.Contains(l, ".start_with?(") ||    // Ruby
+			strings.Contains(l, "str_starts_with(") || // PHP 8+
+			(strings.Contains(l, "strpos(") && strings.Contains(l, "===")) || // PHP strpos check
+			strings.Contains(l, ".includes('..')") ||  // JS ..check
+			strings.Contains(l, `".."`) && (strings.Contains(l, "Contains") || strings.Contains(l, "contains")) {
+			hasContainment = true
 		}
 	}
-	return hasClean && hasPrefix
+
+	return hasNormalise && hasContainment
+}
+
+// functionScope returns the start and end indices (half-open) of the function
+// enclosing the line at idx, by scanning for function boundaries. If no clear
+// function boundary is found, it falls back to a generous +/-40 line window.
+func functionScope(lines []string, idx int) (int, int) {
+	// Scan backward for function start. We begin one line above idx
+	// so that braces on the flagged line itself don't confuse the scan.
+	start := 0
+	braceDepth := 0
+	for i := idx - 1; i >= 0; i-- {
+		l := lines[i]
+		braceDepth += strings.Count(l, "}") - strings.Count(l, "{")
+		if braceDepth < 0 {
+			// We've exited the enclosing block upward — the function
+			// starts at or just after this line.
+			start = i
+			break
+		}
+		// Language-specific function declarations.
+		trimmed := strings.TrimSpace(l)
+		if strings.HasPrefix(trimmed, "func ") || // Go
+			strings.HasPrefix(trimmed, "def ") || // Python/Ruby
+			strings.HasPrefix(trimmed, "function ") || // JS/PHP
+			strings.Contains(trimmed, "function(") || // JS anonymous
+			strings.Contains(trimmed, "=> {") || // JS arrow
+			strings.Contains(trimmed, "=>{") { // JS arrow compact
+			start = i
+			break
+		}
+	}
+
+	// Scan forward for function end. Start one line after idx to avoid
+	// the flagged line's braces.
+	end := len(lines)
+	braceDepth = 0
+	for i := idx + 1; i < len(lines); i++ {
+		l := lines[i]
+		braceDepth += strings.Count(l, "{") - strings.Count(l, "}")
+		if braceDepth < 0 {
+			end = i + 1
+			break
+		}
+	}
+
+	// For languages without braces (Python), use indentation as a fallback.
+	// If we didn't find clear boundaries, use a generous window.
+	if end-start < 3 {
+		fallbackStart := idx - 40
+		if fallbackStart < 0 {
+			fallbackStart = 0
+		}
+		fallbackEnd := idx + 40
+		if fallbackEnd > len(lines) {
+			fallbackEnd = len(lines)
+		}
+		if fallbackStart < start {
+			start = fallbackStart
+		}
+		if fallbackEnd > end {
+			end = fallbackEnd
+		}
+	}
+
+	return start, end
+}
+
+// isAllowlistGuard returns true if the line contains an allowlist check pattern.
+func isAllowlistGuard(line string) bool {
+	// Go: map lookup like allowed[name]
+	if strings.Contains(line, "allowed[") || strings.Contains(line, "whitelist[") ||
+		strings.Contains(line, "allowlist[") || strings.Contains(line, "permitted[") {
+		return true
+	}
+	// PHP: in_array
+	if strings.Contains(line, "in_array(") {
+		return true
+	}
+	// JS: .includes( for array membership
+	if strings.Contains(line, ".includes(") && !strings.Contains(line, "'..'") && !strings.Contains(line, `".."`) {
+		return true
+	}
+	// Python: in allowed / in whitelist
+	if (strings.Contains(line, " in ") || strings.Contains(line, " not in ")) &&
+		(strings.Contains(line, "allowed") || strings.Contains(line, "whitelist") ||
+			strings.Contains(line, "ALLOWED") || strings.Contains(line, "allowlist")) {
+		return true
+	}
+	return false
 }
 
 // --- GTSS-TRV-002: File Inclusion ---

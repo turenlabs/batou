@@ -34,6 +34,105 @@ var (
 
 	// Validation/sanitization indicators (if present nearby, suppress finding)
 	reValidationPresent = regexp.MustCompile(`(?i)\b(?:validate|sanitize|clean|escape|parseInt|parseFloat|Number\(|int\(|float\(|isinstance|strconv\.|regexp\.|@Valid|@Pattern|Joi\.|zod\.|\.parse\(|\.safeParse\(|yup\.|validator\.|express-validator|filter_var|intval|is_numeric|\.to_i\b|Integer\.parseInt|Long\.parseLong|\.matches\(|pydantic|wtforms|marshmallow|binding\.Bind|ValidationPipe)\b`)
+
+	// Parameterized SQL — only match when actual placeholders are present in
+	// a query string (not just the DB function name, which could still use
+	// string concatenation).
+	reParameterizedSQL = regexp.MustCompile(`(?:` +
+		`=\s*\$\d+` + // PostgreSQL-style: = $1, = $2
+		`|,\s*\$\d+` + // PostgreSQL-style in list: , $2
+		`|LIMIT\s+\$\d+` + // PostgreSQL-style: LIMIT $3
+		`|=\s*\?` + // MySQL-style: = ?
+		`|,\s*\?` + // MySQL-style in VALUES: , ?
+		`|=\s*%s` + // Python DB-API style: = %s
+		`|,\s*%s` + // Python DB-API style: , %s
+		`)`)
+
+	// ORM / query builder patterns that are inherently safe (auto-parameterized).
+	// These only match patterns where string interpolation is NOT being used.
+	reORMUsage = regexp.MustCompile(`(?i)(?:` +
+		// Django ORM keyword-arg filtering (auto-parameterized)
+		`\.objects\.filter\s*\(\s*\w+` +
+		`|\.objects\.exclude\s*\(\s*\w+` +
+		`|\.objects\.annotate\s*\(` +
+		`|\.objects\.aggregate\s*\(` +
+		`|\.objects\.create\s*\(\s*\w+` +
+		`|\.values\s*\(` + // Django .values()
+		// ActiveRecord find_by with hash args (auto-parameterized)
+		`|\.find_by\s*\(\s*\w+\s*:` +
+		`|\.find_by_\w+` +
+		// ActiveRecord where with placeholder: .where('col = ?', val)
+		`|\.where\s*\(\s*(?:"|')[^"']*\?\s*(?:"|')` +
+		`|\.where\s*\(\s*\w+\s*:` + // .where(id: params[:id]) — hash syntax
+		// Knex query builder chain
+		`|db\s*\(\s*(?:"|')\w+(?:"|')\s*\)\s*\.` +
+		`|\.andWhere\s*\(` +
+		// ActiveRecord update_all with placeholder
+		`|update_all\s*\(\s*\[` +
+		// ActiveRecord Arel (auto-parameterized)
+		`|\.arel_table` +
+		// Java PreparedStatement (always parameterized)
+		`|PreparedStatement` +
+		`|\.prepareStatement\s*\(` +
+		`)`)
+
+	// Path-safety indicators — path traversal prevented
+	rePathSafety = regexp.MustCompile(`(?i)(?:` +
+		`path\.resolve\b` + // Node path.resolve
+		`|path\.basename\b` + // Node path.basename
+		`|path\.join\b` + // Node path.join (often with resolve/startsWith)
+		`|filepath\.Clean\b` + // Go filepath.Clean
+		`|filepath\.Base\b` + // Go filepath.Base
+		`|filepath\.Join\b` + // Go filepath.Join
+		`|os\.path\.basename\b` + // Python os.path.basename
+		`|os\.path\.realpath\b` + // Python os.path.realpath
+		`|\.resolve\(\)` + // Python pathlib .resolve()
+		`|File\.realpath\b` + // Ruby File.realpath
+		`|File\.basename\b` + // Ruby File.basename
+		`|startsWith\s*\(` + // JS startsWith check
+		`|\.startswith\s*\(` + // Python startswith check
+		`|strings\.HasPrefix\s*\(` + // Go strings.HasPrefix
+		`|start_with\?\s*\(` + // Ruby start_with?
+		`|realpath\s*\(` + // PHP realpath
+		`)`)
+
+	// HTML-safe output indicators — XSS prevention already handled
+	reHTMLSafe = regexp.MustCompile(`(?i)(?:` +
+		`escapeHtml\b` + // escape-html npm package
+		`|DOMPurify\.sanitize\b` + // DOMPurify
+		`|CGI\.escapeHTML\b` + // Ruby CGI.escapeHTML
+		`|markupsafe\.escape\b` + // Python markupsafe
+		`|html\.EscapeString\b` + // Go html.EscapeString
+		`|html/template` + // Go html/template (auto-escapes)
+		`|render_template\s*\(` + // Flask render_template (Jinja2 auto-escapes)
+		`|htmlspecialchars\s*\(` + // PHP htmlspecialchars
+		`|res\.json\s*\(` + // Express JSON response (no HTML)
+		`|jsonify\s*\(` + // Flask jsonify (no HTML)
+		`|JsonResponse\s*\(` + // Django JsonResponse (no HTML)
+		`|\.to_json\b` + // Ruby to_json (no HTML)
+		`|content_type\s*:\s*:json` + // Sinatra JSON content type
+		`|json\.NewEncoder\b` + // Go JSON encoder
+		`)`)
+
+	// URL-safety indicators — SSRF/redirect prevention
+	reURLSafe = regexp.MustCompile(`(?i)(?:` +
+		`new\s+URL\s*\(` + // JS URL parsing
+		`|url\.Parse\s*\(` + // Go url.Parse
+		`|urlparse\s*\(` + // Python urlparse
+		`|URI\.parse\s*\(` + // Ruby URI.parse
+		`|ALLOWED_REDIRECT` + // Explicit allowlist variable names
+		`|allowedHosts` +
+		`|allowed_hosts` +
+		`)`)
+
+	// Equality / switch / comparison — value is checked before use.
+	reEqualityCheck = regexp.MustCompile(`(?i)(?:` +
+		`switch\s*\(` + // switch statement
+		`|case\s+(?:"|')` + // case branch with literal
+		`|allowedFiles\b` + // explicit allowlist variable names
+		`|allowedActions\b` +
+		`|allowed\b.*\.includes\s*\(` + // allowed.includes(...)
+		`)`)
 )
 
 // GTSS-VAL-002: Missing type coercion / bounds checking
@@ -135,6 +234,51 @@ func (r DirectParamUsage) Languages() []rules.Language {
 	}
 }
 
+// paramUsageSuppressed checks whether the parameter access at lineIdx is
+// used in a safe context by scanning surrounding lines for evidence of
+// validation, parameterized queries, ORM usage, path safety, HTML escaping,
+// URL validation, or equality/allowlist checks.
+func paramUsageSuppressed(lines []string, lineIdx int) bool {
+	const window = 20
+
+	// Layer 1: Original validation/sanitization keywords
+	if scopeHasPattern(lines, lineIdx, reValidationPresent, window) {
+		return true
+	}
+
+	// Layer 2: Parameterized SQL (the param is bound safely via placeholders)
+	if scopeHasPattern(lines, lineIdx, reParameterizedSQL, window) {
+		return true
+	}
+
+	// Layer 3: ORM / query builder (input goes through safe abstraction)
+	if scopeHasPattern(lines, lineIdx, reORMUsage, window) {
+		return true
+	}
+
+	// Layer 4: Path-safety functions (traversal already handled)
+	if scopeHasPattern(lines, lineIdx, rePathSafety, window) {
+		return true
+	}
+
+	// Layer 5: HTML-safe output (XSS already handled or JSON-only)
+	if scopeHasPattern(lines, lineIdx, reHTMLSafe, window) {
+		return true
+	}
+
+	// Layer 6: URL-safety (SSRF/redirect already handled)
+	if scopeHasPattern(lines, lineIdx, reURLSafe, window) {
+		return true
+	}
+
+	// Layer 7: Equality / switch / comparison checks
+	if scopeHasPattern(lines, lineIdx, reEqualityCheck, window) {
+		return true
+	}
+
+	return false
+}
+
 func (r DirectParamUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
@@ -183,8 +327,8 @@ func (r DirectParamUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		for _, p := range patterns {
 			if loc := p.re.FindStringIndex(line); loc != nil {
-				// Check if validation/sanitization exists nearby (within 10 lines)
-				if scopeHasPattern(lines, i, reValidationPresent, 10) {
+				// Check if validation/sanitization exists nearby
+				if paramUsageSuppressed(lines, i) {
 					continue
 				}
 

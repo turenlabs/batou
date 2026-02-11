@@ -160,3 +160,118 @@ var LangExtension = map[string]string{
 	"dockerfile": ".dockerfile",
 	"tf":         ".tf",
 }
+
+// BenchFixture holds a single benchmark fixture with its file metadata.
+type BenchFixture struct {
+	Lang     string // Language directory name (e.g., "javascript", "python")
+	FileName string // Base file name (e.g., "a03_sql_injection.py")
+	Content  string // Full file content
+	FullPath string // Absolute path to the fixture file
+}
+
+// BenchFixtures discovers and loads all vulnerable fixtures under
+// testdata/fixtures/bench/{lang}/vulnerable/. Returns nil if the bench
+// directory does not exist.
+func BenchFixtures(t *testing.T) []BenchFixture {
+	t.Helper()
+
+	benchDir := filepath.Join(FixtureDir(), "bench")
+	langEntries, err := os.ReadDir(benchDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		t.Fatalf("failed to read bench directory: %v", err)
+	}
+
+	var fixtures []BenchFixture
+	for _, langEntry := range langEntries {
+		if !langEntry.IsDir() {
+			continue
+		}
+		lang := langEntry.Name()
+		vulnDir := filepath.Join(benchDir, lang, "vulnerable")
+		fileEntries, err := os.ReadDir(vulnDir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			t.Fatalf("failed to read %s: %v", vulnDir, err)
+		}
+
+		for _, fe := range fileEntries {
+			if fe.IsDir() || strings.HasPrefix(fe.Name(), ".") {
+				continue
+			}
+			fp := filepath.Join(vulnDir, fe.Name())
+			data, err := os.ReadFile(fp)
+			if err != nil {
+				t.Fatalf("failed to read bench fixture %s: %v", fp, err)
+			}
+			fixtures = append(fixtures, BenchFixture{
+				Lang:     lang,
+				FileName: fe.Name(),
+				Content:  string(data),
+				FullPath: fp,
+			})
+		}
+	}
+	return fixtures
+}
+
+// BenchSafeFixtures discovers and loads all safe fixtures under
+// testdata/fixtures/bench/{lang}/safe/. Returns nil if the bench
+// directory does not exist.
+func BenchSafeFixtures(t *testing.T) []BenchFixture {
+	t.Helper()
+
+	benchDir := filepath.Join(FixtureDir(), "bench")
+	langEntries, err := os.ReadDir(benchDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		t.Fatalf("failed to read bench directory: %v", err)
+	}
+
+	var fixtures []BenchFixture
+	for _, langEntry := range langEntries {
+		if !langEntry.IsDir() {
+			continue
+		}
+		lang := langEntry.Name()
+		safeDir := filepath.Join(benchDir, lang, "safe")
+		fileEntries, err := os.ReadDir(safeDir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			t.Fatalf("failed to read %s: %v", safeDir, err)
+		}
+
+		for _, fe := range fileEntries {
+			if fe.IsDir() || strings.HasPrefix(fe.Name(), ".") {
+				continue
+			}
+			fp := filepath.Join(safeDir, fe.Name())
+			data, err := os.ReadFile(fp)
+			if err != nil {
+				t.Fatalf("failed to read bench safe fixture %s: %v", fp, err)
+			}
+			fixtures = append(fixtures, BenchFixture{
+				Lang:     lang,
+				FileName: fe.Name(),
+				Content:  string(data),
+				FullPath: fp,
+			})
+		}
+	}
+	return fixtures
+}
+
+// BenchDirExists returns true if the bench fixtures directory exists.
+func BenchDirExists() bool {
+	benchDir := filepath.Join(FixtureDir(), "bench")
+	_, err := os.Stat(benchDir)
+	return err == nil
+}
