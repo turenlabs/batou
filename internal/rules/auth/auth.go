@@ -19,11 +19,14 @@ var (
 	reHardcodedCredPHP    = regexp.MustCompile(`(?i)\$(?:password|passwd|pass|pwd|secret|token)\s*(?:==|===|!=|!==)\s*(?:"[^"]{1,}"|'[^']{1,}')`)
 )
 
+// JWT "none" algorithm allowed in verify options (used by GTSS-AUTH-001)
+var reJWTNoneAlgorithm = regexp.MustCompile(`(?i)algorithms?\s*:\s*\[.*['"]none['"]`)
+
 // GTSS-AUTH-002: Missing auth check patterns
 var (
 	reGoHandleFunc       = regexp.MustCompile(`http\.HandleFunc\s*\(`)
 	reGoMuxHandle        = regexp.MustCompile(`\.Handle(?:Func)?\s*\(`)
-	reExpressRoute       = regexp.MustCompile(`(?:app|router)\.\s*(?:get|post|put|patch|delete|all)\s*\(\s*['"]\/(?:admin|dashboard|api|manage|internal|settings)`)
+	reExpressRoute       = regexp.MustCompile(`(?:app|router)\.\s*(?:get|post|put|patch|delete|all)\s*\(\s*['"]\/(?:admin|dashboard|manage|internal|settings)`)
 	reDjangoView         = regexp.MustCompile(`^\s*def\s+\w+\(.*request`)
 	reDjangoLoginReq     = regexp.MustCompile(`@login_required`)
 	reDjangoPermRequired = regexp.MustCompile(`@permission_required`)
@@ -147,6 +150,27 @@ func (r *HardcodedCredentialCheck) Scan(ctx *rules.ScanContext) []rules.Finding 
 				Tags:          []string{"auth", "hardcoded", "credentials"},
 			})
 		}
+
+		// JWT "none" algorithm: allowing the "none" algorithm lets attackers
+		// forge tokens without a valid signature.
+		if m := reJWTNoneAlgorithm.FindString(line); m != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      rules.Critical,
+				SeverityLabel: rules.Critical.String(),
+				Title:         "JWT 'none' algorithm allowed in token verification",
+				Description:   "The JWT verification accepts the 'none' algorithm, which means tokens with no signature are considered valid. An attacker can forge arbitrary tokens by setting alg to 'none' and removing the signature.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   strings.TrimSpace(m),
+				Suggestion:    "Remove 'none' from the allowed algorithms list. Only allow specific algorithms you intend to use (e.g., ['HS256'] or ['RS256']).",
+				CWEID:         "CWE-345",
+				OWASPCategory: "A07:2021-Identification and Authentication Failures",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"auth", "jwt", "none-algorithm"},
+			})
+		}
 	}
 	return findings
 }
@@ -184,7 +208,7 @@ func (r *MissingAuthCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
 			for i, line := range lines {
 				if reGoHandleFunc.MatchString(line) {
 					lineLower := strings.ToLower(line)
-					if strings.Contains(lineLower, "/admin") || strings.Contains(lineLower, "/api") ||
+					if strings.Contains(lineLower, "/admin") ||
 						strings.Contains(lineLower, "/dashboard") || strings.Contains(lineLower, "/manage") ||
 						strings.Contains(lineLower, "/settings") || strings.Contains(lineLower, "/internal") {
 						findings = append(findings, r.makeFinding(ctx, i+1, strings.TrimSpace(line)))

@@ -90,7 +90,7 @@
         "is_pure": true
       },
       "content_hash": "a0a0b728e8db3253",
-      "last_scan_at": "2026-02-10T16:16:48.474969-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.657621-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -111,13 +111,13 @@
         "is_pure": true
       },
       "content_hash": "7706703181879499",
-      "last_scan_at": "2026-02-10T16:16:48.472908-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.655608-06:00",
       "language": "typescript",
       "finding_count": 0
     }
   },
   "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/logging",
   "session_id": "",
-  "last_updated": "2026-02-10T16:16:48.47497-06:00",
+  "last_updated": "2026-02-12T13:38:43.657621-06:00",
   "version": 1
 }

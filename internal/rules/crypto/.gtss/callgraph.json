@@ -1,5 +1,26 @@
 {
   "nodes": {
+    "/app/Auth.java:hashPassword": {
+      "id": "/app/Auth.java:hashPassword",
+      "file_path": "/app/Auth.java",
+      "name": "hashPassword",
+      "package": "",
+      "start_line": 1,
+      "end_line": 5,
+      "calls": [
+        "/app/Auth.java:hashPassword"
+      ],
+      "called_by": [
+        "/app/Auth.java:hashPassword"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "f483055d73c371c3",
+      "last_scan_at": "2026-02-12T13:38:43.206735-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
     "/app/auth.go:generateToken": {
       "id": "/app/auth.go:generateToken",
       "file_path": "/app/auth.go",
@@ -17,179 +38,87 @@
       "language": "go",
       "finding_count": 0
     },
-    "/app/auth.py:make_api_key": {
-      "id": "/app/auth.py:make_api_key",
+    "/app/auth.py:hash_password": {
+      "id": "/app/auth.py:hash_password",
       "file_path": "/app/auth.py",
-      "name": "make_api_key",
+      "name": "hash_password",
       "package": "",
-      "start_line": 2,
-      "end_line": 3,
+      "start_line": 3,
+      "end_line": 4,
       "calls": [
-        "/app/auth.py:make_api_key"
+        "/app/auth.py:hash_password"
       ],
       "called_by": [
-        "/app/auth.py:make_api_key"
+        "/app/auth.py:hash_password"
       ],
       "taint_sig": {
         "is_pure": true
       },
-      "content_hash": "5c0e5710352e081c",
-      "last_scan_at": "2026-02-10T16:16:47.690085-06:00",
+      "content_hash": "7047df9d57e48a7b",
+      "last_scan_at": "2026-02-12T13:38:43.211259-06:00",
       "language": "python",
       "finding_count": 0
     },
-    "/app/auth.ts:generateApiKey": {
-      "id": "/app/auth.ts:generateApiKey",
+    "/app/auth.ts:hashPassword": {
+      "id": "/app/auth.ts:hashPassword",
       "file_path": "/app/auth.ts",
-      "name": "generateApiKey",
+      "name": "hashPassword",
       "package": "",
       "start_line": 1,
       "end_line": 3,
       "calls": [
-        "/app/auth.ts:generateApiKey"
+        "/app/auth.ts:hashPassword"
       ],
       "called_by": [
-        "/app/auth.ts:generateApiKey"
+        "/app/auth.ts:hashPassword"
       ],
       "taint_sig": {
         "is_pure": true
       },
-      "content_hash": "04676594d95b0f47",
-      "last_scan_at": "2026-02-10T16:16:47.687104-06:00",
+      "content_hash": "d7e63aec66d2ec52",
+      "last_scan_at": "2026-02-12T13:38:43.199912-06:00",
       "language": "typescript",
       "finding_count": 0
     },
-    "/app/crypto.go:HandleResetToken": {
-      "id": "/app/crypto.go:HandleResetToken",
+    "/app/crypto.go:encryptAndMAC": {
+      "id": "/app/crypto.go:encryptAndMAC",
       "file_path": "/app/crypto.go",
-      "name": "HandleResetToken",
-      "package": "vulnerable",
-      "start_line": 15,
-      "end_line": 28,
+      "name": "encryptAndMAC",
+      "package": "main",
+      "start_line": 4,
+      "end_line": 11,
       "calls": null,
       "called_by": null,
       "taint_sig": {
-        "tainted_params": {
-          "0": [
-            "external"
-          ]
-        },
-        "source_params": {
-          "0": "external",
-          "1": "user_input"
-        },
-        "sink_calls": [
-          {
-            "category": "html_output",
-            "method": "fmt.Fprint(w)",
-            "line": 27,
-            "arg_from_param": 0
-          }
-        ]
+        "is_pure": true
       },
-      "content_hash": "ec8b8ed1903b901e",
-      "last_scan_at": "2026-02-10T15:47:36.009698-06:00",
+      "content_hash": "c353312b99312e48",
+      "last_scan_at": "2026-02-12T13:38:43.171509-06:00",
       "language": "go",
       "finding_count": 0
     },
-    "/app/crypto.ts:createInsecureClient": {
-      "id": "/app/crypto.ts:createInsecureClient",
-      "file_path": "/app/crypto.ts",
-      "name": "createInsecureClient",
+    "/app/util.py:checksum": {
+      "id": "/app/util.py:checksum",
+      "file_path": "/app/util.py",
+      "name": "checksum",
       "package": "",
-      "start_line": 24,
-      "end_line": 26,
+      "start_line": 2,
+      "end_line": 3,
       "calls": [],
       "called_by": [
-        "/app/crypto.ts:createInsecureClient"
+        "/app/util.py:checksum"
       ],
       "taint_sig": {
         "is_pure": true
       },
-      "content_hash": "ef9cdbf360b399be",
-      "last_scan_at": "2026-02-10T15:47:36.023384-06:00",
-      "language": "typescript",
-      "finding_count": 0
-    },
-    "/app/crypto.ts:encryptData": {
-      "id": "/app/crypto.ts:encryptData",
-      "file_path": "/app/crypto.ts",
-      "name": "encryptData",
-      "package": "",
-      "start_line": 29,
-      "end_line": 33,
-      "calls": [],
-      "called_by": [
-        "/app/crypto.ts:encryptData"
-      ],
-      "taint_sig": {
-        "is_pure": true
-      },
-      "content_hash": "8da6e6c453dd9d3e",
-      "last_scan_at": "2026-02-10T15:47:36.023398-06:00",
-      "language": "typescript",
-      "finding_count": 0
-    },
-    "/app/crypto.ts:generateSessionToken": {
-      "id": "/app/crypto.ts:generateSessionToken",
-      "file_path": "/app/crypto.ts",
-      "name": "generateSessionToken",
-      "package": "",
-      "start_line": 16,
-      "end_line": 21,
-      "calls": [],
-      "called_by": [
-        "/app/crypto.ts:generateSessionToken"
-      ],
-      "taint_sig": {
-        "is_pure": true
-      },
-      "content_hash": "83b6d57e99184807",
-      "last_scan_at": "2026-02-10T15:47:36.023359-06:00",
-      "language": "typescript",
-      "finding_count": 0
-    },
-    "/app/crypto.ts:generateVerificationToken": {
-      "id": "/app/crypto.ts:generateVerificationToken",
-      "file_path": "/app/crypto.ts",
-      "name": "generateVerificationToken",
-      "package": "",
-      "start_line": 10,
-      "end_line": 13,
-      "calls": [],
-      "called_by": [
-        "/app/crypto.ts:generateVerificationToken"
-      ],
-      "taint_sig": {
-        "is_pure": true
-      },
-      "content_hash": "7c6f9d41fd4c858b",
-      "last_scan_at": "2026-02-10T15:47:36.023336-06:00",
-      "language": "typescript",
-      "finding_count": 0
-    },
-    "/app/crypto.ts:hashPassword": {
-      "id": "/app/crypto.ts:hashPassword",
-      "file_path": "/app/crypto.ts",
-      "name": "hashPassword",
-      "package": "",
-      "start_line": 4,
-      "end_line": 7,
-      "calls": [],
-      "called_by": [
-        "/app/crypto.ts:hashPassword"
-      ],
-      "taint_sig": {
-        "is_pure": true
-      },
-      "content_hash": "db6f9a6bbafe320f",
-      "last_scan_at": "2026-02-10T15:47:36.023307-06:00",
-      "language": "typescript",
+      "content_hash": "fa03ddc275f89b85",
+      "last_scan_at": "2026-02-11T13:37:55.143245-06:00",
+      "language": "python",
       "finding_count": 0
     }
   },
   "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/crypto",
   "session_id": "",
-  "last_updated": "2026-02-10T16:16:47.690086-06:00",
+  "last_updated": "2026-02-12T13:38:43.214757-06:00",
   "version": 1
 }

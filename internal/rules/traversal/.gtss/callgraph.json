@@ -17,7 +17,7 @@
         "is_pure": true
       },
       "content_hash": "bfecd7abb429a59e",
-      "last_scan_at": "2026-02-10T16:16:49.337858-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.599678-06:00",
       "language": "java",
       "finding_count": 0
     },
@@ -162,7 +162,7 @@
       "called_by": null,
       "taint_sig": {},
       "content_hash": "f7ef246e2f4b380b",
-      "last_scan_at": "2026-02-10T16:16:49.290764-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.55389-06:00",
       "language": "go",
       "finding_count": 0
     },
@@ -183,7 +183,7 @@
         "is_pure": true
       },
       "content_hash": "a95ec53d6c3262a6",
-      "last_scan_at": "2026-02-10T16:16:49.442716-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.687433-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -204,7 +204,7 @@
         "is_pure": true
       },
       "content_hash": "6481811260dd6f79",
-      "last_scan_at": "2026-02-10T16:16:49.441611-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.686343-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -225,7 +225,7 @@
         "is_pure": true
       },
       "content_hash": "5c0ceb8876b0ddf0",
-      "last_scan_at": "2026-02-10T16:16:49.414558-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.661475-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -246,7 +246,7 @@
         "is_pure": true
       },
       "content_hash": "784fdee5086ce35f",
-      "last_scan_at": "2026-02-10T16:16:49.415186-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.662057-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -267,7 +267,7 @@
         "is_pure": true
       },
       "content_hash": "6c775be448f24b74",
-      "last_scan_at": "2026-02-10T16:16:49.413691-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.660856-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -284,7 +284,7 @@
         "is_pure": true
       },
       "content_hash": "c7c1376c10577c4a",
-      "last_scan_at": "2026-02-10T16:16:49.397434-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.646691-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -301,7 +301,7 @@
         "is_pure": true
       },
       "content_hash": "f06ca89c2b588490",
-      "last_scan_at": "2026-02-10T16:16:49.389876-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.639754-06:00",
       "language": "go",
       "finding_count": 0
     },
@@ -322,7 +322,7 @@
         "is_pure": true
       },
       "content_hash": "39fdd8d545dfea6c",
-      "last_scan_at": "2026-02-10T16:16:49.322243-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.586511-06:00",
       "language": "python",
       "finding_count": 0
     },
@@ -343,7 +343,7 @@
         "is_pure": true
       },
       "content_hash": "3d8661d07e5c7b3f",
-      "last_scan_at": "2026-02-10T16:16:49.321399-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.585687-06:00",
       "language": "python",
       "finding_count": 0
     },
@@ -364,13 +364,13 @@
         "is_pure": true
       },
       "content_hash": "4e10256c8a21b00e",
-      "last_scan_at": "2026-02-10T16:16:49.32186-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.586128-06:00",
       "language": "python",
       "finding_count": 0
     }
   },
   "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/traversal",
   "session_id": "",
-  "last_updated": "2026-02-10T16:16:49.452228-06:00",
+  "last_updated": "2026-02-12T13:38:44.696769-06:00",
   "version": 1
 }

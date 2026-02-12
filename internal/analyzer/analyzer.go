@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/turen/gtss/internal/fpfilter"
 	"github.com/turen/gtss/internal/rules"
 )
 
@@ -67,7 +68,9 @@ func DetectLanguage(filePath string) rules.Language {
 }
 
 // IsScannable returns true if the file should be scanned.
-// Skips binary files, images, fonts, etc.
+// Skips binary files, images, fonts, and generated/vendored files
+// (based on path patterns only; content-based generated detection
+// happens later in the scanner when content is available).
 func IsScannable(filePath string) bool {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
@@ -82,7 +85,16 @@ func IsScannable(filePath string) bool {
 		".lock": true,
 	}
 
-	return !skipExts[ext]
+	if skipExts[ext] {
+		return false
+	}
+
+	// Path-only generated file check (no content available yet).
+	if fpfilter.IsGeneratedFile(filePath, "") {
+		return false
+	}
+
+	return true
 }
 
 // ContentLines splits content into numbered lines for rule scanning.

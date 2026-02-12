@@ -29,7 +29,7 @@
         ]
       },
       "content_hash": "bd49f97aec2310a4",
-      "last_scan_at": "2026-02-10T16:16:48.024065-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.294681-06:00",
       "language": "go",
       "finding_count": 0
     },
@@ -62,7 +62,7 @@
         ]
       },
       "content_hash": "fbc4b78643a5a1eb",
-      "last_scan_at": "2026-02-10T16:16:48.024048-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.294664-06:00",
       "language": "go",
       "finding_count": 0
     },
@@ -83,7 +83,7 @@
         "is_pure": true
       },
       "content_hash": "0b9cc2b54f3a0084",
-      "last_scan_at": "2026-02-10T16:16:48.034204-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.305723-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -104,13 +104,13 @@
         "is_pure": true
       },
       "content_hash": "263c05ea491bcf47",
-      "last_scan_at": "2026-02-10T16:16:48.033742-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.305274-06:00",
       "language": "typescript",
       "finding_count": 0
     }
   },
   "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/generic",
   "session_id": "",
-  "last_updated": "2026-02-10T16:16:48.034205-06:00",
+  "last_updated": "2026-02-12T13:38:43.305723-06:00",
   "version": 1
 }

@@ -34,7 +34,7 @@
         "is_pure": true
       },
       "content_hash": "1f53d6844baa7067",
-      "last_scan_at": "2026-02-10T16:16:47.438374-06:00",
+      "last_scan_at": "2026-02-12T13:38:41.1722-06:00",
       "language": "python",
       "finding_count": 0
     },
@@ -51,7 +51,7 @@
         "is_pure": true
       },
       "content_hash": "59dc319694ece79c",
-      "last_scan_at": "2026-02-10T16:16:47.417975-06:00",
+      "last_scan_at": "2026-02-12T13:38:41.153502-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -94,6 +94,6 @@
   },
   "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/auth",
   "session_id": "",
-  "last_updated": "2026-02-10T16:16:47.446875-06:00",
+  "last_updated": "2026-02-12T13:38:41.181328-06:00",
   "version": 1
 }

@@ -113,7 +113,7 @@
         "is_pure": true
       },
       "content_hash": "cc3a4be98e3c0d03",
-      "last_scan_at": "2026-02-10T16:16:48.451012-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.692816-06:00",
       "language": "java",
       "finding_count": 0
     },
@@ -128,14 +128,14 @@
         "/app/dao/UserDAO.java:getConnection"
       ],
       "called_by": [
-        "/app/dao/UserDAO.java:doGet",
-        "/app/dao/UserDAO.java:getConnection"
+        "/app/dao/UserDAO.java:getConnection",
+        "/app/dao/UserDAO.java:doGet"
       ],
       "taint_sig": {
         "is_pure": true
       },
       "content_hash": "2acc0e059b8bfff8",
-      "last_scan_at": "2026-02-10T16:16:48.450557-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.692354-06:00",
       "language": "java",
       "finding_count": 0
     },
@@ -331,7 +331,7 @@
         ]
       },
       "content_hash": "8f0613b5c3b21625",
-      "last_scan_at": "2026-02-10T16:16:48.39703-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.636294-06:00",
       "language": "go",
       "finding_count": 0
     },
@@ -373,7 +373,7 @@
         ]
       },
       "content_hash": "64ba3b9e4b87167b",
-      "last_scan_at": "2026-02-10T16:16:48.396767-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.636104-06:00",
       "language": "go",
       "finding_count": 0
     },
@@ -415,7 +415,7 @@
         ]
       },
       "content_hash": "e3ab8eee16974c7b",
-      "last_scan_at": "2026-02-10T16:16:48.552193-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.818166-06:00",
       "language": "go",
       "finding_count": 0
     },
@@ -457,7 +457,22 @@
         ]
       },
       "content_hash": "e8346625bb8374de",
-      "last_scan_at": "2026-02-10T16:16:48.552169-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.818142-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "/app/handlers/graphql.go:handleGraphQL": {
+      "id": "/app/handlers/graphql.go:handleGraphQL",
+      "file_path": "/app/handlers/graphql.go",
+      "name": "handleGraphQL",
+      "package": "main",
+      "start_line": 9,
+      "end_line": 13,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {},
+      "content_hash": "61715ea86b86b6c5",
+      "last_scan_at": "2026-02-11T13:38:08.887509-06:00",
       "language": "go",
       "finding_count": 0
     },
@@ -554,6 +569,90 @@
       "language": "ruby",
       "finding_count": 0
     },
+    "/app/routes/orders.ts:addComputedFields": {
+      "id": "/app/routes/orders.ts:addComputedFields",
+      "file_path": "/app/routes/orders.ts",
+      "name": "addComputedFields",
+      "package": "",
+      "start_line": 35,
+      "end_line": 41,
+      "calls": [
+        "/app/routes/orders.ts:addComputedFields"
+      ],
+      "called_by": [
+        "/app/routes/orders.ts:addComputedFields"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "60d2004c82355851",
+      "last_scan_at": "2026-02-12T13:38:44.114667-06:00",
+      "language": "typescript",
+      "finding_count": 0
+    },
+    "/app/routes/orders.ts:groupByStatus": {
+      "id": "/app/routes/orders.ts:groupByStatus",
+      "file_path": "/app/routes/orders.ts",
+      "name": "groupByStatus",
+      "package": "",
+      "start_line": 26,
+      "end_line": 32,
+      "calls": [
+        "/app/routes/orders.ts:groupByStatus"
+      ],
+      "called_by": [
+        "/app/routes/orders.ts:groupByStatus"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "f449f61c06f2127a",
+      "last_scan_at": "2026-02-12T13:38:44.114295-06:00",
+      "language": "typescript",
+      "finding_count": 0
+    },
+    "/app/routes/orders.ts:lookupOrders": {
+      "id": "/app/routes/orders.ts:lookupOrders",
+      "file_path": "/app/routes/orders.ts",
+      "name": "lookupOrders",
+      "package": "",
+      "start_line": 7,
+      "end_line": 13,
+      "calls": [
+        "/app/routes/orders.ts:lookupOrders"
+      ],
+      "called_by": [
+        "/app/routes/orders.ts:lookupOrders"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "4babd162928509db",
+      "last_scan_at": "2026-02-12T13:38:44.113396-06:00",
+      "language": "typescript",
+      "finding_count": 0
+    },
+    "/app/routes/orders.ts:mergeResults": {
+      "id": "/app/routes/orders.ts:mergeResults",
+      "file_path": "/app/routes/orders.ts",
+      "name": "mergeResults",
+      "package": "",
+      "start_line": 16,
+      "end_line": 23,
+      "calls": [
+        "/app/routes/orders.ts:mergeResults"
+      ],
+      "called_by": [
+        "/app/routes/orders.ts:mergeResults"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "19b35ba1266d3101",
+      "last_scan_at": "2026-02-12T13:38:44.113868-06:00",
+      "language": "typescript",
+      "finding_count": 0
+    },
     "/app/routes/query.ts:deleteProduct": {
       "id": "/app/routes/query.ts:deleteProduct",
       "file_path": "/app/routes/query.ts",
@@ -628,7 +727,7 @@
         "is_pure": true
       },
       "content_hash": "c209fa88f7f4b212",
-      "last_scan_at": "2026-02-10T16:16:48.374254-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.613404-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -649,7 +748,7 @@
         "is_pure": true
       },
       "content_hash": "d62612cb950369e3",
-      "last_scan_at": "2026-02-10T16:16:48.373777-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.612911-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -670,7 +769,7 @@
         "is_pure": true
       },
       "content_hash": "3db7a84964259d73",
-      "last_scan_at": "2026-02-10T16:16:48.372981-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.612107-06:00",
       "language": "typescript",
       "finding_count": 0
     },
@@ -723,7 +822,7 @@
       "called_by": null,
       "taint_sig": {},
       "content_hash": "73c27da54df6a3da",
-      "last_scan_at": "2026-02-10T16:16:48.693693-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.990752-06:00",
       "language": "go",
       "finding_count": 0
     },
@@ -890,93 +989,51 @@
       "language": "ruby",
       "finding_count": 0
     },
-    "/app/views.py:email_preview": {
-      "id": "/app/views.py:email_preview",
+    "/app/views.py:list_users": {
+      "id": "/app/views.py:list_users",
       "file_path": "/app/views.py",
-      "name": "email_preview",
+      "name": "list_users",
       "package": "",
-      "start_line": 23,
-      "end_line": 30,
+      "start_line": 12,
+      "end_line": 16,
       "calls": [
-        "/app/views.py:email_preview"
+        "/app/views.py:list_users"
       ],
       "called_by": [
-        "/app/views.py:email_preview"
+        "/app/views.py:list_users"
       ],
       "taint_sig": {
         "is_pure": true
       },
-      "content_hash": "43818f5c55c53e49",
-      "last_scan_at": "2026-02-10T16:16:48.655415-06:00",
+      "content_hash": "f23a64374b9410cd",
+      "last_scan_at": "2026-02-12T13:38:44.238166-06:00",
       "language": "python",
       "finding_count": 0
     },
-    "/app/views.py:greeting": {
-      "id": "/app/views.py:greeting",
+    "/app/views.py:search_user": {
+      "id": "/app/views.py:search_user",
       "file_path": "/app/views.py",
-      "name": "greeting",
+      "name": "search_user",
       "package": "",
-      "start_line": 16,
-      "end_line": 19,
+      "start_line": 5,
+      "end_line": 11,
       "calls": [
-        "/app/views.py:greeting"
+        "/app/views.py:search_user"
       ],
       "called_by": [
-        "/app/views.py:greeting"
+        "/app/views.py:search_user"
       ],
       "taint_sig": {
         "is_pure": true
       },
-      "content_hash": "d489ff75380ad499",
-      "last_scan_at": "2026-02-10T16:16:48.655174-06:00",
-      "language": "python",
-      "finding_count": 0
-    },
-    "/app/views.py:render_page": {
-      "id": "/app/views.py:render_page",
-      "file_path": "/app/views.py",
-      "name": "render_page",
-      "package": "",
-      "start_line": 10,
-      "end_line": 12,
-      "calls": [
-        "/app/views.py:render_page"
-      ],
-      "called_by": [
-        "/app/views.py:render_page"
-      ],
-      "taint_sig": {
-        "is_pure": true
-      },
-      "content_hash": "15f63bb80c789649",
-      "last_scan_at": "2026-02-10T16:16:48.655013-06:00",
-      "language": "python",
-      "finding_count": 0
-    },
-    "/app/views.py:report": {
-      "id": "/app/views.py:report",
-      "file_path": "/app/views.py",
-      "name": "report",
-      "package": "",
-      "start_line": 34,
-      "end_line": 38,
-      "calls": [
-        "/app/views.py:report"
-      ],
-      "called_by": [
-        "/app/views.py:report"
-      ],
-      "taint_sig": {
-        "is_pure": true
-      },
-      "content_hash": "0c2396c7ef19f6f7",
-      "last_scan_at": "2026-02-10T16:16:48.655743-06:00",
+      "content_hash": "0ff0f203b29ff292",
+      "last_scan_at": "2026-02-12T13:38:44.237777-06:00",
       "language": "python",
       "finding_count": 0
     }
   },
   "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/injection",
   "session_id": "",
-  "last_updated": "2026-02-10T16:16:48.719783-06:00",
+  "last_updated": "2026-02-12T13:38:44.238166-06:00",
   "version": 1
 }

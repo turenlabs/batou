@@ -1,0 +1,347 @@
+{
+  "nodes": {
+    "/app/bench_target.c:display_error": {
+      "id": "/app/bench_target.c:display_error",
+      "file_path": "/app/bench_target.c",
+      "name": "display_error",
+      "package": "",
+      "start_line": 17,
+      "end_line": 21,
+      "calls": [
+        "/app/bench_target.c:display_error"
+      ],
+      "called_by": [
+        "/app/bench_target.c:display_error"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "5847541316818dd2",
+      "last_scan_at": "2026-02-12T13:38:46.70854-06:00",
+      "language": "c",
+      "finding_count": 0
+    },
+    "/app/bench_target.c:log_request": {
+      "id": "/app/bench_target.c:log_request",
+      "file_path": "/app/bench_target.c",
+      "name": "log_request",
+      "package": "",
+      "start_line": 23,
+      "end_line": 27,
+      "calls": [
+        "/app/bench_target.c:log_request"
+      ],
+      "called_by": [
+        "/app/bench_target.c:log_request"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "eb38d6e65ca02de8",
+      "last_scan_at": "2026-02-12T13:38:46.708814-06:00",
+      "language": "c",
+      "finding_count": 0
+    },
+    "/app/bench_target.c:log_user_action": {
+      "id": "/app/bench_target.c:log_user_action",
+      "file_path": "/app/bench_target.c",
+      "name": "log_user_action",
+      "package": "",
+      "start_line": 9,
+      "end_line": 15,
+      "calls": [
+        "/app/bench_target.c:log_user_action"
+      ],
+      "called_by": [
+        "/app/bench_target.c:log_user_action"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "cb6b43a1f23d9c1d",
+      "last_scan_at": "2026-02-12T13:38:46.708122-06:00",
+      "language": "c",
+      "finding_count": 0
+    },
+    "/app/bench_target.go:bad": {
+      "id": "/app/bench_target.go:bad",
+      "file_path": "/app/bench_target.go",
+      "name": "bad",
+      "package": "main",
+      "start_line": 5,
+      "end_line": 7,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "sink_calls": [
+          {
+            "category": "sql_query",
+            "method": "sql.Query",
+            "line": 6,
+            "arg_from_param": -1
+          }
+        ]
+      },
+      "content_hash": "d9e52a6803e635ed",
+      "last_scan_at": "2026-02-12T13:38:57.588959-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "/app/bench_target.java:echo": {
+      "id": "/app/bench_target.java:echo",
+      "file_path": "/app/bench_target.java",
+      "name": "echo",
+      "package": "",
+      "start_line": 35,
+      "end_line": 39,
+      "calls": [
+        "/app/bench_target.java:echo"
+      ],
+      "called_by": [
+        "/app/bench_target.java:echo"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "bf05281eff5aede3",
+      "last_scan_at": "2026-02-12T13:38:50.38415-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/bench_target.java:preview": {
+      "id": "/app/bench_target.java:preview",
+      "file_path": "/app/bench_target.java",
+      "name": "preview",
+      "package": "",
+      "start_line": 20,
+      "end_line": 23,
+      "calls": [
+        "/app/bench_target.java:preview"
+      ],
+      "called_by": [
+        "/app/bench_target.java:preview"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "7b74d8c846594c16",
+      "last_scan_at": "2026-02-12T13:38:50.383608-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/bench_target.java:profilePage": {
+      "id": "/app/bench_target.java:profilePage",
+      "file_path": "/app/bench_target.java",
+      "name": "profilePage",
+      "package": "",
+      "start_line": 27,
+      "end_line": 31,
+      "calls": [
+        "/app/bench_target.java:profilePage"
+      ],
+      "called_by": [
+        "/app/bench_target.java:profilePage"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "11ea4fcc79798da6",
+      "last_scan_at": "2026-02-12T13:38:50.383877-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/bench_target.java:search": {
+      "id": "/app/bench_target.java:search",
+      "file_path": "/app/bench_target.java",
+      "name": "search",
+      "package": "",
+      "start_line": 14,
+      "end_line": 16,
+      "calls": [
+        "/app/bench_target.java:search"
+      ],
+      "called_by": [
+        "/app/bench_target.java:search"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "12d5a285c905cdaf",
+      "last_scan_at": "2026-02-12T13:38:50.383384-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/bench_target.js:downloadFile": {
+      "id": "/app/bench_target.js:downloadFile",
+      "file_path": "/app/bench_target.js",
+      "name": "downloadFile",
+      "package": "",
+      "start_line": 9,
+      "end_line": 19,
+      "calls": [
+        "/app/bench_target.js:downloadFile"
+      ],
+      "called_by": [
+        "/app/bench_target.js:downloadFile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "ee9d59b0d3e2de5d",
+      "last_scan_at": "2026-02-12T13:38:51.120825-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/bench_target.js:getStaticAsset": {
+      "id": "/app/bench_target.js:getStaticAsset",
+      "file_path": "/app/bench_target.js",
+      "name": "getStaticAsset",
+      "package": "",
+      "start_line": 22,
+      "end_line": 33,
+      "calls": [
+        "/app/bench_target.js:getStaticAsset"
+      ],
+      "called_by": [
+        "/app/bench_target.js:getStaticAsset"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "49e747fa4ab2a107",
+      "last_scan_at": "2026-02-12T13:38:51.121361-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/bench_target.js:profilePage": {
+      "id": "/app/bench_target.js:profilePage",
+      "file_path": "/app/bench_target.js",
+      "name": "profilePage",
+      "package": "",
+      "start_line": 50,
+      "end_line": 53,
+      "calls": [
+        "/app/bench_target.js:profilePage"
+      ],
+      "called_by": [
+        "/app/bench_target.js:profilePage"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "2a66077f3d124604",
+      "last_scan_at": "2026-02-12T13:38:51.122488-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/bench_target.js:serveDocument": {
+      "id": "/app/bench_target.js:serveDocument",
+      "file_path": "/app/bench_target.js",
+      "name": "serveDocument",
+      "package": "",
+      "start_line": 36,
+      "end_line": 47,
+      "calls": [
+        "/app/bench_target.js:serveDocument"
+      ],
+      "called_by": [
+        "/app/bench_target.js:serveDocument"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "d03a7148e1a51b7b",
+      "last_scan_at": "2026-02-12T13:38:51.121945-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/bench_target.php:downloadFile": {
+      "id": "/app/bench_target.php:downloadFile",
+      "file_path": "/app/bench_target.php",
+      "name": "downloadFile",
+      "package": "",
+      "start_line": 7,
+      "end_line": 18,
+      "calls": [
+        "/app/bench_target.php:downloadFile"
+      ],
+      "called_by": [
+        "/app/bench_target.php:downloadFile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "3e92a9b6eb2029ed",
+      "last_scan_at": "2026-02-12T13:38:51.352915-06:00",
+      "language": "php",
+      "finding_count": 0
+    },
+    "/app/bench_target.php:serveDocument": {
+      "id": "/app/bench_target.php:serveDocument",
+      "file_path": "/app/bench_target.php",
+      "name": "serveDocument",
+      "package": "",
+      "start_line": 21,
+      "end_line": 32,
+      "calls": [
+        "/app/bench_target.php:serveDocument"
+      ],
+      "called_by": [
+        "/app/bench_target.php:serveDocument"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "044f08a57c418987",
+      "last_scan_at": "2026-02-12T13:38:51.353446-06:00",
+      "language": "php",
+      "finding_count": 0
+    },
+    "/app/bench_target.php:uploadFile": {
+      "id": "/app/bench_target.php:uploadFile",
+      "file_path": "/app/bench_target.php",
+      "name": "uploadFile",
+      "package": "",
+      "start_line": 35,
+      "end_line": 47,
+      "calls": [
+        "/app/bench_target.php:uploadFile"
+      ],
+      "called_by": [
+        "/app/bench_target.php:uploadFile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "906f4f0326c16813",
+      "last_scan_at": "2026-02-12T13:38:51.353766-06:00",
+      "language": "php",
+      "finding_count": 0
+    },
+    "/app/bench_target.py:get_user": {
+      "id": "/app/bench_target.py:get_user",
+      "file_path": "/app/bench_target.py",
+      "name": "get_user",
+      "package": "",
+      "start_line": 7,
+      "end_line": 14,
+      "calls": [
+        "/app/bench_target.py:get_user"
+      ],
+      "called_by": [
+        "/app/bench_target.py:get_user"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "e2784b2fa4286df6",
+      "last_scan_at": "2026-02-12T13:38:57.558528-06:00",
+      "language": "python",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/bench/eval",
+  "session_id": "",
+  "last_updated": "2026-02-12T13:38:57.588965-06:00",
+  "version": 1
+}

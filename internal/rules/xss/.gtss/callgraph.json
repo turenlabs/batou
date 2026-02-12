@@ -70,7 +70,7 @@
         ]
       },
       "content_hash": "61ac911d5691e9a8",
-      "last_scan_at": "2026-02-10T16:16:49.702474-06:00",
+      "last_scan_at": "2026-02-12T13:38:44.992215-06:00",
       "language": "go",
       "finding_count": 0
     },
@@ -267,6 +267,6 @@
   },
   "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/xss",
   "session_id": "",
-  "last_updated": "2026-02-10T16:16:49.720813-06:00",
+  "last_updated": "2026-02-12T13:38:45.017376-06:00",
   "version": 1
 }

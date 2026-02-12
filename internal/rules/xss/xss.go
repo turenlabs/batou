@@ -72,6 +72,12 @@ var (
 	reNodeResJSON     = regexp.MustCompile(`res\.json\s*\(`)
 	reNodeContentJSON = regexp.MustCompile(`(?:Content-Type|content-type).*application/json`)
 
+	// GTSS-XSS-013: Python f-string HTML building without escaping
+	rePyFStringHTML = regexp.MustCompile(`(?:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*f["'].*<.*\{`)
+	rePyFormatHTML  = regexp.MustCompile(`(?:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*["'].*<.*["']\s*\.format\s*\(`)
+	rePyPctHTML     = regexp.MustCompile(`(?:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*["'].*<.*%s`)
+	rePyEscape      = regexp.MustCompile(`(?:escape|html\.escape|markupsafe\.escape|cgi\.escape|bleach\.clean)\s*\(`)
+
 	// GTSS-XSS-011: Reflected XSS patterns
 	rePyReflected      = regexp.MustCompile(`(?:return|response)\s*.*(?:request\.args\.get|request\.form\.get|request\.values\.get|request\.args\[)`)
 	rePyFStringReq     = regexp.MustCompile(`f["'].*\{request\.(?:args|form|values)`)
@@ -84,6 +90,12 @@ var (
 	reJSResSendHTML    = regexp.MustCompile(`res\.send\s*\(`)
 	// Indicators of user input in nearby lines for JS/TS
 	reJSReqInput       = regexp.MustCompile(`req\.(?:query|params|body)\b`)
+
+	// PHP: echo with variable concatenation (. $var) or interpolation ("...$var...")
+	rePHPEchoVarConcat = regexp.MustCompile(`(?i)\becho\s+["'].*\.\s*\$\w+`)
+	rePHPEchoVarInterp = regexp.MustCompile(`(?i)\becho\s+"[^"]*\$\w+`)
+	// PHP superglobal usage nearby (indicates user input)
+	rePHPSuperglobal   = regexp.MustCompile(`\$_(?:GET|POST|REQUEST|COOKIE)\s*\[`)
 )
 
 func init() {
@@ -98,6 +110,7 @@ func init() {
 	rules.Register(&MissingContentType{})
 	rules.Register(&JSONContentTypeXSS{})
 	rules.Register(&ReflectedXSS{})
+	rules.Register(&PythonFStringHTML{})
 }
 
 // ---------- helpers ----------
@@ -782,7 +795,12 @@ func (r *ReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		case rules.LangPHP:
 			if rePHPEchoGet.MatchString(line) {
 				matched = true
-				desc = "PHP echo outputs $_GET/$_POST/$_REQUEST parameters directly in the response without escaping, creating a reflected XSS vulnerability."
+				desc = "PHP echo outputs superglobal parameters directly in the response without escaping, creating a reflected XSS vulnerability."
+				suggestion = "Wrap with htmlspecialchars($value, ENT_QUOTES, 'UTF-8') before echoing, or use a template engine with auto-escaping."
+			} else if (rePHPEchoVarConcat.MatchString(line) || rePHPEchoVarInterp.MatchString(line)) &&
+				!rePHPEchoSafe.MatchString(line) && hasNearbyPHPSuperglobal(lines, i) {
+				matched = true
+				desc = "PHP echo outputs a variable derived from user input (superglobals) without escaping, creating a reflected XSS vulnerability."
 				suggestion = "Wrap with htmlspecialchars($value, ENT_QUOTES, 'UTF-8') before echoing, or use a template engine with auto-escaping."
 			}
 
@@ -829,6 +847,100 @@ func (r *ReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 	}
 	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-XSS-013: Python f-string HTML Building
+// ---------------------------------------------------------------------------
+
+type PythonFStringHTML struct{}
+
+func (r *PythonFStringHTML) ID() string                     { return "GTSS-XSS-013" }
+func (r *PythonFStringHTML) Name() string                   { return "PythonFStringHTML" }
+func (r *PythonFStringHTML) DefaultSeverity() rules.Severity { return rules.High }
+func (r *PythonFStringHTML) Description() string {
+	return "Detects Python code that builds HTML strings using f-strings, .format(), or % formatting with unescaped variables, leading to stored/reflected XSS."
+}
+func (r *PythonFStringHTML) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
+
+func (r *PythonFStringHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if ctx.Language != rules.LangPython {
+		return nil
+	}
+
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	// Check if file uses escape functions anywhere
+	hasEscapeImport := rePyEscape.MatchString(ctx.Content)
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+
+		var matched string
+		if m := rePyFStringHTML.FindString(line); m != "" {
+			matched = m
+		} else if m := rePyFormatHTML.FindString(line); m != "" {
+			matched = m
+		} else if m := rePyPctHTML.FindString(line); m != "" {
+			matched = m
+		}
+
+		if matched == "" {
+			continue
+		}
+
+		// Check if the interpolated variable on this line was escaped
+		// Look back a few lines for escape() calls on the variables used
+		lineEscaped := false
+		if hasEscapeImport {
+			start := i - 5
+			if start < 0 {
+				start = 0
+			}
+			for j := start; j <= i; j++ {
+				if rePyEscape.MatchString(lines[j]) {
+					lineEscaped = true
+					break
+				}
+			}
+		}
+
+		if !lineEscaped {
+			if len(matched) > 120 {
+				matched = matched[:120]
+			}
+			findings = append(findings, makeFinding(
+				r.ID(),
+				"HTML built with unescaped Python f-string/format interpolation",
+				"Building HTML strings with f-strings, .format(), or % formatting inserts unescaped user data into HTML, enabling XSS. Use a template engine with auto-escaping (Jinja2) or explicitly escape with markupsafe.escape().",
+				ctx.FilePath, i+1, matched,
+				"Use a template engine with auto-escaping (e.g., Jinja2), or escape all interpolated values with markupsafe.escape() / html.escape() before embedding in HTML.",
+				"CWE-79", string(ctx.Language), r.DefaultSeverity(), "high",
+			))
+		}
+	}
+	return findings
+}
+
+// hasNearbyPHPSuperglobal checks if $_GET/$_POST/$_REQUEST/$_COOKIE appears
+// within 20 lines before the current line (same function scope).
+func hasNearbyPHPSuperglobal(lines []string, idx int) bool {
+	start := idx - 20
+	if start < 0 {
+		start = 0
+	}
+	for _, l := range lines[start : idx+1] {
+		if rePHPSuperglobal.MatchString(l) {
+			return true
+		}
+	}
+	return false
 }
 
 // hasNearbyJSInput checks surrounding lines for req.query/params/body user input.

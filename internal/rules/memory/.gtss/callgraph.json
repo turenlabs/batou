@@ -18,7 +18,7 @@
         "is_pure": true
       },
       "content_hash": "76eaf3fd3537f7fe",
-      "last_scan_at": "2026-02-10T16:16:48.70496-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.924618-06:00",
       "language": "c",
       "finding_count": 0
     },
@@ -39,7 +39,7 @@
         "is_pure": true
       },
       "content_hash": "8672e1c8f222457a",
-      "last_scan_at": "2026-02-10T16:16:48.703597-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.922623-06:00",
       "language": "c",
       "finding_count": 0
     },
@@ -62,7 +62,7 @@
         "is_pure": true
       },
       "content_hash": "7ea77003f2f131e5",
-      "last_scan_at": "2026-02-10T16:16:48.705107-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.92477-06:00",
       "language": "c",
       "finding_count": 0
     },
@@ -84,7 +84,7 @@
         "is_pure": true
       },
       "content_hash": "d691b7c7c148918a",
-      "last_scan_at": "2026-02-10T16:16:48.704786-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.924437-06:00",
       "language": "c",
       "finding_count": 0
     },
@@ -106,7 +106,7 @@
         "is_pure": true
       },
       "content_hash": "40c38b0306dab2aa",
-      "last_scan_at": "2026-02-10T16:16:48.637693-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.85096-06:00",
       "language": "c",
       "finding_count": 0
     },
@@ -128,13 +128,13 @@
         "is_pure": true
       },
       "content_hash": "dd6b640b3571cc09",
-      "last_scan_at": "2026-02-10T16:16:48.638106-06:00",
+      "last_scan_at": "2026-02-12T13:38:43.851367-06:00",
       "language": "c",
       "finding_count": 0
     }
   },
   "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/memory",
   "session_id": "",
-  "last_updated": "2026-02-10T16:16:48.705107-06:00",
+  "last_updated": "2026-02-12T13:38:43.924771-06:00",
   "version": 1
 }

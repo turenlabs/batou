@@ -109,7 +109,8 @@ var (
 	// Ruby: ERB with variable
 	reTemplateRuby = regexp.MustCompile(`(?i)\bERB\.new\s*\(\s*[^"'\s)]`)
 	// Go: text/template or html/template Parse with variable (not a string literal or backtick)
-	reTemplateGoParse = regexp.MustCompile("(?i)\\.\\s*Parse\\s*\\(\\s*[^\"'`\\s)]")
+	// Requires template/tmpl context to avoid matching jwt.Parse, url.Parse, etc.
+	reTemplateGoParse = regexp.MustCompile("(?i)(?:template|tmpl|tpl)(?:\\.[^.]*)*\\.\\s*Parse\\s*\\(\\s*[^\"'`\\s)]")
 	// Java: Thymeleaf/Freemarker/Velocity templateEngine.process with variable
 	reTemplateJavaEngine = regexp.MustCompile(`(?i)(?:templateEngine|template|engine)\s*\.\s*(?:process|evaluate|merge)\s*\(\s*[^"'\s)]`)
 )
@@ -140,6 +141,58 @@ var (
 	reNoSQLEval = regexp.MustCompile(`(?i)\.(?:mapReduce|group)\s*\([^)]*(?:function|=>)`)
 	// Direct pass-through of req.body/req.query/req.params to MongoDB query methods
 	reNoSQLDirectPassthrough = regexp.MustCompile(`(?i)\.(?:find|findOne|aggregate|updateOne|updateMany|deleteOne|deleteMany|remove|count|countDocuments)\s*\(\s*req\.(?:body|query|params)\b`)
+
+	// Indirect passthrough: MongoDB query method with object literal + nearby req input
+	reNoSQLQueryMethodBrace = regexp.MustCompile(`(?i)\.(?:find|findOne|aggregate|updateOne|updateMany|deleteOne|deleteMany|remove|count|countDocuments)\s*\(\s*\{`)
+	reNoSQLReqInputNearby   = regexp.MustCompile(`(?i)\breq\.(?:body|query|params)\b`)
+
+	// MongoDB aggregation pipeline: $lookup with user-controlled "from" field
+	reNoSQLAggLookup = regexp.MustCompile(
+		`(?i)['"]\$lookup['"]\s*:\s*\{[^}]*['"]from['"]\s*:\s*` +
+			`(?:[^"'\s{][^,}]*\+|req\.(?:body|query|params)|f["']|[^"'\s{,}]+\.(?:body|query|params|input|data))`)
+	// MongoDB aggregation pipeline: $merge/$out with user-controlled collection
+	reNoSQLAggMergeOut = regexp.MustCompile(
+		`(?i)['"]\$` + `(?:merge|out)['"]\s*:\s*` +
+			`(?:[^"'\s{][^,}]*\+|req\.(?:body|query|params)|f["']|[^"'\s{,}]+\.(?:body|query|params|input|data))`)
+	// MongoDB aggregation pipeline: $group with user-controlled _id expression
+	reNoSQLAggGroup = regexp.MustCompile(
+		`(?i)['"]\$group['"]\s*:\s*\{[^}]*['"]\s*_id\s*['"]\s*:\s*` +
+			`(?:[^"'\s{][^,}]*\+|req\.(?:body|query|params)|f["']|[^"'\s{,}]+\.(?:body|query|params|input|data))`)
+	// MongoDB aggregation pipeline: $addFields with user-controlled expression
+	reNoSQLAggAddFields = regexp.MustCompile(
+		`(?i)['"]\$addFields['"]\s*:\s*` +
+			`(?:req\.(?:body|query|params)|[^"'\s{,}]+\.(?:body|query|params|input|data))`)
+)
+
+// GraphQL Injection patterns (GTSS-INJ-008)
+//
+// Note: patterns use (?:[^"'\\]|\\.)* instead of [^"']* to correctly
+// handle escaped quotes (e.g., \") inside string literals.
+var (
+	// String concat in GraphQL query string (all languages)
+	reGQLConcatQuery = regexp.MustCompile(
+		"(?i)(?:[\"']\\s*(?:query|mutation|subscription)\\s*(?:\\w+\\s*)?\\{(?:[^\"'\\\\]|\\\\.)*[\"']\\s*\\+)")
+	// JS/TS: template literal with interpolation in GraphQL query
+	reGQLTemplateLiteral = regexp.MustCompile(
+		"(?i)`\\s*(?:query|mutation|subscription)[^`]*\\$" + "\\{")
+	// Python: f-string in GraphQL query
+	reGQLFStringPy = regexp.MustCompile(
+		"(?i)f[\"']\\s*(?:query|mutation|subscription)\\s*(?:\\w+\\s*)?\\{(?:[^\"'\\\\]|\\\\.)*\\{")
+	// Python: .format() in GraphQL query
+	reGQLFormatPy = regexp.MustCompile(
+		"(?i)[\"']\\s*(?:query|mutation|subscription)\\s*(?:\\w+\\s*)?\\{(?:[^\"'\\\\]|\\\\.)*[\"']\\s*\\.format\\(")
+	// Python: % formatting in GraphQL query
+	reGQLPercentPy = regexp.MustCompile(
+		"(?i)[\"']\\s*(?:query|mutation|subscription)\\s*(?:\\w+\\s*)?\\{(?:[^\"'\\\\]|\\\\.)*%[sv](?:[^\"'\\\\]|\\\\.)*[\"']\\s*%")
+	// Go: fmt.Sprintf in GraphQL query
+	reGQLSprintfGo = regexp.MustCompile(
+		"(?i)fmt\\.Sprintf\\(\\s*[\"']\\s*(?:query|mutation|subscription)\\s*(?:\\w+\\s*)?\\{(?:[^\"'\\\\]|\\\\.)*%[sv]")
+	// Generic: graphql function/method call with string concat
+	reGQLExecConcat = regexp.MustCompile(
+		"(?i)(?:graphql|execute_query|execute_async|execute_sync|run_query)\\s*\\(\\s*(?:[\"'](?:[^\"'\\\\]|\\\\.)*[\"']\\s*\\+|[^\"'\\s,)]+\\s*\\+)")
+	// Generic: gql tag or function with concat/interpolation (template literal)
+	reGQLTagConcat = regexp.MustCompile(
+		"(?i)(?:gql|graphql)\\s*\\(\\s*`[^`]*\\$" + "\\{")
 )
 
 // ---------------------------------------------------------------------------
@@ -266,24 +319,25 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	lines := strings.Split(ctx.Content, "\n")
 
 	type pattern struct {
-		re   *regexp.Regexp
-		conf string
-		desc string
+		re      *regexp.Regexp
+		conf    string
+		desc    string
+		skipFor []rules.Language // languages where this pattern should not apply
 	}
 
 	patterns := []pattern{
-		{reCmdOsSystem, "high", "os.system/os.popen with dynamic argument"},
-		{reCmdSubprocessShell, "high", "subprocess call with shell=True"},
-		{reCmdExecCommandShell, "high", "exec.Command with shell interpreter and -c flag"},
-		{reCmdExecCommandConcat, "medium", "exec.Command with string concatenation"},
-		{reCmdChildProcess, "high", "child_process exec with dynamic argument"},
-		{reCmdChildProcessExec, "medium", "child_process.exec usage (verify input is sanitized)"},
-		{reCmdShellInterp, "high", "shell command with variable interpolation inside backticks/$()"},
-		{reCmdRuntimeExec, "high", "Runtime.exec with string concatenation"},
-		{reCmdProcessBuilder, "low", "ProcessBuilder usage (verify arguments are sanitized)"},
-		{reCmdPHP, "high", "PHP shell function with variable argument"},
-		{reCmdRuby, "high", "Ruby shell execution with string interpolation"},
-		{reCmdSubprocessStr, "medium", "subprocess with string command (use list form instead)"},
+		{re: reCmdOsSystem, conf: "high", desc: "os.system/os.popen with dynamic argument"},
+		{re: reCmdSubprocessShell, conf: "high", desc: "subprocess call with shell=True"},
+		{re: reCmdExecCommandShell, conf: "high", desc: "exec.Command with shell interpreter and -c flag"},
+		{re: reCmdExecCommandConcat, conf: "medium", desc: "exec.Command with string concatenation"},
+		{re: reCmdChildProcess, conf: "high", desc: "child_process exec with dynamic argument"},
+		{re: reCmdChildProcessExec, conf: "medium", desc: "child_process.exec usage (verify input is sanitized)"},
+		{re: reCmdShellInterp, conf: "high", desc: "shell command with variable interpolation inside backticks/$()", skipFor: []rules.Language{rules.LangJavaScript, rules.LangTypeScript}},
+		{re: reCmdRuntimeExec, conf: "high", desc: "Runtime.exec with string concatenation"},
+		{re: reCmdProcessBuilder, conf: "low", desc: "ProcessBuilder usage (verify arguments are sanitized)"},
+		{re: reCmdPHP, conf: "high", desc: "PHP shell function with variable argument"},
+		{re: reCmdRuby, conf: "high", desc: "Ruby shell execution with string interpolation"},
+		{re: reCmdSubprocessStr, conf: "medium", desc: "subprocess with string command (use list form instead)"},
 	}
 
 	for i, line := range lines {
@@ -291,6 +345,18 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
+			if len(p.skipFor) > 0 {
+				skip := false
+				for _, lang := range p.skipFor {
+					if ctx.Language == lang {
+						skip = true
+						break
+					}
+				}
+				if skip {
+					continue
+				}
+			}
 			if loc := p.re.FindStringIndex(line); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
@@ -626,8 +692,13 @@ func (r NoSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		{reNoSQLQueryConcat, "medium", "NoSQL query with string concatenation"},
 		{reNoSQLEval, "medium", "mapReduce/group with function (potential code injection)"},
 		{reNoSQLDirectPassthrough, "high", "req.body/req.query/req.params passed directly to MongoDB query (NoSQL injection)"},
+		{reNoSQLAggLookup, "high", "$lookup with user-controlled 'from' collection (aggregation pipeline injection)"},
+		{reNoSQLAggMergeOut, "high", "$merge/$out with user-controlled collection name (aggregation pipeline injection)"},
+		{reNoSQLAggGroup, "medium", "$group with user-controlled _id expression (aggregation pipeline injection)"},
+		{reNoSQLAggAddFields, "medium", "$addFields with user-controlled expression (aggregation pipeline injection)"},
 	}
 
+	flaggedLines := make(map[int]bool)
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -651,6 +722,126 @@ func (r NoSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 					Confidence:    p.conf,
 					Tags:          []string{"injection", "nosql", "mongodb"},
 				})
+				flaggedLines[i+1] = true
+				break
+			}
+		}
+	}
+
+	// Indirect passthrough: MongoDB query methods with object literal where
+	// req.body/req.query/req.params is destructured into variables nearby.
+	if ctx.Language == rules.LangJavaScript || ctx.Language == rules.LangTypeScript {
+		for i, line := range lines {
+			if flaggedLines[i+1] || isCommentLine(line) {
+				continue
+			}
+			if reNoSQLQueryMethodBrace.MatchString(line) && hasNearbyReqInput(lines, i) {
+				matched := truncate(strings.TrimSpace(line), 120)
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "NoSQL Injection: user input from request object used in MongoDB query",
+					Description:   "Variables assigned from request body/query/params are used in a MongoDB query object. An attacker can inject query operators to manipulate the query logic.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   matched,
+					Suggestion:    "Validate and sanitize all query inputs. Cast to expected types (e.g., String(value)) or use a schema validator to prevent operator injection.",
+					CWEID:         "CWE-943",
+					OWASPCategory: "A03:2021-Injection",
+					Language:      ctx.Language,
+					Confidence:    "medium",
+					Tags:          []string{"injection", "nosql", "mongodb"},
+				})
+			}
+		}
+	}
+
+	return findings
+}
+
+// hasNearbyReqInput checks if req.body/req.query/req.params appears within
+// 20 lines before the current line (typically within the same function scope).
+func hasNearbyReqInput(lines []string, idx int) bool {
+	start := idx - 20
+	if start < 0 {
+		start = 0
+	}
+	for _, l := range lines[start : idx+1] {
+		if reNoSQLReqInputNearby.MatchString(l) {
+			return true
+		}
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-INJ-008: GraphQL Injection
+// ---------------------------------------------------------------------------
+
+type GraphQLInjection struct{}
+
+func (r GraphQLInjection) ID() string              { return "GTSS-INJ-008" }
+func (r GraphQLInjection) Name() string            { return "GraphQL Injection" }
+func (r GraphQLInjection) DefaultSeverity() rules.Severity { return rules.High }
+func (r GraphQLInjection) Description() string {
+	return "Detects GraphQL queries constructed via string concatenation or formatting instead of using parameterized variables, which may allow GraphQL injection attacks."
+}
+func (r GraphQLInjection) Languages() []rules.Language {
+	return []rules.Language{
+		rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript,
+		rules.LangJava, rules.LangRuby, rules.LangPHP,
+	}
+}
+
+func (r GraphQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	type pattern struct {
+		re   *regexp.Regexp
+		conf string
+		desc string
+		lang rules.Language
+	}
+
+	patterns := []pattern{
+		{reGQLConcatQuery, "high", "GraphQL query built with string concatenation", rules.LangAny},
+		{reGQLTemplateLiteral, "high", "GraphQL query with template literal interpolation", rules.LangAny},
+		{reGQLFStringPy, "high", "GraphQL query built with Python f-string", rules.LangPython},
+		{reGQLFormatPy, "high", "GraphQL query built with .format()", rules.LangPython},
+		{reGQLPercentPy, "high", "GraphQL query built with % formatting", rules.LangPython},
+		{reGQLSprintfGo, "high", "GraphQL query built with fmt.Sprintf", rules.LangGo},
+		{reGQLExecConcat, "medium", "GraphQL execute function with string concatenation", rules.LangAny},
+		{reGQLTagConcat, "high", "gql/graphql tagged template with interpolation", rules.LangAny},
+	}
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+		for _, p := range patterns {
+			if p.lang != rules.LangAny && p.lang != ctx.Language {
+				continue
+			}
+			if loc := p.re.FindStringIndex(line); loc != nil {
+				matched := truncate(line[loc[0]:loc[1]], 120)
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "GraphQL Injection: " + p.desc,
+					Description:   "GraphQL queries should use parameterized variables ($var syntax) instead of string concatenation or formatting with user-controlled input.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   matched,
+					Suggestion:    "Use GraphQL variables (e.g., query($id: ID!) { user(id: $id) { ... } }) and pass user input via the variables parameter.",
+					CWEID:         "CWE-943",
+					OWASPCategory: "A03:2021-Injection",
+					Language:      ctx.Language,
+					Confidence:    p.conf,
+					Tags:          []string{"injection", "graphql"},
+				})
 				break
 			}
 		}
@@ -670,4 +861,5 @@ func init() {
 	rules.Register(TemplateInjection{})
 	rules.Register(XPathInjection{})
 	rules.Register(NoSQLInjection{})
+	rules.Register(GraphQLInjection{})
 }

@@ -90,7 +90,9 @@ var (
 
 // GTSS-GEN-007: Mass assignment patterns
 var (
-	reGoBindJSON        = regexp.MustCompile(`\.(?:ShouldBindJSON|BindJSON|ShouldBind|Bind|Decode)\s*\(\s*&`)
+	reGoBindJSON        = regexp.MustCompile(`\.(?:ShouldBindJSON|BindJSON|ShouldBind|Bind)\s*\(\s*&`)
+	reGoDecodeBody      = regexp.MustCompile(`\.Decode\s*\(\s*&`)
+	reGoNewDecoder      = regexp.MustCompile(`(?:NewDecoder|NewReader)\s*\(\s*r\.Body`)
 	reRailsPermitAll    = regexp.MustCompile(`params\.permit!`)
 	reRailsPermitLax    = regexp.MustCompile(`\.permit\s*\(\s*!\s*\)`)
 	reDjangoExcludeNone = regexp.MustCompile(`exclude\s*=\s*\[\s*\]`)
@@ -651,6 +653,23 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if m := reGoBindJSON.FindString(line); m != "" {
 				matched = m
 				detail = "Binding all JSON fields directly to a struct without restricting allowed fields. Use a dedicated input DTO or explicitly select fields."
+			} else if m := reGoDecodeBody.FindString(line); m != "" {
+				// Only flag .Decode(&) when r.Body is used as the decoder source nearby
+				start := i - 5
+				if start < 0 {
+					start = 0
+				}
+				hasBodySource := false
+				for j := start; j <= i; j++ {
+					if reGoNewDecoder.MatchString(lines[j]) {
+						hasBodySource = true
+						break
+					}
+				}
+				if hasBodySource {
+					matched = m
+					detail = "Decoding HTTP request body directly into a struct without restricting allowed fields. Use a dedicated input DTO or explicitly select fields."
+				}
 			}
 		case rules.LangRuby:
 			if m := reRailsPermitAll.FindString(line); m != "" {
