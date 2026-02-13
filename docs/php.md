@@ -317,6 +317,7 @@ The following regex-based rules (Layer 1) include PHP in their language list:
 | GTSS-INJ-006 | XPathInjection | XPath queries built with string concatenation |
 | GTSS-INJ-007 | NoSQLInjection | NoSQL/MongoDB queries with unsafe patterns |
 | GTSS-INJ-008 | GraphQLInjection | GraphQL queries via string concatenation |
+| GTSS-INJ-009 | HTTPHeaderInjection | `header()` with user input variables (`$_GET`, `$_POST`, `$_REQUEST`, `$_SERVER`) enabling CRLF injection / response splitting |
 
 ### XSS
 
@@ -339,6 +340,7 @@ The following regex-based rules (Layer 1) include PHP in their language list:
 | GTSS-CRY-010 | WeakPRNG | `rand()`, `mt_rand()` used for security purposes |
 | GTSS-CRY-011 | PredictableSeed | `srand()` / `mt_srand()` with fixed or time-based seeds |
 | GTSS-CRY-015 | WeakPasswordHash | `md5($password)` / `sha1($password)` instead of `password_hash()` |
+| GTSS-CRY-016 | InsecureRandomBroad | `rand()` / `mt_rand()` in security-sensitive contexts (tokens, sessions, CSRF, keys) |
 
 ### Secrets
 
@@ -384,11 +386,44 @@ The following regex-based rules (Layer 1) include PHP in their language list:
 | GTSS-VAL-001 | DirectParamUsage | `$_GET`/`$_POST` used directly without validation |
 | GTSS-VAL-003 | MissingLengthValidation | User input stored without length checks |
 
+### Deserialization
+
+| Rule ID | Name | What It Detects |
+|---------|------|-----------------|
+| GTSS-DESER-003 | PHPDangerousPatterns | `preg_replace` with `/e` modifier, `extract()` with superglobals (`$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE`), `assert()` with variable argument, `create_function()`, variable variable function calls (`$$var()`) |
+
+### CORS
+
+| Rule ID | Name | What It Detects |
+|---------|------|-----------------|
+| GTSS-CORS-001 | CORSWildcardCredentials | `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` (wildcard origin with credentials misconfiguration) |
+| GTSS-CORS-002 | CORSReflectedOrigin | `header("Access-Control-Allow-Origin: " . $_SERVER["HTTP_ORIGIN"])` reflecting the request Origin without validation |
+
+### Redirect
+
+| Rule ID | Name | What It Detects |
+|---------|------|-----------------|
+| GTSS-REDIR-001 | ServerRedirectUserInput | `header("Location: " . $var)` with user input from `$_GET`/`$_POST`/`$_REQUEST` (open redirect) |
+
 ### SSRF
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
 | GTSS-SSRF-001 | URLFromUserInput | HTTP requests with user-derived URLs (applies to all languages) |
+
+### Framework Rules
+
+#### Laravel
+
+| Rule ID | Name | What It Detects |
+|---------|------|-----------------|
+| GTSS-FW-LARAVEL-001 | LaravelDBRaw | `DB::raw()` with variable interpolation or concatenation, `DB::select`/`statement`/`insert`/`update`/`delete` with PHP variables in raw SQL |
+| GTSS-FW-LARAVEL-002 | LaravelBladeUnescaped | Blade `{!! $variable !!}` unescaped output bypassing HTML escaping (XSS) |
+| GTSS-FW-LARAVEL-003 | LaravelMassAssignment | `$request->all()` passed directly to Eloquent `::create`, `::update`, `::insert`, `->fill`, `->forceFill` (mass assignment) |
+| GTSS-FW-LARAVEL-004 | LaravelDebugMode | `APP_DEBUG=true` in `.env` or config files (information disclosure of stack traces, credentials, paths) |
+| GTSS-FW-LARAVEL-005 | LaravelAppKey | `APP_KEY=base64:...` committed in `.env` files or hardcoded in PHP config (session forgery, RCE via deserialization) |
+| GTSS-FW-LARAVEL-006 | LaravelUnserialize | `unserialize()` with user input (`$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE`, `$request`, `$input`) enabling object injection / RCE |
+| GTSS-FW-LARAVEL-007 | LaravelStorageTraversal | `Storage::get`/`read`/`download`/`url`/`path`/`exists`/`delete` with `$request->` input (path traversal) |
 
 ## Example Detections
 
@@ -418,6 +453,67 @@ This code triggers **GTSS-INJ-002** (Layer 1) and taint flow from `php.superglob
 ```php
 $target = $_POST['ip'];
 system("ping -c 4 " . $target);
+```
+
+### 4. HTTP Header Injection via header()
+
+This code triggers **GTSS-INJ-009** (Layer 1) and taint flow from `php.superglobal.get` to `php.header` (Layer 2):
+
+```php
+$lang = $_GET['lang'];
+header("Content-Language: " . $lang);
+```
+
+### 5. PHP Dangerous Pattern -- extract() with Superglobals
+
+This code triggers **GTSS-DESER-003** (Layer 1):
+
+```php
+extract($_POST);
+// $is_admin, $role, etc. are now overwritten with attacker-controlled values
+```
+
+### 6. CORS Reflected Origin
+
+This code triggers **GTSS-CORS-002** (Layer 1):
+
+```php
+header("Access-Control-Allow-Origin: " . $_SERVER["HTTP_ORIGIN"]);
+header("Access-Control-Allow-Credentials: true");
+```
+
+### 7. Open Redirect via header()
+
+This code triggers **GTSS-REDIR-001** (Layer 1) and taint flow from `php.superglobal.get` to `php.header.location` (Layer 2):
+
+```php
+$url = $_GET['redirect'];
+header("Location: " . $url);
+```
+
+### 8. Laravel DB::raw() SQL Injection
+
+This code triggers **GTSS-FW-LARAVEL-001** (Layer 1):
+
+```php
+$sort = $request->input('sort');
+$users = DB::select("SELECT * FROM users ORDER BY $sort");
+```
+
+### 9. Laravel Mass Assignment
+
+This code triggers **GTSS-FW-LARAVEL-003** (Layer 1):
+
+```php
+$user = User::create($request->all());
+```
+
+### 10. Laravel Storage Path Traversal
+
+This code triggers **GTSS-FW-LARAVEL-007** (Layer 1):
+
+```php
+$file = Storage::get($request->input('path'));
 ```
 
 ## Safe Patterns
@@ -454,6 +550,41 @@ if (!in_array($host, $allowed, true)) {
 }
 $safe = escapeshellarg($host);
 $output = shell_exec("ping -c 4 " . $safe);
+```
+
+### 4. Validated Redirect with Allowlist
+
+Validating the redirect URL against trusted domains prevents open redirect:
+
+```php
+$url = $_GET['redirect'];
+$allowed = ['https://example.com', 'https://app.example.com'];
+$parsed = parse_url($url);
+if (!in_array($parsed['scheme'] . '://' . $parsed['host'], $allowed, true)) {
+    die("Invalid redirect target.");
+}
+header("Location: " . $url);
+```
+
+### 5. Laravel $request->validated() for Mass Assignment
+
+Using form request validation prevents mass assignment:
+
+```php
+$user = User::create($request->validated());
+```
+
+### 6. Laravel DB Query Builder with Bindings
+
+Parameterized bindings prevent SQL injection in raw queries:
+
+```php
+$sort = $request->input('sort');
+$allowed = ['name', 'email', 'created_at'];
+if (!in_array($sort, $allowed, true)) {
+    $sort = 'created_at';
+}
+$users = DB::select("SELECT * FROM users ORDER BY {$sort}");
 ```
 
 ## Limitations

@@ -240,6 +240,44 @@ The following Layer 1 regex rules apply to Ruby files. Rules with `LangAny` also
 | GTSS-INJ-007 | NoSQL Injection | MongoDB `$where` with string concatenation, unsafe `$regex` |
 | GTSS-INJ-008 | GraphQL Injection | GraphQL query string concatenation |
 
+### NoSQL Injection
+
+| Rule ID | Name | Description |
+|---------|------|-------------|
+| GTSS-NOSQL-001 | MongoDB $where Injection | `$where` with Ruby string interpolation (`"#{...}"`) or string concatenation enabling server-side JS execution |
+| GTSS-NOSQL-002 | MongoDB Operator Injection | Mongoid queries with unsanitized `params` (`.where(params[...])`, `.find_by(params[...])`) allowing operator injection |
+| GTSS-NOSQL-003 | MongoDB Raw Query Injection | `$regex` with user input, `mapReduce`/`group` with functions, `$lookup`/`$merge`/`$out` with user-controlled collection names, server-side `eval` |
+
+### Deserialization / Dynamic Execution
+
+| Rule ID | Name | Description |
+|---------|------|-------------|
+| GTSS-DESER-002 | Ruby Dangerous Dynamic Execution | `eval()` / `instance_eval` / `class_eval` / `module_eval` with dynamic arguments, `send()` / `public_send()` / `__send__()` with user input, `constantize` with user-controlled strings |
+
+### Mass Assignment
+
+| Rule ID | Name | Description |
+|---------|------|-------------|
+| GTSS-MASS-003 | Ruby/Rails Mass Assignment | `Model.new(params[:...])`, `.create(params[:...])`, `.update(params)` without strong parameters (`.permit`); detects missing `permit` calls |
+
+### CORS
+
+| Rule ID | Name | Description |
+|---------|------|-------------|
+| GTSS-CORS-001 | CORS Wildcard with Credentials | `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` via generic header patterns |
+
+### GraphQL
+
+| Rule ID | Name | Description |
+|---------|------|-------------|
+| GTSS-GQL-001 | GraphQL Introspection Enabled | `introspection: true` or equivalent configuration enabling full schema exposure in production |
+
+### Redirect
+
+| Rule ID | Name | Description |
+|---------|------|-------------|
+| GTSS-REDIR-001 | Server Redirect with User Input | `redirect_to` with `params` allowing open redirect attacks for phishing |
+
 ### XSS
 
 | Rule ID | Name | Description |
@@ -259,8 +297,10 @@ The following Layer 1 regex rules apply to Ruby files. Rules with `LangAny` also
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-CRY-010 | Weak PRNG | `rand()` / `srand()` in security-sensitive contexts |
+| GTSS-CRY-010 | Weak PRNG | `rand()` / `Random.new` / `Random.rand` / `srand()` in security-sensitive contexts |
 | GTSS-CRY-011 | Predictable Seed | `srand()` with fixed or time-based seeds |
+| GTSS-CRY-016 | Insecure Random (Broad) | `rand()` / `Random.new` / `Random.rand` in security contexts (tokens, sessions, OTPs, CSRF, API keys); complements CRY-010 |
+| GTSS-CRY-017 | Timing-Unsafe Comparison | `==` used to compare secrets, tokens, hashes, or signatures instead of `Rack::Utils.secure_compare` or `ActiveSupport::SecurityUtils.secure_compare` |
 
 ### Secrets
 
@@ -313,6 +353,19 @@ The following Layer 1 regex rules apply to Ruby files. Rules with `LangAny` also
 | GTSS-SSRF-001 | URL From User Input | HTTP requests with user-derived URLs (applies to all languages) |
 | GTSS-SSRF-002 | Internal Network Access | Requests to private IPs or cloud metadata (applies to all languages) |
 
+### Framework Rules
+
+Rails-specific rules are defined in `internal/rules/framework/rails.go` and target common Rails security anti-patterns.
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-FW-RAILS-001 | Rails html_safe on Dynamic Content | High | `.html_safe` called on variables or interpolated strings (not plain string literals), bypassing Rails auto-escaping and enabling XSS (CWE-79) |
+| GTSS-FW-RAILS-002 | Rails render inline: SSTI | Critical | `render inline:` with dynamic content or string interpolation, enabling server-side template injection and RCE via ERB tag injection (CWE-1336) |
+| GTSS-FW-RAILS-003 | Rails constantize / safe_constantize | Critical/High | `.constantize` or `.safe_constantize` usage, especially with `params` or user input; converts strings to class constants enabling arbitrary class instantiation (CWE-470) |
+| GTSS-FW-RAILS-004 | Rails params.permit! | High | `params.permit!` bypasses strong parameter protection, permitting all parameters and enabling mass assignment of admin flags, foreign keys, etc. (CWE-915) |
+| GTSS-FW-RAILS-005 | Rails Misconfigurations | Medium | Insecure production settings: `consider_all_requests_local = true` (CWE-209), `force_ssl = false` (CWE-319), `protect_from_forgery with: :null_session` (CWE-352), `skip_before_action :verify_authenticity_token` (CWE-352) |
+| GTSS-FW-RAILS-006 | Rails ActiveRecord SQL Injection | Critical | `.where()` with params string interpolation (`"#{params[:name]}"`), `.where(params[:...])` hash injection, `.order()` with interpolation or raw params (CWE-89) |
+
 ## Example Detections
 
 ### SQL Injection via String Interpolation
@@ -356,6 +409,73 @@ end
 ```
 
 **Triggers**: GTSS-GEN-002 (Unsafe Deserialization) and taint sink `ruby.marshal.load` (CWE-502) -- `Marshal.load` on user-controlled cookie data enables arbitrary code execution.
+
+### Rails params.permit! Mass Assignment
+
+```ruby
+class UsersController < ApplicationController
+  def update
+    @user = User.find(params[:id])
+    @user.update(params.permit!)
+  end
+end
+```
+
+**Triggers**: GTSS-FW-RAILS-004 (Rails params.permit!) -- `params.permit!` permits all parameters, allowing an attacker to set `admin`, `role`, or any other model attribute.
+
+### MongoDB $where with Ruby String Interpolation
+
+```ruby
+class SearchController < ApplicationController
+  def find
+    name = params[:name]
+    results = collection.find("$where" => "this.name == '#{name}'")
+    render json: results
+  end
+end
+```
+
+**Triggers**: GTSS-NOSQL-001 (MongoDB $where Injection) -- Ruby string interpolation `#{name}` inside a `$where` expression enables server-side JavaScript execution on the MongoDB server.
+
+### Rails constantize with User Input
+
+```ruby
+class WidgetsController < ApplicationController
+  def create
+    klass = params[:type].constantize
+    @widget = klass.new(widget_params)
+  end
+end
+```
+
+**Triggers**: GTSS-FW-RAILS-003 (Rails constantize) -- `params[:type].constantize` converts a user-controlled string into a Ruby class constant, enabling instantiation of arbitrary classes and potential RCE.
+
+### Dynamic eval with Variable Argument
+
+```ruby
+class ReportController < ApplicationController
+  def generate
+    formula = params[:formula]
+    result = eval(formula)
+    render json: { result: result }
+  end
+end
+```
+
+**Triggers**: GTSS-DESER-002 (Ruby Dangerous Dynamic Execution) -- `eval()` with a user-controlled argument executes arbitrary Ruby code, enabling remote code execution.
+
+### Rails render inline with Interpolation
+
+```ruby
+class PagesController < ApplicationController
+  def preview
+    template = params[:template]
+    render inline: "#{template}"
+  end
+end
+```
+
+**Triggers**: GTSS-FW-RAILS-002 (Rails render inline: SSTI) -- `render inline:` with interpolated user input allows injection of ERB tags (`<%= system('...') %>`) for server-side template injection.
 
 ## Safe Patterns
 

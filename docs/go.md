@@ -218,6 +218,7 @@ The following regex-based rules include Go in their `Languages()` method. Rules 
 | GTSS-INJ-006 | XPath Injection | Medium | XPath query with string concat/format |
 | GTSS-INJ-007 | NoSQL Injection | High | `$where` operator, query concat patterns |
 | GTSS-INJ-008 | GraphQL Injection | High | `fmt.Sprintf` with GraphQL query/mutation keywords |
+| GTSS-INJ-009 | HTTP Header Injection | High | `w.Header().Set/Add` with `r.URL.Query().Get`/`r.FormValue`/`r.Header.Get` value |
 
 ### XSS Rules
 
@@ -236,6 +237,7 @@ The following regex-based rules include Go in their `Languages()` method. Rules 
 | GTSS-TRV-001 | Path Traversal | Critical | `os.Open/ReadFile/Create(variable)` without `filepath.Clean` + `strings.HasPrefix` guard |
 | GTSS-TRV-003 | Archive Extraction (Zip Slip) | High | `zip.OpenReader` / `os.Create` from zip entry without path validation |
 | GTSS-TRV-004 | Symlink Following | Medium | `os.Readlink()` without subsequent path validation (Go-only rule) |
+| GTSS-TRV-010 | Zip Slip Traversal | Critical | `filepath.Join`/`os.Create`/`os.OpenFile`/`os.MkdirAll` with zip entry `.Name` without path validation |
 
 ### Cryptographic Rules
 
@@ -254,6 +256,8 @@ The following regex-based rules include Go in their `Languages()` method. Rules 
 | GTSS-CRY-013 | Unauthenticated Encryption | High | `cipher.NewCBCEncrypter()` without HMAC/GCM in file |
 | GTSS-CRY-014 | Insecure RSA Padding | High | `rsa.EncryptPKCS1v15()`, `rsa.DecryptPKCS1v15()` |
 | GTSS-CRY-015 | Weak Password Hash | Critical | `md5.Sum`/`sha256.Sum256` near password context |
+| GTSS-CRY-017 | Timing-Unsafe Comparison | Medium | `==` comparison of security-related variables (token, secret, hash, signature, hmac) without `subtle.ConstantTimeCompare` |
+| GTSS-CRY-018 | Hardcoded IV/Nonce (Broad) | High | AEAD `.Seal`/`.Open` with fixed nonce (e.g., `nil` nonce with `[]byte{}` or `make([]byte)`) |
 
 ### SSRF Rules
 
@@ -308,6 +312,26 @@ The following regex-based rules include Go in their `Languages()` method. Rules 
 | GTSS-VAL-002 | Missing Type Coercion | Medium | String params used without `strconv.Atoi` or similar |
 | GTSS-VAL-003 | Missing Length Validation | Medium | User input without length bounds checking |
 | GTSS-VAL-004 | Missing Allowlist Validation | Medium | Enum-like params without allowlist check |
+
+### CORS Rules
+
+| Rule ID | Name | Severity | Go-Specific Patterns |
+|---------|------|----------|---------------------|
+| GTSS-CORS-001 | CORS Wildcard Credentials | Medium | `w.Header().Set("Access-Control-Allow-Origin", "*")` combined with `Access-Control-Allow-Credentials: true` |
+| GTSS-CORS-002 | CORS Reflected Origin | High | `w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))` without origin validation |
+
+### GraphQL Rules
+
+| Rule ID | Name | Severity | Go-Specific Patterns |
+|---------|------|----------|---------------------|
+| GTSS-GQL-001 | GraphQL Introspection Enabled | Medium | `introspection: true` or `enableIntrospection: true` in schema configuration |
+| GTSS-GQL-002 | GraphQL No Depth Limiting | Medium | GraphQL server creation (`new ApolloServer`, `createYoga`, `graphqlHTTP`) without `depthLimit`/`maxDepth`/`complexityLimit` |
+
+### Redirect Rules
+
+| Rule ID | Name | Severity | Go-Specific Patterns |
+|---------|------|----------|---------------------|
+| GTSS-REDIR-001 | Server Redirect User Input | Medium | `http.Redirect` with variable URL and `r.URL.Query().Get`/`r.FormValue`/`r.PostFormValue` nearby |
 
 ## Example Detections
 

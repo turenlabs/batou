@@ -408,6 +408,7 @@ The following regex-based rules apply to JavaScript and TypeScript files. Rules 
 | GTSS-INJ-006 | XPath Injection | Medium | XPath queries built with string concatenation |
 | GTSS-INJ-007 | NoSQL Injection | High | MongoDB `$where` with concatenation, unsanitized `$regex`, `JSON.parse` in queries |
 | GTSS-INJ-008 | GraphQL Injection | High | GraphQL queries built via string concatenation instead of variables |
+| GTSS-INJ-009 | HTTP Header Injection | High | HTTP response headers set with user-controlled input allowing CRLF injection |
 
 ### XSS
 
@@ -434,6 +435,7 @@ The following regex-based rules apply to JavaScript and TypeScript files. Rules 
 | GTSS-TRV-007 | Express sendFile Path | High | `res.sendFile()`/`res.download()` with variable path (JS/TS only) |
 | GTSS-TRV-008 | Null Byte File Path | Medium | File operations lacking null byte sanitization |
 | GTSS-TRV-009 | Render Options Injection | High | User input spread into `res.render()` options (JS/TS only) |
+| GTSS-TRV-010 | Zip Slip Path Traversal | Critical | Archive extraction where entry names construct file paths without target directory validation |
 
 ### Cryptography
 
@@ -450,6 +452,7 @@ The following regex-based rules apply to JavaScript and TypeScript files. Rules 
 | GTSS-CRY-013 | Unauthenticated Encryption | High | CBC mode without HMAC/MAC authentication |
 | GTSS-CRY-014 | Insecure RSA Padding | High | PKCS#1 v1.5 padding (Bleichenbacher-vulnerable) |
 | GTSS-CRY-015 | Weak Password Hash | Critical | Fast hash functions for password storage instead of bcrypt/scrypt/Argon2 |
+| GTSS-CRY-017 | Timing-Unsafe Compare | Medium | `==`/`===` used to compare secrets, tokens, hashes, or signatures instead of constant-time comparison |
 
 ### Secrets
 
@@ -506,6 +509,89 @@ The following regex-based rules apply to JavaScript and TypeScript files. Rules 
 | GTSS-VAL-002 | Missing Type Coercion | Medium | User input used where a specific type is expected |
 | GTSS-VAL-003 | Missing Length Validation | Medium | User input in DB/storage operations without length checks |
 | GTSS-VAL-004 | Missing Allowlist Validation | Medium | User input as object keys without allowlist |
+
+### XXE
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-XXE-002 | JavaScript XXE | Critical | XML parsing with external entity expansion enabled (libxmljs with `noent:true`, fast-xml-parser with `processEntities:true`, DOMParser, XML parsing with request input) |
+
+### NoSQL Injection
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-NOSQL-001 | MongoDB $where Injection | Critical | `$where` operator with string interpolation or concatenation enabling server-side JavaScript execution |
+| GTSS-NOSQL-002 | MongoDB Operator Injection | High | User input passed as MongoDB query operators (`$gt`, `$ne`, etc.) enabling query manipulation |
+| GTSS-NOSQL-003 | MongoDB Raw Query Injection | High | Raw MongoDB queries with user input in `$regex`, aggregation pipelines, `mapReduce`, or server-side eval |
+
+### Deserialization
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-DESER-004 | setTimeout/setInterval String Exec | High | `setTimeout`/`setInterval` with string arguments containing user input (implicit `eval()`) |
+
+### Prototype Pollution
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-PROTO-001 | Prototype Pollution via Merge | High | Deep merge/extend/`Object.assign`/spread operations with user-controlled input (lodash merge, deepmerge, etc.) |
+| GTSS-PROTO-002 | Direct Prototype Assignment | High | Direct access to `__proto__` or `constructor.prototype` properties, dynamic property assignment with user-controlled keys |
+
+### Mass Assignment
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-MASS-001 | JavaScript Mass Assignment | High | `Object.assign(model, req.body)`, spread into models, ORM update with raw body, model constructor with raw user input |
+
+### CORS
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-CORS-001 | CORS Wildcard with Credentials | Medium | CORS configuration with wildcard origin (`*`) and credentials enabled |
+| GTSS-CORS-002 | CORS Reflected Origin | High | Request `Origin` header reflected in `Access-Control-Allow-Origin` without validation |
+
+### GraphQL
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-GQL-001 | GraphQL Introspection Enabled | Medium | GraphQL schema with introspection enabled, exposing the full API schema |
+| GTSS-GQL-002 | No Query Depth Limiting | Medium | GraphQL server without query depth limiting or complexity analysis (DoS risk) |
+
+### Misconfiguration
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-MISC-001 | Debug Mode | Medium | `NODE_ENV` hardcoded to development, or generic debug mode flags enabled |
+| GTSS-MISC-002 | Error Disclosure | Low | Error stack traces, messages, or raw error objects sent in HTTP responses |
+
+### Redirect
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-REDIR-001 | Server Redirect with User Input | Medium | `res.redirect()` with user-controlled URL (open redirect) |
+| GTSS-REDIR-002 | Bypassable URL Allowlist | Medium | URL validation via `url.includes()`, `url.indexOf()`, or `url.startsWith('http')` that can be bypassed |
+
+### Express Framework Rules
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-FW-EXPRESS-001 | Missing Helmet | Medium | Express application without Helmet middleware for security headers (CSP, HSTS, X-Frame-Options) |
+| GTSS-FW-EXPRESS-002 | Insecure Session Config | Medium | Express session with `secure: false`, `httpOnly: false`, or `sameSite: 'none'` |
+| GTSS-FW-EXPRESS-003 | Stack Trace Leak | Medium | Express error handler leaking stack traces or error messages to clients |
+| GTSS-FW-EXPRESS-004 | Dynamic Require | Critical | `require()` or `import()` with user-controlled input enabling arbitrary module loading |
+| GTSS-FW-EXPRESS-005 | Sensitive Static Directory | High | `express.static()` serving directories that expose sensitive files (`.git`, `.env`, root, `node_modules`) |
+| GTSS-FW-EXPRESS-006 | Trust Proxy Misconfiguration | Medium | `app.set('trust proxy', true)` trusting all proxies, allowing IP spoofing via `X-Forwarded-For` |
+| GTSS-FW-EXPRESS-007 | Missing Session Expiration | Medium | Session configuration without `maxAge` or `expires`, creating sessions that never expire |
+| GTSS-FW-EXPRESS-008 | Process.env Leak | High | `process.env` sent directly in client responses, exposing secrets and API keys |
+
+### React Framework Rules
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-FW-REACT-001 | React SSR Unsanitized | High | `renderToString`/`renderToStaticMarkup` in files handling user input without sanitization (XSS risk) |
+| GTSS-FW-REACT-002 | React Ref innerHTML | High | `ref.current.innerHTML` assignment bypassing React's built-in XSS protection |
+| GTSS-FW-REACT-003 | React Prop Spreading | Medium | Spreading user-controlled data as React component props (can inject `dangerouslySetInnerHTML`, event handlers) |
+| GTSS-FW-REACT-004 | Dynamic Script/Iframe | High | `createElement('script'/'iframe')` or JSX `<script>`/`<iframe>` with dynamic `src`/`srcdoc` attributes |
 
 ## Example Detections
 

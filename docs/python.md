@@ -258,7 +258,7 @@ GTSS recognizes 25 sanitizer patterns for Python.
 
 ## Rule Coverage
 
-GTSS applies 47 regex-based rules to Python files across 11 categories.
+GTSS applies 76 regex-based rules to Python files across 20 categories.
 
 ### Injection (`internal/rules/injection/`)
 
@@ -272,6 +272,7 @@ GTSS applies 47 regex-based rules to Python files across 11 categories.
 | GTSS-INJ-006 | XPathInjection | High | XPath query construction with unsanitized input |
 | GTSS-INJ-007 | NoSQLInjection | High | MongoDB query construction with user input |
 | GTSS-INJ-008 | GraphQLInjection | High | GraphQL query built with f-string, `.format()`, or `%` formatting |
+| GTSS-INJ-009 | HTTPHeaderInjection | High | HTTP response headers set with `request.GET`/`request.headers` values without CRLF sanitization |
 
 ### XSS (`internal/rules/xss/`)
 
@@ -291,6 +292,7 @@ GTSS applies 47 regex-based rules to Python files across 11 categories.
 | GTSS-TRV-003 | ArchiveExtraction | High | `zipfile`/`tarfile` extraction without path validation |
 | GTSS-TRV-005 | TemplatePathInjection | High | `render_template()` with user-controlled template name |
 | GTSS-TRV-008 | NullByteFilePath | Medium | File paths without null byte sanitization |
+| GTSS-TRV-010 | ZipSlipTraversal | Critical | `tarfile.extractall()` without `members=` or `filter=` parameter, `os.path.join()` with archive entry `.filename`/`.name` without path validation |
 
 ### Cryptography (`internal/rules/crypto/`)
 
@@ -309,6 +311,8 @@ GTSS applies 47 regex-based rules to Python files across 11 categories.
 | GTSS-CRY-013 | UnauthenticatedEncryption | High | CBC mode without HMAC or authentication |
 | GTSS-CRY-014 | InsecureRSAPadding | High | PKCS1v15 padding instead of OAEP |
 | GTSS-CRY-015 | WeakPasswordHash | Critical | MD5/SHA for password hashing instead of bcrypt/argon2 |
+| GTSS-CRY-017 | TimingUnsafeCompare | Medium | `==` comparison of tokens, secrets, hashes, or signatures instead of `hmac.compare_digest()` |
+| GTSS-CRY-018 | HardcodedIVBroad | High | `AES.new()` with hardcoded IV bytes (e.g., `AES.new(key, AES.MODE_CBC, b'fixed_iv')`) |
 
 ### Secrets (`internal/rules/secrets/`)
 
@@ -371,6 +375,79 @@ GTSS applies 47 regex-based rules to Python files across 11 categories.
 | GTSS-VAL-002 | MissingTypeCoercion | Medium | Request params used without `int()` / type conversion |
 | GTSS-VAL-003 | MissingLengthValidation | Medium | String input accepted without length bounds |
 | GTSS-VAL-004 | MissingAllowlistValidation | Medium | Enum-like values without allowlist check |
+
+### XXE (`internal/rules/xxe/`)
+
+| Rule ID | Name | Severity | What It Detects |
+|---------|------|----------|-----------------|
+| GTSS-XXE-003 | PythonXXE | High | `xml.etree.ElementTree`, `xml.dom.minidom`, `xml.sax`, `lxml.etree`, `xml.dom.pulldom` usage without `defusedxml` (skips files importing `defusedxml`; for lxml, checks `resolve_entities=False`) |
+
+### NoSQL Injection (`internal/rules/nosql/`)
+
+| Rule ID | Name | Severity | What It Detects |
+|---------|------|----------|-----------------|
+| GTSS-NOSQL-001 | WhereInjection | Critical | MongoDB `$where` operator with Python f-string, `.format()`, or `%` string formatting (server-side JavaScript execution) |
+| GTSS-NOSQL-002 | OperatorInjection | High | pymongo queries with unsanitized `request.form`/`request.args`/`request.json`/`request.data`/`request.values` passed directly to `find()`, `find_one()`, `aggregate()`, etc. |
+| GTSS-NOSQL-003 | RawQueryInjection | High | `$regex`, `mapReduce`, `$lookup`, `$merge`/`$out` with user-controlled input, server-side `db.eval()` |
+
+### Deserialization (`internal/rules/deser/`)
+
+| Rule ID | Name | Severity | What It Detects |
+|---------|------|----------|-----------------|
+| GTSS-DESER-001 | ExtendedDeserialization | Critical | `shelve.open()` (uses pickle internally) and `marshal.loads()`/`marshal.load()` (unsafe for untrusted data) |
+
+### Mass Assignment (`internal/rules/massassign/`)
+
+| Rule ID | Name | Severity | What It Detects |
+|---------|------|----------|-----------------|
+| GTSS-MASS-002 | MassAssignPython | High | Django `.objects.create(**request.data)`, `Model(**request.POST)`, Flask `Model(**request.json)`, `__dict__.update(request.data)`, `setattr()` loops with dynamic keys, DRF serializer with `fields = '__all__'` |
+
+### CORS (`internal/rules/cors/`)
+
+| Rule ID | Name | Severity | What It Detects |
+|---------|------|----------|-----------------|
+| GTSS-CORS-001 | CORSWildcardCredentials | Medium | Django `CORS_ALLOW_ALL_ORIGINS=True` + `CORS_ALLOW_CREDENTIALS=True`, Flask-CORS `origins="*"` + `supports_credentials=True` |
+| GTSS-CORS-002 | CORSReflectedOrigin | High | `response["Access-Control-Allow-Origin"] = request.META.get("HTTP_ORIGIN")` or `request.headers.get("origin")` reflected without validation |
+
+### GraphQL (`internal/rules/graphql/`)
+
+| Rule ID | Name | Severity | What It Detects |
+|---------|------|----------|-----------------|
+| GTSS-GQL-001 | IntrospectionEnabled | Medium | `introspection=True` in Python graphene/strawberry/ariadne GraphQL schema configuration |
+| GTSS-GQL-002 | NoDepthLimiting | Medium | GraphQL server creation without depth limiting or query complexity analysis configured |
+
+### Misconfiguration (`internal/rules/misconfig/`)
+
+| Rule ID | Name | Severity | What It Detects |
+|---------|------|----------|-----------------|
+| GTSS-MISC-001 | DebugMode | Medium | Django `DEBUG = True`, Flask `app.debug = True`, `app.run(debug=True)` |
+| GTSS-MISC-002 | ErrorDisclosure | Low | `traceback.format_exc()` in HTTP response, `str(e)` in `return`/`response`/`jsonify` calls |
+
+### Redirect (`internal/rules/redirect/`)
+
+| Rule ID | Name | Severity | What It Detects |
+|---------|------|----------|-----------------|
+| GTSS-REDIR-001 | ServerRedirectUserInput | Medium | `redirect()`/`HttpResponseRedirect()` with `request.GET`/`request.POST`/`request.args`/`request.params` (open redirect) |
+| GTSS-REDIR-002 | BypassableURLAllowlist | Medium | `'domain' in url` substring check pattern that can be bypassed via subdomain or path manipulation |
+
+### Framework Rules - Django (`internal/rules/framework/`)
+
+| Rule ID | Name | Severity | What It Detects |
+|---------|------|----------|-----------------|
+| GTSS-FW-DJANGO-001 | DjangoSettingsMisconfig | Medium-High | `DEBUG=True`, `ALLOWED_HOSTS=['*']`, `SECURE_SSL_REDIRECT=False`, `SESSION_COOKIE_SECURE=False`, `CSRF_COOKIE_SECURE=False`, `SESSION_COOKIE_HTTPONLY=False`, `CORS_ALLOW_ALL_ORIGINS=True` |
+| GTSS-FW-DJANGO-002 | DjangoORMSQLInjection | Critical | `.objects.raw()` with f-string/`.format()`/`%` formatting, `.objects.extra()` usage, `cursor.execute()` with string formatting |
+| GTSS-FW-DJANGO-003 | DjangoTemplateXSS | High | `{{ variable\|safe }}` template filter, `mark_safe()` with dynamic content or f-strings |
+| GTSS-FW-DJANGO-004 | DjangoCsrfExempt | Medium | `@csrf_exempt` decorator that disables CSRF protection on views |
+| GTSS-FW-DJANGO-005 | DjangoMassAssignment | High | `.objects.create(**request.POST/data)`, `ModelForm(request.POST)` without explicit fields |
+
+### Framework Rules - Flask (`internal/rules/framework/`)
+
+| Rule ID | Name | Severity | What It Detects |
+|---------|------|----------|-----------------|
+| GTSS-FW-FLASK-001 | FlaskMisconfiguration | Medium-Critical | `app.run(debug=True)` (interactive debugger), hardcoded `secret_key`/`SECRET_KEY`, `SESSION_COOKIE_SECURE=False` |
+| GTSS-FW-FLASK-002 | FlaskSSTI | Critical | `render_template_string()` with dynamic/user-controlled input (server-side template injection leading to RCE) |
+| GTSS-FW-FLASK-003 | FlaskPathTraversal | High | `send_file()` with user-controlled path, `send_from_directory()` with `request` data in filename |
+| GTSS-FW-FLASK-004 | FlaskMarkupXSS | High | `Markup()` with dynamic content, f-strings, `.format()`, or `request` data (bypasses Jinja2 auto-escaping) |
 
 ## Example Detections
 

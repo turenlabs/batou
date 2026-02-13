@@ -306,7 +306,7 @@ Sanitizers neutralize tainted data for specific sink categories.
 
 Rules that explicitly include Java in their `Languages()` method, plus rules with `LangAny` that apply to all languages including Java.
 
-### Injection (7 rules)
+### Injection (8 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
@@ -317,13 +317,16 @@ Rules that explicitly include Java in their `Languages()` method, plus rules wit
 | `GTSS-INJ-006` | XPathInjection | XPath queries built with string concatenation |
 | `GTSS-INJ-007` | NoSQLInjection | Unsafe NoSQL/MongoDB query patterns |
 | `GTSS-INJ-008` | GraphQLInjection | GraphQL queries built via string concatenation |
+| `GTSS-INJ-009` | HTTPHeaderInjection | HTTP response headers set with `request.getParameter()` or `request.getHeader()` values without CRLF sanitization |
 
-### XSS (2 rules)
+### XSS (4 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
 | `GTSS-XSS-008` | ServerSideRenderingXSS | JSP scriptlets, `th:utext`, `PrintWriter.write()` without escaping |
 | `GTSS-XSS-011` | ReflectedXSS | Request parameters reflected directly in HTTP response body |
+| `GTSS-XSS-014` | JavaHTMLStringConcat | `StringBuilder.append()` or string concatenation building HTML with user input from `@RequestParam`/`request.getParameter()` without OWASP Encoder |
+| `GTSS-XSS-015` | JavaResponseWriterXSS | `response.getWriter().print()` with HTML concatenation, `String.format()` with HTML template and `%s`, Spring `@ResponseBody`/`@RestController` returning HTML via string concatenation |
 
 ### Cryptography (10 rules)
 
@@ -387,13 +390,14 @@ Rules that explicitly include Java in their `Languages()` method, plus rules wit
 | `GTSS-VAL-002` | MissingTypeCoercion | User input used where a type is expected without parsing |
 | `GTSS-VAL-003` | MissingLengthValidation | User input in DB operations without length validation |
 
-### Traversal (3 rules with LangAny)
+### Traversal (4 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
 | `GTSS-TRV-001` | PathTraversal | File operations with unsanitized user input (LangAny) |
 | `GTSS-TRV-003` | ArchiveExtraction | Zip/tar extraction without path validation (LangAny) |
 | `GTSS-TRV-008` | NullByteFilePath | Null byte in file paths (LangAny) |
+| `GTSS-TRV-010` | ZipSlipTraversal | `ZipEntry.getName()` used in `new File()` or `Paths.get()`/`Path.of()`/`resolve()` without `getCanonicalPath()` or `normalize()`+`startsWith()` validation |
 
 ### SSRF (2 rules with LangAny)
 
@@ -401,6 +405,65 @@ Rules that explicitly include Java in their `Languages()` method, plus rules wit
 |---|---|---|
 | `GTSS-SSRF-001` | URLFromUserInput | HTTP requests where URL comes from user input (LangAny) |
 | `GTSS-SSRF-002` | InternalNetworkAccess | Requests to private IPs or cloud metadata endpoints (LangAny) |
+
+### XXE (1 rule)
+
+| Rule ID | Name | What It Detects |
+|---|---|---|
+| `GTSS-XXE-001` | Java XXE Vulnerability | Java XML parsers (`DocumentBuilderFactory`, `SAXParserFactory`, `XMLInputFactory`, `TransformerFactory`, `XMLReader`, `SchemaFactory`) instantiated without disabling external entity processing. Checks for `setFeature()`/`setProperty()`/`setAttribute()` with `disallow-doctype-decl`, `external-general-entities`, `FEATURE_SECURE_PROCESSING`, or `ACCESS_EXTERNAL_DTD` nearby. |
+
+### Deserialization (1 rule)
+
+| Rule ID | Name | What It Detects |
+|---|---|---|
+| `GTSS-DESER-001` | ExtendedDeserialization | `XStream.fromXML()` (many CVEs for RCE), `Kryo.readObject()`/`readClassAndObject()` without `setRegistrationRequired(true)`, `new XMLDecoder()` with untrusted data, and `SnakeYAML new Yaml()` without `SafeConstructor` (allows arbitrary object instantiation via `!!` tags) |
+
+### Mass Assignment (1 rule)
+
+| Rule ID | Name | What It Detects |
+|---|---|---|
+| `GTSS-MASS-004` | MassAssignJava | Spring `@ModelAttribute` without `@InitBinder` field restrictions, and `BeanUtils.copyProperties()` that may copy unintended fields from user-controlled sources |
+
+### CORS (2 rules)
+
+| Rule ID | Name | What It Detects |
+|---|---|---|
+| `GTSS-CORS-001` | CORSWildcardCredentials | `@CrossOrigin(origins = "*")` or `allowedOrigins("*")` combined with `allowCredentials = true` in Spring CORS configuration |
+| `GTSS-CORS-002` | CORSReflectedOrigin | Request `Origin` header reflected directly in `Access-Control-Allow-Origin` response header without validation (Java included in language list) |
+
+### GraphQL (2 rules)
+
+| Rule ID | Name | What It Detects |
+|---|---|---|
+| `GTSS-GQL-001` | GraphQL Introspection Enabled | GraphQL schema with introspection explicitly enabled (`.introspection(true)` in Java/Spring GraphQL), exposing the entire API schema for attacker reconnaissance |
+| `GTSS-GQL-002` | GraphQL No Depth Limiting | GraphQL server created without query depth limiting or complexity analysis, allowing deeply nested queries that cause denial of service |
+
+### Misconfiguration (1 rule)
+
+| Rule ID | Name | What It Detects |
+|---|---|---|
+| `GTSS-MISC-002` | ErrorDisclosure | `printStackTrace()` calls that may leak stack traces to clients, and exception details (`getMessage()`, `getStackTrace()`, `toString()`) written to HTTP response objects |
+
+### Redirect (1 rule)
+
+| Rule ID | Name | What It Detects |
+|---|---|---|
+| `GTSS-REDIR-001` | ServerRedirectUserInput | `response.sendRedirect()` with `request.getParameter()` or user-controlled variable as the redirect destination, enabling open redirect attacks for phishing |
+
+### Framework Rules -- Spring (10 rules)
+
+| Rule ID | Name | What It Detects |
+|---|---|---|
+| `GTSS-FW-SPRING-001` | CSRFDisabled | Spring Security `http.csrf().disable()` or lambda DSL `csrf(csrf -> csrf.disable())` disabling CSRF protection |
+| `GTSS-FW-SPRING-002` | OverlyPermissiveAccess | `antMatchers("/**").permitAll()` or `anyRequest().permitAll()` bypassing authentication on all endpoints |
+| `GTSS-FW-SPRING-003` | InsecureCORS | `setAllowedOrigins("*")` with `setAllowCredentials(true)`, `@CrossOrigin` without origin restrictions or with wildcard origins |
+| `GTSS-FW-SPRING-004` | ActuatorExposure | Actuator endpoints with `permitAll()`, `management.endpoints.web.exposure.include=*`, or `management.security.enabled=false` exposing sensitive operational data |
+| `GTSS-FW-SPRING-005` | NativeQueryInjection | `@Query(nativeQuery=true)` with string concatenation, `EntityManager.createNativeQuery()` or `createQuery()` with string concatenation (SQL/HQL injection) |
+| `GTSS-FW-SPRING-006` | MassAssignment | `@ModelAttribute` on controller parameters without `@InitBinder` defining `setAllowedFields()` or `setDisallowedFields()` |
+| `GTSS-FW-SPRING-007` | InsecureCookie | `setHttpOnly(false)` allowing JavaScript cookie access, `setSecure(false)` allowing cookie transmission over HTTP |
+| `GTSS-FW-SPRING-008` | FrameOptionsDisabled | `frameOptions().disable()` removing clickjacking protection, `headers().disable()` removing all security headers |
+| `GTSS-FW-SPRING-009` | DispatcherForward | `getRequestDispatcher(variable).forward()` with user-controlled path, `new ModelAndView(variable)` with user-controlled view name in controllers handling user input |
+| `GTSS-FW-SPRING-010` | SessionFixation | `sessionFixation().none()` disabling session fixation protection, allowing attackers to fix a session ID before authentication |
 
 ## Example Detections
 
@@ -490,6 +553,6 @@ ProcessBuilder pb = new ProcessBuilder("/usr/local/bin/tool", "--action", action
 - **No Android-specific rules**: Android-specific security patterns (Intent injection, exported components, WebView vulnerabilities, content provider exposure) are not covered.
 - **Build configuration files**: Maven `pom.xml` and Gradle `build.gradle` files are not scanned for dependency vulnerabilities or insecure plugin configurations.
 - **SSRF rules**: While taint analysis tracks Java-specific SSRF sinks (`new URL()`, `HttpURLConnection`, `RestTemplate`), the SSRF regex rules (GTSS-SSRF-003 DNS Rebinding, GTSS-SSRF-004 Redirect Following) do not include Java-specific patterns -- they apply via `LangAny` or are limited to other languages.
-- **Session management**: The GTSS-AUTH-004 SessionFixation rule does not include Java in its language list. Servlet session fixation patterns (`request.getSession()` without invalidation) are not detected.
+- **Session management**: The GTSS-AUTH-004 SessionFixation rule does not include Java in its language list. However, GTSS-FW-SPRING-010 detects Spring Security configurations that disable session fixation protection (`sessionFixation().none()`). Servlet-level session fixation patterns (`request.getSession()` without invalidation outside Spring Security) are not detected.
 - **Race conditions**: The GTSS-GEN-006 RaceCondition rule does not include Java. Java-specific TOCTOU patterns with `synchronized` blocks are not checked.
 - **No Kotlin support**: Kotlin (`.kt`) files are not detected or scanned, even though Kotlin runs on the JVM and uses the same libraries.
