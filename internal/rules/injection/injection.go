@@ -850,6 +850,133 @@ func (r GraphQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
+// GTSS-INJ-009: HTTP Header Injection
+// ---------------------------------------------------------------------------
+
+// HTTP Header Injection patterns
+var (
+	// Go: w.Header().Set/Add with r.URL.Query/r.FormValue/r.Header.Get
+	reHeaderGoSet = regexp.MustCompile(`\bw\.Header\(\)\.(?:Set|Add)\s*\([^,]+,\s*r\.(?:URL\.Query\(\)\.Get|FormValue|Header\.Get|PostFormValue)\s*\(`)
+	// Go: http.SetCookie or w.Header().Set("Set-Cookie", ...) with user input
+	reHeaderGoSetCookie = regexp.MustCompile(`\bw\.Header\(\)\.(?:Set|Add)\s*\(\s*["']Set-Cookie["']`)
+	// Node/Express: res.set/res.header/res.setHeader with req.query/req.params/req.body
+	reHeaderJSSet = regexp.MustCompile(`\bres\.(?:set|header|setHeader)\s*\(\s*[^,]+,\s*req\.(?:query|params|body|headers)\s*[\[.]`)
+	// Node/Express: res.set/header with variable that may come from request
+	reHeaderJSSetVar = regexp.MustCompile(`\bres\.(?:set|header|setHeader)\s*\(\s*[^,]+,\s*[a-zA-Z_]\w*\s*\)`)
+	// Python: response[header] = request.GET/POST/etc
+	reHeaderPySet = regexp.MustCompile(`\bresponse\s*\[\s*["'][^"']+["']\s*\]\s*=\s*request\.(?:GET|POST|META|headers|args|form|values)\s*[\[.]`)
+	// Python: Django/Flask set header with user input
+	reHeaderPySetMethod = regexp.MustCompile(`\bresponse(?:\[["'][^"']+["']\]|\.headers\[["'][^"']+["']\])\s*=\s*(?:request\.|user_input|param|data)`)
+	// Java: response.setHeader/addHeader with request.getParameter
+	reHeaderJavaSet = regexp.MustCompile(`\bresponse\.(?:setHeader|addHeader)\s*\(\s*["'][^"']+["']\s*,\s*request\.(?:getParameter|getHeader)\s*\(`)
+	// Java: HttpServletResponse header with user input
+	reHeaderJavaSetVar = regexp.MustCompile(`\bresponse\.(?:setHeader|addHeader)\s*\(\s*["'][^"']+["']\s*,\s*[a-zA-Z_]\w*\s*\)`)
+	// PHP: header() with user input
+	reHeaderPHPSet = regexp.MustCompile(`\bheader\s*\(\s*(?:["'][^"']*["']\s*\.\s*\$(?:_GET|_POST|_REQUEST|_SERVER|input|param)|.*\$(?:_GET|_POST|_REQUEST)\s*\[)`)
+)
+
+type HTTPHeaderInjection struct{}
+
+func (r HTTPHeaderInjection) ID() string              { return "GTSS-INJ-009" }
+func (r HTTPHeaderInjection) Name() string            { return "HTTP Header Injection" }
+func (r HTTPHeaderInjection) DefaultSeverity() rules.Severity { return rules.High }
+func (r HTTPHeaderInjection) Description() string {
+	return "Detects HTTP response headers set with user-controlled input, which may allow header injection or response splitting via CRLF sequences."
+}
+func (r HTTPHeaderInjection) Languages() []rules.Language {
+	return []rules.Language{
+		rules.LangGo, rules.LangJavaScript, rules.LangTypeScript,
+		rules.LangPython, rules.LangJava, rules.LangPHP,
+	}
+}
+
+func (r HTTPHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	type pattern struct {
+		re   *regexp.Regexp
+		conf string
+		desc string
+		lang rules.Language
+	}
+
+	patterns := []pattern{
+		{reHeaderGoSet, "high", "HTTP header set with request parameter value", rules.LangGo},
+		{reHeaderJSSet, "high", "HTTP header set with req.query/params/body value", rules.LangAny},
+		{reHeaderPySet, "high", "HTTP response header set with request input", rules.LangPython},
+		{reHeaderPySetMethod, "high", "HTTP response header set with request input", rules.LangPython},
+		{reHeaderJavaSet, "high", "HTTP response header set with request.getParameter()", rules.LangJava},
+		{reHeaderPHPSet, "high", "PHP header() with user input variable", rules.LangPHP},
+	}
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+		for _, p := range patterns {
+			if p.lang != rules.LangAny && p.lang != ctx.Language {
+				continue
+			}
+			if loc := p.re.FindStringIndex(line); loc != nil {
+				// Check for CRLF sanitization nearby
+				if hasHeaderSanitization(lines, i) {
+					continue
+				}
+				matched := truncate(line[loc[0]:loc[1]], 120)
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "HTTP Header Injection: " + p.desc,
+					Description:   "HTTP response headers set with user-controlled input can allow header injection via CRLF (\\r\\n) sequences. An attacker can inject arbitrary headers or split the HTTP response.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   matched,
+					Suggestion:    "Sanitize header values by stripping or rejecting \\r and \\n characters. Use framework-provided header setting methods that auto-sanitize. Never pass raw user input as header values.",
+					CWEID:         "CWE-113",
+					OWASPCategory: "A03:2021-Injection",
+					Language:      ctx.Language,
+					Confidence:    p.conf,
+					Tags:          []string{"injection", "header-injection", "crlf", "response-splitting"},
+				})
+				break
+			}
+		}
+	}
+	return findings
+}
+
+// hasHeaderSanitization checks for CRLF sanitization patterns near the given line.
+func hasHeaderSanitization(lines []string, idx int) bool {
+	start := idx - 10
+	if start < 0 {
+		start = 0
+	}
+	end := idx + 5
+	if end > len(lines) {
+		end = len(lines)
+	}
+	for _, l := range lines[start:end] {
+		// Check for CRLF stripping/replacing
+		if strings.Contains(l, `\r`) || strings.Contains(l, `\n`) ||
+			strings.Contains(l, "\\r") || strings.Contains(l, "\\n") {
+			if strings.Contains(l, "Replace") || strings.Contains(l, "replace") ||
+				strings.Contains(l, "strip") || strings.Contains(l, "sanitize") ||
+				strings.Contains(l, "reject") || strings.Contains(l, "Split") {
+				return true
+			}
+		}
+		// Framework-level sanitization
+		if strings.Contains(l, "encodeURIComponent") || strings.Contains(l, "url.QueryEscape") ||
+			strings.Contains(l, "urllib.parse.quote") || strings.Contains(l, "URLEncoder.encode") {
+			return true
+		}
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -862,4 +989,5 @@ func init() {
 	rules.Register(XPathInjection{})
 	rules.Register(NoSQLInjection{})
 	rules.Register(GraphQLInjection{})
+	rules.Register(HTTPHeaderInjection{})
 }

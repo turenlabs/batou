@@ -358,3 +358,71 @@ func TestINJ008_Safe_Static_Query(t *testing.T) {
 	result := testutil.ScanContent(t, "/app/routes/graphql.ts", content)
 	testutil.MustNotFindRule(t, result, "GTSS-INJ-008")
 }
+
+// --- GTSS-INJ-009: HTTP Header Injection ---
+
+func TestINJ009_HeaderInjection_Go_Fixture(t *testing.T) {
+	content := testutil.LoadFixture(t, "go/vulnerable/header_injection.go")
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustFindRule(t, result, "GTSS-INJ-009")
+}
+
+func TestINJ009_HeaderInjection_JS_Fixture(t *testing.T) {
+	content := testutil.LoadFixture(t, "javascript/vulnerable/header_injection.ts")
+	result := testutil.ScanContent(t, "/app/routes/api.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-INJ-009")
+}
+
+func TestINJ009_HeaderInjection_Python_Fixture(t *testing.T) {
+	content := testutil.LoadFixture(t, "python/vulnerable/header_injection.py")
+	result := testutil.ScanContent(t, "/app/views.py", content)
+	testutil.MustFindRule(t, result, "GTSS-INJ-009")
+}
+
+func TestINJ009_HeaderInjection_Java_Fixture(t *testing.T) {
+	content := testutil.LoadFixture(t, "java/vulnerable/HeaderInjection.java")
+	result := testutil.ScanContent(t, "/app/HeaderServlet.java", content)
+	testutil.MustFindRule(t, result, "GTSS-INJ-009")
+}
+
+func TestINJ009_HeaderInjection_Go_Inline(t *testing.T) {
+	content := `package handler
+import "net/http"
+func setHeader(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Token", r.URL.Query().Get("token"))
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustFindRule(t, result, "GTSS-INJ-009")
+}
+
+func TestINJ009_HeaderInjection_JS_Inline(t *testing.T) {
+	content := `app.get('/api', (req, res) => {
+  res.setHeader('X-Request-Id', req.query.rid);
+  res.json({});
+});`
+	result := testutil.ScanContent(t, "/app/routes/api.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-INJ-009")
+}
+
+func TestINJ009_HeaderInjection_Java_Inline(t *testing.T) {
+	content := `import javax.servlet.http.*;
+public class Servlet extends HttpServlet {
+    void doGet(HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("X-Custom", request.getParameter("val"));
+    }
+}`
+	result := testutil.ScanContent(t, "/app/Servlet.java", content)
+	testutil.MustFindRule(t, result, "GTSS-INJ-009")
+}
+
+func TestINJ009_Safe_Go(t *testing.T) {
+	content := testutil.LoadFixture(t, "go/safe/header_injection_safe.go")
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-INJ-009")
+}
+
+func TestINJ009_Safe_JS(t *testing.T) {
+	content := testutil.LoadFixture(t, "javascript/safe/header_injection_safe.ts")
+	result := testutil.ScanContent(t, "/app/routes/api.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-INJ-009")
+}

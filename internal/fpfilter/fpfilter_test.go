@@ -285,6 +285,21 @@ func TestIsTestFile(t *testing.T) {
 		{"lib/stub_handler.rb", true},
 		{"docs/example_usage.py", true},
 
+		// Maven/Gradle test conventions
+		{"src/test/java/org/owasp/webgoat/SomeTest.java", true},
+		{"src/it/java/org/owasp/webgoat/IntegrationTest.java", true},
+		{"src/test/resources/config.xml", true},
+
+		// Java test class suffixes (case-sensitive)
+		{"src/main/java/FooTest.java", true},
+		{"src/main/java/FooIT.java", true},
+		{"src/main/java/FooITCase.java", true},
+		{"src/main/java/BarTests.java", true},
+
+		// Test config files
+		{"cypress.config.ts", true},
+		{"playwright.config.js", true},
+
 		// Negative cases
 		{"/app/handler.go", false},
 		{"internal/scanner/scanner.go", false},
@@ -292,6 +307,9 @@ func TestIsTestFile(t *testing.T) {
 		{"src/index.ts", false},
 		{"lib/auth.rb", false},
 		{"api/controller.java", false},
+		// Java files that look like tests but aren't
+		{"src/main/java/TestUtils.java", false},
+		{"src/main/java/Contest.java", false},
 	}
 
 	for _, tt := range tests {
@@ -299,6 +317,61 @@ func TestIsTestFile(t *testing.T) {
 			got := IsTestFile(tt.path)
 			if got != tt.want {
 				t.Errorf("IsTestFile(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// IsVendoredLibrary
+// ---------------------------------------------------------------------------
+
+func TestIsVendoredLibrary(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		// Known JS library prefixes
+		{"frontend/src/assets/jquery-3.6.0.js", true},
+		{"static/js/backbone-min.js", true},
+		{"public/underscore-1.13.js", true},
+		{"assets/three.js", true},
+		{"lib/ace.js", true},
+		{"vendor/wysihtml5-0.3.0.js", true},
+		{"static/bootstrap.min.js", true},
+		{"js/codemirror-5.65.js", true},
+		{"js/handlebars-4.7.js", true},
+		{"static/socket.io-client.js", true},
+
+		// Vendored directory patterns
+		{"frontend/src/assets/private/RenderPass.js", true},
+		{"public/static/vendor/moment.js", true},
+		{"lib/third_party/parser.js", true},
+		{"src/3rdparty/crypto.js", true},
+		{"src/external/helper.js", true},
+		{"data/static/codefixes/sqli_fix.ts", true},
+
+		// Negative cases — application JS files should NOT match
+		{"src/app.js", false},
+		{"routes/handler.js", false},
+		{"frontend/src/app/login.component.ts", false},
+		{"lib/insecurity.ts", false},
+		{"src/services/auth.service.ts", false},
+
+		// Non-JS files with vendor-like names should NOT match prefix list
+		{"src/jquery-wrapper.ts", false},
+		{"internal/bootstrap.go", false},
+
+		// But non-JS in vendored dirs still match
+		{"frontend/src/assets/private/shader.glsl", true},
+		{"data/static/codefixes/login_fix.java", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got := IsVendoredLibrary(tt.path)
+			if got != tt.want {
+				t.Errorf("IsVendoredLibrary(%q) = %v, want %v", tt.path, got, tt.want)
 			}
 		})
 	}

@@ -126,6 +126,93 @@ const resp = await got(url, { followRedirects: true });`
 	testutil.MustFindRule(t, result, "GTSS-SSRF-004")
 }
 
+// --- GTSS-SSRF-001: Angular false positive exclusion ---
+
+func TestSSRF001_Angular_HttpClient_Safe(t *testing.T) {
+	// Angular HttpClient calls should NOT trigger SSRF — they are frontend HTTP calls
+	content := `import { HttpClient } from '@angular/common/http';
+
+@Injectable({ providedIn: 'root' })
+export class UserService {
+  constructor(private http: HttpClient) {}
+
+  getUsers(): Observable<User[]> {
+    return this.http.get<User[]>(apiUrl);
+  }
+
+  updateUser(user: User): Observable<User> {
+    return this.http.put<User>(endpoint, user);
+  }
+
+  deleteUser(id: string): Observable<void> {
+    return this.http.delete<void>(url);
+  }
+}`
+	result := testutil.ScanContent(t, "/app/user.service.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_Angular_HttpClient_Post_Safe(t *testing.T) {
+	content := `import { HttpClient } from '@angular/common/http';
+
+export class ApiService {
+  constructor(private http: HttpClient) {}
+
+  submitData(data: any): Observable<any> {
+    return this.http.post<any>(targetUrl, data);
+  }
+}`
+	result := testutil.ScanContent(t, "/app/api.service.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_NonAngular_Fetch_StillDetected(t *testing.T) {
+	// Server-side fetch should still be detected even in .ts files
+	content := `const url = req.query.url;
+const response = await fetch(url);`
+	result := testutil.ScanContent(t, "/app/proxy.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
+// --- GTSS-SSRF-001: Java server-side SSRF detection ---
+
+func TestSSRF001_Java_URLOpenStream(t *testing.T) {
+	content := `String url = request.getParameter("url");
+InputStream is = new URL(url).openStream();`
+	result := testutil.ScanContent(t, "/app/SsrfHandler.java", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_Java_URLOpenConnection(t *testing.T) {
+	content := `@RequestParam String targetUrl
+URL url = new URL(targetUrl).openConnection();`
+	result := testutil.ScanContent(t, "/app/ProxyController.java", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_Java_RestTemplate(t *testing.T) {
+	content := `String url = request.getParameter("url");
+String result = restTemplate.getForObject(url, String.class);`
+	result := testutil.ScanContent(t, "/app/ApiController.java", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_Java_WebClient(t *testing.T) {
+	content := `@RequestParam String serviceUrl
+WebClient client = WebClient.create(serviceUrl);`
+	result := testutil.ScanContent(t, "/app/WebClientController.java", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
+func TestSSRF001_Java_Fixture(t *testing.T) {
+	if !testutil.FixtureExists("java/vulnerable/SsrfBasic.java") {
+		t.Skip("Java SSRF fixture not available")
+	}
+	content := testutil.LoadFixture(t, "java/vulnerable/SsrfBasic.java")
+	result := testutil.ScanContent(t, "/app/SsrfBasic.java", content)
+	testutil.MustFindRule(t, result, "GTSS-SSRF-001")
+}
+
 // --- Safe fixture tests ---
 
 func TestSSRF_Safe_Go(t *testing.T) {

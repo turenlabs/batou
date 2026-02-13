@@ -210,6 +210,8 @@ var testDirSegments = []string{
 	"/__fixtures__/",
 	"/testing/",
 	"/test_data/",
+	"/src/test/",  // Maven/Gradle convention
+	"/src/it/",    // Maven integration tests
 }
 
 // testFileSuffixes are filename suffixes that indicate test files.
@@ -235,10 +237,77 @@ var testFileSuffixes = []string{
 	"_spec.rb",
 }
 
+// javaTestSuffixes match Java/Kotlin conventional test class names.
+var javaTestSuffixes = []string{
+	"Test.java",
+	"Tests.java",
+	"IT.java",        // integration tests
+	"ITCase.java",
+	"Spec.java",
+	"Test.kt",
+	"Tests.kt",
+	"IT.kt",
+}
+
 // testFileNames are exact base filenames that indicate test/config files.
 var testFileNames = []string{
 	"conftest.py",
 	"setup_test.go",
+	"cypress.config.ts",
+	"cypress.config.js",
+	"playwright.config.ts",
+	"playwright.config.js",
+}
+
+// vendoredJSLibPrefixes are filename prefixes for well-known third-party JS
+// libraries that should be treated as generated/vendored code.
+var vendoredJSLibPrefixes = []string{
+	"jquery",
+	"backbone",
+	"underscore",
+	"lodash",
+	"moment",
+	"angular.",   // Angular 1.x vendored builds
+	"react.",     // vendored React builds
+	"vue.",       // vendored Vue builds
+	"bootstrap",
+	"d3.",
+	"three.",
+	"ace.",
+	"codemirror",
+	"highlight",
+	"prism",
+	"wysihtml",
+	"ckeditor",
+	"tinymce",
+	"quill",
+	"popper",
+	"chart.",
+	"raphael",
+	"ember",
+	"knockout",
+	"mootools",
+	"prototype.",
+	"dojo",
+	"ext-all",
+	"handlebars",
+	"mustache",
+	"require.",
+	"modernizr",
+	"socket.io",
+}
+
+// vendoredDirPatterns are path substrings for directories containing
+// third-party or educational/challenge code that is not production code.
+var vendoredDirPatterns = []string{
+	"/assets/private/",
+	"/static/vendor/",
+	"/third_party/",
+	"/3rdparty/",
+	"/external/",
+	"/codefixes/",    // intentionally vulnerable challenge snippets
+	"/codefix/",
+	"/snippets/challenge/",
 }
 
 // testPathKeywords are case-insensitive substrings that indicate test-like files.
@@ -271,16 +340,24 @@ func IsTestFile(filePath string) bool {
 		}
 	}
 
+	// Java/Kotlin conventional test class suffixes (case-sensitive).
+	base := filepath.Base(filePath)
+	for _, suf := range javaTestSuffixes {
+		if strings.HasSuffix(base, suf) {
+			return true
+		}
+	}
+
 	// Exact base filenames.
-	base := strings.ToLower(filepath.Base(filePath))
+	baseLower := strings.ToLower(base)
 	for _, name := range testFileNames {
-		if base == name {
+		if baseLower == name {
 			return true
 		}
 	}
 
 	// Test file name patterns: test_*.py
-	if strings.HasPrefix(base, "test_") && strings.HasSuffix(base, ".py") {
+	if strings.HasPrefix(baseLower, "test_") && strings.HasSuffix(baseLower, ".py") {
 		return true
 	}
 
@@ -288,6 +365,39 @@ func IsTestFile(filePath string) bool {
 	for _, kw := range testPathKeywords {
 		if strings.Contains(lower, kw) {
 			return true
+		}
+	}
+
+	return false
+}
+
+// ---------------------------------------------------------------------------
+// Vendored / third-party library detection
+// ---------------------------------------------------------------------------
+
+// IsVendoredLibrary returns true if the file looks like a known third-party
+// JavaScript library or lives in a vendored/third-party directory.
+// These files produce noise because they contain patterns (eval, innerHTML, etc.)
+// that are intentional library internals, not application vulnerabilities.
+func IsVendoredLibrary(filePath string) bool {
+	norm := "/" + filepath.ToSlash(filePath)
+	lower := strings.ToLower(norm)
+
+	// Check vendored directory patterns.
+	for _, pat := range vendoredDirPatterns {
+		if strings.Contains(lower, pat) {
+			return true
+		}
+	}
+
+	// Check known JS library filenames (only for .js files).
+	ext := strings.ToLower(filepath.Ext(filePath))
+	if ext == ".js" {
+		baseLower := strings.ToLower(filepath.Base(filePath))
+		for _, prefix := range vendoredJSLibPrefixes {
+			if strings.HasPrefix(baseLower, prefix) {
+				return true
+			}
 		}
 	}
 

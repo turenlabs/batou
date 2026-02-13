@@ -207,3 +207,145 @@ func TestXSS_Safe_Escaped_Java(t *testing.T) {
 	testutil.MustNotFindRule(t, result, "GTSS-XSS-008")
 	testutil.MustNotFindRule(t, result, "GTSS-XSS-011")
 }
+
+// --- GTSS-XSS-014: Java HTML String Concatenation ---
+
+func TestXSS014_StringBuilderAppendHTML(t *testing.T) {
+	content := `
+import javax.servlet.http.HttpServletRequest;
+public class Vuln {
+    void doGet(HttpServletRequest request) {
+        String field1 = request.getParameter("field1");
+        StringBuilder cart = new StringBuilder();
+        cart.append("<div class='cart'>" + field1 + "</div>");
+    }
+}
+`
+	result := testutil.ScanContent(t, "/app/Vuln.java", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-014")
+}
+
+func TestXSS014_HTMLTagConcatWithUserInput(t *testing.T) {
+	content := `
+import javax.servlet.http.HttpServletRequest;
+public class Vuln {
+    void doGet(HttpServletRequest request) {
+        String name = request.getParameter("name");
+        String html = "<h1>" + name + "</h1>";
+    }
+}
+`
+	result := testutil.ScanContent(t, "/app/Vuln.java", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-014")
+}
+
+func TestXSS014_Fixture_XssStringConcat(t *testing.T) {
+	content := testutil.LoadFixture(t, "java/vulnerable/XssStringConcat.java")
+	result := testutil.ScanContent(t, "/app/XssStringConcat.java", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-014")
+}
+
+func TestXSS014_Safe_WithEncoder(t *testing.T) {
+	content := `
+import javax.servlet.http.HttpServletRequest;
+import org.owasp.encoder.Encode;
+public class Safe {
+    void doGet(HttpServletRequest request) {
+        String name = request.getParameter("name");
+        String safe = Encode.forHtml(name);
+        String html = "<h1>" + safe + "</h1>";
+    }
+}
+`
+	result := testutil.ScanContent(t, "/app/Safe.java", content)
+	testutil.MustNotFindRule(t, result, "GTSS-XSS-014")
+}
+
+func TestXSS014_Safe_Fixture(t *testing.T) {
+	content := testutil.LoadFixture(t, "java/safe/XssHtmlSafe.java")
+	result := testutil.ScanContent(t, "/app/Safe.java", content)
+	testutil.MustNotFindRule(t, result, "GTSS-XSS-014")
+}
+
+// --- GTSS-XSS-015: Java Response Writer XSS ---
+
+func TestXSS015_ResponseWriterHTML(t *testing.T) {
+	content := `
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+public class Vuln {
+    void doGet(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        String name = request.getParameter("name");
+        response.getWriter().println("<div class='result'>" + name + "</div>");
+    }
+}
+`
+	result := testutil.ScanContent(t, "/app/Vuln.java", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-015")
+}
+
+func TestXSS015_StringFormatHTML(t *testing.T) {
+	content := `
+import javax.servlet.http.HttpServletRequest;
+public class Vuln {
+    void doGet(HttpServletRequest request) {
+        String name = request.getParameter("name");
+        String html = String.format("<h1>Welcome %s</h1>", name);
+    }
+}
+`
+	result := testutil.ScanContent(t, "/app/Vuln.java", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-015")
+}
+
+func TestXSS015_SpringResponseBodyReturn(t *testing.T) {
+	content := `
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+@RestController
+public class Controller {
+    @GetMapping("/greet")
+    public String greet(@RequestParam String name) {
+        return "<h1>Hello " + name + "</h1>";
+    }
+}
+`
+	result := testutil.ScanContent(t, "/app/Controller.java", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-015")
+}
+
+func TestXSS015_Fixture_XssResponseWriter(t *testing.T) {
+	content := testutil.LoadFixture(t, "java/vulnerable/XssResponseWriter.java")
+	result := testutil.ScanContent(t, "/app/XssResponseWriter.java", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-015")
+}
+
+func TestXSS015_Fixture_XssSpringController(t *testing.T) {
+	content := testutil.LoadFixture(t, "java/vulnerable/XssSpringController.java")
+	result := testutil.ScanContent(t, "/app/XssSpringController.java", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-015")
+}
+
+func TestXSS015_Safe_WithEncoder(t *testing.T) {
+	content := `
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.owasp.encoder.Encode;
+public class Safe {
+    void doGet(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        String name = request.getParameter("name");
+        response.getWriter().println("<div>" + Encode.forHtml(name) + "</div>");
+    }
+}
+`
+	result := testutil.ScanContent(t, "/app/Safe.java", content)
+	testutil.MustNotFindRule(t, result, "GTSS-XSS-015")
+}
+
+func TestXSS015_Safe_Fixture(t *testing.T) {
+	content := testutil.LoadFixture(t, "java/safe/XssHtmlSafe.java")
+	result := testutil.ScanContent(t, "/app/Safe.java", content)
+	testutil.MustNotFindRule(t, result, "GTSS-XSS-015")
+}

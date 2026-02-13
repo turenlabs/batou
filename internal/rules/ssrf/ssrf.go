@@ -24,6 +24,16 @@ var (
 	jsAxiosCall       = regexp.MustCompile(`\baxios\.(?:get|post|put|delete|patch|head|options|request)\s*\(\s*[a-zA-Z_]\w*`)
 	jsHTTPGet         = regexp.MustCompile(`\b(?:http|https)\.(?:get|request)\s*\(\s*[a-zA-Z_]\w*`)
 	jsGotCall         = regexp.MustCompile(`\bgot\s*\(\s*[a-zA-Z_]\w*`)
+	// JS/TS: Angular HttpClient patterns (false positive exclusion)
+	angularHTTPClient = regexp.MustCompile(`\bthis\.http\s*\.\s*(?:get|post|put|delete|patch|head|options)\s*[<(]`)
+	angularImport     = regexp.MustCompile(`@angular/common/http|HttpClient`)
+	// Java: server-side SSRF patterns
+	javaURLOpen       = regexp.MustCompile(`\bnew\s+URL\s*\(\s*[a-zA-Z_]\w*\s*\)\s*\.\s*(?:openStream|openConnection)\s*\(`)
+	javaHTTPURLConn   = regexp.MustCompile(`\(\s*HttpURLConnection\s*\)\s*[a-zA-Z_]\w*\s*\.\s*openConnection\s*\(`)
+	javaRestTemplate  = regexp.MustCompile(`\b(?:restTemplate|RestTemplate)\s*\.\s*(?:getForObject|getForEntity|postForObject|postForEntity|exchange)\s*\(\s*[a-zA-Z_]\w*`)
+	javaWebClient     = regexp.MustCompile(`\bWebClient\s*\.\s*create\s*\(\s*[a-zA-Z_]\w*`)
+	// Java: user input sources
+	javaUserInput     = regexp.MustCompile(`request\.getParameter|@RequestParam|@PathVariable|@RequestBody`)
 	// PHP: curl/file_get_contents with variable
 	phpCurlSetopt     = regexp.MustCompile(`\bcurl_setopt\s*\([^,]+,\s*CURLOPT_URL\s*,\s*\$`)
 	phpFileGetURL     = regexp.MustCompile(`\bfile_get_contents\s*\(\s*\$(?:_GET|_POST|_REQUEST|url|uri|link|input|param)`)
@@ -86,7 +96,7 @@ func (r *URLFromUserInput) ID() string             { return "GTSS-SSRF-001" }
 func (r *URLFromUserInput) Name() string            { return "URLFromUserInput" }
 func (r *URLFromUserInput) DefaultSeverity() rules.Severity { return rules.High }
 func (r *URLFromUserInput) Languages() []rules.Language {
-	return []rules.Language{rules.LangAny}
+	return []rules.Language{rules.LangAny, rules.LangJava}
 }
 
 func (r *URLFromUserInput) Description() string {
@@ -96,6 +106,20 @@ func (r *URLFromUserInput) Description() string {
 func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
+
+	// Pre-check: for JS/TS files, detect Angular HttpClient to suppress frontend HTTP call FPs
+	isAngularFile := false
+	if ctx.Language == rules.LangJavaScript || ctx.Language == rules.LangTypeScript {
+		if angularImport.MatchString(ctx.Content) {
+			isAngularFile = true
+		}
+	}
+
+	// Pre-check: for Java files, detect user input sources for confidence boosting
+	javaHasUserInput := false
+	if ctx.Language == rules.LangJava {
+		javaHasUserInput = javaUserInput.MatchString(ctx.Content)
+	}
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -148,6 +172,11 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
+			// Skip Angular HttpClient calls — these are frontend HTTP calls, not server-side SSRF
+			if isAngularFile && angularHTTPClient.MatchString(line) {
+				continue
+			}
+
 			if loc := jsFetchVar.FindString(line); loc != "" {
 				if !hasURLValidation(lines, i) {
 					matched = loc
@@ -175,6 +204,53 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 					if !hasURLValidation(lines, i) {
 						matched = loc
 						confidence = "low"
+					}
+				}
+			}
+		case rules.LangJava:
+			if loc := javaURLOpen.FindString(line); loc != "" {
+				if !hasURLValidation(lines, i) {
+					matched = loc
+					if javaHasUserInput {
+						confidence = "high"
+					} else {
+						confidence = "medium"
+					}
+				}
+			}
+			if matched == "" {
+				if loc := javaHTTPURLConn.FindString(line); loc != "" {
+					if !hasURLValidation(lines, i) {
+						matched = loc
+						if javaHasUserInput {
+							confidence = "high"
+						} else {
+							confidence = "medium"
+						}
+					}
+				}
+			}
+			if matched == "" {
+				if loc := javaRestTemplate.FindString(line); loc != "" {
+					if !hasURLValidation(lines, i) {
+						matched = loc
+						if javaHasUserInput {
+							confidence = "high"
+						} else {
+							confidence = "medium"
+						}
+					}
+				}
+			}
+			if matched == "" {
+				if loc := javaWebClient.FindString(line); loc != "" {
+					if !hasURLValidation(lines, i) {
+						matched = loc
+						if javaHasUserInput {
+							confidence = "high"
+						} else {
+							confidence = "medium"
+						}
 					}
 				}
 			}
@@ -630,6 +706,12 @@ func fileHasUserURL(content string, lang rules.Language) bool {
 			strings.Contains(content, "req.params") ||
 			strings.Contains(content, "req.body") ||
 			strings.Contains(content, "searchParams")
+	case rules.LangJava:
+		return strings.Contains(content, "request.getParameter") ||
+			strings.Contains(content, "@RequestParam") ||
+			strings.Contains(content, "@PathVariable") ||
+			strings.Contains(content, "@RequestBody") ||
+			strings.Contains(content, "getServletRequest")
 	}
 	return false
 }

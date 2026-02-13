@@ -104,6 +104,30 @@ var (
 	jsRenderSpreadReq = regexp.MustCompile(`\bres\.render\s*\([^,]+,\s*\{[^}]*\.\.\.req\.(?:query|params)\b`)
 )
 
+// GTSS-TRV-010: Zip Slip Path Traversal
+var (
+	// Go: zip.File.Name or header.Name used in filepath.Join/os.Create without path check
+	goZipSlipJoinCreate = regexp.MustCompile(`(?:filepath\.Join|os\.Create|os\.OpenFile|os\.MkdirAll)\s*\([^)]*(?:\.Name\b|entry\.Name|header\.Name|f\.Name|file\.Name|zipEntry|zf\.Name)`)
+	// Go: zip.File range with file operations
+	goZipSlipRange = regexp.MustCompile(`for\s+.*range\s+.*\.File\b`)
+	// Java: ZipEntry.getName() used in new File() without validation
+	javaZipSlipNewFile = regexp.MustCompile(`new\s+File\s*\([^)]*(?:\.getName\s*\(\)|entry\.getName|zipEntry\.getName)`)
+	// Java: ZipEntry.getName() used in path construction
+	javaZipSlipPath = regexp.MustCompile(`(?:Paths\.get|Path\.of|resolve)\s*\([^)]*(?:\.getName\s*\(\)|entry\.getName|zipEntry\.getName)`)
+	// Python: tarfile.extractall() without members filter
+	pyTarExtractAll = regexp.MustCompile(`tarfile\.open\b.*\.extractall\s*\(`)
+	// Python: tarfile extraction without safe filter
+	pyTarExtract = regexp.MustCompile(`\.extractall\s*\([^)]*\)`)
+	// Python: tarfile import + extractall
+	pyTarImport = regexp.MustCompile(`\btarfile\b`)
+	// Python: manual zip extract with path join
+	pyZipSlipManual = regexp.MustCompile(`os\.path\.join\s*\([^)]*\.(?:filename|name)\b`)
+	// JS: zip entry path used in createWriteStream/writeFile without validation
+	jsZipSlipWrite = regexp.MustCompile(`(?:fs\.createWriteStream|fs\.writeFile|fs\.writeFileSync)\s*\([^)]*(?:entry\.(?:fileName|path|name)|file\.(?:path|name)|zipEntry)`)
+	// JS: adm-zip/yauzl/unzipper entry path in file operations
+	jsZipSlipEntry = regexp.MustCompile(`(?:path\.join|path\.resolve)\s*\([^)]*(?:entry\.(?:fileName|path|name)|file\.(?:path|name)|zipEntry\.(?:fileName|path))`)
+)
+
 func init() {
 	rules.Register(&PathTraversal{})
 	rules.Register(&FileInclusion{})
@@ -114,6 +138,7 @@ func init() {
 	rules.Register(&ExpressSendFilePath{})
 	rules.Register(&NullByteFilePath{})
 	rules.Register(&RenderOptionsInjection{})
+	rules.Register(&ZipSlipTraversal{})
 }
 
 // --- GTSS-TRV-001: Path Traversal ---
@@ -1025,6 +1050,162 @@ func isStringLiteralArg(line, funcName string) bool {
 	after := line[idx+len(funcName):]
 	after = strings.TrimLeft(after, " \t(")
 	return strings.HasPrefix(after, `"`) || strings.HasPrefix(after, `'`) || strings.HasPrefix(after, "`")
+}
+
+// --- GTSS-TRV-010: Zip Slip Path Traversal ---
+
+type ZipSlipTraversal struct{}
+
+func (r *ZipSlipTraversal) ID() string                    { return "GTSS-TRV-010" }
+func (r *ZipSlipTraversal) Name() string                  { return "ZipSlipTraversal" }
+func (r *ZipSlipTraversal) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *ZipSlipTraversal) Languages() []rules.Language {
+	return []rules.Language{rules.LangGo, rules.LangJava, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript}
+}
+
+func (r *ZipSlipTraversal) Description() string {
+	return "Detects zip/tar archive extraction where entry names are used to construct file paths without validating that the result stays within the target directory (zip slip attack)."
+}
+
+func (r *ZipSlipTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
+
+		if isComment(trimmed) {
+			continue
+		}
+
+		var matched string
+		var confidence string
+
+		switch ctx.Language {
+		case rules.LangGo:
+			if loc := goZipSlipJoinCreate.FindString(line); loc != "" {
+				if !hasZipSlipValidation(lines, i) {
+					matched = loc
+					confidence = "high"
+				}
+			}
+		case rules.LangJava:
+			if loc := javaZipSlipNewFile.FindString(line); loc != "" {
+				if !hasZipSlipValidation(lines, i) {
+					matched = loc
+					confidence = "high"
+				}
+			}
+			if matched == "" {
+				if loc := javaZipSlipPath.FindString(line); loc != "" {
+					if !hasZipSlipValidation(lines, i) {
+						matched = loc
+						confidence = "high"
+					}
+				}
+			}
+		case rules.LangPython:
+			if pyTarImport.MatchString(ctx.Content) {
+				if loc := pyTarExtract.FindString(line); loc != "" {
+					// Safe if members= or filter= is used
+					if !strings.Contains(line, "members=") && !strings.Contains(line, "members =") &&
+						!strings.Contains(line, "filter=") && !strings.Contains(line, "filter =") {
+						if !hasZipSlipValidation(lines, i) {
+							matched = strings.TrimSpace(line)
+							confidence = "high"
+						}
+					}
+				}
+			}
+			if matched == "" {
+				if loc := pyZipSlipManual.FindString(line); loc != "" {
+					if !hasZipSlipValidation(lines, i) {
+						matched = loc
+						confidence = "medium"
+					}
+				}
+			}
+		case rules.LangJavaScript, rules.LangTypeScript:
+			if loc := jsZipSlipWrite.FindString(line); loc != "" {
+				if !hasZipSlipValidation(lines, i) {
+					matched = loc
+					confidence = "high"
+				}
+			}
+			if matched == "" {
+				if loc := jsZipSlipEntry.FindString(line); loc != "" {
+					if !hasZipSlipValidation(lines, i) {
+						matched = loc
+						confidence = "high"
+					}
+				}
+			}
+		}
+
+		if matched != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				Title:         "Zip Slip: archive entry path used without validation",
+				Description:   "Archive entry names (from zip/tar) are used to construct file paths without checking for path traversal sequences (../). An attacker can craft a malicious archive that writes files outside the intended extraction directory.",
+				LineNumber:    lineNum,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Validate that the resolved path starts with the intended destination directory. In Go: use filepath.Clean + strings.HasPrefix. In Java: use getCanonicalPath() and verify prefix. In Python: use os.path.realpath and check prefix. In JS: use path.resolve and verify it starts with the target dir.",
+				CWEID:         "CWE-22",
+				OWASPCategory: "A01:2021-Broken Access Control",
+				Confidence:    confidence,
+				Tags:          []string{"traversal", "zip-slip", "archive", "path-traversal"},
+			})
+		}
+	}
+
+	return findings
+}
+
+// hasZipSlipValidation checks for common zip slip mitigation patterns in the function scope.
+func hasZipSlipValidation(lines []string, idx int) bool {
+	start, end := functionScope(lines, idx)
+
+	for _, l := range lines[start:end] {
+		// Go: strings.HasPrefix after filepath.Clean
+		if strings.Contains(l, "strings.HasPrefix") || strings.Contains(l, "strings.Contains") {
+			return true
+		}
+		// Go/general: checking for ".."
+		if strings.Contains(l, `".."`) || strings.Contains(l, `'..`) {
+			if strings.Contains(l, "if") || strings.Contains(l, "err") || strings.Contains(l, "return") {
+				return true
+			}
+		}
+		// Java: getCanonicalPath
+		if strings.Contains(l, "getCanonicalPath") || strings.Contains(l, "getCanonicalFile") {
+			return true
+		}
+		// Java: normalize + startsWith
+		if strings.Contains(l, ".normalize()") && strings.Contains(l, ".startsWith(") {
+			return true
+		}
+		// Python: os.path.realpath / os.path.commonpath / os.path.commonprefix
+		if strings.Contains(l, "os.path.realpath") || strings.Contains(l, "os.path.commonpath") ||
+			strings.Contains(l, "os.path.commonprefix") {
+			return true
+		}
+		// Python: .startswith check
+		if strings.Contains(l, ".startswith(") {
+			return true
+		}
+		// JS: path.resolve + startsWith
+		if strings.Contains(l, "path.resolve") && strings.Contains(l, ".startsWith(") {
+			return true
+		}
+		// filepath.Clean + prefix check
+		if strings.Contains(l, "filepath.Clean") || strings.Contains(l, "filepath.Abs") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // --- Helpers ---

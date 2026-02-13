@@ -852,6 +852,258 @@ func (r *XMLParserMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
+// GTSS-GEN-010: VM/Sandbox escape patterns (Node.js)
+var (
+	// vm.runInContext / vm.runInNewContext / vm.runInThisContext with any argument
+	reVMRunInContext     = regexp.MustCompile(`\bvm\.run(?:In(?:New|This)?Context)\s*\(`)
+	// vm.createScript / vm.Script / vm.compileFunction
+	reVMCreateScript     = regexp.MustCompile(`\bvm\.(?:createScript|Script|compileFunction)\s*\(`)
+	// vm2 sandbox: new VM / new NodeVM / new VMScript
+	reVM2Sandbox         = regexp.MustCompile(`\bnew\s+(?:VM|NodeVM|VMScript)\s*\(`)
+	// new Function() constructor with variable argument (code generation from string)
+	reNewFunctionCtor    = regexp.MustCompile(`\bnew\s+Function\s*\(\s*[^)]*[a-zA-Z_]\w*`)
+	// child_process.exec with template literal interpolation
+	reChildProcExecTpl   = regexp.MustCompile("\\bchild_process\\.exec\\s*\\(\\s*`")
+	reExecTpl            = regexp.MustCompile("\\b(?:exec|execSync)\\s*\\(\\s*`[^`]*\\$\\{")
+	// User input source patterns for JS/TS sandbox context
+	reJSSandboxUserInput = regexp.MustCompile(`req\.(?:query|params|body|headers)\b|process\.argv|\.(?:readFileSync|readFile)\s*\(`)
+)
+
+// --- Rule 10: VM Sandbox Escape (Node.js) ---
+
+type VMSandboxEscape struct{}
+
+func (r *VMSandboxEscape) ID() string                     { return "GTSS-GEN-010" }
+func (r *VMSandboxEscape) Name() string                   { return "VMSandboxEscape" }
+func (r *VMSandboxEscape) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *VMSandboxEscape) Description() string {
+	return "Detects use of Node.js vm module, vm2, new Function(), or child_process.exec with user-controlled input, which can lead to sandbox escape and remote code execution."
+}
+func (r *VMSandboxEscape) Languages() []rules.Language {
+	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
+}
+
+func (r *VMSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	// Check if file has user input sources for higher confidence
+	hasUserInput := reJSSandboxUserInput.MatchString(ctx.Content)
+
+	for i, line := range lines {
+		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
+			continue
+		}
+
+		var matched string
+		var detail string
+		var confidence string
+
+		// vm.runInContext / vm.runInNewContext / vm.runInThisContext
+		if m := reVMRunInContext.FindString(line); m != "" {
+			matched = m
+			detail = "vm.runInContext/runInNewContext/runInThisContext executes code in a sandbox that can be trivially escaped. The Node.js vm module is NOT a security mechanism. If the code string is user-controlled, this leads to full remote code execution."
+			if hasUserInput {
+				confidence = "high"
+			} else {
+				confidence = "medium"
+			}
+		}
+
+		// vm.createScript / vm.Script / vm.compileFunction
+		if matched == "" {
+			if m := reVMCreateScript.FindString(line); m != "" {
+				matched = m
+				detail = "vm.createScript/Script/compileFunction compiles code for sandbox execution. The Node.js vm module sandbox is trivially escapable and is NOT a security boundary."
+				if hasUserInput {
+					confidence = "high"
+				} else {
+					confidence = "medium"
+				}
+			}
+		}
+
+		// vm2 sandbox: new VM / new NodeVM / new VMScript
+		if matched == "" {
+			if m := reVM2Sandbox.FindString(line); m != "" {
+				// Avoid false positives: VM could be a generic class name
+				if strings.Contains(ctx.Content, "vm2") || strings.Contains(ctx.Content, "require('vm") || strings.Contains(ctx.Content, "require(\"vm") || strings.Contains(ctx.Content, "from 'vm") || strings.Contains(ctx.Content, "from \"vm") {
+					matched = m
+					detail = "vm2 sandbox has known escape vulnerabilities (CVE-2023-29199, CVE-2023-32314, and others). The vm2 package is deprecated and should not be used as a security boundary for untrusted code execution."
+					confidence = "high"
+				}
+			}
+		}
+
+		// new Function() with variable argument
+		if matched == "" {
+			if m := reNewFunctionCtor.FindString(line); m != "" {
+				if hasUserInput || hasNearbyUserInput(lines, i, reJSSandboxUserInput) {
+					matched = m
+					detail = "new Function() constructor creates executable code from strings. If arguments include user input, this leads to arbitrary code execution with full process privileges."
+					confidence = "high"
+				}
+			}
+		}
+
+		// child_process.exec with template literal interpolation
+		if matched == "" {
+			if m := reChildProcExecTpl.FindString(line); m != "" {
+				matched = m
+				detail = "child_process.exec() with template literal interpolation can lead to command injection if any interpolated value comes from user input."
+				confidence = "medium"
+			} else if m := reExecTpl.FindString(line); m != "" {
+				matched = m
+				detail = "exec/execSync with template literal interpolation containing ${} can lead to command injection."
+				confidence = "medium"
+			}
+		}
+
+		if matched != "" {
+			if len(matched) > 120 {
+				matched = matched[:120] + "..."
+			}
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "VM sandbox escape / unsafe code execution",
+				Description:   detail,
+				FilePath:      ctx.FilePath,
+				LineNumber:    lineNum,
+				MatchedText:   matched,
+				Suggestion:    "Never use Node.js vm module or vm2 as a security sandbox for untrusted code. Use isolated-vm, Web Workers with restrictive policies, or run untrusted code in a separate container/process with minimal privileges.",
+				CWEID:         "CWE-94",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    confidence,
+				Tags:          []string{"sandbox-escape", "rce", "vm", "code-injection"},
+			})
+		}
+	}
+
+	return findings
+}
+
+// GTSS-GEN-011: Unsafe YAML deserialization patterns
+var (
+	// Python: yaml.load() without SafeLoader — unsafe by default in PyYAML
+	rePyYAMLLoad     = regexp.MustCompile(`\byaml\.load\s*\(`)
+	rePyYAMLSafe     = regexp.MustCompile(`Loader\s*=\s*(?:yaml\.)?SafeLoader|yaml\.safe_load`)
+	// Python: yaml.unsafe_load() — explicitly unsafe
+	rePyYAMLUnsafe   = regexp.MustCompile(`\byaml\.unsafe_load\s*\(`)
+	// Node.js (js-yaml): yaml.load() — unsafe by default in js-yaml < 4.0
+	reJSYAMLLoad     = regexp.MustCompile(`\byaml\.load\s*\(`)
+	reJSYAMLSafeLoad = regexp.MustCompile(`\byaml\.(?:safeLoad|safe_load)\s*\(`)
+	// Ruby: YAML.load() — unsafe by default, allows arbitrary object instantiation
+	reRubyYAMLLoad   = regexp.MustCompile(`\bYAML\.load\s*\(`)
+	reRubyYAMLSafe   = regexp.MustCompile(`\bYAML\.safe_load\s*\(`)
+)
+
+// --- Rule 11: Unsafe YAML Deserialization ---
+
+type UnsafeYAMLDeserialization struct{}
+
+func (r *UnsafeYAMLDeserialization) ID() string                     { return "GTSS-GEN-011" }
+func (r *UnsafeYAMLDeserialization) Name() string                   { return "UnsafeYAMLDeserialization" }
+func (r *UnsafeYAMLDeserialization) DefaultSeverity() rules.Severity { return rules.High }
+func (r *UnsafeYAMLDeserialization) Description() string {
+	return "Detects unsafe YAML deserialization that can lead to arbitrary code execution via object instantiation in Python (PyYAML), Node.js (js-yaml), and Ruby."
+}
+func (r *UnsafeYAMLDeserialization) Languages() []rules.Language {
+	return []rules.Language{
+		rules.LangPython, rules.LangJavaScript, rules.LangTypeScript, rules.LangRuby,
+	}
+}
+
+func (r *UnsafeYAMLDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	switch ctx.Language {
+	case rules.LangPython:
+		// Skip if the file uses yaml.safe_load globally (unlikely to also have unsafe)
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+				continue
+			}
+
+			if m := rePyYAMLUnsafe.FindString(line); m != "" {
+				findings = append(findings, r.makeFinding(ctx, i+1, m,
+					"yaml.unsafe_load() explicitly deserializes YAML without safety restrictions. Arbitrary Python objects can be instantiated, leading to remote code execution.",
+					"high"))
+			} else if rePyYAMLLoad.MatchString(line) && !rePyYAMLSafe.MatchString(line) {
+				m := rePyYAMLLoad.FindString(line)
+				findings = append(findings, r.makeFinding(ctx, i+1, m,
+					"yaml.load() without Loader=SafeLoader can execute arbitrary Python code via !!python/object tags. Use yaml.safe_load() or specify Loader=SafeLoader.",
+					"high"))
+			}
+		}
+
+	case rules.LangJavaScript, rules.LangTypeScript:
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(trimmed, "//") {
+				continue
+			}
+
+			// Skip yaml.safeLoad / yaml.safe_load calls
+			if reJSYAMLSafeLoad.MatchString(line) {
+				continue
+			}
+
+			if m := reJSYAMLLoad.FindString(line); m != "" {
+				findings = append(findings, r.makeFinding(ctx, i+1, m,
+					"yaml.load() in js-yaml (versions < 4.0) can execute arbitrary JavaScript via !!js/function tags. Use yaml.safeLoad() or upgrade to js-yaml >= 4.0 where load() is safe by default.",
+					"medium"))
+			}
+		}
+
+	case rules.LangRuby:
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+				continue
+			}
+
+			// Skip YAML.safe_load calls
+			if reRubyYAMLSafe.MatchString(line) {
+				continue
+			}
+
+			if m := reRubyYAMLLoad.FindString(line); m != "" {
+				findings = append(findings, r.makeFinding(ctx, i+1, m,
+					"YAML.load() in Ruby can instantiate arbitrary objects, leading to remote code execution. Use YAML.safe_load() or Psych.safe_load() instead.",
+					"high"))
+			}
+		}
+	}
+
+	return findings
+}
+
+func (r *UnsafeYAMLDeserialization) makeFinding(ctx *rules.ScanContext, line int, matched, desc, confidence string) rules.Finding {
+	return rules.Finding{
+		RuleID:        r.ID(),
+		Severity:      r.DefaultSeverity(),
+		SeverityLabel: r.DefaultSeverity().String(),
+		Title:         "Unsafe YAML deserialization",
+		Description:   desc,
+		FilePath:      ctx.FilePath,
+		LineNumber:    line,
+		MatchedText:   matched,
+		Suggestion:    "Use safe YAML loading functions: Python yaml.safe_load(), Ruby YAML.safe_load(), or js-yaml safeLoad(). Never deserialize untrusted YAML with the default unsafe loader.",
+		CWEID:         "CWE-502",
+		OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		Language:      ctx.Language,
+		Confidence:    confidence,
+		Tags:          []string{"yaml", "deserialization", "rce"},
+	}
+}
+
 // --- Registration ---
 
 func init() {
@@ -864,4 +1116,6 @@ func init() {
 	rules.Register(&MassAssignment{})
 	rules.Register(&CodeAsStringEval{})
 	rules.Register(&XMLParserMisconfig{})
+	rules.Register(&VMSandboxEscape{})
+	rules.Register(&UnsafeYAMLDeserialization{})
 }

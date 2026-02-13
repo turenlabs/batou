@@ -96,6 +96,33 @@ var (
 	rePHPEchoVarInterp = regexp.MustCompile(`(?i)\becho\s+"[^"]*\$\w+`)
 	// PHP superglobal usage nearby (indicates user input)
 	rePHPSuperglobal   = regexp.MustCompile(`\$_(?:GET|POST|REQUEST|COOKIE)\s*\[`)
+
+	// GTSS-XSS-014: Java HTML string concatenation with user input
+	// StringBuilder/StringBuffer.append with HTML tags and variables
+	reJavaStringBuilderHTML = regexp.MustCompile(`(?:StringBuilder|StringBuffer)\s*(?:\(\s*\))?[^;]*\.append\s*\(\s*["']<[^"']*["']\s*\+`)
+	reJavaStringBuilderAppendConcat = regexp.MustCompile(`\.append\s*\(\s*["']<[^"']*["']\s*\+`)
+	// String concatenation with HTML tags: "<tag>" + variable
+	reJavaHTMLStringConcat = regexp.MustCompile(`["']<\s*(?:div|span|p|h[1-6]|br|td|tr|table|li|ul|ol|a|form|input|img|script|body|html|head|title|meta|link|b|i|u|strong|em|label|button|select|option|textarea|section|article|header|footer|nav|main)[^"']*>?\s*["']\s*\+`)
+	// Variable + "</tag>" pattern
+	reJavaHTMLCloseConcat = regexp.MustCompile(`\+\s*["']\s*<\s*/\s*(?:div|span|p|h[1-6]|br|td|tr|table|li|ul|ol|a|form|input|img|script|body|html|head|title)[^"']*>\s*["']`)
+	// General pattern: "...<tag>..." + var or var + "...</tag>..."
+	reJavaHTMLConcatGeneral = regexp.MustCompile(`["'][^"']*<[^"'>]+>[^"']*["']\s*\+\s*[a-zA-Z_]\w*`)
+	// Java encoder/escaper methods (safe patterns)
+	reJavaEncoder = regexp.MustCompile(`(?:Encode\.forHtml|escapeHtml|escapeXml|StringEscapeUtils\.escapeHtml|HtmlUtils\.htmlEscape|ESAPI\.encoder|sanitize)\s*\(`)
+	// @RequestParam or @RequestBody annotation nearby (indicates user input)
+	reJavaRequestParam = regexp.MustCompile(`@(?:RequestParam|RequestBody|PathVariable|RequestHeader|CookieValue)`)
+
+	// GTSS-XSS-015: Java response writer XSS (HttpServletResponse, Spring @ResponseBody, String.format)
+	// response.getWriter().print/println/write with HTML and concatenation
+	reJavaResponseWriterHTML = regexp.MustCompile(`(?:response\.getWriter\(\)|response\.getOutputStream\(\))\s*\.\s*(?:print(?:ln)?|write)\s*\(\s*["']<.+?["']\s*\+`)
+	// String.format with HTML template containing %s (potential user data injection)
+	reJavaStringFormatHTML = regexp.MustCompile(`String\.format\s*\(\s*["'][^"']*<[^"']*%s[^"']*["']`)
+	// Spring @ResponseBody returning string concatenation with HTML
+	reJavaResponseBodyReturn = regexp.MustCompile(`return\s+["']<[^"']*["']\s*\+`)
+	// @ResponseBody annotation indicator
+	reJavaResponseBodyAnnotation = regexp.MustCompile(`@ResponseBody`)
+	// @RestController annotation indicator
+	reJavaRestController = regexp.MustCompile(`@RestController`)
 )
 
 func init() {
@@ -111,6 +138,8 @@ func init() {
 	rules.Register(&JSONContentTypeXSS{})
 	rules.Register(&ReflectedXSS{})
 	rules.Register(&PythonFStringHTML{})
+	rules.Register(&JavaHTMLStringConcat{})
+	rules.Register(&JavaResponseWriterXSS{})
 }
 
 // ---------- helpers ----------
@@ -926,6 +955,279 @@ func (r *PythonFStringHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 	}
 	return findings
+}
+
+// ---------- GTSS-XSS-014: JavaHTMLStringConcat ----------
+
+type JavaHTMLStringConcat struct{}
+
+func (r *JavaHTMLStringConcat) ID() string                      { return "GTSS-XSS-014" }
+func (r *JavaHTMLStringConcat) Name() string                    { return "JavaHTMLStringConcat" }
+func (r *JavaHTMLStringConcat) DefaultSeverity() rules.Severity { return rules.High }
+func (r *JavaHTMLStringConcat) Description() string {
+	return "Detects Java string concatenation or StringBuilder.append building HTML with unsanitized user input, leading to stored or reflected XSS."
+}
+func (r *JavaHTMLStringConcat) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
+
+func (r *JavaHTMLStringConcat) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if ctx.Language != rules.LangJava {
+		return nil
+	}
+
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	// Check if file has encoder imports (reduces false positives)
+	fileHasEncoder := reJavaEncoder.MatchString(ctx.Content)
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+
+		// Skip lines that use an encoder
+		if reJavaEncoder.MatchString(line) {
+			continue
+		}
+
+		var matched bool
+		var desc string
+
+		// StringBuilder/StringBuffer.append with HTML + concatenation
+		if reJavaStringBuilderAppendConcat.MatchString(line) {
+			// Only flag if the concat part looks like a variable (not another string literal)
+			// Skip lines where all + operands are string literals: "..." + "..."
+			if !isJavaAllStringLiteralConcat(line) {
+				if !fileHasEncoder || !hasNearbyJavaEncoder(lines, i) {
+					matched = true
+					desc = "StringBuilder/StringBuffer.append() concatenates HTML tags with variables. If any variable contains user input, this creates an XSS vulnerability."
+				}
+			}
+		}
+
+		// String concat: "<tag>" + variable  or  variable + "</tag>"
+		if !matched && !isJavaAllStringLiteralConcatLine(line) &&
+			(reJavaHTMLStringConcat.MatchString(line) || reJavaHTMLCloseConcat.MatchString(line) || reJavaHTMLConcatGeneral.MatchString(line)) {
+			// Only flag if not inside a test and not using an encoder
+			if !fileHasEncoder || !hasNearbyJavaEncoder(lines, i) {
+				// Check for user input indicators nearby (request params, annotations)
+				if hasNearbyJavaUserInput(lines, i) {
+					matched = true
+					desc = "HTML is built by concatenating string literals with variables derived from user input (@RequestParam, request.getParameter). This creates an XSS vulnerability."
+				}
+			}
+		}
+
+		if matched {
+			findings = append(findings, makeFinding(
+				r.ID(), "Java HTML string concatenation with user input",
+				desc, ctx.FilePath, i+1, trimmed,
+				"Use a template engine with auto-escaping (Thymeleaf, JSP with JSTL <c:out>), or escape with OWASP Java Encoder (Encode.forHtml()) before concatenation.",
+				"CWE-79", string(ctx.Language), rules.High, "high",
+			))
+		}
+	}
+	return findings
+}
+
+// ---------- GTSS-XSS-015: JavaResponseWriterXSS ----------
+
+type JavaResponseWriterXSS struct{}
+
+func (r *JavaResponseWriterXSS) ID() string                      { return "GTSS-XSS-015" }
+func (r *JavaResponseWriterXSS) Name() string                    { return "JavaResponseWriterXSS" }
+func (r *JavaResponseWriterXSS) DefaultSeverity() rules.Severity { return rules.High }
+func (r *JavaResponseWriterXSS) Description() string {
+	return "Detects Java HttpServletResponse writer, String.format HTML, and Spring @ResponseBody returning unsanitized HTML with user data."
+}
+func (r *JavaResponseWriterXSS) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
+
+func (r *JavaResponseWriterXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if ctx.Language != rules.LangJava {
+		return nil
+	}
+
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	// Detect file-level annotations for Spring controllers
+	isResponseBody := reJavaResponseBodyAnnotation.MatchString(ctx.Content)
+	isRestController := reJavaRestController.MatchString(ctx.Content)
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+
+		// Skip lines using encoders
+		if reJavaEncoder.MatchString(line) {
+			continue
+		}
+
+		var matched bool
+		var desc string
+
+		// response.getWriter().print/write("<html>" + var)
+		if reJavaResponseWriterHTML.MatchString(line) {
+			if !hasNearbyJavaEncoder(lines, i) {
+				matched = true
+				desc = "HttpServletResponse writer outputs HTML concatenated with variables. If any variable contains user input, this creates an XSS vulnerability."
+			}
+		}
+
+		// String.format("<html>%s</html>", userInput)
+		if !matched && reJavaStringFormatHTML.MatchString(line) {
+			if !hasNearbyJavaEncoder(lines, i) {
+				matched = true
+				desc = "String.format() builds HTML with %s placeholders. User input inserted via format parameters creates an XSS vulnerability."
+			}
+		}
+
+		// return "<tag>" + var in @ResponseBody or @RestController
+		if !matched && reJavaResponseBodyReturn.MatchString(line) {
+			if isResponseBody || isRestController {
+				if !hasNearbyJavaEncoder(lines, i) {
+					matched = true
+					desc = "Spring @ResponseBody/@RestController method returns HTML built by string concatenation. User input in the concatenated value creates an XSS vulnerability."
+				}
+			}
+		}
+
+		if matched {
+			findings = append(findings, makeFinding(
+				r.ID(), "Java response writer XSS",
+				desc, ctx.FilePath, i+1, trimmed,
+				"Use a template engine (Thymeleaf) for HTML responses. If raw response writing is needed, escape all user input with OWASP Java Encoder (Encode.forHtml()) or use Content-Type application/json.",
+				"CWE-79", string(ctx.Language), rules.High, "high",
+			))
+		}
+	}
+	return findings
+}
+
+// isJavaAllStringLiteralConcat checks if all + operands in a .append() call are
+// string literals (e.g., .append("<nav>" + "Home" + "</nav>")). Returns true if
+// there are no variable references between the concatenation operators.
+func isJavaAllStringLiteralConcat(line string) bool {
+	// Find the append argument portion
+	idx := strings.Index(line, ".append(")
+	if idx < 0 {
+		return false
+	}
+	arg := line[idx+len(".append("):]
+	// Find the closing paren (simple heuristic)
+	depth := 1
+	end := -1
+	for i, ch := range arg {
+		if ch == '(' {
+			depth++
+		} else if ch == ')' {
+			depth--
+			if depth == 0 {
+				end = i
+				break
+			}
+		}
+	}
+	if end < 0 {
+		return false
+	}
+	arg = arg[:end]
+	// Split on + and check each part is a string literal
+	parts := strings.Split(arg, "+")
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if (strings.HasPrefix(p, `"`) && strings.HasSuffix(p, `"`)) ||
+			(strings.HasPrefix(p, `'`) && strings.HasSuffix(p, `'`)) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// isJavaAllStringLiteralConcatLine checks if all + operands on the line are
+// string literals. Returns true if concatenation only joins string literals
+// (e.g., "<h1>" + "text" + "</h1>") with no variable references.
+func isJavaAllStringLiteralConcatLine(line string) bool {
+	// Only applies to lines with concatenation
+	if !strings.Contains(line, "+") {
+		return false
+	}
+	// Extract the portion after = or after ( that contains the concat
+	// Simple approach: split entire line on + and check each part
+	parts := strings.Split(line, "+")
+	if len(parts) < 2 {
+		return false
+	}
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		// Strip trailing ; ) etc.
+		p = strings.TrimRight(p, ";) \t")
+		// Strip leading assignment, method call prefix etc.
+		// Find the last " or ' bounded token
+		if p == "" {
+			continue
+		}
+		// Check if this part is or ends with a string literal
+		// A part is safe if after removing prefix code, it's a string literal
+		dqIdx := strings.LastIndex(p, `"`)
+		sqIdx := strings.LastIndex(p, `'`)
+		if dqIdx < 0 && sqIdx < 0 {
+			// No string literal found in this part — it's a variable
+			return false
+		}
+	}
+	return true
+}
+
+// hasNearbyJavaEncoder checks if OWASP encoder or escapeHtml is used within 5 lines.
+func hasNearbyJavaEncoder(lines []string, idx int) bool {
+	start := idx - 5
+	if start < 0 {
+		start = 0
+	}
+	end := idx + 3
+	if end > len(lines) {
+		end = len(lines)
+	}
+	for _, l := range lines[start:end] {
+		if reJavaEncoder.MatchString(l) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasNearbyJavaUserInput checks if request.getParameter, @RequestParam, or similar
+// user input patterns appear within 30 lines before the current line.
+func hasNearbyJavaUserInput(lines []string, idx int) bool {
+	start := idx - 30
+	if start < 0 {
+		start = 0
+	}
+	end := idx + 1
+	if end > len(lines) {
+		end = len(lines)
+	}
+	for _, l := range lines[start:end] {
+		if strings.Contains(l, "request.getParameter") ||
+			strings.Contains(l, "request.getHeader") ||
+			strings.Contains(l, "request.getCookies") ||
+			reJavaRequestParam.MatchString(l) {
+			return true
+		}
+	}
+	return false
 }
 
 // hasNearbyPHPSuperglobal checks if $_GET/$_POST/$_REQUEST/$_COOKIE appears

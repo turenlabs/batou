@@ -258,3 +258,86 @@ func TestTRV009_RenderOptionsInjection_QueryParams(t *testing.T) {
 	result := testutil.ScanContent(t, "/app/routes/page.ts", content)
 	testutil.MustFindRule(t, result, "GTSS-TRV-009")
 }
+
+// --- GTSS-TRV-010: Zip Slip Path Traversal ---
+
+func TestTRV010_ZipSlip_Go_Fixture(t *testing.T) {
+	content := testutil.LoadFixture(t, "go/vulnerable/zip_slip.go")
+	result := testutil.ScanContent(t, "/app/extract.go", content)
+	testutil.MustFindRule(t, result, "GTSS-TRV-010")
+}
+
+func TestTRV010_ZipSlip_Java_Fixture(t *testing.T) {
+	content := testutil.LoadFixture(t, "java/vulnerable/ZipSlip.java")
+	result := testutil.ScanContent(t, "/app/ZipExtractor.java", content)
+	testutil.MustFindRule(t, result, "GTSS-TRV-010")
+}
+
+func TestTRV010_ZipSlip_JS_Fixture(t *testing.T) {
+	content := testutil.LoadFixture(t, "javascript/vulnerable/zip_slip.ts")
+	result := testutil.ScanContent(t, "/app/extract.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-TRV-010")
+}
+
+func TestTRV010_ZipSlip_Python_Fixture(t *testing.T) {
+	content := testutil.LoadFixture(t, "python/vulnerable/zip_slip.py")
+	result := testutil.ScanContent(t, "/app/extract.py", content)
+	testutil.MustFindRule(t, result, "GTSS-TRV-010")
+}
+
+func TestTRV010_ZipSlip_Go_Inline(t *testing.T) {
+	content := `package handler
+import (
+	"archive/zip"
+	"os"
+	"path/filepath"
+)
+func extract(r *zip.ReadCloser, dest string) {
+	for _, f := range r.File {
+		outPath := filepath.Join(dest, f.Name)
+		os.Create(outPath)
+	}
+}`
+	result := testutil.ScanContent(t, "/app/extract.go", content)
+	testutil.MustFindRule(t, result, "GTSS-TRV-010")
+}
+
+func TestTRV010_ZipSlip_Java_Inline(t *testing.T) {
+	content := `import java.util.zip.*;
+import java.io.*;
+public class Extractor {
+    void extract(ZipInputStream zis, String dest) throws Exception {
+        ZipEntry entry;
+        while ((entry = zis.getNextEntry()) != null) {
+            File destFile = new File(dest, entry.getName());
+            new FileOutputStream(destFile);
+        }
+    }
+}`
+	result := testutil.ScanContent(t, "/app/Extractor.java", content)
+	testutil.MustFindRule(t, result, "GTSS-TRV-010")
+}
+
+func TestTRV010_Safe_Go(t *testing.T) {
+	content := testutil.LoadFixture(t, "go/safe/zip_slip_safe.go")
+	result := testutil.ScanContent(t, "/app/extract.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-TRV-010")
+}
+
+func TestTRV010_Safe_Java(t *testing.T) {
+	content := testutil.LoadFixture(t, "java/safe/ZipSlipSafe.java")
+	result := testutil.ScanContent(t, "/app/ZipExtractor.java", content)
+	testutil.MustNotFindRule(t, result, "GTSS-TRV-010")
+}
+
+func TestTRV010_Safe_JS(t *testing.T) {
+	content := testutil.LoadFixture(t, "javascript/safe/zip_slip_safe.ts")
+	result := testutil.ScanContent(t, "/app/extract.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-TRV-010")
+}
+
+func TestTRV010_Safe_Python(t *testing.T) {
+	content := testutil.LoadFixture(t, "python/safe/zip_slip_safe.py")
+	result := testutil.ScanContent(t, "/app/extract.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-TRV-010")
+}

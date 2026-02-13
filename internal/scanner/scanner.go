@@ -50,7 +50,7 @@ func Scan(input *hook.Input) *reporter.ScanResult {
 
 	// Skip generated / vendored files — they are not authored by the user
 	// and produce noise.
-	if fpfilter.IsGeneratedFile(filePath, content) {
+	if fpfilter.IsGeneratedFile(filePath, content) || fpfilter.IsVendoredLibrary(filePath) {
 		result.ScanTimeMs = time.Since(start).Milliseconds()
 		return result
 	}

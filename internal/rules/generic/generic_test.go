@@ -248,3 +248,171 @@ func TestGEN009_JavaExternalEntities(t *testing.T) {
 	result := testutil.ScanContent(t, "/app/XmlParser.java", content)
 	testutil.MustFindRule(t, result, "GTSS-GEN-009")
 }
+
+// --- GTSS-GEN-011: Unsafe YAML Deserialization ---
+
+func TestGEN011_Python_YAMLLoad_Unsafe(t *testing.T) {
+	content := `import yaml
+data = yaml.load(user_input)`
+	result := testutil.ScanContent(t, "/app/config.py", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-011")
+}
+
+func TestGEN011_Python_YAMLUnsafeLoad(t *testing.T) {
+	content := `import yaml
+data = yaml.unsafe_load(raw_data)`
+	result := testutil.ScanContent(t, "/app/parser.py", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-011")
+}
+
+func TestGEN011_Python_YAMLLoad_Safe_SafeLoader(t *testing.T) {
+	content := `import yaml
+data = yaml.load(user_input, Loader=SafeLoader)`
+	result := testutil.ScanContent(t, "/app/config.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GEN-011")
+}
+
+func TestGEN011_Python_YAMLSafeLoad(t *testing.T) {
+	content := `import yaml
+data = yaml.safe_load(user_input)`
+	result := testutil.ScanContent(t, "/app/config.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GEN-011")
+}
+
+func TestGEN011_JS_YAMLLoad_Unsafe(t *testing.T) {
+	content := `const yaml = require('js-yaml');
+const data = yaml.load(fileContent);`
+	result := testutil.ScanContent(t, "/app/parser.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-011")
+}
+
+func TestGEN011_JS_YAMLSafeLoad(t *testing.T) {
+	content := `const yaml = require('js-yaml');
+const data = yaml.safeLoad(fileContent);`
+	result := testutil.ScanContent(t, "/app/parser.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GEN-011")
+}
+
+func TestGEN011_Ruby_YAMLLoad_Unsafe(t *testing.T) {
+	content := `require 'yaml'
+data = YAML.load(user_input)`
+	result := testutil.ScanContent(t, "/app/parser.rb", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-011")
+}
+
+func TestGEN011_Ruby_YAMLSafeLoad(t *testing.T) {
+	content := `require 'yaml'
+data = YAML.safe_load(user_input)`
+	result := testutil.ScanContent(t, "/app/parser.rb", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GEN-011")
+}
+
+func TestGEN011_Fixture_Ruby_YAML(t *testing.T) {
+	if !testutil.FixtureExists("ruby/vulnerable/yaml_deserialization.rb") {
+		t.Skip("Ruby YAML fixture not available")
+	}
+	content := testutil.LoadFixture(t, "ruby/vulnerable/yaml_deserialization.rb")
+	result := testutil.ScanContent(t, "/app/handler.rb", content)
+	hasYAML := testutil.HasFinding(result, "GTSS-GEN-011") || testutil.HasFinding(result, "GTSS-GEN-002")
+	if !hasYAML {
+		t.Errorf("expected YAML deserialization finding in yaml_deserialization.rb, got: %v", testutil.FindingRuleIDs(result))
+	}
+}
+
+// --- GTSS-GEN-010: VM Sandbox Escape ---
+
+func TestGEN010_VMRunInNewContext(t *testing.T) {
+	content := `const vm = require('vm');
+const userCode = req.body.code;
+const result = vm.runInNewContext(userCode, sandbox);`
+	result := testutil.ScanContent(t, "/app/sandbox.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-010")
+}
+
+func TestGEN010_VMRunInContext(t *testing.T) {
+	content := `const vm = require('vm');
+const data = req.body.expression;
+const ctx = vm.createContext(sandbox);
+const output = vm.runInContext(data, ctx);`
+	result := testutil.ScanContent(t, "/app/eval.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-010")
+}
+
+func TestGEN010_VMRunInThisContext(t *testing.T) {
+	content := `const vm = require('vm');
+const code = req.query.expr;
+vm.runInThisContext(code);`
+	result := testutil.ScanContent(t, "/app/eval.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-010")
+}
+
+func TestGEN010_VMCreateScript(t *testing.T) {
+	content := `const vm = require('vm');
+const userInput = req.body.script;
+const script = vm.createScript(userInput);`
+	result := testutil.ScanContent(t, "/app/runner.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-010")
+}
+
+func TestGEN010_VM2Sandbox(t *testing.T) {
+	content := `const { VM } = require('vm2');
+const vm = new VM({ timeout: 1000 });
+const result = vm.run(userCode);`
+	result := testutil.ScanContent(t, "/app/sandbox.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-010")
+}
+
+func TestGEN010_NewFunctionWithUserInput(t *testing.T) {
+	content := `app.post('/calc', (req, res) => {
+  const expr = req.body.expression;
+  const fn = new Function('x', expr);
+  res.json({ result: fn(42) });
+});`
+	result := testutil.ScanContent(t, "/app/calc.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-010")
+}
+
+func TestGEN010_ChildProcessExecTemplateLiteral(t *testing.T) {
+	content := "const cmd = req.query.cmd;\nchild_process.exec(`ls ${cmd}`);"
+	result := testutil.ScanContent(t, "/app/exec.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-010")
+}
+
+func TestGEN010_ExecSyncTemplateLiteral(t *testing.T) {
+	content := "const name = req.params.name;\nconst out = execSync(`grep ${name} /etc/passwd`);"
+	result := testutil.ScanContent(t, "/app/search.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-010")
+}
+
+func TestGEN010_Safe_VMWithoutUserInput(t *testing.T) {
+	// vm usage without any user input source should not trigger at high confidence
+	// but will still trigger at medium confidence since vm is inherently unsafe
+	content := `const vm = require('vm');
+const script = "2 + 2";
+const result = vm.runInNewContext(script, {});`
+	result := testutil.ScanContent(t, "/app/calc.ts", content)
+	// Should still detect vm usage (medium confidence)
+	testutil.MustFindRule(t, result, "GTSS-GEN-010")
+}
+
+func TestGEN010_Safe_NoVMImport(t *testing.T) {
+	// new VM() without vm/vm2 import context should NOT trigger
+	content := `class VM {
+  constructor() { this.state = {}; }
+}
+const vm = new VM();`
+	result := testutil.ScanContent(t, "/app/engine.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GEN-010")
+}
+
+func TestGEN010_Fixture_B2BOrder(t *testing.T) {
+	if !testutil.FixtureExists("javascript/vulnerable/vm_sandbox_escape.ts") {
+		t.Skip("vm sandbox escape fixture not available")
+	}
+	content := testutil.LoadFixture(t, "javascript/vulnerable/vm_sandbox_escape.ts")
+	result := testutil.ScanContent(t, "/app/b2bOrder.ts", content)
+	hasVM := testutil.HasFinding(result, "GTSS-GEN-010") || testutil.HasFinding(result, "GTSS-GEN-002")
+	if !hasVM {
+		t.Errorf("expected VM sandbox escape finding in vm_sandbox_escape.ts, got: %v", testutil.FindingRuleIDs(result))
+	}
+}

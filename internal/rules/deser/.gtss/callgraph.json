@@ -1,0 +1,59 @@
+{
+  "nodes": {
+    "/app/handler.rb:deserialize_cache": {
+      "id": "/app/handler.rb:deserialize_cache",
+      "file_path": "/app/handler.rb",
+      "name": "deserialize_cache",
+      "package": "",
+      "start_line": 18,
+      "end_line": 23,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "d486a09f8b01c9f3",
+      "last_scan_at": "2026-02-13T10:54:39.500037-06:00",
+      "language": "ruby",
+      "finding_count": 0
+    },
+    "/app/handler.rb:import_data": {
+      "id": "/app/handler.rb:import_data",
+      "file_path": "/app/handler.rb",
+      "name": "import_data",
+      "package": "",
+      "start_line": 12,
+      "end_line": 16,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "884c2053f12ad936",
+      "last_scan_at": "2026-02-13T10:54:39.500009-06:00",
+      "language": "ruby",
+      "finding_count": 0
+    },
+    "/app/handler.rb:restore": {
+      "id": "/app/handler.rb:restore",
+      "file_path": "/app/handler.rb",
+      "name": "restore",
+      "package": "",
+      "start_line": 5,
+      "end_line": 10,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "47a69198d2f3fbc4",
+      "last_scan_at": "2026-02-13T10:54:39.499792-06:00",
+      "language": "ruby",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/deser",
+  "session_id": "",
+  "last_updated": "2026-02-13T10:54:39.500037-06:00",
+  "version": 1
+}

@@ -21,6 +21,16 @@ import (
 	_ "github.com/turen/gtss/internal/rules/logging"
 	_ "github.com/turen/gtss/internal/rules/validation"
 	_ "github.com/turen/gtss/internal/rules/memory"
+	_ "github.com/turen/gtss/internal/rules/nosql"
+	_ "github.com/turen/gtss/internal/rules/xxe"
+	_ "github.com/turen/gtss/internal/rules/redirect"
+	_ "github.com/turen/gtss/internal/rules/graphql"
+	_ "github.com/turen/gtss/internal/rules/misconfig"
+	_ "github.com/turen/gtss/internal/rules/deser"
+	_ "github.com/turen/gtss/internal/rules/framework"
+	_ "github.com/turen/gtss/internal/rules/prototype"
+	_ "github.com/turen/gtss/internal/rules/massassign"
+	_ "github.com/turen/gtss/internal/rules/cors"
 	_ "github.com/turen/gtss/internal/analyzer/goast"
 
 	// Taint analysis engine and language catalogs

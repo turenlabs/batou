@@ -498,6 +498,128 @@ def checksum(data):
 	testutil.MustNotFindRule(t, result, "GTSS-CRY-015")
 }
 
+// --- GTSS-CRY-016: Insecure Random Broad ---
+
+func TestCRY016_RubyRand_TokenGen(t *testing.T) {
+	content := `def generate_token
+  token = rand(999999).to_s
+  token
+end`
+	result := testutil.ScanContent(t, "/app/auth.rb", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-016")
+}
+
+func TestCRY016_PHPRand_SessionToken(t *testing.T) {
+	content := `<?php
+$session_token = rand(100000, 999999);`
+	result := testutil.ScanContent(t, "/app/auth.php", content)
+	hasFinding := testutil.HasFinding(result, "GTSS-CRY-016") || testutil.HasFinding(result, "GTSS-CRY-010")
+	if !hasFinding {
+		t.Errorf("expected insecure random finding, got: %v", testutil.FindingRuleIDs(result))
+	}
+}
+
+func TestCRY016_PHPMtRand_OTP(t *testing.T) {
+	content := `<?php
+$otp = mt_rand(100000, 999999);`
+	result := testutil.ScanContent(t, "/app/otp.php", content)
+	hasFinding := testutil.HasFinding(result, "GTSS-CRY-016") || testutil.HasFinding(result, "GTSS-CRY-010")
+	if !hasFinding {
+		t.Errorf("expected insecure random finding, got: %v", testutil.FindingRuleIDs(result))
+	}
+}
+
+func TestCRY016_Safe_RubySecureRandom(t *testing.T) {
+	content := `require 'securerandom'
+def generate_token
+  SecureRandom.hex(32)
+end`
+	result := testutil.ScanContent(t, "/app/auth.rb", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CRY-016")
+}
+
+// --- GTSS-CRY-017: Timing-Unsafe Comparison ---
+
+func TestCRY017_JSTokenCompare(t *testing.T) {
+	content := `function verify(req) {
+  if (req.token === expectedToken) {
+    return true;
+  }
+}`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-017")
+}
+
+func TestCRY017_PythonHashCompare(t *testing.T) {
+	content := `def verify_signature(received_hash, expected):
+    if received_hash == expected:
+        return True`
+	result := testutil.ScanContent(t, "/app/auth.py", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-017")
+}
+
+func TestCRY017_GoTokenCompare(t *testing.T) {
+	content := `func verifyToken(token, expected string) bool {
+	return token == expected
+}`
+	result := testutil.ScanContent(t, "/app/auth.go", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-017")
+}
+
+func TestCRY017_RubyTokenCompare(t *testing.T) {
+	content := `def verify(token, expected)
+  token == expected
+end`
+	result := testutil.ScanContent(t, "/app/auth.rb", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-017")
+}
+
+func TestCRY017_Safe_JSTimingSafeEqual(t *testing.T) {
+	content := `const valid = crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CRY-017")
+}
+
+func TestCRY017_Safe_PythonCompareDigest(t *testing.T) {
+	content := `import hmac
+valid = hmac.compare_digest(received_hash, expected_hash)`
+	result := testutil.ScanContent(t, "/app/auth.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CRY-017")
+}
+
+func TestCRY017_Safe_GoConstantTimeCompare(t *testing.T) {
+	content := `import "crypto/subtle"
+valid := subtle.ConstantTimeCompare([]byte(token), []byte(expected))`
+	result := testutil.ScanContent(t, "/app/auth.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CRY-017")
+}
+
+// --- GTSS-CRY-018: Hardcoded IV Broad ---
+
+func TestCRY018_JavaIvParameterSpec_ByteArray(t *testing.T) {
+	content := `IvParameterSpec ivSpec = new IvParameterSpec(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});`
+	result := testutil.ScanContent(t, "/app/Crypto.java", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-018")
+}
+
+func TestCRY018_JavaIvParameterSpec_GetBytes(t *testing.T) {
+	content := `IvParameterSpec ivSpec = new IvParameterSpec("1234567890abcdef".getBytes());`
+	result := testutil.ScanContent(t, "/app/Crypto.java", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-018")
+}
+
+func TestCRY018_PythonAESFixedIV(t *testing.T) {
+	content := `cipher = AES.new(key, AES.MODE_CBC, b'1234567890abcdef')`
+	result := testutil.ScanContent(t, "/app/crypto.py", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-018")
+}
+
+func TestCRY018_GoFixedNonceSeal(t *testing.T) {
+	content := `sealed := aead.Seal(nil, []byte{0,0,0,0,0,0,0,0,0,0,0,0}, plaintext, nil)`
+	result := testutil.ScanContent(t, "/app/crypto.go", content)
+	testutil.MustFindRule(t, result, "GTSS-CRY-018")
+}
+
 // --- Safe fixture tests ---
 
 func TestCRY_Safe_Go(t *testing.T) {

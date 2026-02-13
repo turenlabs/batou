@@ -183,6 +183,38 @@ var (
 	reProperPasswordHash = regexp.MustCompile(`(?i)(bcrypt|scrypt|argon2|pbkdf2|password_hash|PBKDF2WithHmacSHA|Rfc2898DeriveBytes)`)
 )
 
+// GTSS-CRY-016: Insecure randomness in security context (broader multi-language)
+var (
+	// Ruby
+	reRubyRandSec    = regexp.MustCompile(`\brand\s*\(`)
+	reRubyRandObjSec = regexp.MustCompile(`\bRandom\.(new|rand)\b`)
+	// PHP
+	rePHPRandSec     = regexp.MustCompile(`\b(rand|mt_rand)\s*\(`)
+	// Shared security context for CRY-016
+	reCRY016SecCtx   = regexp.MustCompile(`(?i)(token|session|password|secret|nonce|otp|csrf|key|salt|iv|auth|uuid|api[_\-]?key)`)
+)
+
+// GTSS-CRY-017: Timing-unsafe string comparison
+var (
+	// Pattern: if (someVar == otherVar) where vars have security-related names
+	reTimingCompareJS   = regexp.MustCompile(`(?:===?)\s*\w*(?i:token|secret|hash|password|digest|signature|hmac|api[_\-]?key|nonce|csrf)\w*`)
+	reTimingComparePy   = regexp.MustCompile(`(?i)\w*(token|secret|hash|password|digest|signature|hmac|api_key|nonce|csrf)\w*\s*==\s*\w+`)
+	reTimingCompareGo   = regexp.MustCompile(`(?i)\w*(token|secret|hash|password|digest|signature|hmac|apiKey|nonce|csrf)\w*\s*==\s*\w+`)
+	reTimingCompareRuby = regexp.MustCompile(`(?i)\w*(token|secret|hash|password|digest|signature|hmac|api_key|nonce|csrf)\w*\s*==\s*\w+`)
+	// Reverse pattern: variable == securityThing
+	reTimingCompareRev  = regexp.MustCompile(`\w+\s*===?\s*\w*(?i:token|secret|hash|password|digest|signature|hmac|api[_\-]?key|nonce|csrf)\w*`)
+	// Safe comparison functions (suppress if present on same line)
+	reTimingSafeCompare = regexp.MustCompile(`(?i)(timingSafeEqual|compare_digest|ConstantTimeCompare|secure_compare|constant_time_compare|MessageDigest\.isEqual|crypto\.subtle\.timingSafeEqual|Rack::Utils\.secure_compare)`)
+)
+
+// GTSS-CRY-018: Hardcoded IV (Java IvParameterSpec and broader patterns)
+var (
+	reJavaIvParameterSpec      = regexp.MustCompile(`new\s+IvParameterSpec\s*\(\s*(?:new\s+byte\s*\[\]\s*\{|"[^"]+"\s*\.getBytes)`)
+	reJavaIvHexBytes           = regexp.MustCompile(`new\s+IvParameterSpec\s*\(\s*(?:javax\.xml\.bind\.DatatypeConverter|DatatypeConverter|Hex|Base64)`)
+	rePyFixedIVAES             = regexp.MustCompile(`AES\.new\s*\([^)]*,\s*[^,)]*,\s*(?:b["'][^"']+["']|bytes\s*\()`)
+	reGoFixedNonceSeal         = regexp.MustCompile(`\.\s*(?:Seal|Open)\s*\(\s*nil\s*,\s*(?:\[\]byte\s*\{|make\s*\(\s*\[\]byte)`)
+)
+
 func init() {
 	rules.Register(&WeakHashing{})
 	rules.Register(&InsecureRandom{})
@@ -199,6 +231,9 @@ func init() {
 	rules.Register(&UnauthenticatedEncryption{})
 	rules.Register(&InsecureRSAPadding{})
 	rules.Register(&WeakPasswordHash{})
+	rules.Register(&InsecureRandomBroad{})
+	rules.Register(&TimingUnsafeCompare{})
+	rules.Register(&HardcodedIVBroad{})
 }
 
 // --- GTSS-CRY-001: WeakHashing ---
@@ -1461,6 +1496,238 @@ func (r *WeakPasswordHash) Scan(ctx *rules.ScanContext) []rules.Finding {
 			Language:      ctx.Language,
 			Confidence:    "high",
 			Tags:          []string{"crypto", "password", "hashing"},
+		})
+	}
+
+	return findings
+}
+
+// --- GTSS-CRY-016: InsecureRandomBroad ---
+
+type InsecureRandomBroad struct{}
+
+func (r *InsecureRandomBroad) ID() string                    { return "GTSS-CRY-016" }
+func (r *InsecureRandomBroad) Name() string                  { return "InsecureRandomBroad" }
+func (r *InsecureRandomBroad) DefaultSeverity() rules.Severity { return rules.High }
+
+func (r *InsecureRandomBroad) Description() string {
+	return "Detects insecure random number generators used in security contexts across Ruby and PHP (complementing CRY-008/009/010 for other languages)."
+}
+
+func (r *InsecureRandomBroad) Languages() []rules.Language {
+	return []rules.Language{rules.LangRuby, rules.LangPHP}
+}
+
+func (r *InsecureRandomBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		lineNum := i + 1
+		var matched string
+		var suggestion string
+		var detail string
+
+		switch ctx.Language {
+		case rules.LangRuby:
+			if loc := reRubyRandSec.FindString(line); loc != "" {
+				if reCRY016SecCtx.MatchString(line) || reCRY016SecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+					matched = loc
+					detail = "Ruby rand()"
+					suggestion = "Use SecureRandom.hex, SecureRandom.uuid, or SecureRandom.random_bytes for security-sensitive random values."
+				}
+			} else if loc := reRubyRandObjSec.FindString(line); loc != "" {
+				if reCRY016SecCtx.MatchString(line) || reCRY016SecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+					matched = loc
+					detail = "Ruby Random"
+					suggestion = "Use SecureRandom.hex, SecureRandom.uuid, or SecureRandom.random_bytes for security-sensitive random values."
+				}
+			}
+		case rules.LangPHP:
+			if loc := rePHPRandSec.FindString(line); loc != "" {
+				if reCRY016SecCtx.MatchString(line) || reCRY016SecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+					matched = loc
+					detail = "PHP rand()/mt_rand()"
+					suggestion = "Use random_bytes() or random_int() for security-sensitive random values."
+				}
+			}
+		}
+
+		if matched == "" {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Insecure random in security context: " + detail,
+			Description:   detail + " is not cryptographically secure. Its output is predictable and must not be used for tokens, session IDs, passwords, nonces, OTPs, CSRF tokens, or any security-sensitive values.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    lineNum,
+			MatchedText:   strings.TrimSpace(line),
+			Suggestion:    suggestion,
+			CWEID:         "CWE-330",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+			Language:      ctx.Language,
+			Confidence:    "high",
+			Tags:          []string{"crypto", "random"},
+		})
+	}
+
+	return findings
+}
+
+// --- GTSS-CRY-017: TimingUnsafeCompare ---
+
+type TimingUnsafeCompare struct{}
+
+func (r *TimingUnsafeCompare) ID() string                    { return "GTSS-CRY-017" }
+func (r *TimingUnsafeCompare) Name() string                  { return "TimingUnsafeCompare" }
+func (r *TimingUnsafeCompare) DefaultSeverity() rules.Severity { return rules.Medium }
+
+func (r *TimingUnsafeCompare) Description() string {
+	return "Detects use of == or === to compare secrets, tokens, hashes, or signatures instead of constant-time comparison functions."
+}
+
+func (r *TimingUnsafeCompare) Languages() []rules.Language {
+	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript, rules.LangRuby}
+}
+
+func (r *TimingUnsafeCompare) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
+
+		// Skip comments
+		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "*") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+
+		// Skip lines that already use safe comparison
+		if reTimingSafeCompare.MatchString(line) {
+			continue
+		}
+
+		var matched bool
+		var suggestion string
+
+		switch ctx.Language {
+		case rules.LangJavaScript, rules.LangTypeScript:
+			if reTimingCompareJS.MatchString(line) || reTimingCompareRev.MatchString(line) {
+				matched = true
+				suggestion = "Use crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b)) for constant-time comparison."
+			}
+		case rules.LangPython:
+			if reTimingComparePy.MatchString(line) {
+				matched = true
+				suggestion = "Use hmac.compare_digest(a, b) for constant-time comparison."
+			}
+		case rules.LangGo:
+			if reTimingCompareGo.MatchString(line) {
+				matched = true
+				suggestion = "Use subtle.ConstantTimeCompare([]byte(a), []byte(b)) from crypto/subtle for constant-time comparison."
+			}
+		case rules.LangRuby:
+			if reTimingCompareRuby.MatchString(line) {
+				matched = true
+				suggestion = "Use Rack::Utils.secure_compare(a, b) or ActiveSupport::SecurityUtils.secure_compare(a, b) for constant-time comparison."
+			}
+		}
+
+		if !matched {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Timing-unsafe comparison of secret value",
+			Description:   "Using == or === to compare secrets, tokens, hashes, or signatures leaks information through timing side-channels. An attacker can determine how many leading bytes match by measuring response time.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    lineNum,
+			MatchedText:   trimmed,
+			Suggestion:    suggestion,
+			CWEID:         "CWE-208",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+			Language:      ctx.Language,
+			Confidence:    "medium",
+			Tags:          []string{"crypto", "timing", "comparison"},
+		})
+	}
+
+	return findings
+}
+
+// --- GTSS-CRY-018: HardcodedIVBroad ---
+
+type HardcodedIVBroad struct{}
+
+func (r *HardcodedIVBroad) ID() string                    { return "GTSS-CRY-018" }
+func (r *HardcodedIVBroad) Name() string                  { return "HardcodedIVBroad" }
+func (r *HardcodedIVBroad) DefaultSeverity() rules.Severity { return rules.High }
+
+func (r *HardcodedIVBroad) Description() string {
+	return "Detects hardcoded initialization vectors via Java IvParameterSpec, Python AES with fixed IV bytes, and Go fixed nonce patterns."
+}
+
+func (r *HardcodedIVBroad) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava, rules.LangPython, rules.LangGo}
+}
+
+func (r *HardcodedIVBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		lineNum := i + 1
+		var matched string
+		var detail string
+
+		switch ctx.Language {
+		case rules.LangJava:
+			if loc := reJavaIvParameterSpec.FindString(line); loc != "" {
+				matched = loc
+				detail = "IvParameterSpec with hardcoded bytes"
+			} else if loc := reJavaIvHexBytes.FindString(line); loc != "" {
+				matched = loc
+				detail = "IvParameterSpec with hardcoded hex/base64"
+			}
+		case rules.LangPython:
+			if loc := rePyFixedIVAES.FindString(line); loc != "" {
+				matched = loc
+				detail = "AES with hardcoded IV bytes"
+			}
+		case rules.LangGo:
+			if loc := reGoFixedNonceSeal.FindString(line); loc != "" {
+				matched = loc
+				detail = "AEAD Seal/Open with fixed nonce"
+			}
+		}
+
+		if matched == "" {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Hardcoded IV/nonce: " + detail,
+			Description:   "Using a fixed IV or nonce makes encryption deterministic, enabling pattern analysis and defeating semantic security. For AES-GCM, nonce reuse is catastrophic (key recovery).",
+			FilePath:      ctx.FilePath,
+			LineNumber:    lineNum,
+			MatchedText:   strings.TrimSpace(line),
+			Suggestion:    "Generate IVs and nonces randomly for each encryption operation using a CSPRNG. For AES-GCM, use 12-byte random nonces.",
+			CWEID:         "CWE-329",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+			Language:      ctx.Language,
+			Confidence:    "high",
+			Tags:          []string{"crypto", "iv", "nonce"},
 		})
 	}
 
