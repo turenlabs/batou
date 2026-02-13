@@ -438,6 +438,12 @@ Rules that explicitly include Java in their `Languages()` method, plus rules wit
 | `GTSS-GQL-001` | GraphQL Introspection Enabled | GraphQL schema with introspection explicitly enabled (`.introspection(true)` in Java/Spring GraphQL), exposing the entire API schema for attacker reconnaissance |
 | `GTSS-GQL-002` | GraphQL No Depth Limiting | GraphQL server created without query depth limiting or complexity analysis, allowing deeply nested queries that cause denial of service |
 
+### Android Manifest (1 rule, from Kotlin rules)
+
+| Rule ID | Name | What It Detects |
+|---|---|---|
+| `GTSS-KT-005` | ExportedComponents | Android components (`<activity>`, `<service>`, `<receiver>`, `<provider>`) with `android:exported="true"` in `AndroidManifest.xml` without an `android:permission` attribute. ContentProviders and Services are flagged at High severity; Activities and BroadcastReceivers at Medium. Only scans files ending in `AndroidManifest.xml`. |
+
 ### Misconfiguration (1 rule)
 
 | Rule ID | Name | What It Detects |
@@ -550,9 +556,9 @@ ProcessBuilder pb = new ProcessBuilder("/usr/local/bin/tool", "--action", action
 - **Annotation-only sources**: Spring annotations like `@RequestParam` are detected as sources, but the association between the annotation and the specific method parameter it decorates is not tracked through the parameter's variable name with full precision. The taint engine matches the annotation presence rather than the specific annotated variable binding.
 - **Struts/Legacy frameworks**: Struts ActionForm support is limited to `form.get*()` getter patterns. Advanced Struts 2 OGNL injection patterns are not covered.
 - **Spring Expression Language (SpEL)**: SpEL injection (`#{...}` in Spring contexts) is not tracked as a dedicated sink.
-- **No Android-specific rules**: Android-specific security patterns (Intent injection, exported components, WebView vulnerabilities, content provider exposure) are not covered.
+- **Limited Android-specific rules**: The only Android rule covering Java is `GTSS-KT-005` (ExportedComponents in `AndroidManifest.xml`). Other Android-specific security patterns (Intent injection, WebView vulnerabilities, insecure SharedPreferences) are covered only for Kotlin. Java-specific Android patterns (exported components without manifest scanning, content provider SQL injection in Java code) are not covered.
 - **Build configuration files**: Maven `pom.xml` and Gradle `build.gradle` files are not scanned for dependency vulnerabilities or insecure plugin configurations.
 - **SSRF rules**: While taint analysis tracks Java-specific SSRF sinks (`new URL()`, `HttpURLConnection`, `RestTemplate`), the SSRF regex rules (GTSS-SSRF-003 DNS Rebinding, GTSS-SSRF-004 Redirect Following) do not include Java-specific patterns -- they apply via `LangAny` or are limited to other languages.
 - **Session management**: The GTSS-AUTH-004 SessionFixation rule does not include Java in its language list. However, GTSS-FW-SPRING-010 detects Spring Security configurations that disable session fixation protection (`sessionFixation().none()`). Servlet-level session fixation patterns (`request.getSession()` without invalidation outside Spring Security) are not detected.
 - **Race conditions**: The GTSS-GEN-006 RaceCondition rule does not include Java. Java-specific TOCTOU patterns with `synchronized` blocks are not checked.
-- **No Kotlin support**: Kotlin (`.kt`) files are not detected or scanned, even though Kotlin runs on the JVM and uses the same libraries.
+- **Limited Kotlin/Android overlap**: The Kotlin rule `GTSS-KT-005` (ExportedComponents) includes `LangJava` and scans `AndroidManifest.xml` files for exported components without permission protection. Other Kotlin rules (KT-001 through KT-004, KT-006 through KT-008) target Kotlin-only patterns and do not apply to `.java` files. Kotlin (`.kt`) source files are not detected by the Java language detector.

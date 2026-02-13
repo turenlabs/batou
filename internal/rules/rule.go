@@ -70,6 +70,8 @@ const (
 	LangRuby       Language = "ruby"
 	LangPHP        Language = "php"
 	LangCSharp     Language = "csharp"
+	LangKotlin     Language = "kotlin"
+	LangSwift      Language = "swift"
 	LangRust       Language = "rust"
 	LangC          Language = "c"
 	LangCPP        Language = "cpp"

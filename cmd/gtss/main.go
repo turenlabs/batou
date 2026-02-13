@@ -31,6 +31,10 @@ import (
 	_ "github.com/turen/gtss/internal/rules/prototype"
 	_ "github.com/turen/gtss/internal/rules/massassign"
 	_ "github.com/turen/gtss/internal/rules/cors"
+	_ "github.com/turen/gtss/internal/rules/kotlin"
+	_ "github.com/turen/gtss/internal/rules/swift"
+	_ "github.com/turen/gtss/internal/rules/csharp"
+	_ "github.com/turen/gtss/internal/rules/rust"
 	_ "github.com/turen/gtss/internal/analyzer/goast"
 
 	// Taint analysis engine and language catalogs

@@ -1,0 +1,824 @@
+package csharp
+
+import (
+	"regexp"
+	"strings"
+
+	"github.com/turen/gtss/internal/rules"
+)
+
+// ---------------------------------------------------------------------------
+// Compiled regex patterns
+// ---------------------------------------------------------------------------
+
+// GTSS-CS-001: SQL Injection (SqlCommand/SqlConnection with string concat/interpolation)
+var (
+	// SqlCommand with string concatenation
+	reSQLCommandConcat = regexp.MustCompile(`(?i)new\s+SqlCommand\s*\(\s*(?:["'][^"']*["']\s*\+|\$"[^"]*\{|[a-zA-Z_]\w*\s*[,)])`)
+	// CommandText assignment with concatenation or interpolation
+	reCommandTextConcat = regexp.MustCompile(`(?i)\.CommandText\s*=\s*(?:["'][^"']*["']\s*\+|\$"|[a-zA-Z_]\w*\s*;)`)
+	// String concat with SQL keywords (C# specific patterns)
+	// Match lines with SQL keyword in a string literal followed by + variable concatenation
+	reSQLStringConcat = regexp.MustCompile(`(?i)["'].*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b.*["']\s*\+\s*\w`)
+	// String interpolation with SQL keywords
+	reSQLInterpolation = regexp.MustCompile(`(?i)\$"[^"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"]*\{`)
+	// FromSqlRaw with variable (not interpolated string handled by EF)
+	reFromSqlRawVar = regexp.MustCompile(`(?i)\.FromSqlRaw\(\s*(?:[a-zA-Z_]\w*|["'][^"']*["']\s*\+|\$")`)
+	// ExecuteSqlRaw with variable
+	reExecuteSqlRawVar = regexp.MustCompile(`(?i)\.ExecuteSqlRaw\(\s*(?:[a-zA-Z_]\w*|["'][^"']*["']\s*\+|\$")`)
+	// Safe: SqlParameter, FromSqlInterpolated, ExecuteSqlInterpolated, Parameters.Add
+	reSQLSafe = regexp.MustCompile(`(?i)(?:SqlParameter|\.Parameters\.Add|\.Parameters\.AddWithValue|FromSqlInterpolated|ExecuteSqlInterpolated)`)
+)
+
+// GTSS-CS-003: Insecure deserialization
+var (
+	// BinaryFormatter, SoapFormatter, NetDataContractSerializer, LosFormatter, ObjectStateFormatter
+	reInsecureDeserializer = regexp.MustCompile(`\b(?:BinaryFormatter|SoapFormatter|NetDataContractSerializer|LosFormatter|ObjectStateFormatter)\s*(?:\(\s*\)|[^(])`)
+	// Deserialize call on known insecure deserializers
+	reInsecureDeserialize = regexp.MustCompile(`\b(?:BinaryFormatter|SoapFormatter|NetDataContractSerializer|LosFormatter|ObjectStateFormatter).*\.Deserialize\s*\(`)
+	// JavaScriptSerializer with TypeNameHandling or SimpleTypeResolver
+	reJavaScriptSerializerUnsafe = regexp.MustCompile(`(?i)new\s+JavaScriptSerializer\s*\(\s*new\s+SimpleTypeResolver`)
+	// JSON.NET TypeNameHandling set to anything other than None
+	reTypeNameHandlingUnsafe = regexp.MustCompile(`(?i)TypeNameHandling\s*=\s*TypeNameHandling\.(?:All|Auto|Objects|Arrays)`)
+)
+
+// GTSS-CS-004: Command injection (Process.Start with user-controlled args)
+var (
+	// Process.Start with variable as first arg, or with string concat/interpolation
+	reProcessStart = regexp.MustCompile(`Process\.Start\s*\(\s*(?:[a-zA-Z_]\w*|["'][^"']*["']\s*\+|\$")`)
+	// Process.Start with hardcoded command but variable second arg: Process.Start("cmd", userInput)
+	reProcessStartWithArgs = regexp.MustCompile(`Process\.Start\s*\(\s*["'][^"']+["']\s*,\s*[a-zA-Z_]\w*`)
+	reProcessStartInfo     = regexp.MustCompile(`(?:\.FileName\s*=\s*(?:[a-zA-Z_]\w*|["'][^"']*["']\s*\+|\$")|\.Arguments\s*=\s*(?:[a-zA-Z_]\w*|["'][^"']*["']\s*\+|\$"))`)
+	// new ProcessStartInfo with variable arguments
+	reNewProcessStartInfo = regexp.MustCompile(`new\s+ProcessStartInfo\s*\(\s*(?:[a-zA-Z_]\w*|\$"|["'][^"']*["']\s*\+)`)
+	// Safe: hardcoded command with no other arguments
+	reProcessSafe = regexp.MustCompile(`Process\.Start\s*\(\s*["'][^"']+["']\s*\)`)
+)
+
+// GTSS-CS-005: Path traversal
+var (
+	reFileOpsUserInput = regexp.MustCompile(`(?:File\.(?:ReadAllText|ReadAllBytes|ReadAllLines|WriteAllText|WriteAllBytes|WriteAllLines|Delete|Copy|Move|Exists|Open|Create|AppendAllText)|Directory\.(?:Delete|CreateDirectory|GetFiles|GetDirectories|EnumerateFiles))\s*\(`)
+	rePathCombine      = regexp.MustCompile(`Path\.Combine\s*\(`)
+	// Safe: Path.GetFileName strips directory components, GetFullPath+StartsWith validates path,
+	// .ToString() indicates non-string source (e.g., integer ID)
+	rePathSafe = regexp.MustCompile(`(?:Path\.GetFileName\s*\(|\.StartsWith\s*\(|Path\.GetFullPath\s*\(|\.ToString\s*\(\s*\))`)
+)
+
+// GTSS-CS-006: LDAP injection
+var (
+	reLDAPFilterConcat     = regexp.MustCompile(`(?i)(?:DirectorySearcher|searcher)\s*(?:\(\s*|\.Filter\s*=\s*)(?:["'][^"']*["']\s*\+|\$"|[a-zA-Z_]\w*\s*[;)])`)
+	reLDAPNewSearcherConcat = regexp.MustCompile(`(?i)new\s+DirectorySearcher\s*\(\s*(?:["'][^"']*["']\s*\+|\$")`)
+)
+
+// GTSS-CS-008: Hardcoded connection strings
+var (
+	reHardcodedConnString = regexp.MustCompile(`(?i)(?:connectionString|connStr|conn_str|connection)\s*=\s*["'][^"']*(?:password|pwd|Password|PWD)\s*=\s*[^"']+["']`)
+)
+
+// GTSS-CS-009: Insecure cookie
+var (
+	reCookieNoSecure   = regexp.MustCompile(`(?i)new\s+CookieOptions\s*\{`)
+	reCookieSecureTrue = regexp.MustCompile(`(?i)Secure\s*=\s*true`)
+	reCookieHttpOnly   = regexp.MustCompile(`(?i)HttpOnly\s*=\s*true`)
+	reCookieSameSite   = regexp.MustCompile(`(?i)SameSite\s*=`)
+)
+
+// GTSS-CS-010: CORS misconfiguration
+var (
+	reAllowAnyOrigin    = regexp.MustCompile(`\.AllowAnyOrigin\s*\(`)
+	reAllowCredentials  = regexp.MustCompile(`\.AllowCredentials\s*\(`)
+	reWithOriginsStar   = regexp.MustCompile(`\.WithOrigins\s*\(\s*["']\*["']\s*\)`)
+	reCORSPolicyStar    = regexp.MustCompile(`(?i)policy\.WithOrigins\s*\(\s*["']\*["']\s*\)`)
+)
+
+// GTSS-CS-011: Blazor JS interop injection
+var (
+	reJSRuntimeInvoke = regexp.MustCompile(`(?i)(?:JSRuntime|jsRuntime|_jsRuntime|IJSRuntime)\.InvokeAsync\s*(?:<[^>]*>\s*)?\(\s*["']eval["']`)
+	reJSRuntimeInterp = regexp.MustCompile(`(?i)(?:JSRuntime|jsRuntime|_jsRuntime|IJSRuntime)\.Invoke(?:Async|Void(?:Async)?)\s*(?:<[^>]*>\s*)?\(\s*\$"`)
+)
+
+// GTSS-CS-012: Mass assignment (no [Bind] or DTO, direct model binding)
+var (
+	// TryUpdateModelAsync without property list
+	reTryUpdateModel    = regexp.MustCompile(`TryUpdateModelAsync\s*<`)
+	reUpdateModelFields = regexp.MustCompile(`TryUpdateModelAsync\s*<[^>]*>\s*\([^)]*,\s*["']`)
+)
+
+// ---------------------------------------------------------------------------
+// Comment detection
+// ---------------------------------------------------------------------------
+
+var reLineComment = regexp.MustCompile(`^\s*(?://|/\*|\*)`)
+
+func isCommentLine(line string) bool {
+	return reLineComment.MatchString(line)
+}
+
+// ---------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------
+
+func truncate(s string, maxLen int) string {
+	s = strings.TrimSpace(s)
+	if len(s) > maxLen {
+		return s[:maxLen] + "..."
+	}
+	return s
+}
+
+func hasNearbySafe(lines []string, idx int, pat *regexp.Regexp) bool {
+	start := idx - 10
+	if start < 0 {
+		start = 0
+	}
+	end := idx + 10
+	if end > len(lines) {
+		end = len(lines)
+	}
+	for _, l := range lines[start:end] {
+		if pat.MatchString(l) {
+			return true
+		}
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-001: SQL Injection
+// ---------------------------------------------------------------------------
+
+type SQLInjection struct{}
+
+func (r *SQLInjection) ID() string                      { return "GTSS-CS-001" }
+func (r *SQLInjection) Name() string                    { return "CSharpSQLInjection" }
+func (r *SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *SQLInjection) Description() string {
+	return "Detects SQL injection in C# via SqlCommand, Entity Framework FromSqlRaw/ExecuteSqlRaw with string concatenation or interpolation."
+}
+func (r *SQLInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	// Skip if file uses parameterized queries extensively
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		var matched string
+		var confidence string
+
+		if hasNearbySafe(lines, i, reSQLSafe) {
+			continue
+		}
+
+		if loc := reSQLInterpolation.FindString(line); loc != "" {
+			matched = loc
+			confidence = "high"
+		} else if loc := reSQLStringConcat.FindString(line); loc != "" {
+			matched = loc
+			confidence = "high"
+		} else if loc := reFromSqlRawVar.FindString(line); loc != "" {
+			matched = loc
+			confidence = "high"
+		} else if loc := reExecuteSqlRawVar.FindString(line); loc != "" {
+			matched = loc
+			confidence = "high"
+		} else if loc := reCommandTextConcat.FindString(line); loc != "" {
+			matched = loc
+			confidence = "medium"
+		}
+
+		if matched != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "SQL Injection via string concatenation/interpolation in C#",
+				Description:   "SQL queries built with string concatenation or interpolation are vulnerable to SQL injection. Use parameterized queries with SqlParameter, FromSqlInterpolated, or ExecuteSqlInterpolated.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Use parameterized queries: command.Parameters.AddWithValue(\"@param\", value) or context.Users.FromSqlInterpolated($\"...\").",
+				CWEID:         "CWE-89",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    confidence,
+				Tags:          []string{"csharp", "sql-injection", "injection"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-003: Insecure Deserialization
+// ---------------------------------------------------------------------------
+
+type InsecureDeserialization struct{}
+
+func (r *InsecureDeserialization) ID() string                      { return "GTSS-CS-003" }
+func (r *InsecureDeserialization) Name() string                    { return "CSharpInsecureDeserialization" }
+func (r *InsecureDeserialization) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *InsecureDeserialization) Description() string {
+	return "Detects insecure deserialization via BinaryFormatter, SoapFormatter, NetDataContractSerializer, LosFormatter, ObjectStateFormatter, and JSON.NET TypeNameHandling."
+}
+func (r *InsecureDeserialization) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		var matched string
+		var detail string
+		sev := r.DefaultSeverity()
+
+		if m := reInsecureDeserialize.FindString(line); m != "" {
+			matched = m
+			detail = "BinaryFormatter/SoapFormatter/NetDataContractSerializer/LosFormatter/ObjectStateFormatter deserialization is inherently insecure and allows arbitrary code execution. Microsoft recommends not using these serializers with untrusted data."
+		} else if m := reInsecureDeserializer.FindString(line); m != "" {
+			matched = m
+			detail = "Instantiation of an insecure deserializer (BinaryFormatter, SoapFormatter, etc.). These serializers can execute arbitrary code during deserialization of untrusted data."
+		} else if m := reJavaScriptSerializerUnsafe.FindString(line); m != "" {
+			matched = m
+			detail = "JavaScriptSerializer with SimpleTypeResolver allows type-discriminated deserialization, enabling remote code execution via crafted JSON payloads."
+		} else if m := reTypeNameHandlingUnsafe.FindString(line); m != "" {
+			matched = m
+			detail = "JSON.NET TypeNameHandling set to All/Auto/Objects/Arrays allows type-discriminated deserialization, enabling remote code execution via crafted JSON payloads."
+			sev = rules.High
+		}
+
+		if matched != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      sev,
+				SeverityLabel: sev.String(),
+				Title:         "Insecure deserialization in C#",
+				Description:   detail,
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Use System.Text.Json or DataContractSerializer with known types. For JSON.NET, use TypeNameHandling.None or a custom SerializationBinder with an allowlist.",
+				CWEID:         "CWE-502",
+				OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"csharp", "deserialization", "rce"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-004: Command Injection
+// ---------------------------------------------------------------------------
+
+type CommandInjection struct{}
+
+func (r *CommandInjection) ID() string                      { return "GTSS-CS-004" }
+func (r *CommandInjection) Name() string                    { return "CSharpCommandInjection" }
+func (r *CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *CommandInjection) Description() string {
+	return "Detects command injection via Process.Start or ProcessStartInfo with user-controlled arguments."
+}
+func (r *CommandInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		var matched string
+		var detail string
+		confidence := "high"
+
+		// Skip safe Process.Start with hardcoded string
+		if reProcessSafe.MatchString(line) {
+			continue
+		}
+
+		if m := reProcessStartWithArgs.FindString(line); m != "" {
+			matched = m
+			detail = "Process.Start with a variable argument may allow command injection if the argument is user-controlled."
+		} else if m := reProcessStart.FindString(line); m != "" {
+			matched = m
+			detail = "Process.Start with dynamic argument may allow command injection if the argument is user-controlled."
+		} else if m := reProcessStartInfo.FindString(line); m != "" {
+			matched = m
+			detail = "ProcessStartInfo FileName or Arguments set with dynamic value may allow command injection."
+			confidence = "medium"
+		} else if m := reNewProcessStartInfo.FindString(line); m != "" {
+			matched = m
+			detail = "ProcessStartInfo constructed with dynamic arguments may allow command injection."
+		}
+
+		if matched != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Command injection via Process.Start in C#",
+				Description:   detail,
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Validate and sanitize all arguments before passing to Process.Start. Use an allowlist for permitted commands. Avoid shell interpreters (cmd.exe /c, bash -c).",
+				CWEID:         "CWE-78",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    confidence,
+				Tags:          []string{"csharp", "command-injection", "injection"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-005: Path Traversal
+// ---------------------------------------------------------------------------
+
+type PathTraversal struct{}
+
+func (r *PathTraversal) ID() string                      { return "GTSS-CS-005" }
+func (r *PathTraversal) Name() string                    { return "CSharpPathTraversal" }
+func (r *PathTraversal) DefaultSeverity() rules.Severity { return rules.High }
+func (r *PathTraversal) Description() string {
+	return "Detects file/directory operations with potentially user-controlled paths and Path.Combine without validation."
+}
+func (r *PathTraversal) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	// Check if file has user input sources
+	hasUserInput := strings.Contains(ctx.Content, "Request.") ||
+		strings.Contains(ctx.Content, "[FromQuery]") ||
+		strings.Contains(ctx.Content, "[FromBody]") ||
+		strings.Contains(ctx.Content, "[FromRoute]") ||
+		strings.Contains(ctx.Content, "[FromForm]") ||
+		strings.Contains(ctx.Content, "IFormFile") ||
+		strings.Contains(ctx.Content, "Console.ReadLine") ||
+		strings.Contains(ctx.Content, "[HttpGet]") ||
+		strings.Contains(ctx.Content, "[HttpPost]") ||
+		strings.Contains(ctx.Content, "[HttpPut]") ||
+		strings.Contains(ctx.Content, "[HttpDelete]") ||
+		strings.Contains(ctx.Content, "ControllerBase") ||
+		strings.Contains(ctx.Content, ": Controller")
+
+	if !hasUserInput {
+		return nil
+	}
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		// Skip lines with Path.GetFileName (safe pattern)
+		if rePathSafe.MatchString(line) {
+			continue
+		}
+
+		var matched string
+		var detail string
+
+		if m := rePathCombine.FindString(line); m != "" {
+			// Path.Combine is vulnerable to traversal if user input contains absolute path
+			if hasNearbySafe(lines, i, rePathSafe) {
+				continue
+			}
+			matched = m
+			detail = "Path.Combine with user-controlled input is vulnerable to path traversal. If the second argument is an absolute path (e.g., starts with / or C:\\), it ignores the base path entirely."
+		} else if m := reFileOpsUserInput.FindString(line); m != "" {
+			// Check if there's path sanitization nearby
+			if hasNearbySafe(lines, i, rePathSafe) {
+				continue
+			}
+			matched = m
+			detail = "File or directory operation with potentially user-controlled path. An attacker could use ../ sequences to access files outside the intended directory."
+		}
+
+		if matched != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Path traversal in file operation",
+				Description:   detail,
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Use Path.GetFileName() to strip directory components from user input. Validate that the resolved path starts with the expected base directory using Path.GetFullPath() and StartsWith().",
+				CWEID:         "CWE-22",
+				OWASPCategory: "A01:2021-Broken Access Control",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "path-traversal", "file-access"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-006: LDAP Injection
+// ---------------------------------------------------------------------------
+
+type LDAPInjection struct{}
+
+func (r *LDAPInjection) ID() string                      { return "GTSS-CS-006" }
+func (r *LDAPInjection) Name() string                    { return "CSharpLDAPInjection" }
+func (r *LDAPInjection) DefaultSeverity() rules.Severity { return rules.High }
+func (r *LDAPInjection) Description() string {
+	return "Detects LDAP injection via DirectorySearcher.Filter with string concatenation or interpolation."
+}
+func (r *LDAPInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		var matched string
+
+		if m := reLDAPFilterConcat.FindString(line); m != "" {
+			matched = m
+		} else if m := reLDAPNewSearcherConcat.FindString(line); m != "" {
+			matched = m
+		}
+
+		if matched != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "LDAP injection via DirectorySearcher with string concatenation",
+				Description:   "LDAP filters constructed with string concatenation or interpolation allow attackers to modify filter logic and access unauthorized directory entries.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Escape LDAP special characters in user input before constructing filters. Use parameterized LDAP searches or encode with a dedicated LDAP filter escaping function.",
+				CWEID:         "CWE-90",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"csharp", "ldap-injection", "injection"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-008: Hardcoded Connection Strings
+// ---------------------------------------------------------------------------
+
+type HardcodedConnectionString struct{}
+
+func (r *HardcodedConnectionString) ID() string                      { return "GTSS-CS-008" }
+func (r *HardcodedConnectionString) Name() string                    { return "CSharpHardcodedConnectionString" }
+func (r *HardcodedConnectionString) DefaultSeverity() rules.Severity { return rules.High }
+func (r *HardcodedConnectionString) Description() string {
+	return "Detects hardcoded database connection strings with embedded passwords in C# source code."
+}
+func (r *HardcodedConnectionString) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *HardcodedConnectionString) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if m := reHardcodedConnString.FindString(line); m != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Hardcoded database connection string with password",
+				Description:   "A connection string with an embedded password is hardcoded in the source code. This exposes database credentials in version control and compiled binaries.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(m, 120),
+				Suggestion:    "Store connection strings in configuration files (appsettings.json) or environment variables. Use Azure Key Vault, AWS Secrets Manager, or similar secrets management for production credentials.",
+				CWEID:         "CWE-798",
+				OWASPCategory: "A07:2021-Identification and Authentication Failures",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"csharp", "hardcoded-credentials", "secrets"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-009: Insecure Cookie
+// ---------------------------------------------------------------------------
+
+type InsecureCookie struct{}
+
+func (r *InsecureCookie) ID() string                      { return "GTSS-CS-009" }
+func (r *InsecureCookie) Name() string                    { return "CSharpInsecureCookie" }
+func (r *InsecureCookie) DefaultSeverity() rules.Severity { return rules.Medium }
+func (r *InsecureCookie) Description() string {
+	return "Detects CookieOptions without Secure, HttpOnly, or SameSite flags in ASP.NET Core."
+}
+func (r *InsecureCookie) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if !reCookieNoSecure.MatchString(line) {
+			continue
+		}
+
+		// Check surrounding lines for cookie security flags
+		start := i
+		end := i + 15
+		if end > len(lines) {
+			end = len(lines)
+		}
+		block := strings.Join(lines[start:end], "\n")
+
+		hasSecure := reCookieSecureTrue.MatchString(block)
+		hasHttpOnly := reCookieHttpOnly.MatchString(block)
+		hasSameSite := reCookieSameSite.MatchString(block)
+
+		if hasSecure && hasHttpOnly && hasSameSite {
+			continue
+		}
+
+		missing := []string{}
+		if !hasSecure {
+			missing = append(missing, "Secure")
+		}
+		if !hasHttpOnly {
+			missing = append(missing, "HttpOnly")
+		}
+		if !hasSameSite {
+			missing = append(missing, "SameSite")
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Cookie missing security flags: " + strings.Join(missing, ", "),
+			Description:   "CookieOptions is missing security flags. Without Secure, cookies are sent over HTTP. Without HttpOnly, cookies are accessible to JavaScript (XSS). Without SameSite, cookies are vulnerable to CSRF.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    i + 1,
+			MatchedText:   truncate(strings.TrimSpace(line), 120),
+			Suggestion:    "Set Secure = true, HttpOnly = true, and SameSite = SameSiteMode.Strict (or Lax) on all cookies containing sensitive data.",
+			CWEID:         "CWE-614",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+			Language:      ctx.Language,
+			Confidence:    "medium",
+			Tags:          []string{"csharp", "cookie", "security-config"},
+		})
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-010: CORS Misconfiguration
+// ---------------------------------------------------------------------------
+
+type CORSMisconfiguration struct{}
+
+func (r *CORSMisconfiguration) ID() string                      { return "GTSS-CS-010" }
+func (r *CORSMisconfiguration) Name() string                    { return "CSharpCORSMisconfiguration" }
+func (r *CORSMisconfiguration) DefaultSeverity() rules.Severity { return rules.Medium }
+func (r *CORSMisconfiguration) Description() string {
+	return "Detects insecure CORS configurations in ASP.NET Core, including AllowAnyOrigin with AllowCredentials and wildcard origins."
+}
+func (r *CORSMisconfiguration) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *CORSMisconfiguration) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	hasAnyOrigin := reAllowAnyOrigin.MatchString(ctx.Content)
+	hasCreds := reAllowCredentials.MatchString(ctx.Content)
+	hasWildcardOrigins := reWithOriginsStar.MatchString(ctx.Content) || reCORSPolicyStar.MatchString(ctx.Content)
+
+	if hasAnyOrigin && hasCreds {
+		for i, line := range lines {
+			if isCommentLine(line) {
+				continue
+			}
+			if reAllowAnyOrigin.MatchString(line) {
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      rules.High,
+					SeverityLabel: rules.High.String(),
+					Title:         "CORS: AllowAnyOrigin with AllowCredentials",
+					Description:   "ASP.NET Core CORS policy allows any origin and also enables credentials. This combination is rejected by browsers but indicates a dangerous misconfiguration that may evolve into a reflected origin vulnerability.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   truncate(strings.TrimSpace(line), 120),
+					Suggestion:    "Use WithOrigins() with an explicit list of trusted domains instead of AllowAnyOrigin(). If credentials are needed, each origin must be specified explicitly.",
+					CWEID:         "CWE-942",
+					OWASPCategory: "A05:2021-Security Misconfiguration",
+					Language:      ctx.Language,
+					Confidence:    "high",
+					Tags:          []string{"csharp", "cors", "security-config"},
+				})
+				break
+			}
+		}
+	} else if hasAnyOrigin || hasWildcardOrigins {
+		for i, line := range lines {
+			if isCommentLine(line) {
+				continue
+			}
+			if reAllowAnyOrigin.MatchString(line) || reWithOriginsStar.MatchString(line) || reCORSPolicyStar.MatchString(line) {
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "CORS: wildcard origin configured",
+					Description:   "The CORS policy allows all origins. While acceptable for fully public APIs, it may expose endpoints to unintended cross-origin access.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   truncate(strings.TrimSpace(line), 120),
+					Suggestion:    "Use WithOrigins() with specific trusted domains instead of AllowAnyOrigin() or WithOrigins(\"*\").",
+					CWEID:         "CWE-942",
+					OWASPCategory: "A05:2021-Security Misconfiguration",
+					Language:      ctx.Language,
+					Confidence:    "medium",
+					Tags:          []string{"csharp", "cors", "security-config"},
+				})
+				break
+			}
+		}
+	}
+
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-011: Blazor JS Interop Injection
+// ---------------------------------------------------------------------------
+
+type BlazorJSInteropInjection struct{}
+
+func (r *BlazorJSInteropInjection) ID() string                      { return "GTSS-CS-011" }
+func (r *BlazorJSInteropInjection) Name() string                    { return "CSharpBlazorJSInteropInjection" }
+func (r *BlazorJSInteropInjection) DefaultSeverity() rules.Severity { return rules.High }
+func (r *BlazorJSInteropInjection) Description() string {
+	return "Detects Blazor JSRuntime.InvokeAsync with eval or string interpolation, which can lead to JavaScript injection."
+}
+func (r *BlazorJSInteropInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *BlazorJSInteropInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		var matched string
+		var detail string
+
+		if m := reJSRuntimeInvoke.FindString(line); m != "" {
+			matched = m
+			detail = "JSRuntime.InvokeAsync with 'eval' as the function name executes arbitrary JavaScript. If user input reaches the eval argument, this enables XSS."
+		} else if m := reJSRuntimeInterp.FindString(line); m != "" {
+			matched = m
+			detail = "JSRuntime.InvokeAsync/InvokeVoidAsync with string interpolation in the function identifier may allow JavaScript injection if user input is interpolated into the function name."
+		}
+
+		if matched != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Blazor JS interop injection",
+				Description:   detail,
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Use fixed JavaScript function names in JSRuntime calls. Pass user data as arguments to the JavaScript function, not as part of the function name. Never use 'eval' with JSRuntime.",
+				CWEID:         "CWE-79",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"csharp", "blazor", "xss", "js-interop"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-012: Mass Assignment
+// ---------------------------------------------------------------------------
+
+type MassAssignment struct{}
+
+func (r *MassAssignment) ID() string                      { return "GTSS-CS-012" }
+func (r *MassAssignment) Name() string                    { return "CSharpMassAssignment" }
+func (r *MassAssignment) DefaultSeverity() rules.Severity { return rules.High }
+func (r *MassAssignment) Description() string {
+	return "Detects mass assignment vulnerabilities in ASP.NET Core where domain models are bound directly from request data without [Bind] attribute or DTO pattern."
+}
+func (r *MassAssignment) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	// Check for TryUpdateModelAsync without field restrictions
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if reTryUpdateModel.MatchString(line) && !reUpdateModelFields.MatchString(line) {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "TryUpdateModelAsync without field restrictions (mass assignment)",
+				Description:   "TryUpdateModelAsync binds all model properties from request data. Without specifying included properties, an attacker can set unintended fields like IsAdmin, Role, or Price.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(strings.TrimSpace(line), 120),
+				Suggestion:    "Specify included properties: TryUpdateModelAsync(model, \"\", m => m.Name, m => m.Email). Or use a dedicated DTO/ViewModel with only the fields you want to accept.",
+				CWEID:         "CWE-915",
+				OWASPCategory: "A04:2021-Insecure Design",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "mass-assignment", "model-binding"},
+			})
+		}
+	}
+
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// Registration
+// ---------------------------------------------------------------------------
+
+func init() {
+	rules.Register(&SQLInjection{})
+	rules.Register(&InsecureDeserialization{})
+	rules.Register(&CommandInjection{})
+	rules.Register(&PathTraversal{})
+	rules.Register(&LDAPInjection{})
+	rules.Register(&HardcodedConnectionString{})
+	rules.Register(&InsecureCookie{})
+	rules.Register(&CORSMisconfiguration{})
+	rules.Register(&BlazorJSInteropInjection{})
+	rules.Register(&MassAssignment{})
+}

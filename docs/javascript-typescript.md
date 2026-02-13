@@ -593,6 +593,15 @@ The following regex-based rules apply to JavaScript and TypeScript files. Rules 
 | GTSS-FW-REACT-003 | React Prop Spreading | Medium | Spreading user-controlled data as React component props (can inject `dangerouslySetInnerHTML`, event handlers) |
 | GTSS-FW-REACT-004 | Dynamic Script/Iframe | High | `createElement('script'/'iframe')` or JSX `<script>`/`<iframe>` with dynamic `src`/`srcdoc` attributes |
 
+### Tauri Framework Rules
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-FW-TAURI-001 | Dangerous Shell Command Allowlist | Critical | `invoke("plugin:shell|execute"...)` or `Command.create(...)` in frontend code enabling system command execution from the webview |
+| GTSS-FW-TAURI-003 | IPC Command Injection | High | `invoke()` called with a variable or user-controlled command name instead of a string literal, allowing arbitrary Tauri command invocation |
+| GTSS-FW-TAURI-004 | Dangerous Protocol Handler | High | Direct `fetch`/`XMLHttpRequest`/`src=` access to `tauri://localhost` protocol, or dangerous URI scheme (`file://`, `smb://`, `nfs://`) in shell open configuration |
+| GTSS-FW-TAURI-006 | window.__TAURI__ Exposure | High | `withGlobalTauri: true` exposing all Tauri APIs on `window.__TAURI__`, or leaking the `__TAURI__` object via `postMessage`/`send`/`emit` to untrusted contexts |
+
 ## Example Detections
 
 ### SQL Injection via Template Literal

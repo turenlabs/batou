@@ -25,4 +25,14 @@ func init() {
 	rules.Register(&ReactRefInnerHTML{})
 	rules.Register(&ReactPropSpreading{})
 	rules.Register(&ReactDynamicScriptIframe{})
+
+	// Tauri rules
+	rules.Register(&TauriShellAllowlist{})
+	rules.Register(&TauriFilesystemScope{})
+	rules.Register(&TauriIPCInjection{})
+	rules.Register(&TauriProtocolHandler{})
+	rules.Register(&TauriCSPMissing{})
+	rules.Register(&TauriWindowExposure{})
+	rules.Register(&TauriDangerousPerms{})
+	rules.Register(&TauriInsecureUpdater{})
 }
