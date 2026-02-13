@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/turen/gtss/internal/analyzer"
+	"github.com/turen/gtss/internal/ast"
 	"github.com/turen/gtss/internal/fpfilter"
 	"github.com/turen/gtss/internal/graph"
 	"github.com/turen/gtss/internal/hints"
@@ -109,6 +110,13 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		sctx.NewText = input.ToolInput.NewString
 	}
 
+	// Parse AST (best-effort — nil tree is fine, rules fall back to regex).
+	var tree *ast.Tree
+	if ast.SupportsLanguage(lang) {
+		tree = ast.Parse([]byte(content), lang)
+		sctx.Tree = tree
+	}
+
 	// Phase 1: Run all registered rules concurrently (regex + taint)
 	applicable := rules.ForLanguage(lang)
 	result.RulesRun = len(applicable)
@@ -195,6 +203,10 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		// Save updated graph (best-effort)
 		graph.SaveGraph(callGraph)
 	}
+
+	// AST-based false positive filtering: suppress findings that fall
+	// entirely within comments or string literals in the parsed AST.
+	findings = ast.FilterFindings(tree, findings)
 
 	// Reduce severity for findings in test / fixture files.
 	// Test code intentionally contains vulnerable patterns so we downgrade

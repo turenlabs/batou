@@ -4,8 +4,9 @@
 BIN_DIR := bin
 BINARY := $(BIN_DIR)/gtss
 
-# Go settings
+# Go settings — CGO is required for tree-sitter AST parsing
 GO := go
+CGO_ENABLED := 1
 GOFLAGS := -trimpath
 LDFLAGS := -s -w -X 'main.version=$(VERSION)'
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -16,15 +17,15 @@ all: build
 # Build the GTSS binary
 build:
 	@mkdir -p $(BIN_DIR)
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/gtss
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/gtss
 
-# Build for all platforms
+# Build for all platforms (CGO cross-compilation requires appropriate C toolchain)
 build-all:
 	@mkdir -p $(BIN_DIR)
-	GOOS=darwin GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/gtss-darwin-arm64 ./cmd/gtss
-	GOOS=darwin GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/gtss-darwin-amd64 ./cmd/gtss
-	GOOS=linux GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/gtss-linux-amd64 ./cmd/gtss
-	GOOS=linux GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/gtss-linux-arm64 ./cmd/gtss
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=darwin GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/gtss-darwin-arm64 ./cmd/gtss
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=darwin GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/gtss-darwin-amd64 ./cmd/gtss
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/gtss-linux-amd64 ./cmd/gtss
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/gtss-linux-arm64 ./cmd/gtss
 
 # Install to user directory
 install: build

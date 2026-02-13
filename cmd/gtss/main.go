@@ -45,6 +45,18 @@ import (
 	_ "github.com/turen/gtss/internal/rules/jsts"
 	_ "github.com/turen/gtss/internal/rules/golang"
 	_ "github.com/turen/gtss/internal/analyzer/goast"
+	_ "github.com/turen/gtss/internal/analyzer/pyast"
+	_ "github.com/turen/gtss/internal/analyzer/javaast"
+	_ "github.com/turen/gtss/internal/analyzer/jsast"
+	_ "github.com/turen/gtss/internal/analyzer/cast"
+	_ "github.com/turen/gtss/internal/analyzer/phpast"
+	_ "github.com/turen/gtss/internal/analyzer/rubyast"
+	_ "github.com/turen/gtss/internal/analyzer/rustast"
+	_ "github.com/turen/gtss/internal/analyzer/csast"
+	_ "github.com/turen/gtss/internal/analyzer/ktast"
+	_ "github.com/turen/gtss/internal/analyzer/swiftast"
+	_ "github.com/turen/gtss/internal/analyzer/luaast"
+	_ "github.com/turen/gtss/internal/analyzer/gvyast"
 
 	// Taint analysis engine and language catalogs
 	_ "github.com/turen/gtss/internal/taint"

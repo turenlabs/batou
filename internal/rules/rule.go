@@ -151,6 +151,13 @@ type ScanContext struct {
 	IsNew    bool   // true for Write, false for Edit
 	OldText  string // for Edit operations, the text being replaced
 	NewText  string // for Edit operations, the replacement text
+
+	// Tree is the parsed AST for the file, if available.  It is an
+	// interface{} so that rule packages do not need to import the ast
+	// package.  Use internal/ast.TreeFromContext(sctx) to obtain the
+	// typed *ast.Tree.  May be nil when AST parsing is unavailable or
+	// failed.
+	Tree interface{}
 }
 
 // Rule is the interface all vulnerability detection rules must implement.
