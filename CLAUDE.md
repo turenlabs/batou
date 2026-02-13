@@ -9,9 +9,9 @@ GTSS is a security scanner that runs as a Claude Code hook, analyzing code for v
 ```
 cmd/gtss/main.go          Entry point - reads hook JSON from stdin, runs scanner, outputs hints
 internal/scanner/          Core scan orchestrator (concurrent rule execution + taint analysis)
-internal/rules/            11 rule categories (76+ regex-based rules)
+internal/rules/            30 rule categories (234 regex-based rules)
 internal/taint/            Taint analysis engine (source -> sink tracking with sanitizers)
-internal/taint/languages/  Language-specific taint catalogs (8 languages, 32 files)
+internal/taint/languages/  Language-specific taint catalogs (16 languages, 56+ files)
 internal/hints/            Hint generation for Claude feedback
 internal/graph/            Persistent call graph + interprocedural analysis
 internal/hook/             Hook I/O (JSON stdin/stdout, exit codes)
@@ -30,11 +30,11 @@ internal/testutil/         Test framework helpers
 
 ## Rule Categories
 
-injection, xss, traversal, crypto, secrets, ssrf, auth, generic, logging, validation, memory
+injection, xss, traversal, crypto, secrets, ssrf, auth, generic, logging, validation, memory, xxe, nosql, deser, prototype, massassign, cors, graphql, misconfig, redirect, kotlin, swift, rust, csharp, perl, lua, groovy, framework (spring, express, django, flask, rails, laravel, react, tauri)
 
 ## Languages Supported
 
-Go, Python, JavaScript/TypeScript, Java, PHP, Ruby, C, C++
+Go, Python, JavaScript/TypeScript, Java, PHP, Ruby, C, C++, Kotlin, Swift, Rust, C#, Perl, Lua, Groovy
 
 ## Building & Testing
 
