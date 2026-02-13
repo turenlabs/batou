@@ -75,6 +75,59 @@ var (
 	jsonDecodeCustom     = regexp.MustCompile(`Json\s*\{[^}]*\}\s*\.decodeFromString`)
 )
 
+// KT-009: Kotlin reflection with user input
+var (
+	reClassForName     = regexp.MustCompile(`Class\.forName\s*\(\s*[a-zA-Z_]\w*`)
+	reKotlinReflection = regexp.MustCompile(`(?:::class|\.java\.newInstance|\.createInstance)\s*`)
+	reClassForNameSafe = regexp.MustCompile(`(?i)(?:allowedClasses|classWhitelist|validClasses|classList)`)
+)
+
+// KT-010: Android content provider injection
+var (
+	reContentResolverQuery  = regexp.MustCompile(`contentResolver\s*\.\s*query\s*\(`)
+	reUriParse              = regexp.MustCompile(`Uri\.parse\s*\(\s*[a-zA-Z_]\w*`)
+	reContentProviderInsert = regexp.MustCompile(`contentResolver\s*\.\s*(?:insert|update|delete)\s*\(`)
+)
+
+// KT-011: Android deep link injection
+var (
+	reIntentGetData     = regexp.MustCompile(`intent\s*\.?\s*(?:data|getData\s*\(\s*\))`)
+	reDeepLinkAction    = regexp.MustCompile(`intent\s*\.\s*(?:action|getAction\s*\(\s*\))`)
+	reDeepLinkValidate  = regexp.MustCompile(`(?i)(?:isValidUrl|validateDeepLink|isAllowed|scheme\s*==\s*"https")`)
+)
+
+// KT-012: Insecure network config (cleartext traffic)
+var (
+	reCleartextTraffic = regexp.MustCompile(`android:usesCleartextTraffic\s*=\s*"true"`)
+	reNetworkSecurityConfig = regexp.MustCompile(`android:networkSecurityConfig`)
+)
+
+// KT-013: Android logging sensitive data
+var (
+	reAndroidLog       = regexp.MustCompile(`Log\s*\.\s*(?:d|v|i|w|e)\s*\(`)
+	reSensitiveLogData = regexp.MustCompile(`(?i)(?:password|token|secret|apiKey|api_key|credential|session|auth|bearer|jwt|cookie|ssn|credit.?card)`)
+)
+
+// KT-014: Room database raw query
+var (
+	reRoomRawQuery     = regexp.MustCompile(`(?:RoomDatabase|\.openHelper|database)\s*\.\s*query\s*\(\s*(?:"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+|"[^"]*\$\{)`)
+	reSupportSQLQuery  = regexp.MustCompile(`SimpleSQLiteQuery\s*\(\s*(?:"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+|"[^"]*\$\{)`)
+)
+
+// KT-015: Ktor route parameter injection
+var (
+	reKtorCallParams     = regexp.MustCompile(`call\s*\.\s*parameters\s*\[\s*["'][^"']+["']\s*\]`)
+	reKtorParamInSQL     = regexp.MustCompile(`(?:execute|query|prepareStatement|createStatement)\s*\(`)
+	reKtorParamSafe      = regexp.MustCompile(`(?:prepareStatement|setString|setInt|bindString)`)
+)
+
+// KT-016: Android broadcast receiver without permission
+var (
+	reRegisterReceiver     = regexp.MustCompile(`registerReceiver\s*\(`)
+	reReceiverPermission   = regexp.MustCompile(`registerReceiver\s*\([^,]+,\s*[^,]+,\s*["'][^"']+["']`)
+	reLocalBroadcast       = regexp.MustCompile(`LocalBroadcastManager`)
+)
+
 func init() {
 	rules.Register(&AndroidSQLInjection{})
 	rules.Register(&AndroidIntentInjection{})
@@ -84,6 +137,14 @@ func init() {
 	rules.Register(&KtorCORSMisconfig{})
 	rules.Register(&UnsafeCoroutineException{})
 	rules.Register(&KotlinSerializationUntrusted{})
+	rules.Register(&KotlinReflectionInjection{})
+	rules.Register(&ContentProviderInjection{})
+	rules.Register(&DeepLinkInjection{})
+	rules.Register(&InsecureNetworkConfig{})
+	rules.Register(&AndroidLoggingSensitive{})
+	rules.Register(&RoomRawQueryInjection{})
+	rules.Register(&KtorParameterInjection{})
+	rules.Register(&BroadcastReceiverNoPermission{})
 }
 
 // --- KT-001: Android SQL Injection ---
@@ -666,6 +727,427 @@ func (r *KotlinSerializationUntrusted) Scan(ctx *rules.ScanContext) []rules.Find
 		}
 	}
 
+	return findings
+}
+
+// --- KT-009: Kotlin Reflection Injection ---
+
+type KotlinReflectionInjection struct{}
+
+func (r *KotlinReflectionInjection) ID() string                      { return "GTSS-KT-009" }
+func (r *KotlinReflectionInjection) Name() string                    { return "KotlinReflectionInjection" }
+func (r *KotlinReflectionInjection) Description() string             { return "Detects Class.forName() with user-controlled input enabling arbitrary class instantiation." }
+func (r *KotlinReflectionInjection) DefaultSeverity() rules.Severity { return rules.High }
+func (r *KotlinReflectionInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+
+func (r *KotlinReflectionInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if isComment(trimmed) {
+			continue
+		}
+
+		if m := reClassForName.FindString(line); m != "" {
+			// Check if there's allowlist validation nearby
+			context := surroundingContext(lines, i, 5)
+			if reClassForNameSafe.MatchString(context) {
+				continue
+			}
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Class.forName() with user-controlled input (reflection injection)",
+				Description:   "Class.forName() with a user-controlled class name allows instantiation of arbitrary classes. An attacker can load dangerous classes to achieve remote code execution, bypass security controls, or access sensitive resources.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(m, 120),
+				Suggestion:    "Validate class names against an explicit allowlist of permitted classes. Use a when/map pattern: val allowedClasses = mapOf(\"user\" to User::class) and look up the class name.",
+				CWEID:         "CWE-470",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"kotlin", "reflection", "injection"},
+			})
+		}
+	}
+	return findings
+}
+
+// --- KT-010: Android Content Provider Injection ---
+
+type ContentProviderInjection struct{}
+
+func (r *ContentProviderInjection) ID() string                      { return "GTSS-KT-010" }
+func (r *ContentProviderInjection) Name() string                    { return "ContentProviderInjection" }
+func (r *ContentProviderInjection) Description() string             { return "Detects ContentResolver.query/insert/update/delete with user-controlled URIs enabling content provider injection." }
+func (r *ContentProviderInjection) DefaultSeverity() rules.Severity { return rules.High }
+func (r *ContentProviderInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+
+func (r *ContentProviderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+
+	// Check if file uses Uri.parse with a variable (user-controlled URI)
+	if !reUriParse.MatchString(ctx.Content) {
+		return nil
+	}
+
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if isComment(trimmed) {
+			continue
+		}
+
+		var matched string
+		if m := reContentResolverQuery.FindString(line); m != "" {
+			matched = m
+		} else if m := reContentProviderInsert.FindString(line); m != "" {
+			matched = m
+		}
+
+		if matched != "" {
+			context := surroundingContext(lines, i, 5)
+			if reUriParse.MatchString(context) {
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "Content provider query with user-controlled URI",
+					Description:   "ContentResolver.query/insert/update/delete with a user-controlled URI (via Uri.parse with variable input) allows an attacker to access arbitrary content providers on the device, potentially reading contacts, messages, or other sensitive data.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   truncate(matched, 120),
+					Suggestion:    "Validate URIs against an allowlist of permitted content provider authorities. Use ContentProvider permissions and avoid parsing URIs directly from user input.",
+					CWEID:         "CWE-926",
+					OWASPCategory: "A01:2021-Broken Access Control",
+					Language:      ctx.Language,
+					Confidence:    "high",
+					Tags:          []string{"android", "content-provider", "injection"},
+				})
+			}
+		}
+	}
+	return findings
+}
+
+// --- KT-011: Android Deep Link Injection ---
+
+type DeepLinkInjection struct{}
+
+func (r *DeepLinkInjection) ID() string                      { return "GTSS-KT-011" }
+func (r *DeepLinkInjection) Name() string                    { return "DeepLinkInjection" }
+func (r *DeepLinkInjection) Description() string             { return "Detects intent.getData() usage without validation, enabling deep link injection attacks." }
+func (r *DeepLinkInjection) DefaultSeverity() rules.Severity { return rules.High }
+func (r *DeepLinkInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+
+func (r *DeepLinkInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if isComment(trimmed) {
+			continue
+		}
+
+		if reIntentGetData.MatchString(line) {
+			// Check if there's validation nearby
+			context := surroundingContext(lines, i, 8)
+			if reDeepLinkValidate.MatchString(context) {
+				continue
+			}
+
+			// Higher confidence if deep link data is used in web/network operations
+			confidence := "medium"
+			if strings.Contains(context, "loadUrl") || strings.Contains(context, "openConnection") ||
+				strings.Contains(context, "HttpClient") || strings.Contains(context, "startActivity") {
+				confidence = "high"
+			}
+
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Deep link data used without validation",
+				Description:   "intent.data/getData() retrieves a URI from a deep link or app link. Without validating the scheme, host, and path, an attacker can craft malicious deep links to trigger unintended navigation, load arbitrary URLs in WebViews, or pass crafted data to internal components.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(trimmed, 120),
+				Suggestion:    "Validate deep link URIs: check the scheme (https only), verify the host against an allowlist, and sanitize path/query parameters. Example: if (uri.scheme == \"https\" && uri.host == \"example.com\") { ... }",
+				CWEID:         "CWE-939",
+				OWASPCategory: "A01:2021-Broken Access Control",
+				Language:      ctx.Language,
+				Confidence:    confidence,
+				Tags:          []string{"android", "deep-link", "injection"},
+			})
+		}
+	}
+	return findings
+}
+
+// --- KT-012: Insecure Network Config ---
+
+type InsecureNetworkConfig struct{}
+
+func (r *InsecureNetworkConfig) ID() string                      { return "GTSS-KT-012" }
+func (r *InsecureNetworkConfig) Name() string                    { return "InsecureNetworkConfig" }
+func (r *InsecureNetworkConfig) Description() string             { return "Detects android:usesCleartextTraffic=\"true\" allowing unencrypted HTTP connections." }
+func (r *InsecureNetworkConfig) DefaultSeverity() rules.Severity { return rules.High }
+func (r *InsecureNetworkConfig) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin, rules.LangJava, rules.LangAny} }
+
+func (r *InsecureNetworkConfig) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+
+	// Only scan AndroidManifest.xml files
+	if !strings.HasSuffix(ctx.FilePath, "AndroidManifest.xml") {
+		return nil
+	}
+
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if reCleartextTraffic.MatchString(line) {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Cleartext traffic enabled (android:usesCleartextTraffic=\"true\")",
+				Description:   "The application allows cleartext (unencrypted HTTP) network traffic. This exposes all network communication to eavesdropping, man-in-the-middle attacks, and data tampering on untrusted networks.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(strings.TrimSpace(line), 120),
+				Suggestion:    "Set android:usesCleartextTraffic=\"false\" and use HTTPS for all network communication. If specific domains require HTTP, use a Network Security Config (res/xml/network_security_config.xml) to allow cleartext only for those domains.",
+				CWEID:         "CWE-319",
+				OWASPCategory: "A02:2021-Cryptographic Failures",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"android", "network", "cleartext", "manifest"},
+			})
+		}
+	}
+	return findings
+}
+
+// --- KT-013: Android Logging Sensitive Data ---
+
+type AndroidLoggingSensitive struct{}
+
+func (r *AndroidLoggingSensitive) ID() string                      { return "GTSS-KT-013" }
+func (r *AndroidLoggingSensitive) Name() string                    { return "AndroidLoggingSensitive" }
+func (r *AndroidLoggingSensitive) Description() string             { return "Detects Android Log.d/Log.v/etc. calls that may log sensitive data like passwords and tokens." }
+func (r *AndroidLoggingSensitive) DefaultSeverity() rules.Severity { return rules.Medium }
+func (r *AndroidLoggingSensitive) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+
+func (r *AndroidLoggingSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if isComment(trimmed) {
+			continue
+		}
+
+		if reAndroidLog.MatchString(line) && reSensitiveLogData.MatchString(line) {
+			severity := r.DefaultSeverity()
+			confidence := "medium"
+			// Higher severity for debug/verbose logs (more likely left in production)
+			if strings.Contains(line, "Log.d") || strings.Contains(line, "Log.v") {
+				severity = rules.High
+				confidence = "high"
+			}
+
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      severity,
+				SeverityLabel: severity.String(),
+				Title:         "Sensitive data in Android log output",
+				Description:   "Android Log.d/Log.v/Log.i/Log.w/Log.e is called with what appears to be sensitive data (passwords, tokens, API keys, etc.). Android logs are accessible to other apps via logcat (pre-Android 4.1) and are included in bug reports.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(trimmed, 120),
+				Suggestion:    "Remove sensitive data from log statements. Use BuildConfig.DEBUG to conditionally disable logging in release builds: if (BuildConfig.DEBUG) Log.d(TAG, msg). Use Timber with a release tree that strips debug logs.",
+				CWEID:         "CWE-532",
+				OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
+				Language:      ctx.Language,
+				Confidence:    confidence,
+				Tags:          []string{"android", "logging", "sensitive-data"},
+			})
+		}
+	}
+	return findings
+}
+
+// --- KT-014: Room Database Raw Query ---
+
+type RoomRawQueryInjection struct{}
+
+func (r *RoomRawQueryInjection) ID() string                      { return "GTSS-KT-014" }
+func (r *RoomRawQueryInjection) Name() string                    { return "RoomRawQueryInjection" }
+func (r *RoomRawQueryInjection) Description() string             { return "Detects Room/SQLite raw queries with string concatenation or template interpolation." }
+func (r *RoomRawQueryInjection) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *RoomRawQueryInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+
+func (r *RoomRawQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if isComment(trimmed) {
+			continue
+		}
+
+		var matched string
+		var detail string
+
+		if m := reRoomRawQuery.FindString(line); m != "" {
+			matched = m
+			detail = "RoomDatabase.query() with string concatenation or template interpolation"
+		} else if m := reSupportSQLQuery.FindString(line); m != "" {
+			matched = m
+			detail = "SimpleSQLiteQuery with string concatenation or template interpolation"
+		}
+
+		if matched != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "SQL injection via " + detail,
+				Description:   "A raw SQL query is constructed using string concatenation or template interpolation. If user input flows into the query, attackers can modify query logic, extract data, or corrupt the database.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Use Room's @Query annotations with parameter binding: @Query(\"SELECT * FROM users WHERE id = :userId\"). For dynamic queries, use SupportSQLiteQuery with bind arguments: SimpleSQLiteQuery(\"SELECT * FROM users WHERE id = ?\", arrayOf(userId)).",
+				CWEID:         "CWE-89",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"android", "room", "sql-injection"},
+			})
+		}
+	}
+	return findings
+}
+
+// --- KT-015: Ktor Route Parameter Injection ---
+
+type KtorParameterInjection struct{}
+
+func (r *KtorParameterInjection) ID() string                      { return "GTSS-KT-015" }
+func (r *KtorParameterInjection) Name() string                    { return "KtorParameterInjection" }
+func (r *KtorParameterInjection) Description() string             { return "Detects Ktor call.parameters used in SQL queries without parameterized queries." }
+func (r *KtorParameterInjection) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *KtorParameterInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+
+func (r *KtorParameterInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+
+	// Only flag if file uses both Ktor parameters and SQL
+	if !reKtorCallParams.MatchString(ctx.Content) {
+		return nil
+	}
+	if !reKtorParamInSQL.MatchString(ctx.Content) {
+		return nil
+	}
+
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if isComment(trimmed) {
+			continue
+		}
+
+		if reKtorCallParams.MatchString(line) {
+			// Check if this parameter value flows into SQL nearby
+			context := surroundingContext(lines, i, 10)
+			if !reKtorParamInSQL.MatchString(context) {
+				continue
+			}
+			// Skip if using parameterized queries
+			if reKtorParamSafe.MatchString(context) {
+				continue
+			}
+
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Ktor route parameter used in SQL query without parameterization",
+				Description:   "A Ktor route parameter (call.parameters[]) is used near SQL query execution without prepared statement parameterization. This creates a SQL injection vulnerability where attackers can craft malicious route parameters to manipulate queries.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(trimmed, 120),
+				Suggestion:    "Use parameterized queries: connection.prepareStatement(\"SELECT * FROM users WHERE id = ?\").apply { setString(1, param) }. With Exposed: Users.select { Users.id eq param.toInt() }.",
+				CWEID:         "CWE-89",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"ktor", "sql-injection", "injection"},
+			})
+		}
+	}
+	return findings
+}
+
+// --- KT-016: Broadcast Receiver Without Permission ---
+
+type BroadcastReceiverNoPermission struct{}
+
+func (r *BroadcastReceiverNoPermission) ID() string                      { return "GTSS-KT-016" }
+func (r *BroadcastReceiverNoPermission) Name() string                    { return "BroadcastReceiverNoPermission" }
+func (r *BroadcastReceiverNoPermission) Description() string             { return "Detects registerReceiver() without a broadcast permission, allowing any app to send broadcasts to the receiver." }
+func (r *BroadcastReceiverNoPermission) DefaultSeverity() rules.Severity { return rules.Medium }
+func (r *BroadcastReceiverNoPermission) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+
+func (r *BroadcastReceiverNoPermission) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+
+	// Skip if using LocalBroadcastManager (safe pattern)
+	if reLocalBroadcast.MatchString(ctx.Content) {
+		return nil
+	}
+
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if isComment(trimmed) {
+			continue
+		}
+
+		if reRegisterReceiver.MatchString(line) {
+			// Check if permission is specified (3-argument form)
+			context := surroundingContext(lines, i, 3)
+			if reReceiverPermission.MatchString(context) {
+				continue
+			}
+
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "registerReceiver() without broadcast permission",
+				Description:   "registerReceiver() is called without specifying a broadcast permission. Any application on the device can send broadcasts to this receiver, which may allow malicious apps to trigger actions, inject data, or cause denial of service.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(trimmed, 120),
+				Suggestion:    "Use registerReceiver(receiver, filter, permission, handler) with a custom permission to restrict which apps can send broadcasts. For app-internal broadcasts, use LocalBroadcastManager or explicit intents. In Android 14+, use RECEIVER_NOT_EXPORTED flag.",
+				CWEID:         "CWE-926",
+				OWASPCategory: "A01:2021-Broken Access Control",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"android", "broadcast-receiver", "permission"},
+			})
+		}
+	}
 	return findings
 }
 

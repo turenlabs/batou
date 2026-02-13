@@ -512,3 +512,316 @@ func TestFixture_CSharp_Safe_PathSafe(t *testing.T) {
 	result := testutil.ScanFixture(t, "csharp/safe/PathSafe.cs")
 	testutil.MustNotFindRule(t, result, "GTSS-CS-005")
 }
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-013: Regex DoS
+// ---------------------------------------------------------------------------
+
+func TestCS013_RegexNoTimeout(t *testing.T) {
+	content := `using System.Text.RegularExpressions;
+public class Validator {
+    public bool Validate(string input) {
+        var regex = new Regex(@"^(a+)+$");
+        return regex.IsMatch(input);
+    }
+}`
+	result := testutil.ScanContent(t, "/app/Validator.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-013")
+}
+
+func TestCS013_RegexWithTimeout_Safe(t *testing.T) {
+	content := `using System.Text.RegularExpressions;
+public class Validator {
+    public bool Validate(string input) {
+        var regex = new Regex(@"^(a+)+$", RegexOptions.None, TimeSpan.FromSeconds(1));
+        return regex.IsMatch(input);
+    }
+}`
+	result := testutil.ScanContent(t, "/app/Validator.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-013")
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-014: Insecure Random
+// ---------------------------------------------------------------------------
+
+func TestCS014_SystemRandomForToken(t *testing.T) {
+	content := `using System;
+public class TokenService {
+    public string GenerateToken() {
+        var random = new Random();
+        var token = random.Next(100000, 999999).ToString();
+        return token;
+    }
+}`
+	result := testutil.ScanContent(t, "/app/TokenService.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-014")
+}
+
+func TestCS014_RandomNumberGenerator_Safe(t *testing.T) {
+	content := `using System.Security.Cryptography;
+public class TokenService {
+    public string GenerateToken() {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToBase64String(bytes);
+    }
+}`
+	result := testutil.ScanContent(t, "/app/TokenService.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-014")
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-015: ViewData/ViewBag XSS
+// ---------------------------------------------------------------------------
+
+func TestCS015_HtmlRaw(t *testing.T) {
+	content := `using Microsoft.AspNetCore.Mvc;
+public class ProfileController : Controller {
+    public IActionResult Show() {
+        return Content(Html.Raw(ViewBag.UserBio));
+    }
+}`
+	result := testutil.ScanContent(t, "/app/ProfileController.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-015")
+}
+
+func TestCS015_RazorEncoded_Safe(t *testing.T) {
+	content := `using Microsoft.AspNetCore.Mvc;
+public class ProfileController : Controller {
+    public IActionResult Show() {
+        ViewData["UserBio"] = user.Bio;
+        return View();
+    }
+}`
+	result := testutil.ScanContent(t, "/app/ProfileController.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-015")
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-016: Open Redirect
+// ---------------------------------------------------------------------------
+
+func TestCS016_RedirectReturnUrl(t *testing.T) {
+	content := `using Microsoft.AspNetCore.Mvc;
+public class AccountController : Controller {
+    [HttpGet]
+    public IActionResult Login(string returnUrl) {
+        return Redirect(returnUrl);
+    }
+}`
+	result := testutil.ScanContent(t, "/app/AccountController.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-016")
+}
+
+func TestCS016_LocalRedirect_Safe(t *testing.T) {
+	content := `using Microsoft.AspNetCore.Mvc;
+public class AccountController : Controller {
+    [HttpGet]
+    public IActionResult Login(string returnUrl) {
+        if (Url.IsLocalUrl(returnUrl))
+            return Redirect(returnUrl);
+        return RedirectToAction("Index");
+    }
+}`
+	result := testutil.ScanContent(t, "/app/AccountController.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-016")
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-017: SSRF via HttpClient
+// ---------------------------------------------------------------------------
+
+func TestCS017_HttpClientUserUrl(t *testing.T) {
+	content := `using System.Net.Http;
+using Microsoft.AspNetCore.Mvc;
+public class ProxyController : ControllerBase {
+    [HttpGet]
+    public async Task<IActionResult> Fetch([FromQuery] string url) {
+        var client = new HttpClient();
+        var response = await client.GetAsync(url);
+        return Ok(await response.Content.ReadAsStringAsync());
+    }
+}`
+	result := testutil.ScanContent(t, "/app/ProxyController.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-017")
+}
+
+func TestCS017_HttpClientBaseAddress_Safe(t *testing.T) {
+	content := `using System.Net.Http;
+public class ApiClient {
+    private readonly HttpClient _client;
+    public ApiClient() {
+        _client = new HttpClient();
+        _client.BaseAddress = new Uri("https://api.example.com");
+    }
+    public async Task<string> GetData(string path) {
+        var response = await _client.GetAsync(path);
+        return await response.Content.ReadAsStringAsync();
+    }
+}`
+	result := testutil.ScanContent(t, "/app/ApiClient.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-017")
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-018: Insecure XML
+// ---------------------------------------------------------------------------
+
+func TestCS018_XmlDocumentNoResolver(t *testing.T) {
+	content := `using System.Xml;
+public class XmlService {
+    public void Parse(string xmlInput) {
+        var doc = new XmlDocument();
+        doc.LoadXml(xmlInput);
+    }
+}`
+	result := testutil.ScanContent(t, "/app/XmlService.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-018")
+}
+
+func TestCS018_XmlDocumentResolverNull_Safe(t *testing.T) {
+	content := `using System.Xml;
+public class XmlService {
+    public void Parse(string xmlInput) {
+        var doc = new XmlDocument();
+        doc.XmlResolver = null;
+        doc.LoadXml(xmlInput);
+    }
+}`
+	result := testutil.ScanContent(t, "/app/XmlService.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-018")
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-019: Expression Injection
+// ---------------------------------------------------------------------------
+
+func TestCS019_DynamicLinqWhere(t *testing.T) {
+	content := `using System.Linq.Dynamic;
+public class SearchService {
+    public IQueryable<Product> Search(string filter) {
+        return _context.Products.Where(filter);
+    }
+}`
+	result := testutil.ScanContent(t, "/app/SearchService.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-019")
+}
+
+func TestCS019_StrongTypedLinq_Safe(t *testing.T) {
+	content := `using System.Linq;
+public class SearchService {
+    public IQueryable<Product> Search(string name) {
+        return _context.Products.Where(p => p.Name.Contains(name));
+    }
+}`
+	result := testutil.ScanContent(t, "/app/SearchService.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-019")
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-020: Missing Anti-Forgery Token
+// ---------------------------------------------------------------------------
+
+func TestCS020_HttpPostNoAntiForgery(t *testing.T) {
+	content := `using Microsoft.AspNetCore.Mvc;
+public class OrderController : Controller {
+    [HttpPost]
+    public IActionResult Create(OrderModel model) {
+        _orderService.Create(model);
+        return RedirectToAction("Index");
+    }
+}`
+	result := testutil.ScanContent(t, "/app/OrderController.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-020")
+}
+
+func TestCS020_HttpPostWithAntiForgery_Safe(t *testing.T) {
+	content := `using Microsoft.AspNetCore.Mvc;
+public class OrderController : Controller {
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult Create(OrderModel model) {
+        _orderService.Create(model);
+        return RedirectToAction("Index");
+    }
+}`
+	result := testutil.ScanContent(t, "/app/OrderController.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-020")
+}
+
+func TestCS020_ApiController_Safe(t *testing.T) {
+	content := `using Microsoft.AspNetCore.Mvc;
+[ApiController]
+[Route("api/[controller]")]
+public class OrderApiController : ControllerBase {
+    [HttpPost]
+    public IActionResult Create(OrderModel model) {
+        _orderService.Create(model);
+        return Ok();
+    }
+}`
+	result := testutil.ScanContent(t, "/app/OrderApiController.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-020")
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-021: Hardcoded Secrets
+// ---------------------------------------------------------------------------
+
+func TestCS021_HardcodedApiKey(t *testing.T) {
+	content := `public class ApiConfig {
+    private string apiKey = "sk_live_abc123def456ghi789jkl012mno";
+}`
+	result := testutil.ScanContent(t, "/app/ApiConfig.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-021")
+}
+
+func TestCS021_ConstSecretKey(t *testing.T) {
+	content := `public class Config {
+    const string SecretKey = "aVeryLongSecretKeyThatShouldNotBeHardcoded123";
+}`
+	result := testutil.ScanContent(t, "/app/Config.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-021")
+}
+
+func TestCS021_ConfigurationInjection_Safe(t *testing.T) {
+	content := `public class ApiConfig {
+    private readonly string _apiKey;
+    public ApiConfig(IConfiguration config) {
+        _apiKey = config["ApiKey"];
+    }
+}`
+	result := testutil.ScanContent(t, "/app/ApiConfig.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-021")
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-022: Unsafe Reflection
+// ---------------------------------------------------------------------------
+
+func TestCS022_TypeGetTypeVariable(t *testing.T) {
+	content := `using Microsoft.AspNetCore.Mvc;
+public class PluginController : ControllerBase {
+    [HttpGet]
+    public IActionResult Load([FromQuery] string typeName) {
+        var type = Type.GetType(typeName);
+        var instance = Activator.CreateInstance(type);
+        return Ok(instance.ToString());
+    }
+}`
+	result := testutil.ScanContent(t, "/app/PluginController.cs", content)
+	testutil.MustFindRule(t, result, "GTSS-CS-022")
+}
+
+func TestCS022_TypeofLiteral_Safe(t *testing.T) {
+	content := `using Microsoft.AspNetCore.Mvc;
+public class ServiceController : ControllerBase {
+    [HttpGet]
+    public IActionResult Info() {
+        var type = typeof(UserService);
+        return Ok(type.Name);
+    }
+}`
+	result := testutil.ScanContent(t, "/app/ServiceController.cs", content)
+	testutil.MustNotFindRule(t, result, "GTSS-CS-022")
+}

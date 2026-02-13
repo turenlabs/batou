@@ -38,6 +38,12 @@ import (
 	_ "github.com/turen/gtss/internal/rules/swift"
 	_ "github.com/turen/gtss/internal/rules/csharp"
 	_ "github.com/turen/gtss/internal/rules/rust"
+	_ "github.com/turen/gtss/internal/rules/php"
+	_ "github.com/turen/gtss/internal/rules/ruby"
+	_ "github.com/turen/gtss/internal/rules/python"
+	_ "github.com/turen/gtss/internal/rules/java"
+	_ "github.com/turen/gtss/internal/rules/jsts"
+	_ "github.com/turen/gtss/internal/rules/golang"
 	_ "github.com/turen/gtss/internal/analyzer/goast"
 
 	// Taint analysis engine and language catalogs

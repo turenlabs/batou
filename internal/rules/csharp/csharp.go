@@ -104,6 +104,75 @@ var (
 	reUpdateModelFields = regexp.MustCompile(`TryUpdateModelAsync\s*<[^>]*>\s*\([^)]*,\s*["']`)
 )
 
+// GTSS-CS-013: Regex DoS (new Regex with user input without timeout)
+var (
+	reNewRegex        = regexp.MustCompile(`new\s+Regex\s*\(`)
+	reRegexTimeout    = regexp.MustCompile(`(?:RegexOptions\s*\.\s*None|TimeSpan|matchTimeout|RegexOptions\.[^)]*,\s*TimeSpan)`)
+	reRegexIsMatch    = regexp.MustCompile(`Regex\.(?:IsMatch|Match|Matches|Replace|Split)\s*\(`)
+	reRegexStaticSafe = regexp.MustCompile(`Regex\.(?:IsMatch|Match|Matches|Replace|Split)\s*\([^,)]*,[^,)]*,\s*RegexOptions`)
+)
+
+// GTSS-CS-014: Insecure random (System.Random for security)
+var (
+	reSystemRandom     = regexp.MustCompile(`new\s+Random\s*\(`)
+	reRandomNext       = regexp.MustCompile(`\b(?:rand|random|rng|rnd)\s*\.\s*Next(?:Bytes|Double)?\s*\(`)
+	reSecurityContext  = regexp.MustCompile(`(?i)(?:password|token|secret|key|nonce|salt|otp|verification|csrf|session|auth)`)
+	reSecureRandomSafe = regexp.MustCompile(`(?:RandomNumberGenerator|RNGCryptoServiceProvider)`)
+)
+
+// GTSS-CS-015: ViewData/ViewBag XSS
+var (
+	reViewDataAssign = regexp.MustCompile(`(?:ViewData|ViewBag)\s*\[?\s*["']?\w*["']?\]?\s*=`)
+	reHtmlRaw        = regexp.MustCompile(`@?Html\.Raw\s*\(`)
+)
+
+// GTSS-CS-016: Open redirect
+var (
+	reRedirectUserInput = regexp.MustCompile(`(?:Redirect|RedirectToAction|RedirectPermanent)\s*\(\s*(?:[a-zA-Z_]\w*|Request\.|returnUrl|redirectUrl|url|next|goto|return_to)`)
+	reRedirectSafe      = regexp.MustCompile(`(?i)(?:Url\.IsLocalUrl|IsLocalUrl|LocalRedirect|RedirectToAction\s*\(\s*["']|RedirectToPage\s*\(\s*["'])`)
+)
+
+// GTSS-CS-017: SSRF via HttpClient
+var (
+	reHttpClientRequest = regexp.MustCompile(`(?:HttpClient|_httpClient|_client|client)\s*\.\s*(?:GetAsync|PostAsync|PutAsync|DeleteAsync|SendAsync|GetStringAsync|GetStreamAsync|GetByteArrayAsync)\s*\(\s*(?:[a-zA-Z_]\w*|\$")`)
+	reHttpClientSafe    = regexp.MustCompile(`(?i)(?:new\s+Uri\s*\(\s*["']https?://|\.BaseAddress\s*=|AllowedHosts|IsAllowedUrl|ValidateUrl|WhitelistUrl)`)
+)
+
+// GTSS-CS-018: Insecure XML (XmlDocument without XmlResolver=null)
+var (
+	reXmlDocument    = regexp.MustCompile(`new\s+XmlDocument\s*\(`)
+	reXmlReaderLoad  = regexp.MustCompile(`\.(?:LoadXml|Load)\s*\(`)
+	reXmlResolverNull = regexp.MustCompile(`XmlResolver\s*=\s*null`)
+	reXmlDtdProc     = regexp.MustCompile(`DtdProcessing\s*=\s*DtdProcessing\.Prohibit`)
+)
+
+// GTSS-CS-019: Expression injection (dynamic LINQ with user input)
+var (
+	reDynamicLinq = regexp.MustCompile(`\.(?:Where|OrderBy|Select|GroupBy)\s*\(\s*(?:[a-zA-Z_]\w*\s*\+|\$"|[a-zA-Z_]\w*\s*\))\s*`)
+	reDynamicLinqLib = regexp.MustCompile(`(?:System\.Linq\.Dynamic|DynamicQueryable)`)
+)
+
+// GTSS-CS-020: Missing [ValidateAntiForgeryToken] on POST endpoints
+var (
+	reHttpPostAttr         = regexp.MustCompile(`\[\s*Http(?:Post|Put|Delete|Patch)\s*\]`)
+	reAntiForgeryToken     = regexp.MustCompile(`\[\s*ValidateAntiForgeryToken\s*\]`)
+	reAutoAntiForgery      = regexp.MustCompile(`(?:AutoValidateAntiforgeryToken|IgnoreAntiforgeryToken|\[ApiController\])`)
+)
+
+// GTSS-CS-021: Hardcoded secrets (API keys, tokens in code)
+var (
+	reHardcodedSecret = regexp.MustCompile(`(?i)(?:apiKey|api_key|secret|secretKey|secret_key|accessKey|access_key|privateKey|private_key|clientSecret|client_secret)\s*=\s*["'][a-zA-Z0-9+/=_\-]{16,}["']`)
+	reHardcodedSecretConst = regexp.MustCompile(`(?i)(?:const|static\s+readonly)\s+string\s+\w*(?:Key|Secret|Token|Password)\w*\s*=\s*["'][^"']{8,}["']`)
+)
+
+// GTSS-CS-022: Unsafe reflection (Type.GetType/Activator.CreateInstance with user input)
+var (
+	reTypeGetType          = regexp.MustCompile(`Type\.GetType\s*\(\s*[a-zA-Z_]\w*`)
+	reActivatorCreate      = regexp.MustCompile(`Activator\.CreateInstance\s*\(\s*(?:Type\.GetType|[a-zA-Z_]\w*Type|[a-zA-Z_]\w*\))`)
+	reAssemblyLoad         = regexp.MustCompile(`Assembly\.(?:Load|LoadFrom|LoadFile)\s*\(\s*[a-zA-Z_]\w*`)
+	reReflectionSafe       = regexp.MustCompile(`(?i)(?:typeof\s*\(|nameof\s*\(|allowedTypes|typeWhitelist|validTypes)`)
+)
+
 // ---------------------------------------------------------------------------
 // Comment detection
 // ---------------------------------------------------------------------------
@@ -807,6 +876,614 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
+// GTSS-CS-013: Regex DoS
+// ---------------------------------------------------------------------------
+
+type RegexDoS struct{}
+
+func (r *RegexDoS) ID() string                      { return "GTSS-CS-013" }
+func (r *RegexDoS) Name() string                    { return "CSharpRegexDoS" }
+func (r *RegexDoS) DefaultSeverity() rules.Severity { return rules.High }
+func (r *RegexDoS) Description() string {
+	return "Detects Regex usage without timeout, which can lead to ReDoS (Regular Expression Denial of Service) when processing user-controlled input."
+}
+func (r *RegexDoS) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if m := reNewRegex.FindString(line); m != "" {
+			// Check if timeout is specified nearby
+			context := strings.Join(getSurrounding(lines, i, 3), "\n")
+			if reRegexTimeout.MatchString(context) {
+				continue
+			}
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Regex without timeout (ReDoS risk)",
+				Description:   "new Regex() without a timeout parameter is vulnerable to Regular Expression Denial of Service (ReDoS). Malicious input with catastrophic backtracking can cause the regex engine to hang indefinitely.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(strings.TrimSpace(line), 120),
+				Suggestion:    "Specify a timeout: new Regex(pattern, RegexOptions.None, TimeSpan.FromSeconds(1)). In .NET 7+, use the [GeneratedRegex] source generator for compile-time safety.",
+				CWEID:         "CWE-1333",
+				OWASPCategory: "A06:2021-Vulnerable and Outdated Components",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "regex", "dos", "redos"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-014: Insecure Random
+// ---------------------------------------------------------------------------
+
+type InsecureRandom struct{}
+
+func (r *InsecureRandom) ID() string                      { return "GTSS-CS-014" }
+func (r *InsecureRandom) Name() string                    { return "CSharpInsecureRandom" }
+func (r *InsecureRandom) DefaultSeverity() rules.Severity { return rules.High }
+func (r *InsecureRandom) Description() string {
+	return "Detects System.Random used in security-sensitive contexts (tokens, passwords, keys). System.Random is not cryptographically secure."
+}
+func (r *InsecureRandom) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+
+	// Skip if file uses secure random
+	if reSecureRandomSafe.MatchString(ctx.Content) {
+		return nil
+	}
+
+	// Only flag in security contexts
+	if !reSecurityContext.MatchString(ctx.Content) {
+		return nil
+	}
+
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		var matched string
+		if m := reSystemRandom.FindString(line); m != "" {
+			matched = m
+		} else if m := reRandomNext.FindString(line); m != "" {
+			// Check if this line or nearby lines involve security
+			context := strings.Join(getSurrounding(lines, i, 5), "\n")
+			if reSecurityContext.MatchString(context) {
+				matched = m
+			}
+		}
+
+		if matched != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "System.Random used in security-sensitive context",
+				Description:   "System.Random is a pseudorandom number generator that is predictable. An attacker who knows the seed can predict all generated values. Using it for tokens, passwords, keys, or nonces compromises security.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Use System.Security.Cryptography.RandomNumberGenerator for security-sensitive random values: RandomNumberGenerator.GetBytes(buffer) or RandomNumberGenerator.GetInt32(maxValue).",
+				CWEID:         "CWE-330",
+				OWASPCategory: "A02:2021-Cryptographic Failures",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "random", "crypto"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-015: ViewData/ViewBag XSS
+// ---------------------------------------------------------------------------
+
+type ViewDataXSS struct{}
+
+func (r *ViewDataXSS) ID() string                      { return "GTSS-CS-015" }
+func (r *ViewDataXSS) Name() string                    { return "CSharpViewDataXSS" }
+func (r *ViewDataXSS) DefaultSeverity() rules.Severity { return rules.High }
+func (r *ViewDataXSS) Description() string {
+	return "Detects Html.Raw() usage with ViewData/ViewBag which bypasses Razor's automatic HTML encoding, leading to XSS."
+}
+func (r *ViewDataXSS) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *ViewDataXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if m := reHtmlRaw.FindString(line); m != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Html.Raw() bypasses Razor HTML encoding (XSS risk)",
+				Description:   "Html.Raw() disables Razor's automatic HTML encoding. If the value contains user input (directly or via ViewData/ViewBag/Model), it creates a cross-site scripting (XSS) vulnerability.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(strings.TrimSpace(line), 120),
+				Suggestion:    "Remove Html.Raw() and let Razor's default encoding handle output. If raw HTML is necessary, sanitize with a library like HtmlSanitizer before passing to Html.Raw().",
+				CWEID:         "CWE-79",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "xss", "razor", "viewdata"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-016: Open Redirect
+// ---------------------------------------------------------------------------
+
+type OpenRedirect struct{}
+
+func (r *OpenRedirect) ID() string                      { return "GTSS-CS-016" }
+func (r *OpenRedirect) Name() string                    { return "CSharpOpenRedirect" }
+func (r *OpenRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
+func (r *OpenRedirect) Description() string {
+	return "Detects Redirect() with user-controlled input (returnUrl, next, goto) without URL validation, enabling open redirect attacks."
+}
+func (r *OpenRedirect) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if m := reRedirectUserInput.FindString(line); m != "" {
+			// Skip if safe redirect pattern nearby
+			if hasNearbySafe(lines, i, reRedirectSafe) {
+				continue
+			}
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Open redirect via Redirect() with user-controlled URL",
+				Description:   "Redirect() with a user-supplied URL (returnUrl, next, goto) without validation allows attackers to redirect users to malicious sites, enabling phishing and credential theft.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(m, 120),
+				Suggestion:    "Use Url.IsLocalUrl() to validate the URL is local before redirecting, or use LocalRedirect() which only allows local URLs. Example: if (Url.IsLocalUrl(returnUrl)) return Redirect(returnUrl);",
+				CWEID:         "CWE-601",
+				OWASPCategory: "A01:2021-Broken Access Control",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "open-redirect", "redirect"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-017: SSRF via HttpClient
+// ---------------------------------------------------------------------------
+
+type SSRFHttpClient struct{}
+
+func (r *SSRFHttpClient) ID() string                      { return "GTSS-CS-017" }
+func (r *SSRFHttpClient) Name() string                    { return "CSharpSSRFHttpClient" }
+func (r *SSRFHttpClient) DefaultSeverity() rules.Severity { return rules.High }
+func (r *SSRFHttpClient) Description() string {
+	return "Detects HttpClient requests with user-controlled URLs that could enable Server-Side Request Forgery (SSRF)."
+}
+func (r *SSRFHttpClient) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *SSRFHttpClient) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+
+	// Check if file has user input sources
+	hasUserInput := strings.Contains(ctx.Content, "Request.") ||
+		strings.Contains(ctx.Content, "[FromQuery]") ||
+		strings.Contains(ctx.Content, "[FromBody]") ||
+		strings.Contains(ctx.Content, "[FromRoute]") ||
+		strings.Contains(ctx.Content, "[FromForm]") ||
+		strings.Contains(ctx.Content, "Console.ReadLine") ||
+		strings.Contains(ctx.Content, "[HttpGet]") ||
+		strings.Contains(ctx.Content, "[HttpPost]") ||
+		strings.Contains(ctx.Content, ": Controller") ||
+		strings.Contains(ctx.Content, "ControllerBase")
+
+	if !hasUserInput {
+		return nil
+	}
+
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if m := reHttpClientRequest.FindString(line); m != "" {
+			if hasNearbySafe(lines, i, reHttpClientSafe) {
+				continue
+			}
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "SSRF via HttpClient with user-controlled URL",
+				Description:   "HttpClient request with a user-controlled URL enables Server-Side Request Forgery (SSRF). An attacker can access internal services, cloud metadata endpoints (169.254.169.254), or scan internal networks.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(m, 120),
+				Suggestion:    "Validate and restrict URLs to an allowlist of permitted domains. Block private/internal IP ranges (10.x, 172.16-31.x, 192.168.x, 169.254.x). Use a URL parser to verify the scheme and host before making requests.",
+				CWEID:         "CWE-918",
+				OWASPCategory: "A10:2021-Server-Side Request Forgery",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "ssrf", "httpclient"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-018: Insecure XML Processing
+// ---------------------------------------------------------------------------
+
+type InsecureXML struct{}
+
+func (r *InsecureXML) ID() string                      { return "GTSS-CS-018" }
+func (r *InsecureXML) Name() string                    { return "CSharpInsecureXML" }
+func (r *InsecureXML) DefaultSeverity() rules.Severity { return rules.High }
+func (r *InsecureXML) Description() string {
+	return "Detects XmlDocument usage without XmlResolver=null, which is vulnerable to XML External Entity (XXE) injection in .NET Framework."
+}
+func (r *InsecureXML) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *InsecureXML) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if reXmlDocument.MatchString(line) {
+			// Check if XmlResolver is set to null or DtdProcessing is prohibited nearby
+			context := strings.Join(getSurrounding(lines, i, 10), "\n")
+			if reXmlResolverNull.MatchString(context) || reXmlDtdProc.MatchString(context) {
+				continue
+			}
+			// Check if Load/LoadXml is called (otherwise just instantiation may be benign)
+			if !reXmlReaderLoad.MatchString(context) {
+				continue
+			}
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "XmlDocument without XmlResolver=null (XXE risk)",
+				Description:   "XmlDocument with the default XmlResolver processes external entities and DTDs. In .NET Framework (< 4.5.2), this allows XXE attacks: reading local files, SSRF, and denial of service via entity expansion (Billion Laughs).",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(strings.TrimSpace(line), 120),
+				Suggestion:    "Set XmlResolver to null: var doc = new XmlDocument() { XmlResolver = null }; Or use XmlReader with DtdProcessing.Prohibit for safer XML parsing.",
+				CWEID:         "CWE-611",
+				OWASPCategory: "A05:2021-Security Misconfiguration",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "xxe", "xml", "injection"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-019: Expression Injection (Dynamic LINQ)
+// ---------------------------------------------------------------------------
+
+type ExpressionInjection struct{}
+
+func (r *ExpressionInjection) ID() string                      { return "GTSS-CS-019" }
+func (r *ExpressionInjection) Name() string                    { return "CSharpExpressionInjection" }
+func (r *ExpressionInjection) DefaultSeverity() rules.Severity { return rules.High }
+func (r *ExpressionInjection) Description() string {
+	return "Detects dynamic LINQ expression injection with user-controlled input via System.Linq.Dynamic."
+}
+func (r *ExpressionInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *ExpressionInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+
+	// Only flag if Dynamic LINQ is in use
+	if !reDynamicLinqLib.MatchString(ctx.Content) {
+		return nil
+	}
+
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if m := reDynamicLinq.FindString(line); m != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Dynamic LINQ expression injection",
+				Description:   "Dynamic LINQ (System.Linq.Dynamic) Where/OrderBy/Select with user-controlled strings allows expression injection. Attackers can access arbitrary properties, call methods, or cause denial of service via crafted expressions.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(strings.TrimSpace(line), 120),
+				Suggestion:    "Validate dynamic LINQ expressions against an allowlist of permitted field names. Use strongly-typed LINQ queries instead of dynamic string-based queries where possible.",
+				CWEID:         "CWE-917",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "expression-injection", "dynamic-linq"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-020: Missing Anti-Forgery Token
+// ---------------------------------------------------------------------------
+
+type MissingAntiForgeryToken struct{}
+
+func (r *MissingAntiForgeryToken) ID() string                      { return "GTSS-CS-020" }
+func (r *MissingAntiForgeryToken) Name() string                    { return "CSharpMissingAntiForgeryToken" }
+func (r *MissingAntiForgeryToken) DefaultSeverity() rules.Severity { return rules.Medium }
+func (r *MissingAntiForgeryToken) Description() string {
+	return "Detects [HttpPost/Put/Delete/Patch] endpoints without [ValidateAntiForgeryToken], making them vulnerable to CSRF."
+}
+func (r *MissingAntiForgeryToken) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *MissingAntiForgeryToken) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+
+	// Skip if auto-validation is enabled at class level
+	if reAutoAntiForgery.MatchString(ctx.Content) {
+		return nil
+	}
+
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if reHttpPostAttr.MatchString(line) {
+			// Check surrounding lines for ValidateAntiForgeryToken
+			context := strings.Join(getSurrounding(lines, i, 3), "\n")
+			if reAntiForgeryToken.MatchString(context) {
+				continue
+			}
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Missing [ValidateAntiForgeryToken] on state-changing endpoint",
+				Description:   "An [HttpPost/Put/Delete/Patch] action method lacks [ValidateAntiForgeryToken]. Without CSRF protection, an attacker can trick authenticated users into submitting malicious requests.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(strings.TrimSpace(line), 120),
+				Suggestion:    "Add [ValidateAntiForgeryToken] to the action method, or apply [AutoValidateAntiforgeryToken] at the controller or global level. For API controllers, use [ApiController] which has its own CSRF mitigation.",
+				CWEID:         "CWE-352",
+				OWASPCategory: "A01:2021-Broken Access Control",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "csrf", "anti-forgery"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-021: Hardcoded Secrets
+// ---------------------------------------------------------------------------
+
+type HardcodedSecret struct{}
+
+func (r *HardcodedSecret) ID() string                      { return "GTSS-CS-021" }
+func (r *HardcodedSecret) Name() string                    { return "CSharpHardcodedSecret" }
+func (r *HardcodedSecret) DefaultSeverity() rules.Severity { return rules.High }
+func (r *HardcodedSecret) Description() string {
+	return "Detects hardcoded API keys, secrets, and tokens assigned directly in C# source code."
+}
+func (r *HardcodedSecret) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *HardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		var matched string
+
+		if m := reHardcodedSecret.FindString(line); m != "" {
+			matched = m
+		} else if m := reHardcodedSecretConst.FindString(line); m != "" {
+			matched = m
+		}
+
+		if matched != "" {
+			// Mask the actual secret value in the output
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Hardcoded secret (API key, token, or password) in source code",
+				Description:   "A secret value (API key, token, password, or private key) is hardcoded in the source code. This exposes credentials in version control history and compiled binaries, enabling unauthorized access if the repository is compromised.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Store secrets in environment variables, appsettings.json (excluded from source control), Azure Key Vault, AWS Secrets Manager, or a similar secrets management solution. Use IConfiguration to inject secrets at runtime.",
+				CWEID:         "CWE-798",
+				OWASPCategory: "A07:2021-Identification and Authentication Failures",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"csharp", "hardcoded-secret", "credentials"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// GTSS-CS-022: Unsafe Reflection
+// ---------------------------------------------------------------------------
+
+type UnsafeReflection struct{}
+
+func (r *UnsafeReflection) ID() string                      { return "GTSS-CS-022" }
+func (r *UnsafeReflection) Name() string                    { return "CSharpUnsafeReflection" }
+func (r *UnsafeReflection) DefaultSeverity() rules.Severity { return rules.High }
+func (r *UnsafeReflection) Description() string {
+	return "Detects Type.GetType(), Activator.CreateInstance(), or Assembly.Load() with user-controlled type names, enabling arbitrary type instantiation."
+}
+func (r *UnsafeReflection) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
+
+func (r *UnsafeReflection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+
+	// Check if file has user input sources
+	hasUserInput := strings.Contains(ctx.Content, "Request.") ||
+		strings.Contains(ctx.Content, "[FromQuery]") ||
+		strings.Contains(ctx.Content, "[FromBody]") ||
+		strings.Contains(ctx.Content, "[FromRoute]") ||
+		strings.Contains(ctx.Content, "[FromForm]") ||
+		strings.Contains(ctx.Content, "Console.ReadLine") ||
+		strings.Contains(ctx.Content, "[HttpGet]") ||
+		strings.Contains(ctx.Content, "[HttpPost]") ||
+		strings.Contains(ctx.Content, ": Controller") ||
+		strings.Contains(ctx.Content, "ControllerBase")
+
+	if !hasUserInput {
+		return nil
+	}
+
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		// Skip if there's a type allowlist check nearby
+		if hasNearbySafe(lines, i, reReflectionSafe) {
+			continue
+		}
+
+		var matched string
+		var detail string
+
+		if m := reTypeGetType.FindString(line); m != "" {
+			matched = m
+			detail = "Type.GetType() with a user-controlled type name allows instantiation of arbitrary types. An attacker can load dangerous types to achieve remote code execution or bypass security controls."
+		} else if m := reActivatorCreate.FindString(line); m != "" {
+			matched = m
+			detail = "Activator.CreateInstance() with a user-controlled type allows arbitrary object creation. Combined with Type.GetType(), this enables loading and instantiating any type in the runtime."
+		} else if m := reAssemblyLoad.FindString(line); m != "" {
+			matched = m
+			detail = "Assembly.Load/LoadFrom/LoadFile with a user-controlled path allows loading arbitrary .NET assemblies, enabling remote code execution."
+		}
+
+		if matched != "" {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Unsafe reflection with user-controlled type name",
+				Description:   detail,
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   truncate(matched, 120),
+				Suggestion:    "Validate type names against an explicit allowlist of permitted types. Never pass user input directly to Type.GetType() or Activator.CreateInstance(). Use a factory pattern with a dictionary of allowed types.",
+				CWEID:         "CWE-470",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      ctx.Language,
+				Confidence:    "medium",
+				Tags:          []string{"csharp", "reflection", "unsafe-reflection"},
+			})
+		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// Helper: getSurrounding
+// ---------------------------------------------------------------------------
+
+func getSurrounding(lines []string, idx int, radius int) []string {
+	start := idx - radius
+	if start < 0 {
+		start = 0
+	}
+	end := idx + radius + 1
+	if end > len(lines) {
+		end = len(lines)
+	}
+	return lines[start:end]
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -821,4 +1498,14 @@ func init() {
 	rules.Register(&CORSMisconfiguration{})
 	rules.Register(&BlazorJSInteropInjection{})
 	rules.Register(&MassAssignment{})
+	rules.Register(&RegexDoS{})
+	rules.Register(&InsecureRandom{})
+	rules.Register(&ViewDataXSS{})
+	rules.Register(&OpenRedirect{})
+	rules.Register(&SSRFHttpClient{})
+	rules.Register(&InsecureXML{})
+	rules.Register(&ExpressionInjection{})
+	rules.Register(&MissingAntiForgeryToken{})
+	rules.Register(&HardcodedSecret{})
+	rules.Register(&UnsafeReflection{})
 }

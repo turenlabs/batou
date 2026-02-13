@@ -1,0 +1,157 @@
+{
+  "nodes": {
+    "/app/auth.go:createToken": {
+      "id": "/app/auth.go:createToken",
+      "file_path": "/app/auth.go",
+      "name": "createToken",
+      "package": "main",
+      "start_line": 8,
+      "end_line": 14,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "44c7069bcfed21c4",
+      "last_scan_at": "2026-02-13T13:13:19.081267-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "/app/handler.go:handler": {
+      "id": "/app/handler.go:handler",
+      "file_path": "/app/handler.go",
+      "name": "handler",
+      "package": "main",
+      "start_line": 5,
+      "end_line": 7,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "tainted_params": {
+          "1": [
+            "user_input"
+          ]
+        },
+        "source_params": {
+          "0": "external",
+          "1": "user_input"
+        },
+        "sink_calls": [
+          {
+            "category": "html_output",
+            "method": "ResponseWriter.Write",
+            "line": 6,
+            "arg_from_param": 1
+          }
+        ]
+      },
+      "content_hash": "ba8c4aa34e921cd7",
+      "last_scan_at": "2026-02-13T13:13:19.124248-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "/app/main.go:main": {
+      "id": "/app/main.go:main",
+      "file_path": "/app/main.go",
+      "name": "main",
+      "package": "main",
+      "start_line": 5,
+      "end_line": 9,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "b9c181655e30ae57",
+      "last_scan_at": "2026-02-13T13:13:19.103762-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "/app/render.go:render": {
+      "id": "/app/render.go:render",
+      "file_path": "/app/render.go",
+      "name": "render",
+      "package": "main",
+      "start_line": 5,
+      "end_line": 7,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "sink_calls": [
+          {
+            "category": "template_render",
+            "method": "template",
+            "line": 6,
+            "arg_from_param": -1
+          }
+        ]
+      },
+      "content_hash": "d0f5cd34cc8427f2",
+      "last_scan_at": "2026-02-13T13:13:18.93354-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "/app/save.go:save": {
+      "id": "/app/save.go:save",
+      "file_path": "/app/save.go",
+      "name": "save",
+      "package": "main",
+      "start_line": 5,
+      "end_line": 7,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "sink_calls": [
+          {
+            "category": "file_write",
+            "method": "os.File",
+            "line": 6,
+            "arg_from_param": -1
+          }
+        ]
+      },
+      "content_hash": "c06073f1ccb41051",
+      "last_scan_at": "2026-02-13T13:08:25.777748-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "/app/setup.go:setup": {
+      "id": "/app/setup.go:setup",
+      "file_path": "/app/setup.go",
+      "name": "setup",
+      "package": "main",
+      "start_line": 5,
+      "end_line": 7,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "b7e0f52fa327bd8f",
+      "last_scan_at": "2026-02-13T13:13:19.091403-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "/app/util.go:shuffle": {
+      "id": "/app/util.go:shuffle",
+      "file_path": "/app/util.go",
+      "name": "shuffle",
+      "package": "main",
+      "start_line": 5,
+      "end_line": 9,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "63cea8e4c9f49d4f",
+      "last_scan_at": "2026-02-13T13:08:25.76529-06:00",
+      "language": "go",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/golang",
+  "session_id": "",
+  "last_updated": "2026-02-13T13:13:19.124249-06:00",
+  "version": 1
+}

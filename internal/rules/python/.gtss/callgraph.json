@@ -1,0 +1,290 @@
+{
+  "nodes": {
+    "/app/admin.py:admin_view": {
+      "id": "/app/admin.py:admin_view",
+      "file_path": "/app/admin.py",
+      "name": "admin_view",
+      "package": "",
+      "start_line": 1,
+      "end_line": 4,
+      "calls": [],
+      "called_by": [
+        "/app/admin.py:admin_view"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "46f4ff81c0df39ca",
+      "last_scan_at": "2026-02-13T13:09:17.701077-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/auth.py:decode_token": {
+      "id": "/app/auth.py:decode_token",
+      "file_path": "/app/auth.py",
+      "name": "decode_token",
+      "package": "",
+      "start_line": 2,
+      "end_line": 4,
+      "calls": [
+        "/app/auth.py:decode_token"
+      ],
+      "called_by": [
+        "/app/auth.py:decode_token"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "c86ff23e91fdf468",
+      "last_scan_at": "2026-02-13T13:13:22.006553-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/client.py:fetch": {
+      "id": "/app/client.py:fetch",
+      "file_path": "/app/client.py",
+      "name": "fetch",
+      "package": "",
+      "start_line": 2,
+      "end_line": 4,
+      "calls": [
+        "/app/client.py:fetch"
+      ],
+      "called_by": [
+        "/app/client.py:fetch"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "c0cf532abffb227e",
+      "last_scan_at": "2026-02-13T13:13:21.957872-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/download.py:download": {
+      "id": "/app/download.py:download",
+      "file_path": "/app/download.py",
+      "name": "download",
+      "package": "",
+      "start_line": 3,
+      "end_line": 7,
+      "calls": [],
+      "called_by": [
+        "/app/download.py:download"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "acb20d1fec59a96d",
+      "last_scan_at": "2026-02-13T13:09:17.692198-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/extractor.py:extract": {
+      "id": "/app/extractor.py:extract",
+      "file_path": "/app/extractor.py",
+      "name": "extract",
+      "package": "",
+      "start_line": 2,
+      "end_line": 6,
+      "calls": [
+        "/app/extractor.py:extract"
+      ],
+      "called_by": [
+        "/app/extractor.py:extract"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "89c406cd495808f3",
+      "last_scan_at": "2026-02-13T13:13:21.980042-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/handler.py:handle": {
+      "id": "/app/handler.py:handle",
+      "file_path": "/app/handler.py",
+      "name": "handle",
+      "package": "",
+      "start_line": 3,
+      "end_line": 6,
+      "calls": [],
+      "called_by": [
+        "/app/handler.py:handle"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "17a01e90d3cdf867",
+      "last_scan_at": "2026-02-13T13:09:17.703648-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/main.py:search": {
+      "id": "/app/main.py:search",
+      "file_path": "/app/main.py",
+      "name": "search",
+      "package": "",
+      "start_line": 5,
+      "end_line": 7,
+      "calls": [
+        "/app/main.py:search"
+      ],
+      "called_by": [
+        "/app/main.py:search"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "cb5342062a12cc4b",
+      "last_scan_at": "2026-02-13T13:13:22.040182-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/model.py:load_model": {
+      "id": "/app/model.py:load_model",
+      "file_path": "/app/model.py",
+      "name": "load_model",
+      "package": "",
+      "start_line": 2,
+      "end_line": 5,
+      "calls": [],
+      "called_by": [
+        "/app/model.py:load_model"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "85a657d0cee04f02",
+      "last_scan_at": "2026-02-13T13:09:17.704993-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/parser.py:parse_data": {
+      "id": "/app/parser.py:parse_data",
+      "file_path": "/app/parser.py",
+      "name": "parse_data",
+      "package": "",
+      "start_line": 2,
+      "end_line": 4,
+      "calls": [],
+      "called_by": [
+        "/app/parser.py:parse_data"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1ba3f9268cf4dedd",
+      "last_scan_at": "2026-02-13T13:09:17.695092-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/posts.py:edit_post": {
+      "id": "/app/posts.py:edit_post",
+      "file_path": "/app/posts.py",
+      "name": "edit_post",
+      "package": "",
+      "start_line": 1,
+      "end_line": 4,
+      "calls": [],
+      "called_by": [
+        "/app/posts.py:edit_post"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "f74ff20c9c4db50b",
+      "last_scan_at": "2026-02-13T13:09:17.702323-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/runner.py:run_command": {
+      "id": "/app/runner.py:run_command",
+      "file_path": "/app/runner.py",
+      "name": "run_command",
+      "package": "",
+      "start_line": 2,
+      "end_line": 5,
+      "calls": [
+        "/app/runner.py:run_command"
+      ],
+      "called_by": [
+        "/app/runner.py:run_command"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "7b62116db2aa625f",
+      "last_scan_at": "2026-02-13T13:13:22.052446-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/search.py:search": {
+      "id": "/app/search.py:search",
+      "file_path": "/app/search.py",
+      "name": "search",
+      "package": "",
+      "start_line": 3,
+      "end_line": 6,
+      "calls": [
+        "/app/search.py:search"
+      ],
+      "called_by": [
+        "/app/search.py:search"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "22812c2b4a3dbf03",
+      "last_scan_at": "2026-02-13T13:13:21.96572-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/temp.py:create_temp": {
+      "id": "/app/temp.py:create_temp",
+      "file_path": "/app/temp.py",
+      "name": "create_temp",
+      "package": "",
+      "start_line": 2,
+      "end_line": 5,
+      "calls": [
+        "/app/temp.py:create_temp"
+      ],
+      "called_by": [
+        "/app/temp.py:create_temp"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "37506f83e6bfff8c",
+      "last_scan_at": "2026-02-13T13:13:21.875365-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/views.py:handle": {
+      "id": "/app/views.py:handle",
+      "file_path": "/app/views.py",
+      "name": "handle",
+      "package": "",
+      "start_line": 3,
+      "end_line": 5,
+      "calls": [
+        "/app/views.py:handle"
+      ],
+      "called_by": [
+        "/app/views.py:handle"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1d0928d77ca050fc",
+      "last_scan_at": "2026-02-13T13:13:21.995862-06:00",
+      "language": "python",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/python",
+  "session_id": "",
+  "last_updated": "2026-02-13T13:13:22.052448-06:00",
+  "version": 1
+}
