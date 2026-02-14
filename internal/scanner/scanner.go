@@ -17,6 +17,8 @@ import (
 	"github.com/turenio/gtss/internal/reporter"
 	"github.com/turenio/gtss/internal/rules"
 	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenio/gtss/internal/taint/astflow"
+	"github.com/turenio/gtss/internal/taint/tsflow"
 )
 
 // scanTimeout is the maximum time a scan may take before we return partial results.
@@ -254,7 +256,16 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 
 	// Phase 3: Generate hints (always — even for clean code)
 	// Run taint analysis to get raw TaintFlow structs for rich hint output.
-	taintFlows := taint.Analyze(content, filePath, lang)
+	// For Go, use AST-driven analysis which provides more accurate tracking
+	// through reassignment, aliasing, and complex expressions.
+	var taintFlows []taint.TaintFlow
+	if lang == rules.LangGo {
+		taintFlows = astflow.AnalyzeGo(content, filePath)
+	} else if tsflow.Supports(lang) {
+		taintFlows = tsflow.Analyze(content, filePath, lang)
+	} else {
+		taintFlows = taint.Analyze(content, filePath, lang)
+	}
 
 	hintCtx := &hints.HintContext{
 		FilePath:    filePath,

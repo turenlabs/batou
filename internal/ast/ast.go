@@ -183,6 +183,19 @@ func (n *Node) FieldName() string {
 	return n.fieldName
 }
 
+// ChildByFieldName returns the first child with the given field name, or nil.
+func (n *Node) ChildByFieldName(name string) *Node {
+	if n == nil {
+		return nil
+	}
+	for _, c := range n.children {
+		if c.fieldName == name {
+			return c
+		}
+	}
+	return nil
+}
+
 // Walk calls fn for every node in the subtree rooted at n (pre-order DFS).
 // If fn returns false, the walk does not descend into that node's children.
 func (n *Node) Walk(fn func(*Node) bool) {

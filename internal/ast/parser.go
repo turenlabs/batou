@@ -75,6 +75,7 @@ func convertNode(tsNode *sitter.Node, content []byte, parent *Node) *Node {
 		for i := 0; i < count; i++ {
 			child := tsNode.Child(i)
 			n.children[i] = convertNode(child, content, n)
+			n.children[i].fieldName = tsNode.FieldNameForChild(i)
 		}
 	}
 
