@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,6 +49,11 @@ func Scan(input *hook.Input) *reporter.ScanResult {
 		result.ScanTimeMs = time.Since(start).Milliseconds()
 		return result
 	}
+
+	// Normalize CRLF line endings to LF so that regex rules, taint
+	// analysis, and line splitting all behave consistently regardless
+	// of the line ending style used in the source file.
+	content = strings.ReplaceAll(content, "\r\n", "\n")
 
 	// Skip generated / vendored files — they are not authored by the user
 	// and produce noise.
@@ -98,10 +104,15 @@ func Scan(input *hook.Input) *reporter.ScanResult {
 // context-based timeout. The context is checked between phases so the
 // goroutine can exit early on cancellation instead of leaking.
 func scanCore(ctx context.Context, input *hook.Input, content, filePath string, lang rules.Language, start time.Time, result *reporter.ScanResult) {
-	// Build scan context
+	// Pre-process content to join continuation lines for regex matching.
+	// Keep the original content for AST parsing and taint analysis (which
+	// need accurate line numbers).
+	preprocessed := JoinContinuationLines(content, lang)
+
+	// Build scan context — use preprocessed content for regex rules.
 	sctx := &rules.ScanContext{
 		FilePath: filePath,
-		Content:  content,
+		Content:  preprocessed,
 		Language: lang,
 		IsNew:    input.IsWriteOperation(),
 	}
@@ -110,7 +121,7 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		sctx.NewText = input.ToolInput.NewString
 	}
 
-	// Parse AST (best-effort — nil tree is fine, rules fall back to regex).
+	// Parse AST using original content (needs accurate line positions).
 	var tree *ast.Tree
 	if ast.SupportsLanguage(lang) {
 		tree = ast.Parse([]byte(content), lang)

@@ -134,3 +134,83 @@ func TestLOG003_PHPSensitiveLog(t *testing.T) {
 	result := testutil.ScanContent(t, "/app/auth.php", content)
 	testutil.MustFindRule(t, result, "GTSS-LOG-003")
 }
+
+// --- Negative/safe tests for LOG rules ---
+
+func TestLOG001_Safe_StaticLogMessage_Python(t *testing.T) {
+	content := `logging.info("Server started on port 8080")`
+	result := testutil.ScanContent(t, "/app/server.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-001")
+}
+
+func TestLOG001_Safe_StaticLogMessage_Go(t *testing.T) {
+	content := `log.Printf("Server listening on %s", ":8080")`
+	result := testutil.ScanContent(t, "/app/main.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-001")
+}
+
+func TestLOG001_Safe_StaticLogMessage_Java(t *testing.T) {
+	content := `logger.info("Application started successfully");`
+	result := testutil.ScanContent(t, "/app/Main.java", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-001")
+}
+
+func TestLOG001_Safe_StaticLogMessage_JS(t *testing.T) {
+	content := `console.log("Database connection established");`
+	result := testutil.ScanContent(t, "/app/db.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-001")
+}
+
+func TestLOG001_Safe_StaticLogMessage_PHP(t *testing.T) {
+	content := `<?php error_log("Cache cleared"); ?>`
+	result := testutil.ScanContent(t, "/app/cache.php", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-001")
+}
+
+func TestLOG001_Safe_StaticLogMessage_Ruby(t *testing.T) {
+	content := `Rails.logger.info("Background job completed")`
+	result := testutil.ScanContent(t, "/app/job.rb", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-001")
+}
+
+func TestLOG002_Safe_StaticConcat_Go(t *testing.T) {
+	content := `log.Info("Server " + "started")`
+	result := testutil.ScanContent(t, "/app/main.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-002")
+}
+
+func TestLOG002_Safe_StaticFString_Python(t *testing.T) {
+	content := `logger.info(f"Processing batch {batch_id}")`
+	result := testutil.ScanContent(t, "/app/batch.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-002")
+}
+
+func TestLOG002_Safe_StaticTemplate_JS(t *testing.T) {
+	content := "console.log(`Server running on port ${port}`);"
+	result := testutil.ScanContent(t, "/app/server.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-002")
+}
+
+func TestLOG003_Safe_NoSensitiveData(t *testing.T) {
+	content := `logger.info("User logged in: " + username)`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-003")
+}
+
+func TestLOG003_Safe_NoSensitiveData_Python(t *testing.T) {
+	content := `logging.info("Request processed in %s ms", duration)`
+	result := testutil.ScanContent(t, "/app/perf.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-003")
+}
+
+func TestLOG003_Safe_NoSensitiveData_Go(t *testing.T) {
+	content := `log.Printf("Processing user: %s", userID)`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-003")
+}
+
+func TestLOG003_Safe_CommentContainsSensitive(t *testing.T) {
+	content := `// logger.info("Token: " + api_key)`
+	result := testutil.ScanContent(t, "/app/handler.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-LOG-003")
+}

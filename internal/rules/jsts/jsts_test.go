@@ -575,3 +575,200 @@ fs.chmodSync('/tmp/data.json', 0o600);
 	result := testutil.ScanContent(t, "/app/setup.js", content)
 	testutil.MustNotFindRule(t, result, "GTSS-JSTS-018")
 }
+
+// ==========================================================================
+// TypeScript-specific tests (.ts file extension)
+// ==========================================================================
+
+func TestJSTS001_PostMessage_TypeScript(t *testing.T) {
+	content := `
+window.addEventListener('message', (event: MessageEvent) => {
+    const data = event.data;
+    document.getElementById('output')!.innerHTML = data.html;
+});
+`
+	result := testutil.ScanContent(t, "/app/handler.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-001")
+}
+
+func TestJSTS003_ReDoS_TypeScript(t *testing.T) {
+	content := `
+import { Request, Response } from 'express';
+
+export function search(req: Request, res: Response): void {
+    const pattern = new RegExp(req.query.search as string);
+    const results = items.filter((i: Item) => pattern.test(i.name));
+    res.json(results);
+}
+`
+	result := testutil.ScanContent(t, "/app/search.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-003")
+}
+
+func TestJSTS004_ExecSync_TypeScript(t *testing.T) {
+	content := `
+import { execSync } from 'child_process';
+
+function deploy(branch: string): string {
+    const output = execSync('git checkout ' + branch);
+    return output.toString();
+}
+`
+	result := testutil.ScanContent(t, "/app/deploy.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-004")
+}
+
+func TestJSTS005_EvalTemplate_TypeScript(t *testing.T) {
+	content := `
+function calculate(expression: string): number {
+    const result = eval(` + "`return ${expression}`" + `);
+    return result as number;
+}
+`
+	result := testutil.ScanContent(t, "/app/calc.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-005")
+}
+
+func TestJSTS006_JWTVerify_TypeScript(t *testing.T) {
+	content := `
+import jwt from 'jsonwebtoken';
+
+interface UserPayload { id: string; role: string; }
+
+function verifyToken(token: string, key: string): UserPayload {
+    const decoded = jwt.verify(token, key);
+    return decoded as UserPayload;
+}
+`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-006")
+}
+
+func TestJSTS006_JWTVerify_WithAlgorithms_TypeScript_Safe(t *testing.T) {
+	content := `
+import jwt from 'jsonwebtoken';
+
+interface UserPayload { id: string; role: string; }
+
+function verifyToken(token: string, key: string): UserPayload {
+    const decoded = jwt.verify(token, key, { algorithms: ['RS256'] });
+    return decoded as UserPayload;
+}
+`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-JSTS-006")
+}
+
+func TestJSTS007_Cookie_TypeScript(t *testing.T) {
+	content := `
+import { Request, Response } from 'express';
+
+export function login(req: Request, res: Response): void {
+    const token: string = generateToken(req.body.user);
+    res.cookie('session', token, { maxAge: 900000 });
+    res.send('OK');
+}
+`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-007")
+}
+
+func TestJSTS010_VMSandbox_TypeScript(t *testing.T) {
+	content := `
+import vm from 'vm';
+
+function runUserCode(code: string): unknown {
+    const sandbox = { console };
+    const result = vm.runInNewContext(code, sandbox);
+    return result;
+}
+`
+	result := testutil.ScanContent(t, "/app/sandbox.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-010")
+}
+
+func TestJSTS011_PathJoin_TypeScript(t *testing.T) {
+	content := `
+import path from 'path';
+import { Request, Response } from 'express';
+
+export function serveFile(req: Request, res: Response): void {
+    const filePath: string = path.join('/uploads', req.params.filename);
+    res.sendFile(filePath);
+}
+`
+	result := testutil.ScanContent(t, "/app/files.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-011")
+}
+
+func TestJSTS013_Electron_TypeScript(t *testing.T) {
+	content := `
+import { BrowserWindow } from 'electron';
+
+const win: BrowserWindow = new BrowserWindow({
+    webPreferences: {
+        nodeIntegration: true,
+    }
+});
+`
+	result := testutil.ScanContent(t, "/app/main.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-013")
+}
+
+func TestJSTS015_SSTI_TypeScript(t *testing.T) {
+	content := `
+import ejs from 'ejs';
+import { Request, Response } from 'express';
+
+export function preview(req: Request, res: Response): void {
+    const html: string = ejs.render(req.body.template, { data: 'test' });
+    res.send(html);
+}
+`
+	result := testutil.ScanContent(t, "/app/preview.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-015")
+}
+
+func TestJSTS017_CreateCipher_TypeScript(t *testing.T) {
+	content := `
+import crypto from 'crypto';
+
+function encrypt(data: string, password: string): Buffer {
+    const cipher = crypto.createCipher('aes-256-cbc', password);
+    return Buffer.concat([cipher.update(data), cipher.final()]);
+}
+`
+	result := testutil.ScanContent(t, "/app/encrypt.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-017")
+}
+
+func TestJSTS017_CreateCipheriv_TypeScript_Safe(t *testing.T) {
+	content := `
+import crypto from 'crypto';
+
+function encrypt(data: string, key: Buffer): Buffer {
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    return Buffer.concat([cipher.update(data), cipher.final()]);
+}
+`
+	result := testutil.ScanContent(t, "/app/encrypt.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-JSTS-017")
+}
+
+// TSX file extension test
+func TestJSTS009_UseEffect_TSX(t *testing.T) {
+	content := `
+import React, { useEffect } from 'react';
+
+const SearchResults: React.FC = () => {
+    useEffect(() => {
+        const query = window.location.search;
+        document.getElementById('results')!.innerHTML = decodeURIComponent(query);
+    }, []);
+    return <div id="results" />;
+};
+`
+	result := testutil.ScanContent(t, "/app/Search.tsx", content)
+	testutil.MustFindRule(t, result, "GTSS-JSTS-009")
+}

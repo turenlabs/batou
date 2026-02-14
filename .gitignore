@@ -10,7 +10,7 @@ coverage.out
 coverage.html
 
 # Cache
-.gtss/callgraph.json
+.gtss/
 
 # IDE
 .idea/

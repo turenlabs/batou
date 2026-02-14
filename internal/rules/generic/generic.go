@@ -1104,6 +1104,90 @@ func (r *UnsafeYAMLDeserialization) makeFinding(ctx *rules.ScanContext, line int
 	}
 }
 
+// GTSS-GEN-012: Insecure download patterns (CWE-494)
+var (
+	// curl/wget piped to shell
+	reCurlPipeBash    = regexp.MustCompile(`\bcurl\b[^|]*\|\s*(?:ba)?sh\b`)
+	reCurlPipeSudo    = regexp.MustCompile(`\bcurl\b[^|]*\|\s*sudo\s+(?:ba)?sh\b`)
+	reWgetPipeBash    = regexp.MustCompile(`\bwget\b[^|]*\|\s*(?:ba)?sh\b`)
+	// curl/wget over HTTP (not HTTPS)
+	reCurlHTTP        = regexp.MustCompile(`\bcurl\b[^|]*\bhttp://`)
+	reWgetHTTP        = regexp.MustCompile(`\bwget\b[^|]*\bhttp://`)
+	// Insecure package install flags
+	rePipTrustedHost  = regexp.MustCompile(`\bpip3?\s+install\b[^#\n]*--trusted-host\b`)
+	reNpmUnsafePerm   = regexp.MustCompile(`\bnpm\s+install\b[^#\n]*--unsafe-perm\b`)
+	// curl with --insecure / -k
+	reCurlInsecure    = regexp.MustCompile(`\bcurl\b[^|]*(?:--insecure|-k)\b`)
+)
+
+// --- Rule 12: Insecure Download Patterns ---
+
+type InsecureDownload struct{}
+
+func (r *InsecureDownload) ID() string                     { return "GTSS-GEN-012" }
+func (r *InsecureDownload) Name() string                   { return "InsecureDownload" }
+func (r *InsecureDownload) DefaultSeverity() rules.Severity { return rules.High }
+func (r *InsecureDownload) Description() string {
+	return "Detects insecure download and install patterns such as piping curl to shell, downloading over HTTP, and using insecure package manager flags."
+}
+func (r *InsecureDownload) Languages() []rules.Language {
+	return []rules.Language{
+		rules.LangShell, rules.LangDocker, rules.LangYAML, rules.LangAny,
+	}
+}
+
+func (r *InsecureDownload) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	type pattern struct {
+		re   *regexp.Regexp
+		desc string
+		sug  string
+	}
+
+	patterns := []pattern{
+		{reCurlPipeSudo, "curl piped to sudo sh — remote code execution with root privileges", "Download the script first, verify its integrity (checksum/signature), then execute."},
+		{reCurlPipeBash, "curl piped to shell — executes remote code without verification", "Download the script first, verify its integrity (checksum/signature), then execute."},
+		{reWgetPipeBash, "wget piped to shell — executes remote code without verification", "Download the script first, verify its integrity (checksum/signature), then execute."},
+		{reCurlInsecure, "curl with --insecure/-k disables TLS certificate verification", "Remove --insecure/-k flag. Fix the certificate issue instead of bypassing verification."},
+		{reCurlHTTP, "curl downloading over plain HTTP — vulnerable to MITM", "Use HTTPS instead of HTTP for all downloads."},
+		{reWgetHTTP, "wget downloading over plain HTTP — vulnerable to MITM", "Use HTTPS instead of HTTP for all downloads."},
+		{rePipTrustedHost, "pip install with --trusted-host bypasses TLS verification", "Remove --trusted-host flag. Use a properly configured package index with HTTPS."},
+		{reNpmUnsafePerm, "npm install with --unsafe-perm runs lifecycle scripts as root", "Remove --unsafe-perm flag. Configure npm to run without elevated privileges."},
+	}
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+
+		for _, p := range patterns {
+			if m := p.re.FindString(line); m != "" {
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "Insecure download: " + p.desc,
+					Description:   "Downloading and executing code without integrity verification allows man-in-the-middle attacks and supply chain compromise.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   m,
+					Suggestion:    p.sug,
+					CWEID:         "CWE-494",
+					OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+					Language:      ctx.Language,
+					Confidence:    "high",
+					Tags:          []string{"download", "supply-chain", "integrity"},
+				})
+				break
+			}
+		}
+	}
+	return findings
+}
+
 // --- Registration ---
 
 func init() {
@@ -1118,4 +1202,5 @@ func init() {
 	rules.Register(&XMLParserMisconfig{})
 	rules.Register(&VMSandboxEscape{})
 	rules.Register(&UnsafeYAMLDeserialization{})
+	rules.Register(&InsecureDownload{})
 }

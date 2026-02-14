@@ -189,6 +189,93 @@ func main() {
 // GTSS-GO-005: filepath traversal
 // ==========================================================================
 
+// ==========================================================================
+// GTSS-GO-004: Bind without validation
+// ==========================================================================
+
+func TestGO004_GinBindJSON_NoValidation(t *testing.T) {
+	content := `package main
+
+func createUser(c *gin.Context) {
+	var user User
+	c.BindJSON(&user)
+	db.Create(&user)
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustFindRule(t, result, "GTSS-GO-004")
+}
+
+func TestGO004_GinShouldBindJSON_NoValidation(t *testing.T) {
+	content := `package main
+
+func createUser(c *gin.Context) {
+	var user User
+	c.ShouldBindJSON(&user)
+	db.Create(&user)
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustFindRule(t, result, "GTSS-GO-004")
+}
+
+func TestGO004_GinBindQuery_NoValidation(t *testing.T) {
+	content := `package main
+
+func searchUsers(c *gin.Context) {
+	var query SearchQuery
+	c.BindQuery(&query)
+	db.Find(&users, query)
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustFindRule(t, result, "GTSS-GO-004")
+}
+
+func TestGO004_EchoBind_NoValidation(t *testing.T) {
+	content := `package main
+
+func createUser(c echo.Context) error {
+	var user User
+	c.Bind(&user)
+	return db.Create(&user).Error
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustFindRule(t, result, "GTSS-GO-004")
+}
+
+func TestGO004_Safe_GinBindWithValidation(t *testing.T) {
+	content := `package main
+
+func createUser(c *gin.Context) {
+	var user User
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validate.Struct(user); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	db.Create(&user)
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GO-004")
+}
+
+func TestGO004_Safe_GinBindWithBindingTag(t *testing.T) {
+	content := `package main
+
+type User struct {
+	Name  string ` + "`" + `json:"name" binding:"required,min=1,max=100"` + "`" + `
+	Email string ` + "`" + `json:"email" binding:"required,email"` + "`" + `
+}
+
+func createUser(c *gin.Context) {
+	var user User
+	c.ShouldBindJSON(&user)
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GO-004")
+}
+
 func TestGO005_FilepathJoin_UserInput(t *testing.T) {
 	content := `package main
 

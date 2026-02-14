@@ -155,3 +155,111 @@ const value = data[req.query.field];`
 	result := testutil.ScanContent(t, "/app/routes.ts", content)
 	testutil.MustNotFindRule(t, result, "GTSS-VAL-004")
 }
+
+// --- GTSS-VAL-005: File Upload Hardening ---
+
+func TestVAL005_Go_FormFileNoContentCheck(t *testing.T) {
+	content := `package main
+import "net/http"
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	file, header, err := r.FormFile("upload")
+	if err != nil { return }
+	defer file.Close()
+	dst, _ := os.Create("/uploads/" + header.Filename)
+	io.Copy(dst, file)
+}`
+	result := testutil.ScanContent(t, "/app/upload.go", content)
+	testutil.MustFindRule(t, result, "GTSS-VAL-005")
+}
+
+func TestVAL005_Python_FilesNoCheck(t *testing.T) {
+	content := `def upload(request):
+    f = request.FILES['document']
+    with open('/uploads/' + f.name, 'wb') as dest:
+        for chunk in f.chunks():
+            dest.write(chunk)`
+	result := testutil.ScanContent(t, "/app/views.py", content)
+	testutil.MustFindRule(t, result, "GTSS-VAL-005")
+}
+
+func TestVAL005_JS_MulterNoFilter(t *testing.T) {
+	content := `const upload = multer({ dest: 'uploads/' });
+app.post('/upload', upload.single('avatar'), (req, res) => {
+	res.json({ path: req.file.path });
+});`
+	result := testutil.ScanContent(t, "/app/routes.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-VAL-005")
+}
+
+func TestVAL005_Java_MultipartNoCheck(t *testing.T) {
+	content := `@PostMapping("/upload")
+public String upload(@RequestParam("file") MultipartFile file) {
+    file.transferTo(new File("/uploads/" + file.getOriginalFilename()));
+    return "uploaded";
+}`
+	result := testutil.ScanContent(t, "/app/Controller.java", content)
+	testutil.MustFindRule(t, result, "GTSS-VAL-005")
+}
+
+func TestVAL005_PHP_FilesNoCheck(t *testing.T) {
+	content := `<?php
+$target = "uploads/" . basename($_FILES["file"]["name"]);
+move_uploaded_file($_FILES["file"]["tmp_name"], $target);
+echo "Uploaded";`
+	result := testutil.ScanContent(t, "/app/upload.php", content)
+	testutil.MustFindRule(t, result, "GTSS-VAL-005")
+}
+
+func TestVAL005_WebAccessibleDir(t *testing.T) {
+	content := `const upload = multer({ dest: 'uploads/' });
+app.post('/upload', upload.single('file'), (req, res) => {
+	const dest = 'public/uploads/' + req.file.originalname;
+	fs.renameSync(req.file.path, dest);
+});`
+	result := testutil.ScanContent(t, "/app/routes.ts", content)
+	// Should find both content-type and web-accessible dir issues
+	testutil.MustFindRule(t, result, "GTSS-VAL-005")
+}
+
+func TestVAL005_Safe_Go_WithDetectContentType(t *testing.T) {
+	content := `package main
+import "net/http"
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	file, header, err := r.FormFile("upload")
+	if err != nil { return }
+	defer file.Close()
+	buf := make([]byte, 512)
+	file.Read(buf)
+	contentType := http.DetectContentType(buf)
+	if contentType != "image/jpeg" && contentType != "image/png" {
+		http.Error(w, "invalid file type", 400)
+		return
+	}
+}`
+	result := testutil.ScanContent(t, "/app/upload.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-VAL-005")
+}
+
+func TestVAL005_Safe_JS_WithFileFilter(t *testing.T) {
+	content := `const upload = multer({
+	dest: 'uploads/',
+	fileFilter: (req, file, cb) => {
+		if (!allowedTypes.includes(file.mimetype)) {
+			return cb(new Error('Invalid type'));
+		}
+		cb(null, true);
+	}
+});`
+	result := testutil.ScanContent(t, "/app/routes.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-VAL-005")
+}
+
+func TestVAL005_Safe_Python_WithContentCheck(t *testing.T) {
+	content := `def upload(request):
+    f = request.FILES['document']
+    if f.content_type not in ALLOWED_EXTENSIONS:
+        return HttpResponseBadRequest("Invalid file type")
+    save_file(f)`
+	result := testutil.ScanContent(t, "/app/views.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-VAL-005")
+}

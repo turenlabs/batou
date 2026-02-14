@@ -93,6 +93,8 @@ func FormatForClaude(result *ScanResult) string {
 }
 
 // FormatBlockMessage formats a message for blocking a write via stderr.
+// This is the most important message GTSS produces: it STOPS the write,
+// so Claude needs clear guidance on how to rewrite the code.
 func FormatBlockMessage(result *ScanResult) string {
 	var b strings.Builder
 
@@ -100,12 +102,37 @@ func FormatBlockMessage(result *ScanResult) string {
 
 	for _, f := range result.Findings {
 		if f.Severity >= rules.Critical {
-			b.WriteString(f.FormatDetail())
+			b.WriteString(fmt.Sprintf("[%s] %s: %s\n", f.Severity, f.RuleID, f.Title))
+			if f.FilePath != "" {
+				loc := f.FilePath
+				if f.LineNumber > 0 {
+					loc = fmt.Sprintf("%s:%d", f.FilePath, f.LineNumber)
+				}
+				b.WriteString(fmt.Sprintf("  Location: %s\n", loc))
+			}
+			if f.MatchedText != "" {
+				snippet := f.MatchedText
+				if len(snippet) > 120 {
+					snippet = snippet[:120] + "..."
+				}
+				b.WriteString(fmt.Sprintf("  Vulnerable code: %s\n", snippet))
+			}
+			b.WriteString(fmt.Sprintf("  Why: %s\n", f.Description))
+			if f.Suggestion != "" {
+				b.WriteString(fmt.Sprintf("  Fix: %s\n", f.Suggestion))
+			}
+			if f.CWEID != "" {
+				b.WriteString(fmt.Sprintf("  Reference: %s", f.CWEID))
+				if f.OWASPCategory != "" {
+					b.WriteString(fmt.Sprintf(", %s", f.OWASPCategory))
+				}
+				b.WriteString("\n")
+			}
 			b.WriteString("\n")
 		}
 	}
 
-	b.WriteString("Fix the critical vulnerabilities above before writing this file.\n")
+	b.WriteString("ACTION: Rewrite the code to fix the critical vulnerabilities above, then retry the write.\n")
 
 	return b.String()
 }

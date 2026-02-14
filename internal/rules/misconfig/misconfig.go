@@ -46,9 +46,35 @@ var (
 	reStackTraceResp   = regexp.MustCompile(`(?i)(?:response|res|resp)\.\w+\(.*(?:stack_?trace|stackTrace|full_?error)`)
 )
 
+// GTSS-MISC-003: Missing security headers (CWE-1021, CWE-693)
+var (
+	// Response handler patterns (where headers should be set)
+	reGoHTTPHandler      = regexp.MustCompile(`func\s+\w*\s*\(\s*\w+\s+http\.ResponseWriter`)
+	reGoHTTPWrite        = regexp.MustCompile(`\.Write\(|\.WriteHeader\(|json\.NewEncoder`)
+	reJSResHandler       = regexp.MustCompile(`(?:app|router)\.\s*(?:get|post|put|patch|delete|all|use)\s*\(`)
+	reJSResSend          = regexp.MustCompile(`res\.(?:send|json|render|status)\s*\(`)
+	rePyViewFunc         = regexp.MustCompile(`def\s+\w+\s*\(\s*(?:request|self)`)
+	rePyResponse         = regexp.MustCompile(`(?:HttpResponse|JsonResponse|Response|render|make_response)\s*\(`)
+	reJavaServlet        = regexp.MustCompile(`(?:doGet|doPost|service)\s*\(\s*HttpServletRequest`)
+	reJavaRespWrite      = regexp.MustCompile(`response\.(?:getWriter|getOutputStream|setStatus)\s*\(`)
+	rePHPHeader          = regexp.MustCompile(`\bheader\s*\(`)
+	rePHPEcho            = regexp.MustCompile(`\becho\b|\bprint\b`)
+	reRubyAction         = regexp.MustCompile(`def\s+(?:index|show|create|update|destroy|new|edit)\b`)
+	reRubyRender         = regexp.MustCompile(`render\s+`)
+
+	// Security header indicators
+	reXFrameOptions      = regexp.MustCompile(`(?i)X-Frame-Options`)
+	reCSP                = regexp.MustCompile(`(?i)Content-Security-Policy`)
+	reHSTS               = regexp.MustCompile(`(?i)Strict-Transport-Security`)
+	// Helmet/framework-level security header middleware
+	reHelmetJS           = regexp.MustCompile(`(?i)\bhelmet\b`)
+	reSecureHeaders      = regexp.MustCompile(`(?i)(?:secure[_-]?headers|SecurityMiddleware|security_headers|SecureHeaders)`)
+)
+
 func init() {
 	rules.Register(&DebugMode{})
 	rules.Register(&ErrorDisclosure{})
+	rules.Register(&MissingSecurityHeaders{})
 }
 
 // --- GTSS-MISC-001: DebugMode ---
@@ -272,6 +298,156 @@ func (r *ErrorDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 			Confidence:    "medium",
 			Tags:          []string{"misconfig", "error-disclosure"},
 		})
+	}
+
+	return findings
+}
+
+// --- GTSS-MISC-003: MissingSecurityHeaders ---
+
+type MissingSecurityHeaders struct{}
+
+func (r *MissingSecurityHeaders) ID() string                    { return "GTSS-MISC-003" }
+func (r *MissingSecurityHeaders) Name() string                  { return "MissingSecurityHeaders" }
+func (r *MissingSecurityHeaders) DefaultSeverity() rules.Severity { return rules.Medium }
+
+func (r *MissingSecurityHeaders) Description() string {
+	return "Detects HTTP response handlers that do not set security headers (X-Frame-Options, Content-Security-Policy, Strict-Transport-Security)."
+}
+
+func (r *MissingSecurityHeaders) Languages() []rules.Language {
+	return []rules.Language{
+		rules.LangGo, rules.LangPython, rules.LangJavaScript,
+		rules.LangTypeScript, rules.LangJava, rules.LangPHP, rules.LangRuby,
+	}
+}
+
+func (r *MissingSecurityHeaders) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// If the file uses a security headers middleware (helmet, SecureHeaders, etc.),
+	// all headers are handled globally — no per-handler findings needed.
+	if reHelmetJS.MatchString(ctx.Content) || reSecureHeaders.MatchString(ctx.Content) {
+		return nil
+	}
+
+	// Check if any security headers are set anywhere in the file
+	hasXFrame := reXFrameOptions.MatchString(ctx.Content)
+	hasCSP := reCSP.MatchString(ctx.Content)
+	hasHSTS := reHSTS.MatchString(ctx.Content)
+
+	// If all three are present, no findings
+	if hasXFrame && hasCSP && hasHSTS {
+		return nil
+	}
+
+	// Find response handler functions that write responses
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	isResponseHandler := false
+	handlerLine := 0
+	handlerMatch := ""
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "*") {
+			continue
+		}
+
+		// Detect handler function start
+		switch ctx.Language {
+		case rules.LangGo:
+			if reGoHTTPHandler.MatchString(line) {
+				isResponseHandler = true
+				handlerLine = i + 1
+				handlerMatch = trimmed
+			}
+		case rules.LangJavaScript, rules.LangTypeScript:
+			if reJSResHandler.MatchString(line) {
+				isResponseHandler = true
+				handlerLine = i + 1
+				handlerMatch = trimmed
+			}
+		case rules.LangPython:
+			if rePyViewFunc.MatchString(line) {
+				isResponseHandler = true
+				handlerLine = i + 1
+				handlerMatch = trimmed
+			}
+		case rules.LangJava:
+			if reJavaServlet.MatchString(line) {
+				isResponseHandler = true
+				handlerLine = i + 1
+				handlerMatch = trimmed
+			}
+		case rules.LangPHP:
+			if rePHPHeader.MatchString(line) {
+				isResponseHandler = true
+				handlerLine = i + 1
+				handlerMatch = trimmed
+			}
+		case rules.LangRuby:
+			if reRubyAction.MatchString(line) {
+				isResponseHandler = true
+				handlerLine = i + 1
+				handlerMatch = trimmed
+			}
+		}
+
+		// If we're in a handler, check for response writes
+		if isResponseHandler {
+			hasWrite := false
+			switch ctx.Language {
+			case rules.LangGo:
+				hasWrite = reGoHTTPWrite.MatchString(line)
+			case rules.LangJavaScript, rules.LangTypeScript:
+				hasWrite = reJSResSend.MatchString(line)
+			case rules.LangPython:
+				hasWrite = rePyResponse.MatchString(line)
+			case rules.LangJava:
+				hasWrite = reJavaRespWrite.MatchString(line)
+			case rules.LangPHP:
+				hasWrite = rePHPEcho.MatchString(line)
+			case rules.LangRuby:
+				hasWrite = reRubyRender.MatchString(line)
+			}
+
+			if hasWrite {
+				var missing []string
+				if !hasXFrame {
+					missing = append(missing, "X-Frame-Options")
+				}
+				if !hasCSP {
+					missing = append(missing, "Content-Security-Policy")
+				}
+				if !hasHSTS {
+					missing = append(missing, "Strict-Transport-Security")
+				}
+
+				if len(handlerMatch) > 120 {
+					handlerMatch = handlerMatch[:120] + "..."
+				}
+
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "Missing security headers: " + strings.Join(missing, ", "),
+					Description:   "HTTP response handler does not set security headers. Missing headers: " + strings.Join(missing, ", ") + ". These headers protect against clickjacking, XSS, and protocol downgrade attacks.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    handlerLine,
+					MatchedText:   handlerMatch,
+					Suggestion:    "Add security headers: X-Frame-Options: DENY, Content-Security-Policy with restrictive policy, and Strict-Transport-Security: max-age=31536000. Consider using a middleware like helmet (Node.js) or django-secure (Python).",
+					CWEID:         "CWE-1021",
+					OWASPCategory: "A05:2021-Security Misconfiguration",
+					Language:      ctx.Language,
+					Confidence:    "medium",
+					Tags:          []string{"misconfig", "security-headers", "clickjacking"},
+				})
+
+				// Only report once per file
+				return findings
+			}
+		}
 	}
 
 	return findings

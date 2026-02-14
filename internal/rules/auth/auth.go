@@ -634,6 +634,161 @@ func (r *InsecureCookie) makeFinding(ctx *rules.ScanContext, line int, matched s
 	}
 }
 
+// GTSS-AUTH-007: Privilege escalation patterns (CWE-269)
+var (
+	// C: setuid(0) / setgid(0)
+	reCSetuid0       = regexp.MustCompile(`\bsetuid\s*\(\s*0\s*\)`)
+	reCSetgid0       = regexp.MustCompile(`\bsetgid\s*\(\s*0\s*\)`)
+	// Python: os.setuid(0) / os.setgid(0)
+	rePySetuid0      = regexp.MustCompile(`\bos\.setuid\s*\(\s*0\s*\)`)
+	rePySetgid0      = regexp.MustCompile(`\bos\.setgid\s*\(\s*0\s*\)`)
+	// Shell/Makefile: chmod 777, chmod a+rwx
+	reChmod777       = regexp.MustCompile(`\bchmod\s+(?:777|a\+rwx)\b`)
+	// Go: os.Chmod with 0777
+	reGoChmod777     = regexp.MustCompile(`os\.Chmod\s*\([^,]+,\s*0o?777\s*\)`)
+	// Dockerfile: USER root without later USER nonroot
+	reDockerUserRoot = regexp.MustCompile(`(?i)^\s*USER\s+root\s*$`)
+	reDockerUserNon  = regexp.MustCompile(`(?i)^\s*USER\s+\S+`)
+)
+
+// --- Rule 7: Privilege Escalation ---
+
+type PrivilegeEscalation struct{}
+
+func (r *PrivilegeEscalation) ID() string                     { return "GTSS-AUTH-007" }
+func (r *PrivilegeEscalation) Name() string                   { return "PrivilegeEscalation" }
+func (r *PrivilegeEscalation) DefaultSeverity() rules.Severity { return rules.High }
+func (r *PrivilegeEscalation) Description() string {
+	return "Detects privilege escalation patterns such as setuid(0), chmod 777, and Dockerfiles running as root."
+}
+func (r *PrivilegeEscalation) Languages() []rules.Language {
+	return []rules.Language{
+		rules.LangC, rules.LangCPP, rules.LangPython, rules.LangGo,
+		rules.LangShell, rules.LangDocker, rules.LangAny,
+	}
+}
+
+func (r *PrivilegeEscalation) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	type pattern struct {
+		re   *regexp.Regexp
+		desc string
+		sug  string
+	}
+
+	// Language-specific patterns
+	var langPatterns []pattern
+
+	switch ctx.Language {
+	case rules.LangC, rules.LangCPP:
+		langPatterns = []pattern{
+			{reCSetuid0, "setuid(0) escalates to root privileges", "Avoid running as root. Use capabilities (CAP_NET_BIND_SERVICE, etc.) or drop privileges after initialization."},
+			{reCSetgid0, "setgid(0) escalates group to root", "Avoid running with root group. Use specific group IDs."},
+		}
+	case rules.LangPython:
+		langPatterns = []pattern{
+			{rePySetuid0, "os.setuid(0) escalates to root privileges", "Avoid running as root. Use specific user IDs and capabilities."},
+			{rePySetgid0, "os.setgid(0) escalates group to root", "Avoid running with root group."},
+		}
+	case rules.LangGo:
+		langPatterns = []pattern{
+			{reGoChmod777, "os.Chmod with 0777 grants world-writable permissions", "Use restrictive permissions: 0644 for files, 0755 for directories."},
+		}
+	}
+
+	// Universal patterns (shell, Makefile, any)
+	universalPatterns := []pattern{
+		{reChmod777, "chmod 777/a+rwx grants world-writable permissions", "Use restrictive permissions: chmod 644 for files, chmod 755 for directories."},
+	}
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+
+		for _, p := range langPatterns {
+			if m := p.re.FindString(line); m != "" {
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "Privilege escalation: " + p.desc,
+					Description:   "Code escalates privileges or sets overly permissive access controls, which can be exploited for unauthorized access.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   m,
+					Suggestion:    p.sug,
+					CWEID:         "CWE-269",
+					OWASPCategory: "A04:2021-Insecure Design",
+					Language:      ctx.Language,
+					Confidence:    "high",
+					Tags:          []string{"auth", "privilege-escalation", "permissions"},
+				})
+				break
+			}
+		}
+
+		for _, p := range universalPatterns {
+			if m := p.re.FindString(line); m != "" {
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "Privilege escalation: " + p.desc,
+					Description:   "Overly permissive file permissions allow any user on the system to read, write, and execute the file.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   m,
+					Suggestion:    p.sug,
+					CWEID:         "CWE-269",
+					OWASPCategory: "A04:2021-Insecure Design",
+					Language:      ctx.Language,
+					Confidence:    "high",
+					Tags:          []string{"auth", "privilege-escalation", "permissions"},
+				})
+				break
+			}
+		}
+	}
+
+	// Dockerfile-specific: USER root without later USER nonroot
+	if ctx.Language == rules.LangDocker {
+		lastUserRootLine := -1
+		hasNonRootAfter := false
+		for i, line := range lines {
+			if reDockerUserRoot.MatchString(line) {
+				lastUserRootLine = i
+				hasNonRootAfter = false
+			} else if reDockerUserNon.MatchString(line) && !reDockerUserRoot.MatchString(line) && lastUserRootLine >= 0 {
+				hasNonRootAfter = true
+			}
+		}
+		if lastUserRootLine >= 0 && !hasNonRootAfter {
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "Privilege escalation: Dockerfile runs as root",
+				Description:   "Dockerfile sets USER root without switching to a non-root user. Containers running as root have full host privileges if they escape the container.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    lastUserRootLine + 1,
+				MatchedText:   strings.TrimSpace(lines[lastUserRootLine]),
+				Suggestion:    "Add 'USER nonroot' or 'USER 1000' after the commands that require root privileges. Only use root for package installation, then switch to a non-root user.",
+				CWEID:         "CWE-269",
+				OWASPCategory: "A04:2021-Insecure Design",
+				Language:      ctx.Language,
+				Confidence:    "high",
+				Tags:          []string{"auth", "privilege-escalation", "docker", "container"},
+			})
+		}
+	}
+
+	return findings
+}
+
 // --- Registration ---
 
 func init() {
@@ -643,4 +798,5 @@ func init() {
 	rules.Register(&SessionFixation{})
 	rules.Register(&WeakPasswordPolicy{})
 	rules.Register(&InsecureCookie{})
+	rules.Register(&PrivilegeEscalation{})
 }

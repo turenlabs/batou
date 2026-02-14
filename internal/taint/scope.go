@@ -989,22 +989,35 @@ func filterPythonParams(params []string) []string {
 	return out
 }
 
-// isIdentStart returns true if the byte can start an identifier.
+// isIdentStart returns true if the byte can start an identifier (ASCII fast path).
 func isIdentStart(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '_' || b == '$'
 }
 
+// isIdentStartRune returns true if the rune can start an identifier,
+// including unicode letters for languages that use non-ASCII identifiers.
+func isIdentStartRune(r rune) bool {
+	return unicode.IsLetter(r) || r == '_' || r == '$'
+}
+
+// isIdentCharRune returns true if the rune can appear in an identifier
+// (after the first character), including unicode letters and digits.
+func isIdentCharRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '$'
+}
+
 // isValidIdentifier checks if a string is a valid identifier.
+// Supports unicode identifiers (e.g., variable names in non-Latin scripts).
 func isValidIdentifier(s string) bool {
 	if len(s) == 0 {
 		return false
 	}
-	if !isIdentStart(s[0]) {
+	runes := []rune(s)
+	if !isIdentStartRune(runes[0]) {
 		return false
 	}
-	for i := 1; i < len(s); i++ {
-		c := s[i]
-		if !isIdentStart(c) && !(c >= '0' && c <= '9') {
+	for _, r := range runes[1:] {
+		if !isIdentCharRune(r) {
 			return false
 		}
 	}

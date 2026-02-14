@@ -208,6 +208,94 @@ func TestXSS_Safe_Escaped_Java(t *testing.T) {
 	testutil.MustNotFindRule(t, result, "GTSS-XSS-011")
 }
 
+// --- GTSS-XSS-010: JSONContentTypeXSS ---
+
+func TestXSS010_ResSendJSON_NoContentType(t *testing.T) {
+	content := `app.get('/api/data', (req, res) => {
+  const data = { name: req.query.name };
+  res.send(JSON.stringify(data));
+});`
+	result := testutil.ScanContent(t, "/app/api.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-010")
+}
+
+func TestXSS010_ResSendStringify_NoContentType(t *testing.T) {
+	content := `app.get('/user', (req, res) => {
+  res.send(JSON.stringify({ user: req.params.id }));
+});`
+	result := testutil.ScanContent(t, "/app/routes.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-010")
+}
+
+func TestXSS010_Safe_ResJSON(t *testing.T) {
+	content := `app.get('/api/data', (req, res) => {
+  const data = { name: req.query.name };
+  res.json(data);
+});`
+	result := testutil.ScanContent(t, "/app/api.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-XSS-010")
+}
+
+func TestXSS010_Safe_ContentTypeSet(t *testing.T) {
+	content := `app.get('/api/data', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(JSON.stringify({ name: req.query.name }));
+});`
+	result := testutil.ScanContent(t, "/app/api.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-XSS-010")
+}
+
+// --- GTSS-XSS-013: Python f-string HTML ---
+
+func TestXSS013_PythonFStringHTML(t *testing.T) {
+	content := `def render_profile(name):
+    html = f"<div class='profile'>{name}</div>"
+    return html`
+	result := testutil.ScanContent(t, "/app/views.py", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-013")
+}
+
+func TestXSS013_PythonFormatHTML(t *testing.T) {
+	content := `def render_greeting(name):
+    html = "<h1>Hello {}</h1>".format(name)
+    return html`
+	result := testutil.ScanContent(t, "/app/views.py", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-013")
+}
+
+func TestXSS013_PythonPercentHTML(t *testing.T) {
+	content := `def render_item(item):
+    html = "<li>%s</li>" % item
+    return html`
+	result := testutil.ScanContent(t, "/app/views.py", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-013")
+}
+
+func TestXSS013_PythonFStringHTML_ResponseVar(t *testing.T) {
+	content := `def render(user):
+    response = f"<span>{user.name}</span>"
+    return response`
+	result := testutil.ScanContent(t, "/app/views.py", content)
+	testutil.MustFindRule(t, result, "GTSS-XSS-013")
+}
+
+func TestXSS013_Safe_WithEscape(t *testing.T) {
+	content := `from markupsafe import escape
+
+def render_profile(name):
+    safe_name = escape(name)
+    html = f"<div class='profile'>{safe_name}</div>"
+    return html`
+	result := testutil.ScanContent(t, "/app/views.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-XSS-013")
+}
+
+func TestXSS013_Safe_WrongLanguage(t *testing.T) {
+	content := `const html = "<div>" + name + "</div>";`
+	result := testutil.ScanContent(t, "/app/handler.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-XSS-013")
+}
+
 // --- GTSS-XSS-014: Java HTML String Concatenation ---
 
 func TestXSS014_StringBuilderAppendHTML(t *testing.T) {

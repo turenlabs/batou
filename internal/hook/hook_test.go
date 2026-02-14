@@ -328,3 +328,289 @@ func TestMaxInputSizeIs50MB(t *testing.T) {
 		_ = err
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Malformed JSON parsing
+// ---------------------------------------------------------------------------
+
+func TestInputMalformedJSON(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{"empty string", ""},
+		{"not JSON", "this is not json"},
+		{"truncated JSON", `{"session_id": "test"`},
+		{"wrong type for field", `{"session_id": 123}`},
+		{"array instead of object", `[1,2,3]`},
+		{"null", "null"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var input hook.Input
+			err := json.Unmarshal([]byte(tt.raw), &input)
+			if tt.raw == "" || tt.raw == "this is not json" ||
+				tt.raw == `{"session_id": "test"` || tt.raw == "[1,2,3]" {
+				if err == nil {
+					t.Errorf("expected error for %q, got nil", tt.name)
+				}
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Full round-trip: JSON -> Input -> ResolvePath/ResolveContent
+// ---------------------------------------------------------------------------
+
+func TestInputFullRoundTrip(t *testing.T) {
+	raw := `{
+		"session_id": "ses-rt-001",
+		"transcript_path": "/tmp/transcript.json",
+		"cwd": "/home/user/project",
+		"permission_mode": "default",
+		"hook_event_name": "PreToolUse",
+		"tool_name": "Write",
+		"tool_use_id": "tu-001",
+		"tool_input": {
+			"file_path": "/home/user/project/app.py",
+			"content": "import os\nos.system(user_input)"
+		}
+	}`
+
+	var input hook.Input
+	if err := json.Unmarshal([]byte(raw), &input); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if input.ResolvePath() != "/home/user/project/app.py" {
+		t.Errorf("ResolvePath() = %q", input.ResolvePath())
+	}
+	if input.ResolveContent() != "import os\nos.system(user_input)" {
+		t.Errorf("ResolveContent() = %q", input.ResolveContent())
+	}
+	if !input.IsPreToolUse() {
+		t.Error("expected IsPreToolUse() = true")
+	}
+	if !input.IsWriteOperation() {
+		t.Error("expected IsWriteOperation() = true")
+	}
+	if input.IsEditOperation() {
+		t.Error("expected IsEditOperation() = false")
+	}
+	if input.IsPostToolUse() {
+		t.Error("expected IsPostToolUse() = false")
+	}
+}
+
+func TestInputEditFullRoundTrip(t *testing.T) {
+	raw := `{
+		"session_id": "ses-rt-002",
+		"hook_event_name": "PreToolUse",
+		"tool_name": "Edit",
+		"tool_input": {
+			"file_path": "/app/server.go",
+			"old_string": "db.Query(fmt.Sprintf(q, name))",
+			"new_string": "db.Query(q, name)",
+			"replace_all": false
+		}
+	}`
+
+	var input hook.Input
+	if err := json.Unmarshal([]byte(raw), &input); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if input.ResolvePath() != "/app/server.go" {
+		t.Errorf("ResolvePath() = %q", input.ResolvePath())
+	}
+	if input.ResolveContent() != "db.Query(q, name)" {
+		t.Errorf("ResolveContent() = %q (expected new_string)", input.ResolveContent())
+	}
+	if !input.IsEditOperation() {
+		t.Error("expected IsEditOperation() = true")
+	}
+	if input.ToolInput.OldString != "db.Query(fmt.Sprintf(q, name))" {
+		t.Errorf("OldString = %q", input.ToolInput.OldString)
+	}
+	if input.ToolInput.ReplaceAll {
+		t.Error("expected ReplaceAll = false")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// PreToolOutput JSON: all fields, block decision
+// ---------------------------------------------------------------------------
+
+func TestPreToolOutputBlockDecision(t *testing.T) {
+	out := hook.PreToolOutput{
+		HookSpecificOutput: &hook.HookSpecificOutput{
+			HookEventName:           "PreToolUse",
+			PermissionDecision:       "block",
+			PermissionDecisionReason: "Critical SQL injection detected",
+			AdditionalContext:        "GTSS-INJ-001: SQL injection in db.Query",
+		},
+	}
+
+	data, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("failed to re-parse: %v", err)
+	}
+
+	hso, ok := parsed["hookSpecificOutput"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected hookSpecificOutput key")
+	}
+	if hso["permissionDecision"] != "block" {
+		t.Errorf("permissionDecision = %v, want block", hso["permissionDecision"])
+	}
+	if hso["hookEventName"] != "PreToolUse" {
+		t.Errorf("hookEventName = %v, want PreToolUse", hso["hookEventName"])
+	}
+	if hso["permissionDecisionReason"] != "Critical SQL injection detected" {
+		t.Errorf("permissionDecisionReason = %v", hso["permissionDecisionReason"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// PreToolOutput: omitempty on nil HookSpecificOutput
+// ---------------------------------------------------------------------------
+
+func TestPreToolOutputOmitsNilHSO(t *testing.T) {
+	out := hook.PreToolOutput{}
+	data, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("failed to re-parse: %v", err)
+	}
+
+	if _, exists := parsed["hookSpecificOutput"]; exists {
+		t.Error("expected hookSpecificOutput to be omitted when nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// NotebookEdit JSON parsing
+// ---------------------------------------------------------------------------
+
+func TestInputJSONNotebookEdit(t *testing.T) {
+	raw := `{
+		"session_id": "ses-789",
+		"hook_event_name": "PreToolUse",
+		"tool_name": "NotebookEdit",
+		"tool_input": {
+			"notebook_path": "/project/analysis.ipynb",
+			"new_source": "import subprocess\nsubprocess.run(user_cmd, shell=True)"
+		}
+	}`
+
+	var input hook.Input
+	if err := json.Unmarshal([]byte(raw), &input); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if input.ToolName != "NotebookEdit" {
+		t.Errorf("ToolName = %q", input.ToolName)
+	}
+	if input.ResolvePath() != "/project/analysis.ipynb" {
+		t.Errorf("ResolvePath() = %q", input.ResolvePath())
+	}
+	if input.ResolveContent() != "import subprocess\nsubprocess.run(user_cmd, shell=True)" {
+		t.Errorf("ResolveContent() = %q", input.ResolveContent())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// PostToolUse JSON parsing
+// ---------------------------------------------------------------------------
+
+func TestInputJSONPostToolUse(t *testing.T) {
+	raw := `{
+		"session_id": "ses-post",
+		"hook_event_name": "PostToolUse",
+		"tool_name": "Write",
+		"tool_input": {
+			"file_path": "/app/handler.go",
+			"content": "package main"
+		},
+		"tool_response": {
+			"filePath": "/app/handler.go",
+			"success": true
+		}
+	}`
+
+	var input hook.Input
+	if err := json.Unmarshal([]byte(raw), &input); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if !input.IsPostToolUse() {
+		t.Error("expected IsPostToolUse() = true")
+	}
+	if input.ToolResponse.FilePath != "/app/handler.go" {
+		t.Errorf("ToolResponse.FilePath = %q", input.ToolResponse.FilePath)
+	}
+	if !input.ToolResponse.Success {
+		t.Error("expected ToolResponse.Success = true")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Extra JSON fields are ignored (forward compatibility)
+// ---------------------------------------------------------------------------
+
+func TestInputJSONExtraFieldsIgnored(t *testing.T) {
+	raw := `{
+		"session_id": "ses-extra",
+		"hook_event_name": "PreToolUse",
+		"tool_name": "Write",
+		"tool_input": {
+			"file_path": "/app/main.go",
+			"content": "package main"
+		},
+		"unknown_field": "should not cause an error",
+		"another_field": 42
+	}`
+
+	var input hook.Input
+	if err := json.Unmarshal([]byte(raw), &input); err != nil {
+		t.Fatalf("extra fields should be silently ignored, got: %v", err)
+	}
+	if input.SessionID != "ses-extra" {
+		t.Errorf("SessionID = %q", input.SessionID)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Unicode content in JSON
+// ---------------------------------------------------------------------------
+
+func TestInputJSONUnicodeContent(t *testing.T) {
+	raw := `{
+		"session_id": "ses-unicode",
+		"hook_event_name": "PreToolUse",
+		"tool_name": "Write",
+		"tool_input": {
+			"file_path": "/app/i18n.py",
+			"content": "message = \"Привет мир! 你好世界! 🌍\""
+		}
+	}`
+
+	var input hook.Input
+	if err := json.Unmarshal([]byte(raw), &input); err != nil {
+		t.Fatalf("failed to unmarshal unicode: %v", err)
+	}
+	if input.ResolveContent() != "message = \"Привет мир! 你好世界! 🌍\"" {
+		t.Errorf("ResolveContent() = %q", input.ResolveContent())
+	}
+}

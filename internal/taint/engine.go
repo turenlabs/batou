@@ -363,6 +363,7 @@ func extractAssignmentLHS(line string, lang rules.Language) string {
 }
 
 // extractFirstIdent extracts the first valid identifier from a string.
+// Supports unicode identifiers for non-Latin scripts.
 func extractFirstIdent(s string) string {
 	s = strings.TrimSpace(s)
 	// Skip leading keywords like "mut" in Rust.
@@ -370,16 +371,15 @@ func extractFirstIdent(s string) string {
 
 	var ident strings.Builder
 	started := false
-	for i := 0; i < len(s); i++ {
-		c := s[i]
+	for _, r := range s {
 		if !started {
-			if isIdentStart(c) {
+			if isIdentStartRune(r) {
 				started = true
-				ident.WriteByte(c)
+				ident.WriteRune(r)
 			}
 		} else {
-			if isIdentStart(c) || (c >= '0' && c <= '9') {
-				ident.WriteByte(c)
+			if isIdentCharRune(r) {
+				ident.WriteRune(r)
 			} else {
 				break
 			}

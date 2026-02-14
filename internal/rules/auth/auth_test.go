@@ -212,3 +212,89 @@ func TestAUTH006_PHP_SetcookieInsecure(t *testing.T) {
 	result := testutil.ScanContent(t, "/app/auth.php", content)
 	testutil.MustFindRule(t, result, "GTSS-AUTH-006")
 }
+
+// --- GTSS-AUTH-007: Privilege Escalation ---
+
+func TestAUTH007_C_Setuid0(t *testing.T) {
+	content := `#include <unistd.h>
+int main() {
+    setuid(0);
+    execl("/bin/sh", "sh", NULL);
+}`
+	result := testutil.ScanContent(t, "/app/escalate.c", content)
+	testutil.MustFindRule(t, result, "GTSS-AUTH-007")
+}
+
+func TestAUTH007_C_Setgid0(t *testing.T) {
+	content := `#include <unistd.h>
+void setup() {
+    setgid(0);
+}`
+	result := testutil.ScanContent(t, "/app/setup.c", content)
+	testutil.MustFindRule(t, result, "GTSS-AUTH-007")
+}
+
+func TestAUTH007_Python_Setuid0(t *testing.T) {
+	content := `import os
+os.setuid(0)
+os.system("whoami")`
+	result := testutil.ScanContent(t, "/app/escalate.py", content)
+	testutil.MustFindRule(t, result, "GTSS-AUTH-007")
+}
+
+func TestAUTH007_Chmod777(t *testing.T) {
+	content := `chmod 777 /var/data/uploads`
+	result := testutil.ScanContent(t, "/app/setup.sh", content)
+	testutil.MustFindRule(t, result, "GTSS-AUTH-007")
+}
+
+func TestAUTH007_ChmodARWX(t *testing.T) {
+	content := `chmod a+rwx /tmp/data`
+	result := testutil.ScanContent(t, "/app/deploy.sh", content)
+	testutil.MustFindRule(t, result, "GTSS-AUTH-007")
+}
+
+func TestAUTH007_Go_OsChmod777(t *testing.T) {
+	content := `package main
+import "os"
+func setup() {
+	os.Chmod("/var/data", 0777)
+}`
+	result := testutil.ScanContent(t, "/app/setup.go", content)
+	testutil.MustFindRule(t, result, "GTSS-AUTH-007")
+}
+
+func TestAUTH007_Dockerfile_UserRoot(t *testing.T) {
+	content := `FROM ubuntu:20.04
+RUN apt-get update
+USER root
+CMD ["./app"]`
+	result := testutil.ScanContent(t, "/app/Dockerfile", content)
+	testutil.MustFindRule(t, result, "GTSS-AUTH-007")
+}
+
+func TestAUTH007_Safe_Dockerfile_UserNonroot(t *testing.T) {
+	content := `FROM ubuntu:20.04
+USER root
+RUN apt-get update && apt-get install -y curl
+USER appuser
+CMD ["./app"]`
+	result := testutil.ScanContent(t, "/app/Dockerfile", content)
+	testutil.MustNotFindRule(t, result, "GTSS-AUTH-007")
+}
+
+func TestAUTH007_Safe_Chmod644(t *testing.T) {
+	content := `chmod 644 /var/data/config.yml`
+	result := testutil.ScanContent(t, "/app/setup.sh", content)
+	testutil.MustNotFindRule(t, result, "GTSS-AUTH-007")
+}
+
+func TestAUTH007_Safe_Go_Chmod755(t *testing.T) {
+	content := `package main
+import "os"
+func setup() {
+	os.Chmod("/var/data", 0755)
+}`
+	result := testutil.ScanContent(t, "/app/setup.go", content)
+	testutil.MustNotFindRule(t, result, "GTSS-AUTH-007")
+}

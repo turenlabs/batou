@@ -405,6 +405,122 @@ const vm = new VM();`
 	testutil.MustNotFindRule(t, result, "GTSS-GEN-010")
 }
 
+// --- GTSS-GEN-012: Insecure Download Patterns ---
+
+func TestGEN012_CurlPipeBash(t *testing.T) {
+	content := `curl -fsSL https://example.com/install.sh | bash`
+	result := testutil.ScanContent(t, "/app/setup.sh", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-012")
+}
+
+// --- GTSS-GEN-008: Code As String Eval ---
+
+func TestGEN008_EvalWithPickle(t *testing.T) {
+	content := `eval('pickle.loads(data)')`
+	result := testutil.ScanContent(t, "/app/handler.py", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-008")
+}
+
+func TestGEN008_EvalWithYAMLLoad(t *testing.T) {
+	content := `eval('yaml.load(user_data)')`
+	result := testutil.ScanContent(t, "/app/handler.py", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-008")
+}
+
+func TestGEN008_VMRunInNewContextWithExec(t *testing.T) {
+	content := `vm.runInNewContext('require("child_process").exec("rm -rf /")', sandbox);`
+	result := testutil.ScanContent(t, "/app/sandbox.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-008")
+}
+
+func TestGEN008_VMRunInContextWithCommand(t *testing.T) {
+	content := `vm.runInContext('os.system("whoami")', ctx);`
+	result := testutil.ScanContent(t, "/app/sandbox.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-008")
+}
+
+func TestGEN008_NewFunctionWithUnserialize(t *testing.T) {
+	content := `new Function('data', 'return unserialize(data)');`
+	result := testutil.ScanContent(t, "/app/handler.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-008")
+}
+
+func TestGEN008_EvalTemplateLiteralWithExec(t *testing.T) {
+	content := "eval(`require('child_process').exec(cmd)`);"
+	result := testutil.ScanContent(t, "/app/handler.ts", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-008")
+}
+
+func TestGEN008_Safe_EvalWithoutDangerousCalls(t *testing.T) {
+	content := `eval('2 + 2')`
+	result := testutil.ScanContent(t, "/app/calc.py", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GEN-008")
+}
+
+func TestGEN008_Safe_CommentLine(t *testing.T) {
+	content := `// eval('pickle.loads(data)')`
+	result := testutil.ScanContent(t, "/app/handler.ts", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GEN-008")
+}
+
+func TestGEN012_CurlPipeSudoBash(t *testing.T) {
+	content := `curl -sSL https://get.example.com | sudo bash`
+	result := testutil.ScanContent(t, "/app/install.sh", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-012")
+}
+
+func TestGEN012_WgetPipeSh(t *testing.T) {
+	content := `wget -qO- https://example.com/setup.sh | sh`
+	result := testutil.ScanContent(t, "/app/install.sh", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-012")
+}
+
+func TestGEN012_CurlHTTP(t *testing.T) {
+	content := `curl http://example.com/package.tar.gz -o pkg.tar.gz`
+	result := testutil.ScanContent(t, "/app/install.sh", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-012")
+}
+
+func TestGEN012_CurlInsecure(t *testing.T) {
+	content := `curl --insecure https://internal.example.com/data`
+	result := testutil.ScanContent(t, "/app/fetch.sh", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-012")
+}
+
+func TestGEN012_PipTrustedHost(t *testing.T) {
+	content := `pip install --trusted-host pypi.internal.com mypackage`
+	result := testutil.ScanContent(t, "/app/install.sh", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-012")
+}
+
+func TestGEN012_NpmUnsafePerm(t *testing.T) {
+	content := `npm install --unsafe-perm -g mypackage`
+	result := testutil.ScanContent(t, "/app/install.sh", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-012")
+}
+
+func TestGEN012_Dockerfile_CurlPipe(t *testing.T) {
+	content := `FROM ubuntu:20.04
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash -`
+	result := testutil.ScanContent(t, "/app/Dockerfile", content)
+	testutil.MustFindRule(t, result, "GTSS-GEN-012")
+}
+
+func TestGEN012_Safe_CurlToFile(t *testing.T) {
+	content := `curl -fsSL https://example.com/install.sh -o install.sh
+sha256sum -c checksums.txt
+bash install.sh`
+	result := testutil.ScanContent(t, "/app/setup.sh", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GEN-012")
+}
+
+func TestGEN012_Safe_Comment(t *testing.T) {
+	content := `# Don't do: curl https://example.com/install.sh | bash
+# Instead download and verify first`
+	result := testutil.ScanContent(t, "/app/setup.sh", content)
+	testutil.MustNotFindRule(t, result, "GTSS-GEN-012")
+}
+
 func TestGEN010_Fixture_B2BOrder(t *testing.T) {
 	if !testutil.FixtureExists("javascript/vulnerable/vm_sandbox_escape.ts") {
 		t.Skip("vm sandbox escape fixture not available")

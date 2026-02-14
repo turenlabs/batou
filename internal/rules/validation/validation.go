@@ -625,6 +625,157 @@ func (r MissingAllowlistValidation) Scan(ctx *rules.ScanContext) []rules.Finding
 }
 
 // ---------------------------------------------------------------------------
+// GTSS-VAL-005: File upload without content-type validation (CWE-434)
+// ---------------------------------------------------------------------------
+
+// File upload handler patterns
+var (
+	// Go: multipart form handling
+	reGoMultipartForm  = regexp.MustCompile(`\.(?:FormFile|MultipartForm|ParseMultipartForm)\s*\(`)
+	reGoContentType    = regexp.MustCompile(`(?i)(?:content[_-]?type|mime|DetectContentType|http\.DetectContentType)`)
+	reGoFileExt        = regexp.MustCompile(`(?:filepath\.Ext|path\.Ext|strings\.HasSuffix)\s*\(`)
+
+	// Python: file upload patterns
+	rePyFileUpload     = regexp.MustCompile(`(?:request\.(?:files|FILES)|FileField|ImageField|UploadedFile)\b`)
+	rePyContentCheck   = regexp.MustCompile(`(?i)(?:content[_-]?type|mimetype|allowed_extensions|ALLOWED_EXTENSIONS|magic\.from_buffer|imghdr|filetype)`)
+
+	// JS/TS: multer / express-fileupload / formidable
+	reJSFileUpload     = regexp.MustCompile(`(?:multer|fileUpload|formidable|busboy|multiparty)\s*\(`)
+	reJSFileFilter     = regexp.MustCompile(`(?i)(?:fileFilter|mimetype|content[_-]?type|allowedTypes|allowedMimes)`)
+	reJSMimeType       = regexp.MustCompile(`(?i)(?:\.mimetype|\.type)\s*(?:===?|!==?|\.includes|\.match|\.test)`)
+
+	// Java: multipart upload
+	reJavaMultipart    = regexp.MustCompile(`(?:MultipartFile|@RequestParam.*MultipartFile|Part\s+\w+\s*=|getPart\s*\()`)
+	reJavaContentCheck = regexp.MustCompile(`(?i)(?:getContentType|content[_-]?type|MediaType|MimeType)`)
+
+	// PHP: file upload
+	rePHPFileUpload    = regexp.MustCompile(`\$_FILES\s*\[`)
+	rePHPTypeCheck     = regexp.MustCompile(`(?i)(?:mime_content_type|finfo_file|getimagesize|exif_imagetype|pathinfo.*PATHINFO_EXTENSION)`)
+
+	// Ruby: file upload
+	reRubyFileUpload   = regexp.MustCompile(`(?:params\[.*\]\.tempfile|uploaded_file|ActionDispatch::Http::UploadedFile|attach\s*\()`)
+	reRubyContentCheck = regexp.MustCompile(`(?i)(?:content[_-]?type|Marcel|MimeMagic|allowed_types)`)
+
+	// Store in web-accessible directory patterns
+	reWebAccessibleDir = regexp.MustCompile(`(?i)(?:public/|static/|www/|htdocs/|webroot/|uploads/|media/)\w*\.`)
+)
+
+type FileUploadHardening struct{}
+
+func (r FileUploadHardening) ID() string              { return "GTSS-VAL-005" }
+func (r FileUploadHardening) Name() string            { return "File Upload Hardening" }
+func (r FileUploadHardening) DefaultSeverity() rules.Severity { return rules.High }
+func (r FileUploadHardening) Description() string {
+	return "Detects file upload handlers missing content-type validation, size limits, or storing files in web-accessible directories."
+}
+func (r FileUploadHardening) Languages() []rules.Language {
+	return []rules.Language{
+		rules.LangGo, rules.LangPython, rules.LangJavaScript,
+		rules.LangTypeScript, rules.LangJava, rules.LangPHP, rules.LangRuby,
+	}
+}
+
+func (r FileUploadHardening) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	// Determine language-specific upload and validation patterns
+	var uploadRE *regexp.Regexp
+	var contentCheckRE *regexp.Regexp
+
+	switch ctx.Language {
+	case rules.LangGo:
+		uploadRE = reGoMultipartForm
+		contentCheckRE = reGoContentType
+	case rules.LangPython:
+		uploadRE = rePyFileUpload
+		contentCheckRE = rePyContentCheck
+	case rules.LangJavaScript, rules.LangTypeScript:
+		uploadRE = reJSFileUpload
+		contentCheckRE = reJSFileFilter
+	case rules.LangJava:
+		uploadRE = reJavaMultipart
+		contentCheckRE = reJavaContentCheck
+	case rules.LangPHP:
+		uploadRE = rePHPFileUpload
+		contentCheckRE = rePHPTypeCheck
+	case rules.LangRuby:
+		uploadRE = reRubyFileUpload
+		contentCheckRE = reRubyContentCheck
+	default:
+		return nil
+	}
+
+	// Find upload handlers
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		if loc := uploadRE.FindStringIndex(line); loc != nil {
+			// Check if content-type validation exists nearby
+			hasContentCheck := scopeHasPattern(lines, i, contentCheckRE, 30)
+
+			// For JS/TS, also check inline mime type checks
+			if !hasContentCheck && (ctx.Language == rules.LangJavaScript || ctx.Language == rules.LangTypeScript) {
+				hasContentCheck = scopeHasPattern(lines, i, reJSMimeType, 30)
+			}
+
+			// For Go, also check file extension checking
+			if !hasContentCheck && ctx.Language == rules.LangGo {
+				hasContentCheck = scopeHasPattern(lines, i, reGoFileExt, 30)
+			}
+
+			if !hasContentCheck {
+				matched := truncate(line[loc[0]:loc[1]], 120)
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "File upload without content-type validation",
+					Description:   "File upload handler does not validate the content type or file extension of uploaded files. Attackers can upload executable files (web shells, scripts) disguised as safe file types.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   matched,
+					Suggestion:    "Validate the file content type using magic bytes (not just the extension or Content-Type header). Maintain an allowlist of permitted MIME types. Use libraries like file-type (Node.js), python-magic, or http.DetectContentType (Go).",
+					CWEID:         "CWE-434",
+					OWASPCategory: "A04:2021-Insecure Design",
+					Language:      ctx.Language,
+					Confidence:    "medium",
+					Tags:          []string{"validation", "file-upload", "content-type", "cwe-434"},
+				})
+			}
+		}
+
+		// Check for storing uploads in web-accessible directories
+		if loc := reWebAccessibleDir.FindStringIndex(line); loc != nil {
+			// Only flag if there's also an upload handler in the file
+			if uploadRE.MatchString(ctx.Content) {
+				matched := truncate(line[loc[0]:loc[1]], 120)
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "File upload stored in web-accessible directory",
+					Description:   "Uploaded files are stored in a web-accessible directory. If an attacker uploads a web shell or executable file, it can be accessed directly via the web server.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   matched,
+					Suggestion:    "Store uploaded files outside the web root. Serve them through an application handler that validates access permissions and sets safe Content-Type headers.",
+					CWEID:         "CWE-434",
+					OWASPCategory: "A04:2021-Insecure Design",
+					Language:      ctx.Language,
+					Confidence:    "low",
+					Tags:          []string{"validation", "file-upload", "storage", "cwe-434"},
+				})
+			}
+		}
+	}
+
+	return findings
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -633,4 +784,5 @@ func init() {
 	rules.Register(MissingTypeCoercion{})
 	rules.Register(MissingLengthValidation{})
 	rules.Register(MissingAllowlistValidation{})
+	rules.Register(FileUploadHardening{})
 }

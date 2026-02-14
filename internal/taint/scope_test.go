@@ -331,6 +331,133 @@ func TestParenBalanced(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Unicode identifier support
+// ---------------------------------------------------------------------------
+
+func TestIsValidIdentifier_Unicode(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"hello", true},
+		{"_private", true},
+		{"$jquery", true},
+		{"données", true},     // French
+		{"变量", true},          // Chinese
+		{"переменная", true},   // Russian
+		{"名前", true},          // Japanese
+		{"café", true},         // accented Latin
+		{"func123", true},
+		{"123bad", false},      // starts with digit
+		{"", false},
+		{"a-b", false},         // hyphen not valid
+		{"a b", false},         // space not valid
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := isValidIdentifier(tt.input)
+			if got != tt.want {
+				t.Errorf("isValidIdentifier(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectScopes_UnicodeNames(t *testing.T) {
+	tests := []struct {
+		name     string
+		lang     rules.Language
+		code     string
+		wantName string
+	}{
+		{
+			name: "Python unicode function name",
+			lang: rules.LangPython,
+			code: "def données(request):\n    return request.args.get('x')\n",
+			wantName: "données",
+		},
+		{
+			name: "Python Chinese function name",
+			lang: rules.LangPython,
+			code: "def 处理请求(request):\n    return request.args.get('x')\n",
+			wantName: "处理请求",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scopes := DetectScopes(tt.code, tt.lang)
+			found := false
+			for _, sc := range scopes {
+				if sc.Name == tt.wantName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				names := make([]string, len(scopes))
+				for i, sc := range scopes {
+					names[i] = sc.Name
+				}
+				t.Errorf("expected scope named %q, got %v", tt.wantName, names)
+			}
+		})
+	}
+}
+
+func TestExtractFirstIdent_Unicode(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"données", "données"},
+		{"变量", "变量"},
+		{"  café123  ", "café123"},
+		{"123abc", "abc"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := extractFirstIdent(tt.input)
+			if got != tt.want {
+				t.Errorf("extractFirstIdent(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Aliased import documentation tests (known limitation of regex rules)
+// ---------------------------------------------------------------------------
+
+func TestAliasedImport_KnownLimitation(t *testing.T) {
+	// Document that regex-based rules do not track Python aliased imports.
+	// The taint analysis and AST analyzers handle these natively, so this
+	// is lower priority. These tests document the limitation.
+	t.Run("Python aliased import not tracked by regex", func(t *testing.T) {
+		// When a module is imported under an alias, regex rules that look
+		// for the original module name will miss it. For example:
+		//   import subprocess as sp
+		//   sp.call(user_input)
+		// The taint engine sees "sp.call" but regex rules look for "subprocess.call".
+		// This is a known limitation documented here for future reference.
+		code := "import subprocess as sp\ndef run(cmd):\n    sp.call(cmd)\n"
+		scopes := DetectScopes(code, rules.LangPython)
+		found := false
+		for _, sc := range scopes {
+			if sc.Name == "run" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("scope detection should still work with aliased imports")
+		}
+	})
+}
+
 func TestExtractAssignmentLHS(t *testing.T) {
 	tests := []struct {
 		line string
