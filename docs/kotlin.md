@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides security scanning for Kotlin code, covering Android applications (SQLite, WebView, Intent, SharedPreferences, exported components), Ktor server-side applications, Spring Boot Kotlin, and kotlinx.serialization. Analysis includes three layers: regex-based pattern rules, intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
+GTSS provides security scanning for Kotlin code, covering Android applications (SQLite, WebView, Intent, SharedPreferences, exported components), Ktor server-side applications, Spring Boot Kotlin, and kotlinx.serialization. Analysis includes four layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
 
 ## Detection
 
@@ -222,6 +222,10 @@ Rules with `LangAny` that also apply when scanning `.kt` files:
 | `GTSS-TRV-001` | PathTraversal | File operations with unsanitized user input |
 | `GTSS-GEN-001` | DebugModeEnabled | Debug mode left enabled |
 | `GTSS-CRY-001` | WeakHashing | Broken hash algorithms used for security |
+| `GTSS-AUTH-007` | PrivilegeEscalation | Privilege escalation patterns (CWE-269) |
+| `GTSS-GEN-012` | InsecureDownload | Insecure download patterns (CWE-494) |
+| `GTSS-MISC-003` | MissingSecurityHeaders | Missing security headers (CWE-1021, CWE-693) |
+| `GTSS-VAL-005` | FileUploadHardening | File upload hardening (CWE-434) |
 
 ## Example Detections
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Java code, covering Servlet-based web applications, Spring/Spring Boot, Hibernate/JPA, MyBatis, Thymeleaf, JSP, and common enterprise Java libraries. Analysis includes three layers: regex-based pattern rules, intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
+GTSS provides comprehensive security scanning for Java code, covering Servlet-based web applications, Spring/Spring Boot, Hibernate/JPA, MyBatis, Thymeleaf, JSP, and common enterprise Java libraries. Analysis includes four layers: regex-based pattern rules (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), intraprocedural taint tracking with source-to-sink and sanitizer recognition (Layer 3), and interprocedural call graph analysis (Layer 4).
 
 ## Detection
 
@@ -362,6 +362,7 @@ Rules that explicitly include Java in their `Languages()` method, plus rules wit
 | `GTSS-AUTH-001` | HardcodedCredentialCheck | Passwords compared against string literals |
 | `GTSS-AUTH-003` | CORSWildcard | Wildcard `*` in CORS origin configuration |
 | `GTSS-AUTH-005` | WeakPasswordPolicy | Password validation with min length below 8 or missing complexity |
+| `GTSS-AUTH-007` | PrivilegeEscalation | Privilege escalation patterns (CWE-269) |
 
 ### Generic (6 rules)
 
@@ -373,6 +374,7 @@ Rules that explicitly include Java in their `Languages()` method, plus rules wit
 | `GTSS-GEN-004` | OpenRedirect | `response.sendRedirect()` with user-controlled URL |
 | `GTSS-GEN-005` | LogInjection | Unsanitized user input in log statements |
 | `GTSS-GEN-009` | XMLParserMisconfig | XML parser configurations that explicitly enable external entities |
+| `GTSS-GEN-012` | InsecureDownload | Insecure download patterns (CWE-494) |
 
 ### Logging (3 rules)
 
@@ -389,6 +391,7 @@ Rules that explicitly include Java in their `Languages()` method, plus rules wit
 | `GTSS-VAL-001` | DirectParamUsage | Request parameters used without any validation |
 | `GTSS-VAL-002` | MissingTypeCoercion | User input used where a type is expected without parsing |
 | `GTSS-VAL-003` | MissingLengthValidation | User input in DB operations without length validation |
+| `GTSS-VAL-005` | FileUploadHardening | File upload without proper validation (CWE-434) |
 
 ### Traversal (4 rules)
 
@@ -449,6 +452,7 @@ Rules that explicitly include Java in their `Languages()` method, plus rules wit
 | Rule ID | Name | What It Detects |
 |---|---|---|
 | `GTSS-MISC-002` | ErrorDisclosure | `printStackTrace()` calls that may leak stack traces to clients, and exception details (`getMessage()`, `getStackTrace()`, `toString()`) written to HTTP response objects |
+| `GTSS-MISC-003` | MissingSecurityHeaders | Missing security headers (CWE-1021, CWE-693) |
 
 ### Redirect (1 rule)
 

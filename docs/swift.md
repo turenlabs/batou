@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides security scanning for Swift/iOS code, covering URLSession TLS validation, App Transport Security configuration, Keychain storage accessibility, WKWebView injection, SQLite injection, hardcoded secrets, insecure random number generation, insecure data storage, deprecated UIWebView usage, and jailbreak detection bypass patterns. Swift is supported through regex-based rules (Layer 1) and taint source-to-sink tracking (Layer 2).
+GTSS provides security scanning for Swift/iOS code, covering URLSession TLS validation, App Transport Security configuration, Keychain storage accessibility, WKWebView injection, SQLite injection, hardcoded secrets, insecure random number generation, insecure data storage, deprecated UIWebView usage, and jailbreak detection bypass patterns. Swift is supported through four analysis layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), taint source-to-sink tracking, and interprocedural call graph analysis.
 
 ## Detection
 
@@ -12,9 +12,11 @@ Swift files are identified by the `.swift` file extension. Detection is handled 
 |-----------|-------------------|
 | `.swift`  | `rules.LangSwift` |
 
-Files matching `.swift` are scanned through two analysis layers:
-- **Layer 1**: Regex-based rules (pattern matching on source code)
-- **Layer 2**: Taint analysis (source-to-sink tracking with sanitizer recognition)
+Files matching `.swift` are scanned through four analysis layers:
+- **Layer 1**: Regex-based rules (348 pattern matching rules on source code)
+- **Layer 2**: Tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection)
+- **Layer 3**: Taint analysis (source-to-sink tracking with sanitizer recognition)
+- **Layer 4**: Interprocedural call graph analysis (cross-function data flow)
 
 Test files (paths matching `Test.swift` or `_test.swift`) are excluded from scanning to reduce false positives.
 
@@ -154,6 +156,10 @@ Rules marked with `LangAny` also apply to Swift files, including:
 - GTSS-SEC-001: Hardcoded passwords
 - GTSS-SEC-002: API key exposure
 - GTSS-CRY-007: Plaintext HTTP URLs
+- GTSS-AUTH-007: Privilege escalation patterns (CWE-269) - HIGH
+- GTSS-GEN-012: Insecure download patterns (CWE-494) - HIGH
+- GTSS-MISC-003: Missing security headers (CWE-1021, CWE-693) - MEDIUM
+- GTSS-VAL-005: File upload hardening (CWE-434) - HIGH
 
 ## Example Detections
 

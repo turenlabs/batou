@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides deep security scanning for C++ code across three analysis layers: regex-based rules (Layer 1), taint source-to-sink tracking (Layer 2), and interprocedural call graph analysis (Layer 3). C++ coverage emphasizes memory safety, which is the dominant vulnerability class in C/C++ codebases, while also covering injection, cryptographic misuse, secrets exposure, and other categories through both C++-specific and language-agnostic rules.
+GTSS provides deep security scanning for C++ code across four analysis layers: regex-based rules (Layer 1), tree-sitter AST structural analysis (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). C++ coverage emphasizes memory safety, which is the dominant vulnerability class in C/C++ codebases, while also covering injection, cryptographic misuse, secrets exposure, and other categories through both C++-specific and language-agnostic rules.
 
 ## Detection
 
@@ -329,6 +329,10 @@ Rules with `LangAny` or explicit `LangCPP` in their language list:
 | Traversal | `GTSS-TRV-007` | Null Byte File Path | `LangAny` |
 | SSRF | `GTSS-SSRF-001` | URL From User Input | `LangAny` |
 | SSRF | `GTSS-SSRF-002` | Internal Network Access | `LangAny` |
+| Auth | `GTSS-AUTH-007` | Privilege Escalation Patterns | `LangAny` |
+| Generic | `GTSS-GEN-012` | Insecure Download Patterns | `LangAny` |
+| Misconfig | `GTSS-MISC-003` | Missing Security Headers | `LangAny` |
+| Validation | `GTSS-VAL-005` | File Upload Hardening | `LangAny` |
 
 ## Example Detections
 
@@ -433,7 +437,7 @@ Using `execve` with a separate argument array avoids shell interpretation. Combi
 
 ## Limitations
 
-1. **No AST-level analysis.** All detection is regex-based. Complex multi-line expressions, macro expansions, and template metaprogramming can produce false positives or false negatives. For example, a macro wrapping `strncpy` will still be recognized as a sanitizer, but the macro call site may not be correlated to the underlying function.
+1. **Limited AST analysis.** Tree-sitter AST analysis is now available for C++, providing comment-aware false positive filtering and structural code inspection. However, complex multi-line expressions, macro expansions, and template metaprogramming can still produce false positives or false negatives. For example, a macro wrapping `strncpy` will still be recognized as a sanitizer, but the macro call site may not be correlated to the underlying function.
 
 2. **Header file classification.** Files with the `.h` extension are classified as C rather than C++. C++ header-only libraries using `.h` will be scanned under C rules (which share the same memory rules) but will not receive C++-specific taint catalog entries for modern frameworks like Boost.Asio or Qt.
 

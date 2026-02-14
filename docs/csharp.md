@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for C# code, covering ASP.NET Core web applications, Entity Framework, Razor views, Blazor components, System.DirectoryServices (LDAP), and common .NET libraries. Analysis includes three layers: regex-based pattern rules (10 C#-specific plus cross-language rules), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
+GTSS provides comprehensive security scanning for C# code, covering ASP.NET Core web applications, Entity Framework, Razor views, Blazor components, System.DirectoryServices (LDAP), and common .NET libraries. Analysis includes four layers: regex-based pattern rules (348 rules, including 10 C#-specific plus cross-language rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
 
 ## Detection
 
@@ -287,8 +287,10 @@ All rules with `LangAny` apply to C# files. Key categories include:
 - **Secrets**: `GTSS-SEC-001` through `GTSS-SEC-006` (hardcoded passwords, API keys, private keys, connection strings, JWT secrets)
 - **Traversal**: `GTSS-TRV-001`, `GTSS-TRV-003`, `GTSS-TRV-008` (path traversal, archive extraction, null byte)
 - **SSRF**: `GTSS-SSRF-001`, `GTSS-SSRF-002` (URL from user input, internal network access)
-- **Authentication**: `GTSS-AUTH-001`, `GTSS-AUTH-003`, `GTSS-AUTH-005` (hardcoded credentials, CORS wildcard, weak passwords)
-- **Generic**: `GTSS-GEN-001` through `GTSS-GEN-005` (debug mode, deserialization, XXE, open redirect, log injection)
+- **Authentication**: `GTSS-AUTH-001`, `GTSS-AUTH-003`, `GTSS-AUTH-005`, `GTSS-AUTH-007` (hardcoded credentials, CORS wildcard, weak passwords, privilege escalation patterns)
+- **Generic**: `GTSS-GEN-001` through `GTSS-GEN-005`, `GTSS-GEN-012` (debug mode, deserialization, XXE, open redirect, log injection, insecure download patterns)
+- **Misconfiguration**: `GTSS-MISC-003` (missing security headers)
+- **Validation**: `GTSS-VAL-005` (file upload hardening)
 
 ## Example Detections
 

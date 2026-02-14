@@ -4,11 +4,12 @@
 
 GTSS provides comprehensive security scanning for JavaScript and TypeScript codebases. Coverage spans server-side frameworks (Express, Fastify, Hapi, Nest.js, Next.js), client-side DOM APIs, React patterns, and common npm ecosystem libraries. Both JavaScript and TypeScript share the same taint analysis definitions, with TypeScript IDs prefixed `ts.` instead of `js.`.
 
-Analysis runs in three layers:
+Analysis runs in four layers:
 
-1. **Regex rules** -- pattern-based detection of known-vulnerable code constructs
-2. **Taint analysis** -- tracks data flow from user-controlled sources to dangerous sinks, accounting for sanitizers
-3. **Interprocedural call graph** -- follows taint across function boundaries using persistent call graphs
+1. **Regex rules** -- pattern-based detection of known-vulnerable code constructs (348 rules)
+2. **Tree-sitter AST analysis** -- structural code inspection with comment-aware false positive filtering
+3. **Taint analysis** -- tracks data flow from user-controlled sources to dangerous sinks, accounting for sanitizers
+4. **Interprocedural call graph** -- follows taint across function boundaries using persistent call graphs
 
 ## Detection
 
@@ -471,6 +472,7 @@ The following regex-based rules apply to JavaScript and TypeScript files. Rules 
 | GTSS-AUTH-004 | Session Fixation | High | Missing session ID regeneration after login |
 | GTSS-AUTH-005 | Weak Password Policy | Medium | Password validation with weak requirements |
 | GTSS-AUTH-006 | Insecure Cookie | High | Cookies without Secure, HttpOnly, or SameSite flags |
+| GTSS-AUTH-007 | Privilege Escalation Patterns | High | Privilege escalation patterns (CWE-269) |
 
 ### SSRF
 
@@ -492,6 +494,7 @@ The following regex-based rules apply to JavaScript and TypeScript files. Rules 
 | GTSS-GEN-007 | Mass Assignment | High | All fields from user input accepted for updates |
 | GTSS-GEN-008 | Code As String Eval | High | Dangerous calls hidden in eval/vm/Function strings (JS/TS only) |
 | GTSS-GEN-009 | XML Parser Misconfig | High | XML parsers with external entity processing enabled |
+| GTSS-GEN-012 | Insecure Download Patterns | High | Insecure download patterns (CWE-494) |
 
 ### Logging
 
@@ -509,6 +512,7 @@ The following regex-based rules apply to JavaScript and TypeScript files. Rules 
 | GTSS-VAL-002 | Missing Type Coercion | Medium | User input used where a specific type is expected |
 | GTSS-VAL-003 | Missing Length Validation | Medium | User input in DB/storage operations without length checks |
 | GTSS-VAL-004 | Missing Allowlist Validation | Medium | User input as object keys without allowlist |
+| GTSS-VAL-005 | File Upload Hardening | High | File upload without proper validation (CWE-434) |
 
 ### XXE
 
@@ -563,6 +567,7 @@ The following regex-based rules apply to JavaScript and TypeScript files. Rules 
 |---------|------|----------|-------------|
 | GTSS-MISC-001 | Debug Mode | Medium | `NODE_ENV` hardcoded to development, or generic debug mode flags enabled |
 | GTSS-MISC-002 | Error Disclosure | Low | Error stack traces, messages, or raw error objects sent in HTTP responses |
+| GTSS-MISC-003 | Missing Security Headers | Medium | Missing security headers (CWE-1021, CWE-693) |
 
 ### Redirect
 
@@ -721,7 +726,7 @@ execFile('ping', ['-c', '3', host], (error, stdout, stderr) => {
 
 The following are known gaps and constraints in GTSS JavaScript/TypeScript coverage:
 
-- **No type system analysis.** GTSS uses regex and pattern matching, not the TypeScript compiler. It cannot resolve types, interfaces, or generics. Taint through complex generic wrapper functions may be missed.
+- **No type system analysis.** While tree-sitter AST analysis is available for JavaScript and TypeScript (providing comment-aware false positive filtering and structural code inspection), GTSS does not use the TypeScript compiler. It cannot resolve types, interfaces, or generics. Taint through complex generic wrapper functions may be missed.
 
 - **No module resolution.** Import paths are not followed. If a source is defined in module A and consumed in module B, the taint engine relies on the interprocedural call graph to connect them rather than `import`/`require` resolution.
 

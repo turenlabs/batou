@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for PHP code, covering native PHP functions, and framework-specific patterns for Laravel, Symfony/Twig, CodeIgniter, and WordPress. PHP analysis includes all three scanning layers: regex-based rule matching (Layer 1), taint source-to-sink tracking (Layer 2), and interprocedural call graph analysis (Layer 3).
+GTSS provides comprehensive security scanning for PHP code, covering native PHP functions, and framework-specific patterns for Laravel, Symfony/Twig, CodeIgniter, and WordPress. PHP analysis includes all four scanning layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4).
 
 ## Detection
 
@@ -358,6 +358,7 @@ The following regex-based rules (Layer 1) include PHP in their language list:
 | GTSS-AUTH-004 | SessionFixation | Login handlers without `session_regenerate_id()` |
 | GTSS-AUTH-005 | WeakPasswordPolicy | Password validation with weak minimum length |
 | GTSS-AUTH-006 | InsecureCookie | `setcookie()` without Secure/HttpOnly/SameSite flags |
+| GTSS-AUTH-007 | PrivilegeEscalation | Privilege escalation patterns (CWE-269) |
 
 ### Generic
 
@@ -370,6 +371,7 @@ The following regex-based rules (Layer 1) include PHP in their language list:
 | GTSS-GEN-006 | RaceCondition | TOCTOU patterns (check-then-use without locking) |
 | GTSS-GEN-008 | CodeAsStringEval | Dangerous calls hidden inside `eval()` strings |
 | GTSS-GEN-009 | XMLParserMisconfig | Insecure XML parser configurations |
+| GTSS-GEN-012 | InsecureDownload | Insecure download patterns (CWE-494) |
 
 ### Logging
 
@@ -385,6 +387,7 @@ The following regex-based rules (Layer 1) include PHP in their language list:
 |---------|------|-----------------|
 | GTSS-VAL-001 | DirectParamUsage | `$_GET`/`$_POST` used directly without validation |
 | GTSS-VAL-003 | MissingLengthValidation | User input stored without length checks |
+| GTSS-VAL-005 | FileUploadHardening | File upload without proper validation (CWE-434) |
 
 ### Deserialization
 
@@ -398,6 +401,12 @@ The following regex-based rules (Layer 1) include PHP in their language list:
 |---------|------|-----------------|
 | GTSS-CORS-001 | CORSWildcardCredentials | `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` (wildcard origin with credentials misconfiguration) |
 | GTSS-CORS-002 | CORSReflectedOrigin | `header("Access-Control-Allow-Origin: " . $_SERVER["HTTP_ORIGIN"])` reflecting the request Origin without validation |
+
+### Misconfiguration
+
+| Rule ID | Name | What It Detects |
+|---------|------|-----------------|
+| GTSS-MISC-003 | MissingSecurityHeaders | Missing security headers (CWE-1021, CWE-693) |
 
 ### Redirect
 

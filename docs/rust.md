@@ -12,10 +12,11 @@ Rust files are identified by the `.rs` file extension. Detection is handled in `
 |-----------|-------------------|
 | `.rs`     | `rules.LangRust`  |
 
-Files matching `.rs` are scanned through all three analysis layers:
-- **Layer 1**: Regex-based rules (pattern matching on source code)
-- **Layer 2**: Taint analysis (source-to-sink tracking with sanitizer recognition)
-- **Layer 3**: Interprocedural call graph analysis (cross-function data flow)
+Files matching `.rs` are scanned through all four analysis layers:
+- **Layer 1**: Regex-based rules (348 pattern matching rules on source code)
+- **Layer 2**: Tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection)
+- **Layer 3**: Taint analysis (source-to-sink tracking with sanitizer recognition)
+- **Layer 4**: Interprocedural call graph analysis (cross-function data flow)
 
 Test files (paths matching `_test.rs` or under `tests/` directories) are excluded from scanning to reduce false positives.
 
@@ -177,6 +178,10 @@ Rules marked with `LangAny` or explicitly including `LangRust` in their `Languag
 - **GTSS-SEC-001/002**: Hardcoded passwords and API keys
 - **GTSS-CRY-007**: Plaintext protocol (http:// URLs)
 - **GTSS-GQL-001/002**: GraphQL introspection and depth limiting (if using async-graphql or juniper)
+- **GTSS-AUTH-007**: Privilege escalation patterns (CWE-269) - HIGH
+- **GTSS-GEN-012**: Insecure download patterns (CWE-494) - HIGH
+- **GTSS-MISC-003**: Missing security headers (CWE-1021, CWE-693) - MEDIUM
+- **GTSS-VAL-005**: File upload hardening (CWE-434) - HIGH
 
 ### Tauri Framework Rules
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Ruby code, covering Rails, Sinatra, Grape, Hanami, and Rack applications. Analysis spans three layers: regex-based pattern matching (Layer 1), taint source-to-sink tracking (Layer 2), and interprocedural call graph analysis (Layer 3). Ruby coverage includes 30+ taint sources across 7 frameworks, 60+ sinks spanning 14 vulnerability categories, and 25+ sanitizer recognitions to reduce false positives.
+GTSS provides comprehensive security scanning for Ruby code, covering Rails, Sinatra, Grape, Hanami, and Rack applications. Analysis spans four layers: regex-based pattern matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). Ruby coverage includes 30+ taint sources across 7 frameworks, 60+ sinks spanning 14 vulnerability categories, and 25+ sanitizer recognitions to reduce false positives.
 
 ## Detection
 
@@ -266,6 +266,12 @@ The following Layer 1 regex rules apply to Ruby files. Rules with `LangAny` also
 |---------|------|-------------|
 | GTSS-CORS-001 | CORS Wildcard with Credentials | `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` via generic header patterns |
 
+### Misconfiguration
+
+| Rule ID | Name | Description |
+|---------|------|-------------|
+| GTSS-MISC-003 | Missing Security Headers | Missing security headers (CWE-1021, CWE-693) |
+
 ### GraphQL
 
 | Rule ID | Name | Description |
@@ -317,6 +323,7 @@ The following Layer 1 regex rules apply to Ruby files. Rules with `LangAny` also
 | GTSS-AUTH-003 | CORS Wildcard | Overly permissive CORS configuration |
 | GTSS-AUTH-004 | Session Fixation | Login without `reset_session` |
 | GTSS-AUTH-005 | Weak Password Policy | Password length requirements below 8 characters |
+| GTSS-AUTH-007 | Privilege Escalation Patterns | Privilege escalation patterns (CWE-269) |
 
 ### Generic
 
@@ -329,6 +336,7 @@ The following Layer 1 regex rules apply to Ruby files. Rules with `LangAny` also
 | GTSS-GEN-007 | Mass Assignment | `update_attributes(params)` without strong parameters |
 | GTSS-GEN-008 | Code-as-String Eval | Dangerous calls inside `eval()` string arguments |
 | GTSS-GEN-009 | XML Parser Misconfig | XXE-enabling XML parser configuration |
+| GTSS-GEN-012 | Insecure Download Patterns | Insecure download patterns (CWE-494) |
 
 ### Logging
 
@@ -345,6 +353,7 @@ The following Layer 1 regex rules apply to Ruby files. Rules with `LangAny` also
 | GTSS-VAL-001 | Direct Parameter Usage | `params` used without any validation nearby |
 | GTSS-VAL-003 | Missing Length Validation | User input stored without size checks |
 | GTSS-VAL-004 | Missing Allowlist Validation | User input used as dynamic property keys |
+| GTSS-VAL-005 | File Upload Hardening | File upload without proper validation (CWE-434) |
 
 ### SSRF
 

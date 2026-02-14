@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Perl code, covering CGI.pm, PSGI/Plack, Mojolicious, Dancer2, Catalyst, and DBI-based applications. Analysis spans three layers: regex-based pattern matching (Layer 1), taint source-to-sink tracking (Layer 2), and interprocedural call graph analysis (Layer 3). Perl coverage includes 25+ taint sources across 6 frameworks, 35+ sinks spanning 12 vulnerability categories, and 15+ sanitizer recognitions to reduce false positives.
+GTSS provides comprehensive security scanning for Perl code, covering CGI.pm, PSGI/Plack, Mojolicious, Dancer2, Catalyst, and DBI-based applications. Analysis spans three layers: regex-based pattern matching (348 rules, Layer 1), taint source-to-sink tracking (Layer 2), and interprocedural call graph analysis (Layer 3). Tree-sitter AST analysis (Layer 2 for other languages) is not available for Perl due to the lack of a tree-sitter grammar. Perl coverage includes 25+ taint sources across 6 frameworks, 35+ sinks spanning 12 vulnerability categories, and 15+ sanitizer recognitions to reduce false positives.
 
 ## Detection
 
@@ -198,6 +198,10 @@ Rules with `LangAny` also apply to Perl files:
 | GTSS-LOG-001 | Unsanitized Log Input | User input in log statements |
 | GTSS-SSRF-001 | URL From User Input | HTTP requests with user-derived URLs |
 | GTSS-SSRF-002 | Internal Network Access | Requests to private IPs or cloud metadata |
+| GTSS-AUTH-007 | Privilege Escalation | Privilege escalation patterns (CWE-269) |
+| GTSS-GEN-012 | Insecure Download | Insecure download patterns (CWE-494) |
+| GTSS-MISC-003 | Missing Security Headers | Missing security headers (CWE-1021, CWE-693) |
+| GTSS-VAL-005 | File Upload Hardening | File upload hardening (CWE-434) |
 
 ## Example Detections
 

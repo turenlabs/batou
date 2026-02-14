@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides security scanning for Lua code, covering the standard library (`os`, `io`, `debug`, `load*`), OpenResty/ngx_lua (`ngx.req`, `ngx.var`, `ngx.say`, `ngx.redirect`), Redis Lua scripting (`KEYS`, `ARGV`, `redis.call`), LOVE2D (`love.filesystem`), database libraries (lua-resty-mysql, ngx_postgres), and serialization libraries (serpent, cjson). Lua is scanned through regex-based rules and taint source-to-sink tracking.
+GTSS provides security scanning for Lua code, covering the standard library (`os`, `io`, `debug`, `load*`), OpenResty/ngx_lua (`ngx.req`, `ngx.var`, `ngx.say`, `ngx.redirect`), Redis Lua scripting (`KEYS`, `ARGV`, `redis.call`), LOVE2D (`love.filesystem`), database libraries (lua-resty-mysql, ngx_postgres), and serialization libraries (serpent, cjson). Lua is scanned through four analysis layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), taint source-to-sink tracking, and interprocedural call graph analysis.
 
 ## Detection
 
@@ -12,9 +12,11 @@ Lua files are identified by the `.lua` file extension. Detection is handled in `
 |-----------|-------------------|
 | `.lua`    | `rules.LangLua`  |
 
-Files matching `.lua` are scanned through two analysis layers:
-- **Layer 1**: Regex-based rules (pattern matching on source code)
-- **Layer 2**: Taint analysis (source-to-sink tracking with sanitizer recognition)
+Files matching `.lua` are scanned through four analysis layers:
+- **Layer 1**: Regex-based rules (348 pattern matching rules on source code)
+- **Layer 2**: Tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection)
+- **Layer 3**: Taint analysis (source-to-sink tracking with sanitizer recognition)
+- **Layer 4**: Interprocedural call graph analysis (cross-function data flow)
 
 Test files (paths matching `_test.lua`) are excluded from scanning to reduce false positives.
 
@@ -186,6 +188,19 @@ The following Lua-specific regex rules are registered in `internal/rules/lua/lua
 | Rule ID | Name | Severity | Patterns |
 |---------|------|----------|----------|
 | GTSS-LUA-008 | Debug Library in Production | Medium | `debug.getinfo()`, `debug.sethook()`, `debug.setmetatable()`, `debug.setlocal()`, `debug.setupvalue()`, `debug.getlocal()`, `debug.getupvalue()` |
+
+### Cross-Language Rules Applicable to Lua
+
+Rules with `LangAny` also apply to Lua files:
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-SEC-001 | HardcodedPassword | High | Hardcoded passwords and credentials |
+| GTSS-SEC-002 | APIKeyExposure | High | Hardcoded API keys from known providers |
+| GTSS-AUTH-007 | PrivilegeEscalation | High | Privilege escalation patterns (CWE-269) |
+| GTSS-GEN-012 | InsecureDownload | High | Insecure download patterns (CWE-494) |
+| GTSS-MISC-003 | MissingSecurityHeaders | Medium | Missing security headers (CWE-1021, CWE-693) |
+| GTSS-VAL-005 | FileUploadHardening | High | File upload hardening (CWE-434) |
 
 ## Example Detections
 

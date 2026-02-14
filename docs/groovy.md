@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Groovy code, covering Grails web applications, Jenkins pipeline scripts (Jenkinsfile), and general Groovy applications. Analysis includes three layers: regex-based pattern rules (10 Groovy-specific rules), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
+GTSS provides comprehensive security scanning for Groovy code, covering Grails web applications, Jenkins pipeline scripts (Jenkinsfile), and general Groovy applications. Analysis includes four layers: regex-based pattern rules (348 rules, including 10 Groovy-specific rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
 
 Groovy runs on the JVM and shares many security concerns with Java, but introduces unique risks through GString interpolation, the `.execute()` method on strings, and Jenkins pipeline DSL patterns.
 
@@ -214,6 +214,20 @@ Taint analysis tracks data flow from untrusted sources through the program to da
 | `groovy.integer.parseint` | Integer.parseInt / toInteger | SQL, Command, File |
 | `groovy.commandobject` | Grails @Validateable command object | SQL, Command, HTML |
 | `groovy.xmlslurper.secure` | setFeature(disallow-doctype-decl) | XPath/XXE |
+
+## Cross-Language Rules Applicable to Groovy
+
+Rules with `LangAny` also apply to Groovy files:
+
+| Rule ID | Name | Severity | Description |
+|---------|------|----------|-------------|
+| GTSS-SEC-001 | HardcodedPassword | High | Hardcoded passwords and credentials |
+| GTSS-SEC-002 | APIKeyExposure | High | Hardcoded API keys from known providers |
+| GTSS-GEN-001 | DebugModeEnabled | Medium | Debug mode left enabled |
+| GTSS-AUTH-007 | PrivilegeEscalation | High | Privilege escalation patterns (CWE-269) |
+| GTSS-GEN-012 | InsecureDownload | High | Insecure download patterns (CWE-494) |
+| GTSS-MISC-003 | MissingSecurityHeaders | Medium | Missing security headers (CWE-1021, CWE-693) |
+| GTSS-VAL-005 | FileUploadHardening | High | File upload hardening (CWE-434) |
 
 ## Test Coverage
 

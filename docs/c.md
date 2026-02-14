@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides deep security scanning for C source files, with particular emphasis on memory safety -- the dominant vulnerability class in C programs. Coverage spans three analysis layers: regex-based rule matching (Layer 1), taint source-to-sink tracking (Layer 2), and interprocedural call graph analysis (Layer 3). C is one of two languages (alongside C++) with dedicated memory safety rules.
+GTSS provides deep security scanning for C source files, with particular emphasis on memory safety -- the dominant vulnerability class in C programs. Coverage spans four analysis layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). C is one of two languages (alongside C++) with dedicated memory safety rules.
 
 ## Detection
 
@@ -260,6 +260,10 @@ These rules use patterns that match across all languages, including C.
 | GTSS-CRY-007 | Crypto | Medium | Plaintext protocols (HTTP, FTP, Telnet) |
 | GTSS-SSRF-001 | SSRF | High | URLs constructed from user input |
 | GTSS-SSRF-002 | SSRF | High | Access to internal network addresses |
+| GTSS-AUTH-007 | Auth | High | Privilege escalation patterns (CWE-269) |
+| GTSS-GEN-012 | Generic | High | Insecure download patterns (CWE-494) |
+| GTSS-MISC-003 | Misconfig | Medium | Missing security headers (CWE-1021, CWE-693) |
+| GTSS-VAL-005 | Validation | High | File upload without proper validation (CWE-434) |
 
 ## Example Detections
 

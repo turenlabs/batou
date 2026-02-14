@@ -13,12 +13,12 @@ GTSS hooks into Claude Code's `Write`, `Edit`, and `NotebookEdit` operations:
 - **PostToolUse**: Performs deep analysis after writes, giving Claude detailed hints to improve code security.
 
 ```
-Claude writes code → GTSS intercepts → Scan (rules + taint + call graph) → Block or Hint
+Claude writes code → GTSS intercepts → Scan (regex + AST + taint + call graph) → Block or Hint
 ```
 
 ## What It Detects
 
-**234 rules across 30 categories:**
+**348 rules across 34 categories:**
 
 | Category | Rules | Examples |
 |----------|-------|---------|
@@ -28,10 +28,10 @@ Claude writes code → GTSS intercepts → Scan (rules + taint + call graph) →
 | Crypto | CRY-001 to CRY-018 | Weak hashing, ECB mode, static IVs, disabled TLS, weak PRNG, timing attacks |
 | Secrets | SEC-001 to SEC-006 | Hardcoded passwords, API keys, private keys, JWT secrets, .env files |
 | SSRF | SSRF-001 to SSRF-004 | User-controlled URLs, internal IP access, DNS rebinding, redirect following |
-| Auth | AUTH-001 to AUTH-006 | Missing auth checks, CORS wildcards, session fixation, timing attacks |
-| Generic | GEN-001 to GEN-011 | Unsafe deserialization, XXE, open redirects, TOCTOU, mass assignment, YAML deser |
+| Auth | AUTH-001 to AUTH-007 | Missing auth checks, CORS wildcards, session fixation, timing attacks, privilege escalation |
+| Generic | GEN-001 to GEN-012 | Unsafe deserialization, XXE, open redirects, TOCTOU, mass assignment, YAML deser, insecure downloads |
 | Logging | LOG-001 to LOG-003 | Log injection, CRLF injection, sensitive data in logs |
-| Validation | VAL-001 to VAL-004 | Missing input validation, type coercion, length checks, enum validation |
+| Validation | VAL-001 to VAL-005 | Missing input validation, type coercion, length checks, enum validation, file upload hardening |
 | Memory | MEM-001 to MEM-006 | Banned C functions, format strings, buffer overflow, use-after-free, integer overflow |
 | XXE | XXE-001 to XXE-004 | Java, JavaScript, Python, C# XML external entity injection |
 | NoSQL | NOSQL-001 to NOSQL-003 | MongoDB $where, operator injection, raw query injection |
@@ -40,7 +40,7 @@ Claude writes code → GTSS intercepts → Scan (rules + taint + call graph) →
 | Mass Assignment | MASS-001 to MASS-004 | JS, Python, Ruby, Java mass assignment |
 | CORS | CORS-001 to CORS-002 | Wildcard + credentials, reflected origin |
 | GraphQL | GQL-001 to GQL-002 | Introspection enabled, no depth limiting |
-| Misconfiguration | MISC-001 to MISC-002 | Debug mode, verbose error disclosure |
+| Misconfiguration | MISC-001 to MISC-003 | Debug mode, verbose error disclosure, missing security headers |
 | Redirect | REDIR-001 to REDIR-002 | Open redirect, bypassable allowlist |
 | Kotlin | KT-001 to KT-008 | Android SQLi, Intent injection, WebView, SharedPrefs, Ktor CORS |
 | Swift | SWIFT-001 to SWIFT-010 | ATS bypass, Keychain, UIWebView, SQLite injection, WKWebView |
@@ -55,17 +55,19 @@ Claude writes code → GTSS intercepts → Scan (rules + taint + call graph) →
 
 **16 languages supported:** Go, Python, JavaScript/TypeScript, Java, PHP, Ruby, C, C++, Kotlin, Swift, Rust, C#, Perl, Lua, Groovy (+ Tauri framework)
 
-## Three-Layer Analysis
+## Four-Layer Analysis
 
-1. **Regex Rules** - Fast pattern matching for known vulnerability signatures
-2. **Taint Analysis** - Source-to-sink dataflow tracking with 1,500+ taint entries (sources, sinks, sanitizers per language)
-3. **Call Graph** - Persistent interprocedural analysis tracking taint across function boundaries
+1. **Regex Rules** - Fast pattern matching for 348 known vulnerability signatures with multi-line preprocessing
+2. **AST Analysis** - Tree-sitter structural analysis for 13 languages, providing comment-aware false positive filtering and deep code structure inspection
+3. **Taint Analysis** - Source-to-sink dataflow tracking with 1,184 taint entries (sources, sinks, sanitizers per language)
+4. **Call Graph** - Persistent interprocedural analysis tracking taint across function boundaries
 
 ## Installation
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.21+ with CGo support (for tree-sitter AST parsing)
+- C compiler (gcc or clang)
 - Claude Code CLI
 
 ### Quick Install
@@ -151,27 +153,28 @@ echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_p
 
 ### Test Suite
 
-- **900+ tests** across 37 packages
-- **250+ test fixtures** across 16 languages (vulnerable + safe code samples)
-- Fixtures sourced from patterns in OWASP Juice Shop, DVWA, WebGoat, RailsGoat, DVPWA, and more
+- **2,380 tests** across 59 packages
+- **430+ test fixtures** across 16 languages (vulnerable + safe code samples)
+- Dedicated benchmarks for WebGoat, OWASP Juice Shop, DVWA, and RailsGoat vulnerability patterns
 - Zero false positives on safe code
 - Race-condition free (verified with `-race`)
 
 ## Project Stats
 
 ```
-Go source files:    150+
-Go test files:      40+
-Total Go lines:     ~55,000
+Go source files:    196
+Go test files:      78
+Total Go lines:     ~86,000
 Binary size:        ~4 MB
-External deps:      0
-Rules:              234
-Rule categories:    30
+External deps:      1 (tree-sitter, compiled into binary)
+Regex rules:        348
+AST analyzers:      13 languages
+Rule categories:    34
 Languages:          16
-Taint entries:      1,500+
+Taint entries:      1,184
 File extensions:    50+
-Test fixtures:      250+
-Test cases:         900+
+Test fixtures:      430+
+Test cases:         2,380
 ```
 
 ## How It Improves AI Code

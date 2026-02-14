@@ -12,10 +12,11 @@ Go files are identified by the `.go` file extension. Detection is handled in `in
 |-----------|-------------------|
 | `.go`     | `rules.LangGo`   |
 
-Files matching `.go` are scanned through all three analysis layers:
-- **Layer 1**: Regex-based rules (pattern matching on source code)
-- **Layer 2**: Taint analysis (source-to-sink tracking with sanitizer recognition)
-- **Layer 3**: Interprocedural call graph analysis (cross-function data flow)
+Files matching `.go` are scanned through all four analysis layers:
+- **Layer 1**: Regex-based rules (348 pattern-matching rules on source code)
+- **Layer 2**: Tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection)
+- **Layer 3**: Taint analysis (source-to-sink tracking with sanitizer recognition)
+- **Layer 4**: Interprocedural call graph analysis (cross-function data flow)
 
 Test files (paths matching `_test.go`) are excluded from scanning to reduce false positives.
 
@@ -284,6 +285,7 @@ The following regex-based rules include Go in their `Languages()` method. Rules 
 | GTSS-AUTH-003 | CORS Wildcard | High | `Access-Control-Allow-Origin: *` with credentials |
 | GTSS-AUTH-005 | Weak Password Policy | Medium | Password validation patterns |
 | GTSS-AUTH-006 | Insecure Cookie | High | Cookie settings without Secure/HttpOnly flags |
+| GTSS-AUTH-007 | Privilege Escalation Patterns | High | Privilege escalation patterns (CWE-269) |
 
 ### Generic Rules
 
@@ -295,6 +297,7 @@ The following regex-based rules include Go in their `Languages()` method. Rules 
 | GTSS-GEN-005 | Log Injection | Medium | Log calls with request data |
 | GTSS-GEN-006 | Race Condition | Medium | Shared state access patterns |
 | GTSS-GEN-007 | Mass Assignment | High | Struct field binding patterns |
+| GTSS-GEN-012 | Insecure Download Patterns | High | Insecure download patterns (CWE-494) |
 
 ### Logging Rules
 
@@ -312,6 +315,7 @@ The following regex-based rules include Go in their `Languages()` method. Rules 
 | GTSS-VAL-002 | Missing Type Coercion | Medium | String params used without `strconv.Atoi` or similar |
 | GTSS-VAL-003 | Missing Length Validation | Medium | User input without length bounds checking |
 | GTSS-VAL-004 | Missing Allowlist Validation | Medium | Enum-like params without allowlist check |
+| GTSS-VAL-005 | File Upload Hardening | High | File upload without proper validation (CWE-434) |
 
 ### CORS Rules
 
@@ -326,6 +330,12 @@ The following regex-based rules include Go in their `Languages()` method. Rules 
 |---------|------|----------|---------------------|
 | GTSS-GQL-001 | GraphQL Introspection Enabled | Medium | `introspection: true` or `enableIntrospection: true` in schema configuration |
 | GTSS-GQL-002 | GraphQL No Depth Limiting | Medium | GraphQL server creation (`new ApolloServer`, `createYoga`, `graphqlHTTP`) without `depthLimit`/`maxDepth`/`complexityLimit` |
+
+### Misconfiguration Rules
+
+| Rule ID | Name | Severity | Go-Specific Patterns |
+|---------|------|----------|---------------------|
+| GTSS-MISC-003 | Missing Security Headers | Medium | Missing security headers (CWE-1021, CWE-693) |
 
 ### Redirect Rules
 

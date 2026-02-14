@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Python code, covering web frameworks (Flask, Django, FastAPI, aiohttp, Tornado, Starlette), cloud platforms (AWS Lambda, GCP Cloud Functions, Azure Functions), and standard library patterns. Analysis operates at three layers: regex-based rule matching (Layer 1), intraprocedural taint source-to-sink tracking (Layer 2), and interprocedural call graph analysis (Layer 3).
+GTSS provides comprehensive security scanning for Python code, covering web frameworks (Flask, Django, FastAPI, aiohttp, Tornado, Starlette), cloud platforms (AWS Lambda, GCP Cloud Functions, Azure Functions), and standard library patterns. Analysis operates at four layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis (Layer 2), intraprocedural taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4).
 
 ## Detection
 
@@ -344,6 +344,7 @@ GTSS applies 76 regex-based rules to Python files across 20 categories.
 | GTSS-AUTH-004 | SessionFixation | High | Session ID set from request parameter |
 | GTSS-AUTH-005 | WeakPasswordPolicy | Medium | Short minimum password lengths in validation |
 | GTSS-AUTH-006 | InsecureCookie | High | Cookies without `secure`, `httponly`, or `samesite` flags |
+| GTSS-AUTH-007 | PrivilegeEscalation | High | Privilege escalation patterns (CWE-269) |
 
 ### Generic (`internal/rules/generic/`)
 
@@ -358,6 +359,7 @@ GTSS applies 76 regex-based rules to Python files across 20 categories.
 | GTSS-GEN-007 | MassAssignment | High | `**request.form` or `**request.json` spread into ORM |
 | GTSS-GEN-008 | CodeAsStringEval | High | Multi-line eval/exec with string-built code |
 | GTSS-GEN-009 | XMLParserMisconfig | High | XML parser with external entities or DTD enabled |
+| GTSS-GEN-012 | InsecureDownload | High | Insecure download patterns (CWE-494) |
 
 ### Logging (`internal/rules/logging/`)
 
@@ -375,6 +377,7 @@ GTSS applies 76 regex-based rules to Python files across 20 categories.
 | GTSS-VAL-002 | MissingTypeCoercion | Medium | Request params used without `int()` / type conversion |
 | GTSS-VAL-003 | MissingLengthValidation | Medium | String input accepted without length bounds |
 | GTSS-VAL-004 | MissingAllowlistValidation | Medium | Enum-like values without allowlist check |
+| GTSS-VAL-005 | FileUploadHardening | High | File upload without proper validation (CWE-434) |
 
 ### XXE (`internal/rules/xxe/`)
 
@@ -422,6 +425,7 @@ GTSS applies 76 regex-based rules to Python files across 20 categories.
 |---------|------|----------|-----------------|
 | GTSS-MISC-001 | DebugMode | Medium | Django `DEBUG = True`, Flask `app.debug = True`, `app.run(debug=True)` |
 | GTSS-MISC-002 | ErrorDisclosure | Low | `traceback.format_exc()` in HTTP response, `str(e)` in `return`/`response`/`jsonify` calls |
+| GTSS-MISC-003 | MissingSecurityHeaders | Medium | Missing security headers (CWE-1021, CWE-693) |
 
 ### Redirect (`internal/rules/redirect/`)
 
@@ -548,7 +552,7 @@ The `py.os.path.basename` sanitizer also neutralizes path traversal when used to
 
 ## Limitations
 
-- **No AST parsing.** Python analysis is regex-based, not AST-based. Patterns like renamed imports (`import os as operating_system; operating_system.system(cmd)`) or deeply aliased references may be missed.
+- **Limited AST analysis.** Tree-sitter AST analysis is now available for Python, providing comment-aware false positive filtering and structural code inspection. However, patterns like renamed imports (`import os as operating_system; operating_system.system(cmd)`) or deeply aliased references may still be missed.
 
 - **Dynamic dispatch.** Taint tracking does not resolve dynamic attribute access (`getattr(obj, method_name)()`) or metaclass-driven dispatch.
 
