@@ -3,7 +3,7 @@ package framework
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- GTSS-FW-EXPRESS-001: Missing Helmet ---

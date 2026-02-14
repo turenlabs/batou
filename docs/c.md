@@ -21,8 +21,8 @@ The C taint catalog is defined across four files in `internal/taint/languages/`:
 
 - `c_catalog.go` -- registers the `CCatalog` struct
 - `c_sources.go` -- 21 taint sources
-- `c_sinks.go` -- 40 taint sinks
-- `c_sanitizers.go` -- 22 sanitizers
+- `c_sinks.go` -- 82 taint sinks
+- `c_sanitizers.go` -- 21 sanitizers
 
 ### Sources (Taint Entry Points)
 

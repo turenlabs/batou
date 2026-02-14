@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // ScanResult holds the complete results of a GTSS scan.

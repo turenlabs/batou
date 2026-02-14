@@ -6,7 +6,7 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // GoASTAnalyzer performs deep semantic analysis of Go source code using the

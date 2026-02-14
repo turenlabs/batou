@@ -3,7 +3,7 @@ package xss
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- GTSS-XSS-001: innerHTML Usage ---

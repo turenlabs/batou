@@ -3,7 +3,7 @@ package redirect
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- GTSS-REDIR-001: Server Redirect With User Input ---

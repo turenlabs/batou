@@ -3,8 +3,8 @@ package nosql
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // ---------------------------------------------------------------------------

@@ -3,8 +3,8 @@ package graph_test
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/graph"
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/graph"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // ---------------------------------------------------------------------------

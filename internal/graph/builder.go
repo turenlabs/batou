@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/taint"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/taint"
 )
 
 // UpdateFile parses a file and updates the call graph with its function

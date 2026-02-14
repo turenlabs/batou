@@ -19,7 +19,7 @@
 // define sources, sinks, and sanitizers per language.
 package taint
 
-import "github.com/turen/gtss/internal/rules"
+import "github.com/turenio/gtss/internal/rules"
 
 // SourceCategory classifies where untrusted data enters the program.
 type SourceCategory string

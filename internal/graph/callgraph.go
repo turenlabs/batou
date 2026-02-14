@@ -18,8 +18,8 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/taint"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/taint"
 )
 
 // CallGraph is the project-wide function relationship graph.

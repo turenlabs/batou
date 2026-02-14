@@ -6,7 +6,7 @@ import (
 
 	sitter "github.com/smacker/go-tree-sitter"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // parseTimeout is the maximum time allowed for a single tree-sitter parse.

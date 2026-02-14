@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Ruby code, covering Rails, Sinatra, Grape, Hanami, and Rack applications. Analysis spans four layers: regex-based pattern matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). Ruby coverage includes 30+ taint sources across 7 frameworks, 60+ sinks spanning 14 vulnerability categories, and 25+ sanitizer recognitions to reduce false positives.
+GTSS provides comprehensive security scanning for Ruby code, covering Rails, Sinatra, Grape, Hanami, and Rack applications. Analysis spans four layers: regex-based pattern matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). Ruby coverage includes 27 taint sources across 7 frameworks, 64 sinks spanning 14 vulnerability categories, and 26 sanitizer recognitions to reduce false positives.
 
 ## Detection
 

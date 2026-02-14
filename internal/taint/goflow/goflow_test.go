@@ -3,10 +3,10 @@ package goflow
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 
 	// Import taint languages catalog so Go sources/sinks/sanitizers are registered.
-	_ "github.com/turen/gtss/internal/taint/languages"
+	_ "github.com/turenio/gtss/internal/taint/languages"
 )
 
 func scanGoFlow(code string) []rules.Finding {

@@ -3,8 +3,8 @@ package ktast
 import (
 	"strings"
 
-	"github.com/turen/gtss/internal/ast"
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/ast"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // KotlinASTAnalyzer performs AST-based security analysis of Kotlin source code.

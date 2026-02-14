@@ -3,7 +3,7 @@ package secrets
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- GTSS-SEC-001: Hardcoded Password ---

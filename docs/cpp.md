@@ -23,7 +23,7 @@ Note: `.h` files are detected as C, not C++. Header-only C++ libraries using `.h
 
 ## Taint Analysis Coverage
 
-### Sources (38 total)
+### Sources (41 total)
 
 Taint sources represent entry points where untrusted data enters the program.
 
@@ -103,7 +103,7 @@ Taint sources represent entry points where untrusted data enters the program.
 | `cpp.boost.serialization` | `boost::archive::*_iarchive` | Deserialized |
 | `cpp.protobuf.parsefromstring` | `ParseFromString() / ParseFromArray()` | Deserialized |
 
-### Sinks (48 total)
+### Sinks (54 total)
 
 Sinks are dangerous functions that should not receive unsanitized tainted data.
 

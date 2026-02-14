@@ -3,7 +3,7 @@ package taint
 import (
 	"time"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // TaintRule implements rules.Rule using the taint analysis engine.

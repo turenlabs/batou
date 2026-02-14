@@ -155,7 +155,7 @@ Detects XSS via unescaped output in Grails GSP views using `${}` without `encode
 
 Taint analysis tracks data flow from untrusted sources through the program to dangerous sinks, recognizing sanitizer functions that neutralize specific threat categories.
 
-### Sources (17 tracked)
+### Sources (16 tracked)
 
 | Category | ID | Description |
 |---|---|---|
@@ -176,7 +176,7 @@ Taint analysis tracks data flow from untrusted sources through the program to da
 | File | `groovy.file.text` | File content |
 | Database | `groovy.sql.rows` | SQL query results |
 
-### Sinks (18 tracked)
+### Sinks (38 tracked)
 
 | Category | ID | Description |
 |---|---|---|

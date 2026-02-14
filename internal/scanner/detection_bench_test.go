@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // fixtureMetadata holds parsed header comment metadata from a benchmark fixture.

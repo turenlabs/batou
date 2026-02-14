@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/turen/gtss/internal/hook"
+	"github.com/turenio/gtss/internal/hook"
 )
 
 // ---------------------------------------------------------------------------

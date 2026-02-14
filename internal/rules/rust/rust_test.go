@@ -3,7 +3,7 @@ package rust
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- RS-001: Unsafe Block Usage ---

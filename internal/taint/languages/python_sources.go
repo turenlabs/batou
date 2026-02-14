@@ -1,8 +1,8 @@
 package languages
 
 import (
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/taint"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/taint"
 )
 
 func (c *PythonCatalog) Sources() []taint.SourceDef {

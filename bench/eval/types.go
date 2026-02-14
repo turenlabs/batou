@@ -7,7 +7,7 @@
 package eval
 
 import (
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // SeverityWeight maps severity levels to numeric weights used in composite scoring.

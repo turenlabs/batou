@@ -3,8 +3,8 @@ package csast
 import (
 	"strings"
 
-	"github.com/turen/gtss/internal/ast"
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/ast"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // CSharpASTAnalyzer performs AST-based security analysis of C# source code.

@@ -22,7 +22,7 @@ Test files (paths matching `_test.lua`) are excluded from scanning to reduce fal
 
 ## Taint Analysis Coverage
 
-The Lua taint catalog is defined in `internal/taint/languages/lua_*.go` and tracks 16 sources, 18 sinks, and 10 sanitizers.
+The Lua taint catalog is defined in `internal/taint/languages/lua_*.go` and tracks 16 sources, 36 sinks, and 10 sanitizers.
 
 ### Sources (User Input Entry Points)
 

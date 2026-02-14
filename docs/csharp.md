@@ -12,7 +12,7 @@ C# files are identified by the `.cs` and `.csx` (C# script) file extensions. The
 
 Taint analysis tracks data flow from untrusted sources through the program to dangerous sinks, recognizing sanitizer functions that neutralize specific threat categories.
 
-### Sources (22 tracked)
+### Sources (21 tracked)
 
 Sources are entry points where untrusted data enters the application.
 
@@ -78,7 +78,7 @@ Sources are entry points where untrusted data enters the application.
 |---|---|---|
 | `csharp.azure.functions.httprequest` | `HttpRequest req` (Azure Functions) | Azure Functions HTTP trigger |
 
-### Sinks (40 tracked)
+### Sinks (60 tracked)
 
 Sinks are dangerous operations where tainted data can cause vulnerabilities.
 
@@ -172,7 +172,7 @@ Sinks are dangerous operations where tainted data can cause vulnerabilities.
 | `csharp.des.create` | `DES.Create()` / `TripleDES.Create()` | High |
 | `csharp.aes.ecb` | AES with CipherMode.ECB | High |
 
-### Sanitizers (17 tracked)
+### Sanitizers (16 tracked)
 
 Sanitizers neutralize tainted data for specific sink categories.
 

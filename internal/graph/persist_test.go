@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turen/gtss/internal/graph"
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/taint"
+	"github.com/turenio/gtss/internal/graph"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/taint"
 )
 
 // guardedStat wraps os.Stat with filepath.Clean + strings.HasPrefix validation.

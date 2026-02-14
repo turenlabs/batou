@@ -3,7 +3,7 @@ package generic
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- GTSS-GEN-001: Debug Mode Enabled ---

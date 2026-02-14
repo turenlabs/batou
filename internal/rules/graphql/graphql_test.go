@@ -3,7 +3,7 @@ package graphql
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- GTSS-GQL-001: GraphQL Introspection Enabled ---

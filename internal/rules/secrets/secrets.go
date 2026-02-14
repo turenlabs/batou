@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // --- Compiled regex patterns ---

@@ -19,9 +19,9 @@ No additional heuristics (shebang lines, `<?php` tags, etc.) are used -- detecti
 The PHP taint catalog is defined across four files in `internal/taint/languages/`:
 
 - `php_catalog.go` -- catalog registration
-- `php_sources.go` -- 35 source definitions
-- `php_sinks.go` -- 60 sink definitions
-- `php_sanitizers.go` -- 33 sanitizer definitions
+- `php_sources.go` -- 36 source definitions
+- `php_sinks.go` -- 63 sink definitions
+- `php_sanitizers.go` -- 34 sanitizer definitions
 
 ### Sources (User Input Entry Points)
 

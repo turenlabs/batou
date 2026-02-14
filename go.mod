@@ -1,4 +1,4 @@
-module github.com/turen/gtss
+module github.com/turenio/gtss
 
 go 1.25.5
 

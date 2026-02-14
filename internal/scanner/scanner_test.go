@@ -4,25 +4,25 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/testutil"
 
 	// Register all rule packages to trigger init() registrations.
-	_ "github.com/turen/gtss/internal/rules/injection"
-	_ "github.com/turen/gtss/internal/rules/secrets"
-	_ "github.com/turen/gtss/internal/rules/crypto"
-	_ "github.com/turen/gtss/internal/rules/xss"
-	_ "github.com/turen/gtss/internal/rules/traversal"
-	_ "github.com/turen/gtss/internal/rules/ssrf"
-	_ "github.com/turen/gtss/internal/rules/auth"
-	_ "github.com/turen/gtss/internal/rules/generic"
-	_ "github.com/turen/gtss/internal/rules/logging"
-	_ "github.com/turen/gtss/internal/rules/validation"
-	_ "github.com/turen/gtss/internal/rules/memory"
+	_ "github.com/turenio/gtss/internal/rules/injection"
+	_ "github.com/turenio/gtss/internal/rules/secrets"
+	_ "github.com/turenio/gtss/internal/rules/crypto"
+	_ "github.com/turenio/gtss/internal/rules/xss"
+	_ "github.com/turenio/gtss/internal/rules/traversal"
+	_ "github.com/turenio/gtss/internal/rules/ssrf"
+	_ "github.com/turenio/gtss/internal/rules/auth"
+	_ "github.com/turenio/gtss/internal/rules/generic"
+	_ "github.com/turenio/gtss/internal/rules/logging"
+	_ "github.com/turenio/gtss/internal/rules/validation"
+	_ "github.com/turenio/gtss/internal/rules/memory"
 
 	// Taint analysis engine and language catalogs.
-	_ "github.com/turen/gtss/internal/taint"
-	_ "github.com/turen/gtss/internal/taint/languages"
+	_ "github.com/turenio/gtss/internal/taint"
+	_ "github.com/turenio/gtss/internal/taint/languages"
 )
 
 // ---------------------------------------------------------------------------

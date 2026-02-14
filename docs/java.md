@@ -87,7 +87,7 @@ Sources are entry points where untrusted data enters the application.
 | `java.gcp.cloudfunctions.event` | `implements HttpFunction/BackgroundFunction` | GCP Cloud Functions event |
 | `java.gcp.pubsub.pull` | `subscriber.pull()` | GCP Pub/Sub message data |
 
-### Sinks (54 tracked)
+### Sinks (58 tracked)
 
 Sinks are dangerous operations where tainted data can cause vulnerabilities.
 
@@ -214,7 +214,7 @@ Sinks are dangerous operations where tainted data can cause vulnerabilities.
 | `java.servlet.addheader` | `response.addHeader()` | Medium |
 | `java.javamail.transport.send` | `Transport.send()` / `setRecipients()` | High |
 
-### Sanitizers (30 tracked)
+### Sanitizers (29 tracked)
 
 Sanitizers neutralize tainted data for specific sink categories.
 

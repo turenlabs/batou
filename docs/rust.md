@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides security scanning for Rust code, covering the standard library (`std::process`, `std::fs`, `std::mem`, `std::ptr`), popular web frameworks (Actix-web, Axum, Rocket, Warp), database libraries (sqlx, diesel, rusqlite), HTTP clients (reqwest, hyper), serialization (serde, bincode, rmp), and cryptographic patterns. Rust support includes 10 Rust-specific regex rules, taint source-to-sink tracking with 22 sources, 22 sinks, and 18 sanitizers.
+GTSS provides security scanning for Rust code, covering the standard library (`std::process`, `std::fs`, `std::mem`, `std::ptr`), popular web frameworks (Actix-web, Axum, Rocket, Warp), database libraries (sqlx, diesel, rusqlite), HTTP clients (reqwest, hyper), serialization (serde, bincode, rmp), and cryptographic patterns. Rust support includes 10 Rust-specific regex rules, taint source-to-sink tracking with 22 sources, 40 sinks, and 15 sanitizers.
 
 ## Detection
 
@@ -22,7 +22,7 @@ Test files (paths matching `_test.rs` or under `tests/` directories) are exclude
 
 ## Taint Analysis Coverage
 
-The Rust taint catalog is defined in `internal/taint/languages/rust_*.go` and tracks 22 sources, 22 sinks, and 18 sanitizers.
+The Rust taint catalog is defined in `internal/taint/languages/rust_*.go` and tracks 22 sources, 40 sinks, and 15 sanitizers.
 
 ### Sources (User Input Entry Points)
 

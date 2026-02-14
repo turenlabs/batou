@@ -22,7 +22,7 @@ Test files (paths matching `Test.swift` or `_test.swift`) are excluded from scan
 
 ## Taint Analysis Coverage
 
-The Swift taint catalog is defined in `internal/taint/languages/swift_*.go` and tracks 15 sources, 18 sinks, and 11 sanitizers.
+The Swift taint catalog is defined in `internal/taint/languages/swift_*.go` and tracks 14 sources, 34 sinks, and 10 sanitizers.
 
 ### Sources (User Input Entry Points)
 

@@ -1,6 +1,6 @@
 package framework
 
-import "github.com/turen/gtss/internal/rules"
+import "github.com/turenio/gtss/internal/rules"
 
 func init() {
 	// Rails rules

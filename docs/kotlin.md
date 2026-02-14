@@ -67,7 +67,7 @@ Sources are entry points where untrusted data enters the application.
 |---|---|---|
 | `kotlin.jackson.readvalue` | `ObjectMapper.readValue()` | Jackson deserialized JSON data |
 
-### Sinks (27 tracked)
+### Sinks (48 tracked)
 
 Sinks are dangerous operations where tainted data can cause vulnerabilities.
 
@@ -135,7 +135,7 @@ Sinks are dangerous operations where tainted data can cause vulnerabilities.
 |---|---|---|
 | `kotlin.ktor.respondredirect` | `call.respondRedirect()` | High |
 
-### Sanitizers (17 tracked)
+### Sanitizers (16 tracked)
 
 Sanitizers neutralize tainted data for specific sink categories.
 

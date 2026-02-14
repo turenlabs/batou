@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/turen/gtss/internal/graph"
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/taint"
+	"github.com/turenio/gtss/internal/graph"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/taint"
 )
 
 // HintContext contains everything needed to generate hints for a scan.

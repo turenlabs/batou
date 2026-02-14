@@ -3,7 +3,7 @@ package ssrf
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- GTSS-SSRF-001: URL From User Input ---

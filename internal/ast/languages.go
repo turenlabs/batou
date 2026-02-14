@@ -21,7 +21,7 @@ import (
 	ts_typescript "github.com/smacker/go-tree-sitter/typescript/typescript"
 	"github.com/smacker/go-tree-sitter/yaml"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // langRegistry maps rules.Language constants to tree-sitter Language pointers.

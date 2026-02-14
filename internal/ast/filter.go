@@ -3,7 +3,7 @@ package ast
 import (
 	"strings"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // FilterFindings runs each finding through the AST to suppress false

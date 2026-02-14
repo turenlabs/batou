@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turen/gtss/internal/ast"
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/ast"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 func scanGvy(t *testing.T, code string) []rules.Finding {

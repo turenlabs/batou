@@ -8,15 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/turen/gtss/internal/analyzer"
-	"github.com/turen/gtss/internal/ast"
-	"github.com/turen/gtss/internal/fpfilter"
-	"github.com/turen/gtss/internal/graph"
-	"github.com/turen/gtss/internal/hints"
-	"github.com/turen/gtss/internal/hook"
-	"github.com/turen/gtss/internal/reporter"
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/taint"
+	"github.com/turenio/gtss/internal/analyzer"
+	"github.com/turenio/gtss/internal/ast"
+	"github.com/turenio/gtss/internal/fpfilter"
+	"github.com/turenio/gtss/internal/graph"
+	"github.com/turenio/gtss/internal/hints"
+	"github.com/turenio/gtss/internal/hook"
+	"github.com/turenio/gtss/internal/reporter"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/taint"
 )
 
 // scanTimeout is the maximum time a scan may take before we return partial results.

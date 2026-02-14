@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/turen/gtss/internal/fpfilter"
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/fpfilter"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // extToLanguage maps file extensions to Language constants.

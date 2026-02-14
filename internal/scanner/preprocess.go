@@ -3,7 +3,7 @@ package scanner
 import (
 	"strings"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // JoinContinuationLines joins lines that are split across multiple lines

@@ -3,7 +3,7 @@ package jsts
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // ==========================================================================

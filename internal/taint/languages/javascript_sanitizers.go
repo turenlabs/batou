@@ -1,6 +1,6 @@
 package languages
 
-import "github.com/turen/gtss/internal/taint"
+import "github.com/turenio/gtss/internal/taint"
 
 // jsSanitizers defines sanitizer patterns for JavaScript/TypeScript.
 var jsSanitizers = []taint.SanitizerDef{

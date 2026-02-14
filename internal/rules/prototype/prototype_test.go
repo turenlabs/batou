@@ -3,7 +3,7 @@ package prototype
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- GTSS-PROTO-001: Prototype Pollution via Merge/Extend ---

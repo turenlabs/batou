@@ -96,7 +96,7 @@ GTSS tracks 33 taint sources for Python, organized by framework and category.
 
 ### Sinks (Dangerous Functions)
 
-GTSS tracks 48 taint sinks for Python.
+GTSS tracks 108 taint sinks for Python.
 
 #### SQL Injection (CWE-89)
 
@@ -193,7 +193,7 @@ Seven crypto-related sinks are tracked. These detect weak hashing (`py.hashlib.m
 
 ### Sanitizers (Functions That Neutralize Taint)
 
-GTSS recognizes 25 sanitizer patterns for Python.
+GTSS recognizes 26 sanitizer patterns for Python.
 
 #### HTML/XSS Sanitizers
 

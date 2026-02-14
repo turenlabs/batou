@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/turen/gtss/internal/ledger"
-	"github.com/turen/gtss/internal/reporter"
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/ledger"
+	"github.com/turenio/gtss/internal/reporter"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // guardedReadFile wraps os.ReadFile with filepath.Clean + strings.HasPrefix

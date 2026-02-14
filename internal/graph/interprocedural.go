@@ -19,8 +19,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/taint"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/taint"
 )
 
 // maxTraversalDepth limits how far we walk up the call graph.

@@ -3,8 +3,8 @@ package analyzer_test
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/analyzer"
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/analyzer"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // ---------------------------------------------------------------------------

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turen/gtss/internal/hook"
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/scanner"
-	"github.com/turen/gtss/internal/taint"
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/hook"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/scanner"
+	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // sampleEntry represents a single gold-standard sample with its scan results.

@@ -3,8 +3,8 @@ package pyast
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/ast"
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/ast"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 func scanPython(code string) []rules.Finding {

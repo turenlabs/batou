@@ -1,6 +1,6 @@
 package languages
 
-import "github.com/turen/gtss/internal/taint"
+import "github.com/turenio/gtss/internal/taint"
 
 // jsSources defines taint sources for JavaScript/TypeScript.
 var jsSources = []taint.SourceDef{

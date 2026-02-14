@@ -22,7 +22,7 @@ Test files (paths matching `_test.go`) are excluded from scanning to reduce fals
 
 ## Taint Analysis Coverage
 
-The Go taint catalog is defined in `internal/taint/languages/go_*.go` and tracks 30 sources, 48 sinks, and 28 sanitizers.
+The Go taint catalog is defined in `internal/taint/languages/go_*.go` and tracks 29 sources, 100 sinks, and 25 sanitizers.
 
 ### Sources (User Input Entry Points)
 

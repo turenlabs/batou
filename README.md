@@ -59,7 +59,7 @@ Claude writes code → GTSS intercepts → Scan (regex + AST + taint + call grap
 
 1. **Regex Rules** - Fast pattern matching for 348 known vulnerability signatures with multi-line preprocessing
 2. **AST Analysis** - Tree-sitter structural analysis for 13 languages, providing comment-aware false positive filtering and deep code structure inspection
-3. **Taint Analysis** - Source-to-sink dataflow tracking with 1,184 taint entries (sources, sinks, sanitizers per language)
+3. **Taint Analysis** - Source-to-sink dataflow tracking with 1,631 taint entries (sources, sinks, sanitizers per language)
 4. **Call Graph** - Persistent interprocedural analysis tracking taint across function boundaries
 
 ## Installation
@@ -171,7 +171,7 @@ Regex rules:        348
 AST analyzers:      13 languages
 Rule categories:    34
 Languages:          16
-Taint entries:      1,184
+Taint entries:      1,631
 File extensions:    50+
 Test fixtures:      430+
 Test cases:         2,380

@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 
 	// Register injection rules.
-	_ "github.com/turen/gtss/internal/rules/injection"
+	_ "github.com/turenio/gtss/internal/rules/injection"
 )
 
 // sqlParts holds SQL fragments assembled at runtime to avoid triggering

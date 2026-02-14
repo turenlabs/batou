@@ -3,7 +3,7 @@ package cors
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- GTSS-CORS-001: Wildcard Origin with Credentials ---

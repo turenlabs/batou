@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/turen/gtss/internal/reporter"
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/reporter"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 // Entry represents a single scan event in the audit ledger.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Perl code, covering CGI.pm, PSGI/Plack, Mojolicious, Dancer2, Catalyst, and DBI-based applications. Analysis spans three layers: regex-based pattern matching (348 rules, Layer 1), taint source-to-sink tracking (Layer 2), and interprocedural call graph analysis (Layer 3). Tree-sitter AST analysis (Layer 2 for other languages) is not available for Perl due to the lack of a tree-sitter grammar. Perl coverage includes 25+ taint sources across 6 frameworks, 35+ sinks spanning 12 vulnerability categories, and 15+ sanitizer recognitions to reduce false positives.
+GTSS provides comprehensive security scanning for Perl code, covering CGI.pm, PSGI/Plack, Mojolicious, Dancer2, Catalyst, and DBI-based applications. Analysis spans three layers: regex-based pattern matching (348 rules, Layer 1), taint source-to-sink tracking (Layer 2), and interprocedural call graph analysis (Layer 3). Tree-sitter AST analysis (Layer 2 for other languages) is not available for Perl due to the lack of a tree-sitter grammar. Perl coverage includes 25 taint sources across 6 frameworks, 27 sinks spanning 12 vulnerability categories, and 16 sanitizer recognitions to reduce false positives.
 
 ## Detection
 

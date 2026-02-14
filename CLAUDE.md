@@ -28,7 +28,7 @@ bench/eval/                 Vulnerability app benchmarks (WebGoat, Juice Shop, D
 - **Four-layer analysis**:
   - Layer 1: Regex rules (348 pattern-matching rules across 34 categories)
   - Layer 2: AST analysis (tree-sitter structural analysis for 13 languages)
-  - Layer 3: Taint analysis (source-to-sink dataflow with 1,184 entries)
+  - Layer 3: Taint analysis (source-to-sink dataflow with 1,631 entries)
   - Layer 4: Call graph (persistent interprocedural taint tracking across function boundaries)
 - **Preprocessing**: CRLF normalization, multi-line continuation joining (backslash + implicit), unicode identifier support
 - **AST false-positive filter**: Suppresses regex findings inside comment AST nodes (not strings — SQL/XSS patterns in strings are intentional)

@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/turen/gtss/internal/hook"
-	"github.com/turen/gtss/internal/rules"
-	"github.com/turen/gtss/internal/scanner"
+	"github.com/turenio/gtss/internal/hook"
+	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/scanner"
 )
 
 // langToExt maps language names to file extensions for scanner language detection.

@@ -3,7 +3,7 @@ package goast
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 func scanGo(code string) []rules.Finding {

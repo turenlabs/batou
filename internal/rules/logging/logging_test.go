@@ -3,7 +3,7 @@ package logging
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // --- GTSS-LOG-001: Unsanitized User Input in Log Calls ---

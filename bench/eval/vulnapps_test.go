@@ -3,7 +3,7 @@ package eval
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/testutil"
+	"github.com/turenio/gtss/internal/testutil"
 )
 
 // TestVulnApps_WebGoat verifies GTSS detects all WebGoat vulnerability patterns.

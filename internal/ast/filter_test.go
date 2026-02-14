@@ -3,7 +3,7 @@ package ast
 import (
 	"testing"
 
-	"github.com/turen/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/rules"
 )
 
 func TestIsInComment_Go(t *testing.T) {
