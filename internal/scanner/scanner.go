@@ -221,6 +221,11 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 	// entirely within comments or string literals in the parsed AST.
 	findings = ast.FilterFindings(tree, findings)
 
+	// Deduplicate findings that share the same (line, CWE) — keep the
+	// highest-fidelity finding (taint > AST > interprocedural > regex)
+	// and merge tags from suppressed duplicates into the winner.
+	findings = DeduplicateFindings(findings)
+
 	// Reduce severity for findings in test / fixture files.
 	// Test code intentionally contains vulnerable patterns so we downgrade
 	// rather than suppress entirely — the hints are still useful.
