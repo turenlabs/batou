@@ -66,5 +66,49 @@ func (phpCatalog) Sanitizers() []taint.SanitizerDef {
 		// Infrastructure / Network Sanitizers
 		{ID: "php.filter_var.validate_url", Language: rules.LangPHP, Pattern: `filter_var\s*\(.*FILTER_VALIDATE_URL`, MethodName: "filter_var(FILTER_VALIDATE_URL)", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect}, Description: "URL validation via filter_var FILTER_VALIDATE_URL"},
 		{ID: "php.filter_var.validate_ip", Language: rules.LangPHP, Pattern: `filter_var\s*\(.*FILTER_VALIDATE_IP`, MethodName: "filter_var(FILTER_VALIDATE_IP)", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch}, Description: "IP address validation via filter_var FILTER_VALIDATE_IP (SSRF prevention)"},
+
+		// --- Path resolution ---
+		{
+			ID:          "php.realpath",
+			Language:    rules.LangPHP,
+			Pattern:     `\brealpath\s*\(`,
+			ObjectType:  "",
+			MethodName:  "realpath",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Resolve symlinks and return canonical path (path traversal prevention)",
+		},
+
+		// --- Type checking ---
+		{
+			ID:          "php.ctype",
+			Language:    rules.LangPHP,
+			Pattern:     `ctype_alpha\s*\(|ctype_alnum\s*\(|ctype_digit\s*\(`,
+			ObjectType:  "",
+			MethodName:  "ctype_*",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
+			Description: "Character type checking functions (restrict to safe character sets)",
+		},
+
+		// --- Regex escaping ---
+		{
+			ID:          "php.preg_quote",
+			Language:    rules.LangPHP,
+			Pattern:     `preg_quote\s*\(`,
+			ObjectType:  "",
+			MethodName:  "preg_quote",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
+			Description: "Regex metacharacter escaping (prevents ReDoS and injection in patterns)",
+		},
+
+		// --- Laravel sanitization ---
+		{
+			ID:          "php.laravel.validator",
+			Language:    rules.LangPHP,
+			Pattern:     `Validator::make\s*\(|\$request->validate\s*\(`,
+			ObjectType:  "Illuminate\\Validation\\Validator",
+			MethodName:  "Validator::make/validate",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput, taint.SnkFileWrite},
+			Description: "Laravel validation for input sanitization",
+		},
 		}
 }

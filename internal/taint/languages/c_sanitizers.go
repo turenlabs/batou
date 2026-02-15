@@ -289,5 +289,47 @@ func (c *CCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkCommand, taint.SnkSQLQuery},
 			Description: "Input length validation (limits attack surface for injection)",
 		},
+
+		// --- Additional bounds checking ---
+		{
+			ID:          "c.bounds.strnlen",
+			Language:    rules.LangC,
+			Pattern:     `\bstrnlen\s*\(`,
+			ObjectType:  "",
+			MethodName:  "strnlen",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand, taint.SnkFileWrite},
+			Description: "Bounded string length check (prevents overflow on tainted strings)",
+		},
+		{
+			ID:          "c.validate.isdigit",
+			Language:    rules.LangC,
+			Pattern:     `\bisdigit\s*\(|isalpha\s*\(|isalnum\s*\(`,
+			ObjectType:  "",
+			MethodName:  "isdigit/isalpha/isalnum",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
+			Description: "Character classification functions (restrict to safe character sets)",
+		},
+
+		// --- Path canonicalization ---
+		{
+			ID:          "c.path.canonicalize_file_name",
+			Language:    rules.LangC,
+			Pattern:     `\bcanonicalize_file_name\s*\(`,
+			ObjectType:  "",
+			MethodName:  "canonicalize_file_name",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "GNU canonical file path resolution (resolves all symlinks)",
+		},
+
+		// --- Secure hashing ---
+		{
+			ID:          "c.crypto.sha512",
+			Language:    rules.LangC,
+			Pattern:     `\bSHA512\s*\(|SHA384\s*\(|EVP_sha512\s*\(`,
+			ObjectType:  "",
+			MethodName:  "SHA512/SHA384",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "Strong SHA-512/384 hash function usage",
+		},
 	}
 }

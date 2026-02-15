@@ -308,5 +308,37 @@ func (c *CCatalog) Sources() []taint.SourceDef {
 			Description: "Memory-mapped file contents",
 			Assigns:     "return",
 		},
+
+		// --- Additional network sources ---
+		{
+			ID:          "c.net.accept",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangC,
+			Pattern:     `\baccept\s*\(`,
+			ObjectType:  "",
+			MethodName:  "accept",
+			Description: "Accepted network connection (tainted file descriptor)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "c.file.readlink",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangC,
+			Pattern:     `\breadlink\s*\(`,
+			ObjectType:  "",
+			MethodName:  "readlink",
+			Description: "Read symbolic link target (potentially tainted)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "c.net.getline.stdin",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangC,
+			Pattern:     `\bgetdelim\s*\(`,
+			ObjectType:  "",
+			MethodName:  "getdelim",
+			Description: "Delimited line read from input stream",
+			Assigns:     "return",
+		},
 	}
 }

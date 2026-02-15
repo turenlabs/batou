@@ -59,5 +59,38 @@ func (perlCatalog) Sanitizers() []taint.SanitizerDef {
 
 		// Catalyst input validation
 		{ID: "perl.catalyst.validate", Language: rules.LangPerl, Pattern: `Catalyst::Plugin::FormValidator|\$c->form`, ObjectType: "Catalyst", MethodName: "FormValidator", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput}, Description: "Catalyst form validation plugin"},
+
+		// --- Regex escaping ---
+		{
+			ID:          "perl.quotemeta",
+			Language:    rules.LangPerl,
+			Pattern:     `quotemeta\s*\(|\\\Q`,
+			ObjectType:  "",
+			MethodName:  "quotemeta/\\Q",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
+			Description: "Perl regex metacharacter escaping (prevents ReDoS and injection)",
+		},
+
+		// --- Path resolution ---
+		{
+			ID:          "perl.cwd.abs_path",
+			Language:    rules.LangPerl,
+			Pattern:     `Cwd::abs_path\s*\(|Cwd::realpath\s*\(|File::Spec->canonpath\s*\(`,
+			ObjectType:  "Cwd",
+			MethodName:  "abs_path/realpath",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Absolute/canonical path resolution (path traversal prevention)",
+		},
+
+		// --- Taint mode checking ---
+		{
+			ID:          "perl.taint.check",
+			Language:    rules.LangPerl,
+			Pattern:     `Scalar::Util::tainted\s*\(|tainted\s*\(`,
+			ObjectType:  "Scalar::Util",
+			MethodName:  "tainted",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand, taint.SnkFileWrite, taint.SnkSQLQuery},
+			Description: "Perl taint mode checking (validates data is untainted)",
+		},
 	}
 }

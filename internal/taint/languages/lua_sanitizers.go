@@ -163,5 +163,27 @@ func (c *LuaCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect, taint.SnkCommand},
 			Description: "Table-based allowlist validation",
 		},
+
+		// --- Numeric conversion ---
+		{
+			ID:          "lua.tonumber.sanitizer",
+			Language:    rules.LangLua,
+			Pattern:     `tonumber\s*\(`,
+			ObjectType:  "",
+			MethodName:  "tonumber",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Numeric conversion (restricts to numeric values)",
+		},
+
+		// --- Pattern escaping ---
+		{
+			ID:          "lua.string.pattern.escape",
+			Language:    rules.LangLua,
+			Pattern:     `string\.gsub\s*\(.*%%`,
+			ObjectType:  "",
+			MethodName:  "string.gsub (escape)",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
+			Description: "Lua pattern metacharacter escaping via gsub",
+		},
 	}
 }

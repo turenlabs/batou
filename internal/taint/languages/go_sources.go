@@ -390,5 +390,65 @@ func (c *GoCatalog) Sources() []taint.SourceDef {
 			Description: "Cobra CLI framework arguments",
 			Assigns:     "return",
 		},
+
+		// --- Standard library: flag ---
+		{
+			ID:          "go.flag.string",
+			Category:    taint.SrcCLIArg,
+			Language:    rules.LangGo,
+			Pattern:     `flag\.String\(|flag\.StringVar\(`,
+			ObjectType:  "",
+			MethodName:  "flag.String/StringVar",
+			Description: "Flag package CLI string argument",
+			Assigns:     "return",
+		},
+
+		// --- Standard library: os ---
+		{
+			ID:          "go.os.lookupenv",
+			Category:    taint.SrcEnvVar,
+			Language:    rules.LangGo,
+			Pattern:     `os\.LookupEnv\(`,
+			ObjectType:  "",
+			MethodName:  "LookupEnv",
+			Description: "Environment variable with existence check",
+			Assigns:     "return",
+		},
+
+		// --- Standard library: net/http ---
+		{
+			ID:          "go.http.request.url.path",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `r\.URL\.Path|request\.URL\.Path`,
+			ObjectType:  "*http.Request",
+			MethodName:  "URL.Path",
+			Description: "Raw URL path from HTTP request",
+			Assigns:     "return",
+		},
+
+		// --- Standard library: bufio ---
+		{
+			ID:          "go.bufio.reader.readstring",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `reader\.ReadString\(|bufio\.NewReader\(`,
+			ObjectType:  "*bufio.Reader",
+			MethodName:  "ReadString",
+			Description: "Buffered reader string input",
+			Assigns:     "return",
+		},
+
+		// --- Standard library: net/http ---
+		{
+			ID:          "go.http.request.referer",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `r\.Referer\(\)|request\.Referer\(\)`,
+			ObjectType:  "*http.Request",
+			MethodName:  "Referer",
+			Description: "HTTP Referer header (user-controlled)",
+			Assigns:     "return",
+		},
 	}
 }

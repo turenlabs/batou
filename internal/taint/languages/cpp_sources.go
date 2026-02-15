@@ -76,5 +76,57 @@ func (cppCatalog) Sources() []taint.SourceDef {
 
 		// ── POCO HTTP sources ────────────────────────────────────────
 		{ID: "cpp.poco.httpserverrequest.input", Category: taint.SrcUserInput, Language: rules.LangCPP, Pattern: `request\.(?:get|getURI|getHost)\s*\(`, ObjectType: "Poco::Net::HTTPServerRequest", MethodName: "get/getURI/getHost", Description: "POCO HTTP server request input", Assigns: "return"},
+
+		// --- Additional framework sources ---
+		{
+			ID:          "cpp.grpc.request",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangCPP,
+			Pattern:     `grpc::ServerContext|::grpc::ServerReader`,
+			ObjectType:  "grpc::ServerContext",
+			MethodName:  "ServerContext",
+			Description: "gRPC server request data",
+			Assigns:     "return",
+		},
+		{
+			ID:          "cpp.websocketpp.message",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangCPP,
+			Pattern:     `websocketpp::.*::message_ptr|msg->get_payload\s*\(`,
+			ObjectType:  "websocketpp",
+			MethodName:  "get_payload",
+			Description: "WebSocket++ message payload",
+			Assigns:     "return",
+		},
+		{
+			ID:          "cpp.nlohmann.json.parse",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangCPP,
+			Pattern:     `nlohmann::json::parse\s*\(|json::parse\s*\(`,
+			ObjectType:  "nlohmann::json",
+			MethodName:  "parse",
+			Description: "nlohmann JSON parsed from potentially untrusted data",
+			Assigns:     "return",
+		},
+		{
+			ID:          "cpp.rapidjson.parse",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangCPP,
+			Pattern:     `rapidjson::Document.*\.Parse\s*\(`,
+			ObjectType:  "rapidjson::Document",
+			MethodName:  "Parse",
+			Description: "RapidJSON parsed from potentially untrusted data",
+			Assigns:     "return",
+		},
+		{
+			ID:          "cpp.civetweb.request",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCPP,
+			Pattern:     `mg_get_request_info\s*\(|mg_read\s*\(`,
+			ObjectType:  "civetweb",
+			MethodName:  "mg_get_request_info/mg_read",
+			Description: "CivetWeb/Mongoose HTTP request data",
+			Assigns:     "return",
+		},
 	}
 }

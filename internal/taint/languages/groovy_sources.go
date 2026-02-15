@@ -248,5 +248,37 @@ func (c *GroovyCatalog) Sources() []taint.SourceDef {
 			Description: "XML parsed data from external source",
 			Assigns:     "return",
 		},
+
+		// --- Additional Groovy sources ---
+		{
+			ID:          "groovy.grails.params",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGroovy,
+			Pattern:     `\bparams\.\w+|params\[`,
+			ObjectType:  "GrailsParameterMap",
+			MethodName:  "params",
+			Description: "Grails controller request parameters",
+			Assigns:     "return",
+		},
+		{
+			ID:          "groovy.grails.request",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGroovy,
+			Pattern:     `request\.getParameter\s*\(|request\.getHeader\s*\(`,
+			ObjectType:  "HttpServletRequest",
+			MethodName:  "getParameter/getHeader",
+			Description: "Grails/Servlet request parameter or header",
+			Assigns:     "return",
+		},
+		{
+			ID:          "groovy.jsonslurper.source",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangGroovy,
+			Pattern:     `new\s+JsonSlurper\s*\(\s*\)\.parse`,
+			ObjectType:  "JsonSlurper",
+			MethodName:  "parse",
+			Description: "JsonSlurper parsed data from potentially untrusted source",
+			Assigns:     "return",
+		},
 	}
 }

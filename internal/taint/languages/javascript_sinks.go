@@ -141,4 +141,27 @@ var jsSinks = []taint.SinkDef{
 	{ID: "js.pino.log", Category: taint.SnkLog, Pattern: `pino\.(?:info|warn|error|debug|fatal|trace)\s*\(`, ObjectType: "pino", MethodName: "log", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Pino logger with potentially tainted data (log injection)", CWEID: "CWE-117", OWASPCategory: "A09:2021-Security Logging and Monitoring Failures"},
 	{ID: "js.bunyan.log", Category: taint.SnkLog, Pattern: `bunyan\.(?:info|warn|error|debug|fatal|trace)\s*\(`, ObjectType: "bunyan", MethodName: "log", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Bunyan logger with potentially tainted data (log injection)", CWEID: "CWE-117", OWASPCategory: "A09:2021-Security Logging and Monitoring Failures"},
 	{ID: "js.logger.generic", Category: taint.SnkLog, Pattern: `logger\.(?:info|warn|error|debug|log)\s*\(`, ObjectType: "Logger", MethodName: "log", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Logger with potentially tainted data (log injection)", CWEID: "CWE-117", OWASPCategory: "A09:2021-Security Logging and Monitoring Failures"},
+
+	// Additional file operations
+	{ID: "js.fs.writefilesync", Category: taint.SnkFileWrite, Pattern: `fs\.writeFileSync\s*\(`, ObjectType: "fs", MethodName: "writeFileSync", DangerousArgs: []int{0}, Severity: rules.High, Description: "Synchronous file write with potential path traversal", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+	{ID: "js.fs.mkdir", Category: taint.SnkFileWrite, Pattern: `fs\.mkdir\s*\(|fs\.mkdirSync\s*\(`, ObjectType: "fs", MethodName: "mkdir/mkdirSync", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Directory creation with potentially tainted path", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+	{ID: "js.fs.rename", Category: taint.SnkFileWrite, Pattern: `fs\.rename\s*\(|fs\.renameSync\s*\(`, ObjectType: "fs", MethodName: "rename/renameSync", DangerousArgs: []int{0, 1}, Severity: rules.High, Description: "File rename with potentially tainted path", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+	{ID: "js.fs.symlink", Category: taint.SnkFileWrite, Pattern: `fs\.symlink\s*\(|fs\.symlinkSync\s*\(`, ObjectType: "fs", MethodName: "symlink/symlinkSync", DangerousArgs: []int{0, 1}, Severity: rules.High, Description: "Symlink creation with potentially tainted path", CWEID: "CWE-59", OWASPCategory: "A01:2021-Broken Access Control"},
+	{ID: "js.fs.copyfile", Category: taint.SnkFileWrite, Pattern: `fs\.copyFile\s*\(|fs\.copyFileSync\s*\(`, ObjectType: "fs", MethodName: "copyFile/copyFileSync", DangerousArgs: []int{0, 1}, Severity: rules.High, Description: "File copy with potentially tainted path", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+
+	// XSS additional vectors
+	{ID: "js.dom.outerhtml", Category: taint.SnkHTMLOutput, Pattern: `\.outerHTML\s*=`, ObjectType: "HTMLElement", MethodName: "outerHTML", DangerousArgs: []int{0}, Severity: rules.High, Description: "outerHTML assignment (XSS)", CWEID: "CWE-79", OWASPCategory: "A03:2021-Injection"},
+	{ID: "js.dom.insertadjacenthtml", Category: taint.SnkHTMLOutput, Pattern: `\.insertAdjacentHTML\s*\(`, ObjectType: "HTMLElement", MethodName: "insertAdjacentHTML", DangerousArgs: []int{1}, Severity: rules.High, Description: "insertAdjacentHTML (XSS)", CWEID: "CWE-79", OWASPCategory: "A03:2021-Injection"},
+	{ID: "js.dom.document.writeln", Category: taint.SnkHTMLOutput, Pattern: `document\.writeln\s*\(`, ObjectType: "document", MethodName: "writeln", DangerousArgs: []int{0}, Severity: rules.High, Description: "document.writeln (XSS)", CWEID: "CWE-79", OWASPCategory: "A03:2021-Injection"},
+
+	// ReDoS
+	{ID: "js.regexp.constructor", Category: taint.SnkEval, Pattern: `new\s+RegExp\s*\(`, ObjectType: "", MethodName: "RegExp", DangerousArgs: []int{0}, Severity: rules.High, Description: "RegExp construction with potentially tainted pattern (ReDoS)", CWEID: "CWE-1333", OWASPCategory: "A03:2021-Injection"},
+
+	// Additional SSRF vectors
+	{ID: "js.axios.post.ssrf", Category: taint.SnkURLFetch, Pattern: `axios\.post\s*\(|axios\.put\s*\(|axios\.delete\s*\(|axios\.patch\s*\(`, ObjectType: "axios", MethodName: "post/put/delete/patch", DangerousArgs: []int{0}, Severity: rules.High, Description: "SSRF via axios HTTP methods", CWEID: "CWE-918", OWASPCategory: "A10:2021-Server-Side Request Forgery"},
+	{ID: "js.got.ssrf", Category: taint.SnkURLFetch, Pattern: `got\s*\(|got\.get\s*\(|got\.post\s*\(`, ObjectType: "got", MethodName: "got", DangerousArgs: []int{0}, Severity: rules.High, Description: "SSRF via got HTTP client", CWEID: "CWE-918", OWASPCategory: "A10:2021-Server-Side Request Forgery"},
+	{ID: "js.node-fetch.ssrf", Category: taint.SnkURLFetch, Pattern: `node-fetch|import.*fetch|require.*node-fetch`, ObjectType: "node-fetch", MethodName: "fetch", DangerousArgs: []int{0}, Severity: rules.High, Description: "SSRF via node-fetch", CWEID: "CWE-918", OWASPCategory: "A10:2021-Server-Side Request Forgery"},
+
+	// Deprecated crypto
+	{ID: "js.crypto.createcipher", Category: taint.SnkCrypto, Pattern: `crypto\.createCipher\s*\(`, ObjectType: "crypto", MethodName: "createCipher", DangerousArgs: []int{0}, Severity: rules.High, Description: "Deprecated crypto.createCipher without IV (use createCipheriv)", CWEID: "CWE-327", OWASPCategory: "A02:2021-Cryptographic Failures"},
 }

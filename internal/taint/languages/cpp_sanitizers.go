@@ -83,5 +83,58 @@ func (cppCatalog) Sanitizers() []taint.SanitizerDef {
 
 		// ── Template auto-escaping ───────────────────────────────────
 		{ID: "cpp.inja.autoescape", Language: rules.LangCPP, Pattern: `inja::Environment.*\.set_html_autoescape\s*\(\s*true`, ObjectType: "inja::Environment", MethodName: "set_html_autoescape", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate}, Description: "Inja HTML auto-escaping enabled (prevents XSS/template injection)"},
+
+		// --- Regex escaping ---
+		{
+			ID:          "cpp.regex.escape",
+			Language:    rules.LangCPP,
+			Pattern:     `boost::regex_replace\s*\(.*boost::regex_constants::format_literal`,
+			ObjectType:  "boost",
+			MethodName:  "regex_replace (literal)",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval},
+			Description: "Boost regex literal format replacement (safe from ReDoS in replacement)",
+		},
+
+		// --- std::filesystem path sanitization ---
+		{
+			ID:          "cpp.filesystem.weakly_canonical",
+			Language:    rules.LangCPP,
+			Pattern:     `std::filesystem::weakly_canonical\s*\(`,
+			ObjectType:  "std::filesystem",
+			MethodName:  "weakly_canonical",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Filesystem weakly_canonical path resolution (resolves symlinks)",
+		},
+		{
+			ID:          "cpp.filesystem.proximate",
+			Language:    rules.LangCPP,
+			Pattern:     `std::filesystem::proximate\s*\(|std::filesystem::relative\s*\(`,
+			ObjectType:  "std::filesystem",
+			MethodName:  "proximate/relative",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Filesystem proximate/relative path computation (safe relative path)",
+		},
+
+		// --- Sanitized output ---
+		{
+			ID:          "cpp.poco.htmlencode",
+			Language:    rules.LangCPP,
+			Pattern:     `Poco::Net::HTMLForm|Poco::XML::toXMLString`,
+			ObjectType:  "Poco",
+			MethodName:  "HTMLForm/toXMLString",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "POCO HTML form encoding / XML string escaping",
+		},
+
+		// --- Numeric conversion ---
+		{
+			ID:          "cpp.stod",
+			Language:    rules.LangCPP,
+			Pattern:     `std::stod\s*\(|std::stof\s*\(|std::stold\s*\(`,
+			ObjectType:  "",
+			MethodName:  "stod/stof/stold",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Floating-point string conversion (restricts to numeric values)",
+		},
 	}
 }

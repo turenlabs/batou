@@ -372,5 +372,65 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-117",
 			OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
 		},
+
+		// --- File operations (CWE-22) ---
+		{
+			ID:            "lua.os.rename",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangLua,
+			Pattern:       `os\.rename\s*\(`,
+			ObjectType:    "",
+			MethodName:    "os.rename",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "File rename with potentially tainted paths",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Dynamic code loading (CWE-94) ---
+		{
+			ID:            "lua.loadstring",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `loadstring\s*\(|load\s*\(`,
+			ObjectType:    "",
+			MethodName:    "loadstring/load",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Dynamic Lua code loading with potentially tainted string",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Redis eval (CWE-94) ---
+		{
+			ID:            "lua.redis.eval",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `redis\.call\s*\(\s*['"]EVAL`,
+			ObjectType:    "redis",
+			MethodName:    "call(EVAL)",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "Redis EVAL with potentially tainted Lua script",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Symlink (CWE-59) ---
+		{
+			ID:            "lua.lfs.link",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangLua,
+			Pattern:       `lfs\.link\s*\(`,
+			ObjectType:    "lfs",
+			MethodName:    "link",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "LuaFileSystem link/symlink creation with potentially tainted paths",
+			CWEID:         "CWE-59",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
 	}
 }

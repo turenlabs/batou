@@ -413,5 +413,78 @@ func (c *GroovyCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-113",
 			OWASPCategory: "A03:2021-Injection",
 		},
+
+		// --- File operations (CWE-22) ---
+		{
+			ID:            "groovy.file.renameto",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGroovy,
+			Pattern:       `\.renameTo\s*\(|new\s+File\(.*\)\.renameTo`,
+			ObjectType:    "File",
+			MethodName:    "renameTo",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "File rename with potentially tainted destination",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "groovy.files.copy",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGroovy,
+			Pattern:       `Files\.copy\s*\(`,
+			ObjectType:    "Files",
+			MethodName:    "copy",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "NIO file copy with potentially tainted paths",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Dynamic code execution (CWE-94) ---
+		{
+			ID:            "groovy.shell.evaluate.string",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGroovy,
+			Pattern:       `new\s+GroovyShell\s*\(\s*\)\.evaluate\s*\(`,
+			ObjectType:    "GroovyShell",
+			MethodName:    "evaluate",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "GroovyShell evaluate with potentially tainted script string",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- SSRF additional ---
+		{
+			ID:            "groovy.url.text",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGroovy,
+			Pattern:       `new\s+URL\s*\(.*\)\.text|\.toURL\s*\(\s*\)\.text`,
+			ObjectType:    "URL",
+			MethodName:    "URL.text",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Groovy URL.text() convenience method with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- ReDoS ---
+		{
+			ID:            "groovy.pattern.compile",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGroovy,
+			Pattern:       `Pattern\.compile\s*\(|~\s*['"]`,
+			ObjectType:    "Pattern",
+			MethodName:    "compile/~",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Regex compilation with potentially tainted pattern (ReDoS risk)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
 	}
 }

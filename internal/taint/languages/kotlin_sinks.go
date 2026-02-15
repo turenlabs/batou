@@ -476,5 +476,93 @@ func (c *KotlinCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-79",
 			OWASPCategory: "A03:2021-Injection",
 		},
+
+		// --- File operations (CWE-22) ---
+		{
+			ID:            "kotlin.files.write",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangKotlin,
+			Pattern:       `Files\.write\s*\(|\.writeText\s*\(|\.writeBytes\s*\(`,
+			ObjectType:    "Files",
+			MethodName:    "write/writeText/writeBytes",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "File write with potentially tainted path or content",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "kotlin.files.copy",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangKotlin,
+			Pattern:       `Files\.copy\s*\(|\.copyTo\s*\(`,
+			ObjectType:    "Files",
+			MethodName:    "copy/copyTo",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "File copy with potentially tainted paths",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- ReDoS (CWE-1333) ---
+		{
+			ID:            "kotlin.regex.construct",
+			Category:      taint.SnkEval,
+			Language:      rules.LangKotlin,
+			Pattern:       `Regex\s*\(|\.toRegex\s*\(`,
+			ObjectType:    "Regex",
+			MethodName:    "Regex/toRegex",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Regex construction with potentially tainted pattern (ReDoS risk)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- SSRF additional ---
+		{
+			ID:            "kotlin.ktor.client.request",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangKotlin,
+			Pattern:       `client\.get\s*\(|client\.post\s*\(|client\.request\s*\(`,
+			ObjectType:    "io.ktor.client.HttpClient",
+			MethodName:    "get/post/request",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Ktor HTTP client request with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- Android Intent redirect ---
+		{
+			ID:            "kotlin.android.startactivity",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangKotlin,
+			Pattern:       `startActivity\s*\(|startActivityForResult\s*\(`,
+			ObjectType:    "android.app.Activity",
+			MethodName:    "startActivity",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Android activity launch with potentially tainted intent",
+			CWEID:         "CWE-926",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Cookie injection ---
+		{
+			ID:            "kotlin.ktor.cookie",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangKotlin,
+			Pattern:       `call\.response\.cookies\.append\s*\(`,
+			ObjectType:    "io.ktor.server.response",
+			MethodName:    "cookies.append",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.Medium,
+			Description:   "Ktor cookie set with potentially tainted value",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
 	}
 }

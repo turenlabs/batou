@@ -64,5 +64,59 @@ func (rubyCatalog) Sources() []taint.SourceDef {
 		{ID: "ruby.rails.request.user_agent", Category: taint.SrcUserInput, Language: rules.LangRuby, Pattern: `request\.user_agent`, ObjectType: "ActionDispatch::Request", MethodName: "user_agent", Description: "Rails request user agent header", Assigns: "return"},
 		{ID: "ruby.rails.request.remote_ip", Category: taint.SrcUserInput, Language: rules.LangRuby, Pattern: `request\.remote_ip`, ObjectType: "ActionDispatch::Request", MethodName: "remote_ip", Description: "Rails request remote IP", Assigns: "return"},
 		{ID: "ruby.rack.env.path_info", Category: taint.SrcUserInput, Language: rules.LangRuby, Pattern: `env\s*\[\s*['"]PATH_INFO['"]\s*\]`, ObjectType: "Rack", MethodName: "env['PATH_INFO']", Description: "Rack PATH_INFO from environment", Assigns: "return"},
+
+		// --- Standard library ---
+		{
+			ID:          "ruby.env.fetch",
+			Category:    taint.SrcEnvVar,
+			Language:    rules.LangRuby,
+			Pattern:     `ENV\.fetch\s*\(|ENV\[`,
+			ObjectType:  "ENV",
+			MethodName:  "fetch/[]",
+			Description: "Environment variable access",
+			Assigns:     "return",
+		},
+		{
+			ID:          "ruby.file.readlines",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangRuby,
+			Pattern:     `File\.readlines\s*\(|IO\.readlines\s*\(`,
+			ObjectType:  "File",
+			MethodName:  "readlines",
+			Description: "File read lines into array",
+			Assigns:     "return",
+		},
+		{
+			ID:          "ruby.net.http.response",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangRuby,
+			Pattern:     `Net::HTTP\.get\s*\(|\.body\b`,
+			ObjectType:  "Net::HTTP",
+			MethodName:  "get/body",
+			Description: "HTTP response body from network request",
+			Assigns:     "return",
+		},
+		{
+			ID:          "ruby.csv.parse",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangRuby,
+			Pattern:     `CSV\.parse\s*\(|CSV\.read\s*\(`,
+			ObjectType:  "CSV",
+			MethodName:  "parse/read",
+			Description: "CSV parsed data from potentially untrusted source",
+			Assigns:     "return",
+		},
+
+		// --- Rails additional sources ---
+		{
+			ID:          "ruby.rails.request.fullpath",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRuby,
+			Pattern:     `request\.fullpath|request\.original_url|request\.url`,
+			ObjectType:  "ActionDispatch::Request",
+			MethodName:  "fullpath/original_url/url",
+			Description: "Rails request full path or URL",
+			Assigns:     "return",
+		},
 	}
 }

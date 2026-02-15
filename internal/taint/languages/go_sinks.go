@@ -864,5 +864,155 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-79",
 			OWASPCategory: "A03:2021-Injection",
 		},
+
+		// --- Symlink Creation (CWE-59) ---
+		{
+			ID:            "go.os.symlink",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGo,
+			Pattern:       `os\.Symlink\(`,
+			ObjectType:    "",
+			MethodName:    "Symlink",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Symlink creation with potentially tainted path (symlink attack)",
+			CWEID:         "CWE-59",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Directory Creation with Tainted Path (CWE-22) ---
+		{
+			ID:            "go.os.mkdirall",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGo,
+			Pattern:       `os\.MkdirAll\(|os\.Mkdir\(`,
+			ObjectType:    "",
+			MethodName:    "MkdirAll/Mkdir",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Directory creation with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- File Rename with Tainted Path (CWE-22) ---
+		{
+			ID:            "go.os.rename",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGo,
+			Pattern:       `os\.Rename\(`,
+			ObjectType:    "",
+			MethodName:    "Rename",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "File rename with potentially tainted source or destination path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- ReDoS via Regex Compilation (CWE-1333) ---
+		{
+			ID:            "go.regexp.compile",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `regexp\.Compile\(|regexp\.MustCompile\(`,
+			ObjectType:    "",
+			MethodName:    "regexp.Compile/MustCompile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Regex compilation with potentially tainted pattern (ReDoS)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- XML Deserialization (CWE-611) ---
+		{
+			ID:            "go.xml.unmarshal",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangGo,
+			Pattern:       `xml\.Unmarshal\(`,
+			ObjectType:    "",
+			MethodName:    "xml.Unmarshal",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "XML deserialization of potentially tainted data (XXE risk)",
+			CWEID:         "CWE-611",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+
+		// --- XML Decoder (CWE-611) ---
+		{
+			ID:            "go.xml.newdecoder",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangGo,
+			Pattern:       `xml\.NewDecoder\(`,
+			ObjectType:    "",
+			MethodName:    "xml.NewDecoder",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "XML decoder from untrusted reader (XXE risk)",
+			CWEID:         "CWE-611",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+
+		// --- Gob Deserialization (CWE-502) ---
+		{
+			ID:            "go.gob.decode",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangGo,
+			Pattern:       `gob\.NewDecoder\(|\.Decode\(`,
+			ObjectType:    "*gob.Decoder",
+			MethodName:    "Decode",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Gob deserialization of potentially tainted data",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+
+		// --- JSON Unmarshal (CWE-502) ---
+		{
+			ID:            "go.json.unmarshal",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangGo,
+			Pattern:       `json\.Unmarshal\(`,
+			ObjectType:    "",
+			MethodName:    "json.Unmarshal",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "JSON deserialization of potentially tainted data",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+
+		// --- Cookie Injection (CWE-113) ---
+		{
+			ID:            "go.http.setcookie",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangGo,
+			Pattern:       `http\.SetCookie\(`,
+			ObjectType:    "",
+			MethodName:    "SetCookie",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "HTTP cookie set with potentially tainted value",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- File OpenFile (CWE-22) ---
+		{
+			ID:            "go.os.openfile",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGo,
+			Pattern:       `os\.OpenFile\(`,
+			ObjectType:    "",
+			MethodName:    "OpenFile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "File open with flags and potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
 	}
 }

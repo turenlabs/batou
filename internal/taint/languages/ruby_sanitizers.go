@@ -76,5 +76,49 @@ func (rubyCatalog) Sanitizers() []taint.SanitizerDef {
 		// Path sanitization
 		{ID: "ruby.pathname.cleanpath", Language: rules.LangRuby, Pattern: `Pathname\.new\s*\(.*\.cleanpath`, ObjectType: "Pathname", MethodName: "cleanpath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Pathname cleanpath"},
 		{ID: "ruby.file.expand_path", Language: rules.LangRuby, Pattern: `File\.expand_path\s*\(`, ObjectType: "File", MethodName: "expand_path", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "File.expand_path"},
+
+		// --- Regex escaping ---
+		{
+			ID:          "ruby.regexp.escape",
+			Language:    rules.LangRuby,
+			Pattern:     `Regexp\.escape\s*\(|Regexp\.quote\s*\(`,
+			ObjectType:  "Regexp",
+			MethodName:  "escape/quote",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
+			Description: "Regex metacharacter escaping (prevents ReDoS and injection)",
+		},
+
+		// --- ActiveRecord SQL sanitization ---
+		{
+			ID:          "ruby.activerecord.sanitize_sql_array",
+			Language:    rules.LangRuby,
+			Pattern:     `sanitize_sql_array\s*\(|sanitize_sql_for_conditions\s*\(`,
+			ObjectType:  "ActiveRecord::Base",
+			MethodName:  "sanitize_sql_array",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "ActiveRecord SQL array sanitization for parameterized queries",
+		},
+
+		// --- Pathname sanitization ---
+		{
+			ID:          "ruby.pathname.realpath",
+			Language:    rules.LangRuby,
+			Pattern:     `Pathname\.new\(.*\)\.realpath|\.realpath\b`,
+			ObjectType:  "Pathname",
+			MethodName:  "realpath",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Pathname realpath resolution (resolves symlinks and .. components)",
+		},
+
+		// --- Rails ActionController parameter filtering ---
+		{
+			ID:          "ruby.rails.strong_params",
+			Language:    rules.LangRuby,
+			Pattern:     `\.permit\s*\(`,
+			ObjectType:  "ActionController::Parameters",
+			MethodName:  "permit",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
+			Description: "Rails strong parameters permit (allowlist filtering)",
+		},
 	}
 }

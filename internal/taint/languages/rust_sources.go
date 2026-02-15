@@ -346,5 +346,37 @@ func (c *RustCatalog) Sources() []taint.SourceDef {
 			Description: "TOML or YAML deserialization from string",
 			Assigns:     "return",
 		},
+
+		// --- Additional Rust sources ---
+		{
+			ID:          "rust.rocket.form",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `Form<|FromForm`,
+			ObjectType:  "rocket::form",
+			MethodName:  "Form/FromForm",
+			Description: "Rocket framework form data",
+			Assigns:     "return",
+		},
+		{
+			ID:          "rust.tokio.io.read",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangRust,
+			Pattern:     `AsyncReadExt.*\.read\s*\(|\.read_to_string\s*\(`,
+			ObjectType:  "tokio::io",
+			MethodName:  "read/read_to_string",
+			Description: "Tokio async read from potentially untrusted source",
+			Assigns:     "return",
+		},
+		{
+			ID:          "rust.serde.from_str_combined",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangRust,
+			Pattern:     `serde_json::from_str\s*\(|serde_json::from_slice\s*\(|serde_json::from_reader\s*\(`,
+			ObjectType:  "serde_json",
+			MethodName:  "from_str/from_slice/from_reader",
+			Description: "Serde JSON deserialization from potentially untrusted data",
+			Assigns:     "return",
+		},
 	}
 }

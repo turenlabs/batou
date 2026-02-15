@@ -210,5 +210,38 @@ func (c *RustCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect, taint.SnkHTMLOutput},
 			Description: "URL encoding for safe URL construction",
 		},
+
+		// --- Path canonicalization ---
+		{
+			ID:          "rust.fs.canonicalize",
+			Language:    rules.LangRust,
+			Pattern:     `\.canonicalize\s*\(|fs::canonicalize\s*\(`,
+			ObjectType:  "std::fs",
+			MethodName:  "canonicalize",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Path canonicalization with symlink resolution",
+		},
+
+		// --- Regex escaping ---
+		{
+			ID:          "rust.regex.escape",
+			Language:    rules.LangRust,
+			Pattern:     `regex::escape\s*\(`,
+			ObjectType:  "regex",
+			MethodName:  "escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
+			Description: "Regex metacharacter escaping (prevents ReDoS)",
+		},
+
+		// --- Numeric conversion ---
+		{
+			ID:          "rust.parse.numeric",
+			Language:    rules.LangRust,
+			Pattern:     `\.parse::<f64>\s*\(|\.parse::<f32>\s*\(|\.parse::<i64>\s*\(|\.parse::<u64>\s*\(`,
+			ObjectType:  "",
+			MethodName:  "parse::<numeric>",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Numeric type parsing (restricts to numeric values)",
+		},
 	}
 }

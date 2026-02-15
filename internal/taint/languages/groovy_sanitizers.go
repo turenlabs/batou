@@ -170,5 +170,27 @@ func (c *GroovyCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
 			Description: "Path canonicalization prevents directory traversal",
 		},
+
+		// --- Regex escaping ---
+		{
+			ID:          "groovy.pattern.quote",
+			Language:    rules.LangGroovy,
+			Pattern:     `Pattern\.quote\s*\(|Matcher\.quoteReplacement\s*\(`,
+			ObjectType:  "Pattern",
+			MethodName:  "quote/quoteReplacement",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
+			Description: "Regex/replacement metacharacter escaping (prevents ReDoS)",
+		},
+
+		// --- Numeric conversion ---
+		{
+			ID:          "groovy.tointeger",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.toInteger\s*\(|\.toDouble\s*\(|\.toLong\s*\(|\.toFloat\s*\(`,
+			ObjectType:  "",
+			MethodName:  "toInteger/toDouble/toLong/toFloat",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Groovy numeric type conversion (restricts to numeric values)",
+		},
 	}
 }

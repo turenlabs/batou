@@ -238,5 +238,38 @@ func (c *CSharpCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
 			Description: "BCrypt password hashing",
 		},
+
+		// --- Regex escaping ---
+		{
+			ID:          "csharp.regex.escape",
+			Language:    rules.LangCSharp,
+			Pattern:     `Regex\.Escape\s*\(`,
+			ObjectType:  "Regex",
+			MethodName:  "Escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
+			Description: "Regex metacharacter escaping (prevents ReDoS and injection)",
+		},
+
+		// --- Path normalization ---
+		{
+			ID:          "csharp.path.getfullpath.normalized",
+			Language:    rules.LangCSharp,
+			Pattern:     `Path\.GetFullPath\s*\(.*Path\.Combine`,
+			ObjectType:  "Path",
+			MethodName:  "GetFullPath+Combine",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Full path resolution combined with path combination",
+		},
+
+		// --- Numeric conversion ---
+		{
+			ID:          "csharp.double.parse",
+			Language:    rules.LangCSharp,
+			Pattern:     `double\.Parse\s*\(|float\.Parse\s*\(|decimal\.Parse\s*\(`,
+			ObjectType:  "double/float/decimal",
+			MethodName:  "Parse",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Floating-point parsing (restricts to numeric values)",
+		},
 	}
 }
