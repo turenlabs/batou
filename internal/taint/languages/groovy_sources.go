@@ -178,5 +178,75 @@ func (c *GroovyCatalog) Sources() []taint.SourceDef {
 			Description: "Groovy SQL query results",
 			Assigns:     "return",
 		},
+
+		// --- HttpServletRequest headers ---
+		{
+			ID:          "groovy.servlet.getheader",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGroovy,
+			Pattern:     `request\.getHeader\s*\(|request\.headers`,
+			ObjectType:  "HttpServletRequest",
+			MethodName:  "getHeader",
+			Description: "Servlet request header",
+			Assigns:     "return",
+		},
+		{
+			ID:          "groovy.grails.request.forwarduri",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGroovy,
+			Pattern:     `request\.forwardURI|request\.requestURI`,
+			ObjectType:  "HttpServletRequest",
+			MethodName:  "requestURI",
+			Description: "Request URI (potentially tainted)",
+			Assigns:     "return",
+		},
+
+		// --- Micronaut ---
+		{
+			ID:          "groovy.micronaut.parameter",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGroovy,
+			Pattern:     `@QueryValue|@PathVariable|@Body|@Header|@CookieValue`,
+			ObjectType:  "Micronaut",
+			MethodName:  "@QueryValue/@PathVariable/@Body",
+			Description: "Micronaut request parameter binding",
+			Assigns:     "return",
+		},
+
+		// --- Ratpack ---
+		{
+			ID:          "groovy.ratpack.context",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGroovy,
+			Pattern:     `ctx\.request|ctx\.getRequest\s*\(\s*\)|context\.request`,
+			ObjectType:  "Ratpack",
+			MethodName:  "ctx.request",
+			Description: "Ratpack request context",
+			Assigns:     "return",
+		},
+
+		// --- YAML parsing ---
+		{
+			ID:          "groovy.yaml.parse",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangGroovy,
+			Pattern:     `new\s+YamlSlurper\s*\(\s*\)\s*\.parse|Yaml\(\)\.load\s*\(`,
+			ObjectType:  "YamlSlurper",
+			MethodName:  "parse",
+			Description: "YAML parsed data from untrusted source",
+			Assigns:     "return",
+		},
+
+		// --- XML parsing ---
+		{
+			ID:          "groovy.xmlslurper.source",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangGroovy,
+			Pattern:     `new\s+XmlSlurper\s*\(\s*\)\s*\.parse\s*\(|XmlSlurper\s*\(\s*\)\s*\.parseText\s*\(`,
+			ObjectType:  "XmlSlurper",
+			MethodName:  "parse/parseText",
+			Description: "XML parsed data from external source",
+			Assigns:     "return",
+		},
 	}
 }

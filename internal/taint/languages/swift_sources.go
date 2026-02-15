@@ -168,5 +168,115 @@ func (c *SwiftCatalog) Sources() []taint.SourceDef {
 			Description: "Deep link / URL scheme input",
 			Assigns:     "return",
 		},
+
+		// --- Vapor framework ---
+		{
+			ID:          "swift.vapor.req.query",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangSwift,
+			Pattern:     `req\.query\[|req\.query\.decode\s*\(`,
+			ObjectType:  "Request",
+			MethodName:  "req.query",
+			Description: "Vapor request query parameters",
+			Assigns:     "return",
+		},
+		{
+			ID:          "swift.vapor.req.content",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangSwift,
+			Pattern:     `req\.content\.decode\s*\(|req\.content\[`,
+			ObjectType:  "Request",
+			MethodName:  "req.content",
+			Description: "Vapor request body content",
+			Assigns:     "return",
+		},
+		{
+			ID:          "swift.vapor.req.parameters",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangSwift,
+			Pattern:     `req\.parameters\.get\s*\(`,
+			ObjectType:  "Request",
+			MethodName:  "req.parameters.get",
+			Description: "Vapor route parameters",
+			Assigns:     "return",
+		},
+		{
+			ID:          "swift.vapor.req.headers",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangSwift,
+			Pattern:     `req\.headers\[|req\.headers\.first\(`,
+			ObjectType:  "Request",
+			MethodName:  "req.headers",
+			Description: "Vapor request headers",
+			Assigns:     "return",
+		},
+		{
+			ID:          "swift.vapor.req.cookies",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangSwift,
+			Pattern:     `req\.cookies\[|req\.cookies\.all`,
+			ObjectType:  "Request",
+			MethodName:  "req.cookies",
+			Description: "Vapor request cookies",
+			Assigns:     "return",
+		},
+
+		// --- SwiftNIO ---
+		{
+			ID:          "swift.nio.channel.read",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangSwift,
+			Pattern:     `channelRead\s*\(\s*context:|func\s+channelRead\(`,
+			ObjectType:  "ChannelInboundHandler",
+			MethodName:  "channelRead",
+			Description: "SwiftNIO channel inbound data",
+			Assigns:     "return",
+		},
+
+		// --- File read ---
+		{
+			ID:          "swift.string.contentsoffile",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangSwift,
+			Pattern:     `String\(\s*contentsOfFile:|String\(\s*contentsOf:`,
+			ObjectType:  "String",
+			MethodName:  "String(contentsOfFile:)",
+			Description: "File contents read as string",
+			Assigns:     "return",
+		},
+		{
+			ID:          "swift.data.contentsof",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangSwift,
+			Pattern:     `Data\(\s*contentsOf:`,
+			ObjectType:  "Data",
+			MethodName:  "Data(contentsOf:)",
+			Description: "File or URL contents read as Data",
+			Assigns:     "return",
+		},
+
+		// --- PropertyList deserialization ---
+		{
+			ID:          "swift.plistdecoder",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangSwift,
+			Pattern:     `PropertyListDecoder\(\)\.decode\(|PropertyListSerialization\.propertyList\(`,
+			ObjectType:  "PropertyListDecoder",
+			MethodName:  "decode",
+			Description: "Property list deserialized data",
+			Assigns:     "return",
+		},
+
+		// --- NSXMLParser (external XML) ---
+		{
+			ID:          "swift.xmlparser",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangSwift,
+			Pattern:     `XMLParser\(\s*data:|XMLParser\(\s*contentsOf:`,
+			ObjectType:  "XMLParser",
+			MethodName:  "XMLParser(data:)",
+			Description: "XML parser with potentially untrusted data",
+			Assigns:     "return",
+		},
 	}
 }

@@ -115,5 +115,60 @@ func (c *GroovyCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
 			Description: "XML parser with XXE protection enabled",
 		},
+
+		// --- LDAP escaping ---
+		{
+			ID:          "groovy.ldap.escape",
+			Language:    rules.LangGroovy,
+			Pattern:     `LdapEncoder\.filterEncode\s*\(|LdapNameBuilder|LdapUtils\.convertBinary`,
+			ObjectType:  "LdapEncoder",
+			MethodName:  "LdapEncoder.filterEncode",
+			Neutralizes: []taint.SinkCategory{taint.SnkLDAP},
+			Description: "LDAP filter encoding to prevent injection",
+		},
+
+		// --- Log sanitization ---
+		{
+			ID:          "groovy.log.sanitize",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.replaceAll\s*\(\s*"[\[\(]\\\\[nrt][\]\)]"`,
+			ObjectType:  "",
+			MethodName:  "replaceAll(newlines)",
+			Neutralizes: []taint.SinkCategory{taint.SnkLog},
+			Description: "Log injection prevention via control character removal",
+		},
+
+		// --- Regex validation ---
+		{
+			ID:          "groovy.regex.matches",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.matches\s*\(|==~\s*/`,
+			ObjectType:  "String",
+			MethodName:  "matches/==~",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
+			Description: "Regex validation restricts input to safe patterns",
+		},
+
+		// --- URL validation ---
+		{
+			ID:          "groovy.url.validate",
+			Language:    rules.LangGroovy,
+			Pattern:     `new\s+URL\s*\(.*\)\.toURI\s*\(|URI\.create\s*\(`,
+			ObjectType:  "URL",
+			MethodName:  "URL.toURI",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URL/URI parsing and validation",
+		},
+
+		// --- Path normalization ---
+		{
+			ID:          "groovy.file.canonicalpath",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.getCanonicalPath\s*\(|\.getCanonicalFile\s*\(|\.normalize\s*\(`,
+			ObjectType:  "File",
+			MethodName:  "getCanonicalPath",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Path canonicalization prevents directory traversal",
+		},
 	}
 }

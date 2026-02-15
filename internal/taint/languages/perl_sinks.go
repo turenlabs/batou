@@ -57,5 +57,23 @@ func (perlCatalog) Sinks() []taint.SinkDef {
 
 		// Insecure random (CWE-338)
 		{ID: "perl.rand", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `\brand\s*\(`, ObjectType: "", MethodName: "rand", DangerousArgs: []int{-1}, Severity: rules.Medium, Description: "Non-cryptographic random (use Crypt::URandom instead)", CWEID: "CWE-338", OWASPCategory: "A02:2021-Cryptographic Failures"},
+
+		// Template injection (CWE-1336)
+		{ID: "perl.tt.process", Category: taint.SnkTemplate, Language: rules.LangPerl, Pattern: `\$tt->process\s*\(|\$template->process\s*\(|Template->new.*process`, ObjectType: "Template::Toolkit", MethodName: "process", DangerousArgs: []int{0}, Severity: rules.High, Description: "Template::Toolkit processing with potentially tainted data", CWEID: "CWE-1336", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.mojo.render", Category: taint.SnkTemplate, Language: rules.LangPerl, Pattern: `\$c->render\s*\(|\$self->render\s*\(`, ObjectType: "Mojolicious::Controller", MethodName: "render", DangerousArgs: []int{0}, Severity: rules.High, Description: "Mojolicious template rendering with potentially tainted data", CWEID: "CWE-1336", OWASPCategory: "A03:2021-Injection"},
+
+		// XPath injection (CWE-643)
+		{ID: "perl.xml.xpath", Category: taint.SnkXPath, Language: rules.LangPerl, Pattern: `XML::XPath->new.*find\s*\(|->findnodes\s*\(|->find\s*\(.*\$`, ObjectType: "XML::XPath", MethodName: "find/findnodes", DangerousArgs: []int{0}, Severity: rules.High, Description: "XPath query with potentially tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.xml.libxml.xpath", Category: taint.SnkXPath, Language: rules.LangPerl, Pattern: `->findnodes\s*\(|->find\s*\(|XML::LibXML::XPathContext`, ObjectType: "XML::LibXML", MethodName: "findnodes", DangerousArgs: []int{0}, Severity: rules.High, Description: "XML::LibXML XPath query with potentially tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+
+		// HTTP header injection (CWE-113)
+		{ID: "perl.cgi.header", Category: taint.SnkHeader, Language: rules.LangPerl, Pattern: `\$cgi->header\s*\(|\$q->header\s*\(|print\s+.*"HTTP/`, ObjectType: "CGI", MethodName: "header", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "HTTP response header with potentially tainted value", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.mojo.res.headers", Category: taint.SnkHeader, Language: rules.LangPerl, Pattern: `\$c->res->headers->header\s*\(|\$self->res->headers->header\s*\(`, ObjectType: "Mojolicious::Controller", MethodName: "res->headers->header", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Mojolicious response header with potentially tainted value", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
+
+		// Additional XSS sinks
+		{ID: "perl.mojo.render.text", Category: taint.SnkHTMLOutput, Language: rules.LangPerl, Pattern: `\$c->render\(\s*text\s*=>|\$self->render\(\s*text\s*=>`, ObjectType: "Mojolicious::Controller", MethodName: "render(text =>)", DangerousArgs: []int{0}, Severity: rules.High, Description: "Mojolicious text rendering without encoding (XSS)", CWEID: "CWE-79", OWASPCategory: "A03:2021-Injection"},
+
+		// Additional logging
+		{ID: "perl.mojo.log", Category: taint.SnkLog, Language: rules.LangPerl, Pattern: `\$c->app->log->(?:info|warn|error|debug)\s*\(`, ObjectType: "Mojo::Log", MethodName: "app->log->*", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Mojolicious logger with potentially tainted data", CWEID: "CWE-117", OWASPCategory: "A09:2021-Security Logging and Monitoring Failures"},
 	}
 }

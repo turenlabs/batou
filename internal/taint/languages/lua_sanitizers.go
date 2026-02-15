@@ -108,5 +108,60 @@ func (c *LuaCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate},
 			Description: "HTML escaping via lua-resty-template or custom function",
 		},
+
+		// --- cjson safe decode ---
+		{
+			ID:          "lua.cjson.safe",
+			Language:    rules.LangLua,
+			Pattern:     `cjson\.safe\.decode\s*\(|pcall\s*\(\s*cjson\.decode`,
+			ObjectType:  "cjson",
+			MethodName:  "cjson.safe.decode",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Safe JSON decoding with error handling",
+		},
+
+		// --- Lapis HTML escaping ---
+		{
+			ID:          "lua.lapis.escape",
+			Language:    rules.LangLua,
+			Pattern:     `escape\s*\(|lapis\.html\.escape`,
+			ObjectType:  "lapis",
+			MethodName:  "lapis.html.escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate},
+			Description: "Lapis HTML escaping",
+		},
+
+		// --- OpenResty SHA256 ---
+		{
+			ID:          "lua.ngx.sha256",
+			Language:    rules.LangLua,
+			Pattern:     `ngx\.sha1_bin\s*\(|resty\.sha256|resty\.sha512`,
+			ObjectType:  "ngx/resty",
+			MethodName:  "resty.sha256",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "OpenResty secure hashing",
+		},
+
+		// --- String format validation ---
+		{
+			ID:          "lua.string.format",
+			Language:    rules.LangLua,
+			Pattern:     `string\.format\s*\(\s*"%%d"`,
+			ObjectType:  "",
+			MethodName:  "string.format(%d)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Format string restricting to numeric value",
+		},
+
+		// --- Allowlist check ---
+		{
+			ID:          "lua.table.contains",
+			Language:    rules.LangLua,
+			Pattern:     `allowed_\w+\[|whitelist\[|allowlist\[`,
+			ObjectType:  "",
+			MethodName:  "table lookup validation",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect, taint.SnkCommand},
+			Description: "Table-based allowlist validation",
+		},
 	}
 }

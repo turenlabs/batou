@@ -228,5 +228,75 @@ func (c *KotlinCatalog) Sources() []taint.SourceDef {
 			Description: "Jackson deserialized JSON data",
 			Assigns:     "return",
 		},
+
+		// --- Ktor cookies ---
+		{
+			ID:          "kotlin.ktor.cookies",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangKotlin,
+			Pattern:     `call\.request\.cookies`,
+			ObjectType:  "ApplicationCall",
+			MethodName:  "request.cookies",
+			Description: "Ktor request cookies",
+			Assigns:     "return",
+		},
+
+		// --- HttpServletRequest ---
+		{
+			ID:          "kotlin.servlet.getparameter",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangKotlin,
+			Pattern:     `request\.getParameter\s*\(|request\.getParameterValues\s*\(`,
+			ObjectType:  "HttpServletRequest",
+			MethodName:  "getParameter",
+			Description: "Servlet request parameter",
+			Assigns:     "return",
+		},
+		{
+			ID:          "kotlin.servlet.getheader",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangKotlin,
+			Pattern:     `request\.getHeader\s*\(`,
+			ObjectType:  "HttpServletRequest",
+			MethodName:  "getHeader",
+			Description: "Servlet request header",
+			Assigns:     "return",
+		},
+
+		// --- Spring multipart ---
+		{
+			ID:          "kotlin.spring.multipart",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangKotlin,
+			Pattern:     `@RequestPart|MultipartFile`,
+			ObjectType:  "Spring",
+			MethodName:  "@RequestPart/MultipartFile",
+			Description: "Spring multipart file upload",
+			Assigns:     "return",
+		},
+
+		// --- Ktor file upload ---
+		{
+			ID:          "kotlin.ktor.multipart.fileitem",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangKotlin,
+			Pattern:     `part\.streamProvider\s*\(|is\s+PartData\.FileItem|PartData\.FormItem`,
+			ObjectType:  "PartData",
+			MethodName:  "PartData.FileItem",
+			Description: "Ktor multipart file upload data",
+			Assigns:     "return",
+		},
+
+		// --- kotlinx.serialization ---
+		{
+			ID:          "kotlin.serialization.decodefromstream",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangKotlin,
+			Pattern:     `Json\.decodeFromStream\s*\(|Cbor\.decodeFromByteArray\s*\(|ProtoBuf\.decodeFromByteArray\s*\(`,
+			ObjectType:  "kotlinx.serialization",
+			MethodName:  "decodeFromStream",
+			Description: "kotlinx.serialization deserialization from stream or bytes",
+			Assigns:     "return",
+		},
 	}
 }

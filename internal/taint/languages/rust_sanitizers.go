@@ -155,5 +155,60 @@ func (c *RustCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
 			Description: "Bcrypt password hashing",
 		},
+
+		// --- Tera auto-escaping ---
+		{
+			ID:          "rust.tera.autoescape",
+			Language:    rules.LangRust,
+			Pattern:     `Tera::new\s*\(|tera\.autoescape_on`,
+			ObjectType:  "tera",
+			MethodName:  "Tera::new (auto-escaping)",
+			Neutralizes: []taint.SinkCategory{taint.SnkTemplate, taint.SnkHTMLOutput},
+			Description: "Tera template engine with auto-escaping enabled by default",
+		},
+
+		// --- Regex validation ---
+		{
+			ID:          "rust.regex.is_match",
+			Language:    rules.LangRust,
+			Pattern:     `Regex::new\s*\(.*\)\s*.*\.is_match\s*\(`,
+			ObjectType:  "regex",
+			MethodName:  "Regex::is_match",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
+			Description: "Regex-based input validation",
+		},
+
+		// --- tokio-postgres parameterized ---
+		{
+			ID:          "rust.tokio.postgres.params",
+			Language:    rules.LangRust,
+			Pattern:     `client\.query\s*\([^,]+,\s*&\[`,
+			ObjectType:  "tokio_postgres",
+			MethodName:  "query with params",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "tokio-postgres parameterized query",
+		},
+
+		// --- sea-orm DSL ---
+		{
+			ID:          "rust.seaorm.dsl",
+			Language:    rules.LangRust,
+			Pattern:     `Entity::find\(\)\.filter\s*\(|\.col\s*\(.*\.eq\s*\(`,
+			ObjectType:  "sea_orm",
+			MethodName:  "Entity::find().filter",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "SeaORM query builder DSL (parameterized)",
+		},
+
+		// --- String escaping ---
+		{
+			ID:          "rust.encode_uri_component",
+			Language:    rules.LangRust,
+			Pattern:     `urlencoding::encode\s*\(|percent_encoding::utf8_percent_encode\s*\(`,
+			ObjectType:  "urlencoding",
+			MethodName:  "urlencoding::encode",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect, taint.SnkHTMLOutput},
+			Description: "URL encoding for safe URL construction",
+		},
 	}
 }

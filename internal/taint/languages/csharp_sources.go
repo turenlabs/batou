@@ -240,5 +240,65 @@ func (c *CSharpCatalog) Sources() []taint.SourceDef {
 			Description: "Azure Functions trigger data from external source",
 			Assigns:     "return",
 		},
+
+		// --- SignalR hub ---
+		{
+			ID:          "csharp.signalr.hubcontext",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `HubCallerContext|Context\.ConnectionId|Context\.User`,
+			ObjectType:  "SignalR",
+			MethodName:  "HubCallerContext",
+			Description: "SignalR hub caller context data",
+			Assigns:     "return",
+		},
+
+		// --- Minimal API parameters ---
+		{
+			ID:          "csharp.minimalapi.parameter",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `\[FromQuery\]|\[FromBody\]|\[FromRoute\]|\[FromHeader\]|\[AsParameters\]`,
+			ObjectType:  "MinimalAPI",
+			MethodName:  "minimal API parameter binding",
+			Description: "ASP.NET minimal API parameter binding",
+			Assigns:     "return",
+		},
+
+		// --- gRPC ---
+		{
+			ID:          "csharp.grpc.request",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `ServerCallContext|\.RequestHeaders|Grpc\.Core\.ServerCallContext`,
+			ObjectType:  "gRPC",
+			MethodName:  "ServerCallContext",
+			Description: "gRPC server call context and request data",
+			Assigns:     "return",
+		},
+
+		// --- Configuration (potentially tainted) ---
+		{
+			ID:          "csharp.configuration.getvalue",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangCSharp,
+			Pattern:     `Configuration\[|IConfiguration.*GetValue\s*\(|_config\[`,
+			ObjectType:  "IConfiguration",
+			MethodName:  "Configuration[key]",
+			Description: "Configuration value from potentially untrusted source",
+			Assigns:     "return",
+		},
+
+		// --- XML deserialization ---
+		{
+			ID:          "csharp.xml.deserialize",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangCSharp,
+			Pattern:     `XmlSerializer.*\.Deserialize\(|DataContractSerializer.*\.ReadObject\(`,
+			ObjectType:  "XmlSerializer",
+			MethodName:  "Deserialize/ReadObject",
+			Description: "XML deserialized data from untrusted source",
+			Assigns:     "return",
+		},
 	}
 }

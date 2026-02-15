@@ -170,5 +170,60 @@ func (c *KotlinCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
 			Description: "Android EncryptedSharedPreferences for secure storage",
 		},
+
+		// --- OWASP Java encoder ---
+		{
+			ID:          "kotlin.owasp.encoder",
+			Language:    rules.LangKotlin,
+			Pattern:     `Encode\.forHtml\s*\(|Encode\.forJavaScript\s*\(|Encode\.forUriComponent\s*\(`,
+			ObjectType:  "OWASP Encoder",
+			MethodName:  "Encode.forHtml/forJavaScript",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate},
+			Description: "OWASP Java encoder for context-aware output encoding",
+		},
+
+		// --- LDAP escaping ---
+		{
+			ID:          "kotlin.ldap.escape",
+			Language:    rules.LangKotlin,
+			Pattern:     `LdapEncoder\.filterEncode\s*\(|LdapNameBuilder|LdapUtils\.convertBinary`,
+			ObjectType:  "LdapEncoder",
+			MethodName:  "LdapEncoder.filterEncode",
+			Neutralizes: []taint.SinkCategory{taint.SnkLDAP},
+			Description: "LDAP filter encoding to prevent injection",
+		},
+
+		// --- Log sanitization ---
+		{
+			ID:          "kotlin.log.sanitize",
+			Language:    rules.LangKotlin,
+			Pattern:     `\.replace\s*\(\s*"\\n".*""|\.replace\s*\(\s*"\\r".*""`,
+			ObjectType:  "",
+			MethodName:  "replace(newline)",
+			Neutralizes: []taint.SinkCategory{taint.SnkLog},
+			Description: "Log injection prevention via newline removal",
+		},
+
+		// --- XPath safe ---
+		{
+			ID:          "kotlin.xpath.parameterized",
+			Language:    rules.LangKotlin,
+			Pattern:     `XPathExpression\.evaluate\s*\(|XPathVariableResolver`,
+			ObjectType:  "XPath",
+			MethodName:  "XPathExpression.evaluate",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "Pre-compiled XPath expression with variable resolver",
+		},
+
+		// --- Android WebView safe ---
+		{
+			ID:          "kotlin.android.webview.safebrowsing",
+			Language:    rules.LangKotlin,
+			Pattern:     `WebSettings.*javaScriptEnabled\s*=\s*false|setJavaScriptEnabled\s*\(\s*false\s*\)`,
+			ObjectType:  "WebView",
+			MethodName:  "setJavaScriptEnabled(false)",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkEval},
+			Description: "WebView with JavaScript disabled",
+		},
 	}
 }

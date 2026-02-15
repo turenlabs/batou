@@ -51,5 +51,23 @@ func (perlCatalog) Sources() []taint.SourceDef {
 
 		// JSON deserialization
 		{ID: "perl.json.decode", Category: taint.SrcDeserialized, Language: rules.LangPerl, Pattern: `decode_json\s*\(|from_json\s*\(|JSON->new->decode\s*\(`, ObjectType: "JSON", MethodName: "decode_json", Description: "JSON decoded data", Assigns: "return"},
+
+		// Mojolicious uploads
+		{ID: "perl.mojo.upload", Category: taint.SrcUserInput, Language: rules.LangPerl, Pattern: `\$c->req->upload\s*\(|\$self->req->upload\s*\(`, ObjectType: "Mojolicious::Controller", MethodName: "req->upload", Description: "Mojolicious file upload", Assigns: "return"},
+
+		// HTTP headers
+		{ID: "perl.mojo.headers", Category: taint.SrcUserInput, Language: rules.LangPerl, Pattern: `\$c->req->headers->header\s*\(|\$self->req->headers->header\s*\(`, ObjectType: "Mojolicious::Controller", MethodName: "req->headers->header", Description: "Mojolicious request header", Assigns: "return"},
+		{ID: "perl.cgi.http", Category: taint.SrcUserInput, Language: rules.LangPerl, Pattern: `\$cgi->http\s*\(|\$q->http\s*\(|\$ENV\{'HTTP_`, ObjectType: "CGI", MethodName: "http/HTTP_*", Description: "CGI HTTP header value", Assigns: "return"},
+		{ID: "perl.plack.header", Category: taint.SrcUserInput, Language: rules.LangPerl, Pattern: `\$req->header\s*\(|\$env->\{'HTTP_`, ObjectType: "Plack::Request", MethodName: "header", Description: "Plack request header", Assigns: "return"},
+		{ID: "perl.catalyst.header", Category: taint.SrcUserInput, Language: rules.LangPerl, Pattern: `\$c->req->header\s*\(|\$c->request->header\s*\(`, ObjectType: "Catalyst", MethodName: "req->header", Description: "Catalyst request header", Assigns: "return"},
+
+		// Plack cookies
+		{ID: "perl.plack.cookies", Category: taint.SrcUserInput, Language: rules.LangPerl, Pattern: `\$req->cookies|cookie_jar`, ObjectType: "Plack::Request", MethodName: "cookies", Description: "Plack request cookies", Assigns: "return"},
+
+		// Mojo cookies
+		{ID: "perl.mojo.cookie", Category: taint.SrcUserInput, Language: rules.LangPerl, Pattern: `\$c->cookie\s*\(|\$self->cookie\s*\(`, ObjectType: "Mojolicious::Controller", MethodName: "cookie", Description: "Mojolicious cookie value", Assigns: "return"},
+
+		// YAML deserialization
+		{ID: "perl.yaml.load", Category: taint.SrcDeserialized, Language: rules.LangPerl, Pattern: `YAML::Load\s*\(|YAML::XS::Load\s*\(|LoadFile\s*\(`, ObjectType: "YAML", MethodName: "YAML::Load", Description: "YAML deserialized data", Assigns: "return"},
 	}
 }

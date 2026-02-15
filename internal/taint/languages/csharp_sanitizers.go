@@ -172,5 +172,71 @@ func (c *CSharpCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
 			Description: "JSON deserialization with type name handling disabled (safe)",
 		},
+
+		// --- XPath safe usage ---
+		{
+			ID:          "csharp.xpath.compiled",
+			Language:    rules.LangCSharp,
+			Pattern:     `XPathExpression\.Compile\s*\(|XPathNavigator\.Compile\s*\(`,
+			ObjectType:  "XPathExpression",
+			MethodName:  "XPathExpression.Compile",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "Pre-compiled XPath expression",
+		},
+
+		// --- Regex timeout ---
+		{
+			ID:          "csharp.regex.timeout",
+			Language:    rules.LangCSharp,
+			Pattern:     `new\s+Regex\s*\([^)]+,\s*RegexOptions\.[^)]*,\s*TimeSpan`,
+			ObjectType:  "Regex",
+			MethodName:  "Regex with timeout",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval},
+			Description: "Regex with timeout prevents ReDoS",
+		},
+
+		// --- Path validation ---
+		{
+			ID:          "csharp.path.getfullpath",
+			Language:    rules.LangCSharp,
+			Pattern:     `Path\.GetFullPath\s*\(`,
+			ObjectType:  "System.IO.Path",
+			MethodName:  "Path.GetFullPath",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Full path resolution for traversal detection",
+		},
+
+		// --- Content Security Policy ---
+		{
+			ID:          "csharp.csp.header",
+			Language:    rules.LangCSharp,
+			Pattern:     `Content-Security-Policy|ContentSecurityPolicyHeaderValue`,
+			ObjectType:  "CSP",
+			MethodName:  "Content-Security-Policy",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkHeader},
+			Description: "Content Security Policy header for XSS mitigation",
+		},
+
+		// --- LDAP filter encoding ---
+		{
+			ID:          "csharp.ldap.encode",
+			Language:    rules.LangCSharp,
+			Pattern:     `LdapFilterEncoder\.FilterEncode\s*\(|Encoder\.LdapFilterEncode\s*\(`,
+			ObjectType:  "LdapFilterEncoder",
+			MethodName:  "LdapFilterEncoder.FilterEncode",
+			Neutralizes: []taint.SinkCategory{taint.SnkLDAP},
+			Description: "LDAP filter encoding to prevent injection",
+		},
+
+		// --- BCrypt hashing ---
+		{
+			ID:          "csharp.bcrypt.hash",
+			Language:    rules.LangCSharp,
+			Pattern:     `BCrypt\.Net\.BCrypt\.HashPassword\s*\(|BCrypt\.HashPassword\s*\(`,
+			ObjectType:  "BCrypt.Net",
+			MethodName:  "BCrypt.HashPassword",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "BCrypt password hashing",
+		},
 	}
 }

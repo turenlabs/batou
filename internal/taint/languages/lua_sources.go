@@ -176,5 +176,75 @@ func (c *LuaCatalog) Sources() []taint.SourceDef {
 			Description: "OpenResty cosocket TCP receive",
 			Assigns:     "return",
 		},
+
+		// --- Lapis framework ---
+		{
+			ID:          "lua.lapis.params",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `self\.params\.\w+|self\.params\[`,
+			ObjectType:  "lapis",
+			MethodName:  "self.params",
+			Description: "Lapis web framework request parameters",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.lapis.req",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `self\.req\.parsed_url|self\.req\.headers`,
+			ObjectType:  "lapis",
+			MethodName:  "self.req",
+			Description: "Lapis web framework request data",
+			Assigns:     "return",
+		},
+
+		// --- OpenResty cookies ---
+		{
+			ID:          "lua.ngx.req.cookies",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `ngx\.var\.cookie_\w+|resty\.cookie`,
+			ObjectType:  "ngx",
+			MethodName:  "ngx.var.cookie_*",
+			Description: "OpenResty cookie value",
+			Assigns:     "return",
+		},
+
+		// --- JSON deserialization ---
+		{
+			ID:          "lua.cjson.decode",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangLua,
+			Pattern:     `cjson\.decode\s*\(|cjson\.new\s*\(\s*\)\s*\.decode\s*\(|dkjson\.decode\s*\(`,
+			ObjectType:  "cjson",
+			MethodName:  "cjson.decode",
+			Description: "JSON deserialized data from untrusted source",
+			Assigns:     "return",
+		},
+
+		// --- OpenResty request method ---
+		{
+			ID:          "lua.ngx.req.method",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `ngx\.req\.get_method\s*\(`,
+			ObjectType:  "ngx",
+			MethodName:  "ngx.req.get_method",
+			Description: "OpenResty request method string",
+			Assigns:     "return",
+		},
+
+		// --- File input ---
+		{
+			ID:          "lua.file.read",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangLua,
+			Pattern:     `file:read\s*\(|:read\s*\(\s*"\*a"|:read\s*\(\s*"\*l"`,
+			ObjectType:  "",
+			MethodName:  "file:read",
+			Description: "File handle read operation",
+			Assigns:     "return",
+		},
 	}
 }
