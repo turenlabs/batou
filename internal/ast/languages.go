@@ -21,6 +21,7 @@ import (
 	ts_typescript "github.com/smacker/go-tree-sitter/typescript/typescript"
 	"github.com/smacker/go-tree-sitter/yaml"
 
+	perlgrammar "github.com/turenio/gtss/internal/ast/perl"
 	"github.com/turenio/gtss/internal/rules"
 )
 
@@ -43,10 +44,10 @@ var langRegistry = map[rules.Language]*sitter.Language{
 	rules.LangRust:       rust.GetLanguage(),
 	rules.LangLua:        lua.GetLanguage(),
 	rules.LangGroovy:     groovy.GetLanguage(),
+	rules.LangPerl:       perlgrammar.GetLanguage(),
 	rules.LangShell:      bash.GetLanguage(),
 	rules.LangSQL:        sql.GetLanguage(),
 	rules.LangYAML:       yaml.GetLanguage(),
-	// Perl: no tree-sitter grammar available in smacker/go-tree-sitter.
 	// Docker/Terraform/JSON: not critical for security AST analysis.
 }
 

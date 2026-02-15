@@ -4,6 +4,8 @@
 
 GTSS provides deep security scanning for C source files, with particular emphasis on memory safety -- the dominant vulnerability class in C programs. Coverage spans four analysis layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). C is one of two languages (alongside C++) with dedicated memory safety rules.
 
+C taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `init_declarator` assignments and call expressions by walking the parsed AST. The walker handles C-specific patterns such as `pointer_declarator` wrapper nodes and `compound_statement` function bodies.
+
 ## Detection
 
 C files are identified by file extension in `internal/analyzer/analyzer.go`:

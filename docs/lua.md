@@ -4,6 +4,8 @@
 
 GTSS provides security scanning for Lua code, covering the standard library (`os`, `io`, `debug`, `load*`), OpenResty/ngx_lua (`ngx.req`, `ngx.var`, `ngx.say`, `ngx.redirect`), Redis Lua scripting (`KEYS`, `ARGV`, `redis.call`), LOVE2D (`love.filesystem`), database libraries (lua-resty-mysql, ngx_postgres), and serialization libraries (serpent, cjson). Lua is scanned through four analysis layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), taint source-to-sink tracking, and interprocedural call graph analysis.
 
+Lua taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `assignment_statement` assignments, `function_call` expressions, and `dot_index_expression` member accesses by walking the parsed AST. The walker handles Lua-specific patterns such as `function_body` child node types for function body extraction.
+
 ## Detection
 
 Lua files are identified by the `.lua` file extension. Detection is handled in `internal/analyzer/analyzer.go`:

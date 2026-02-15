@@ -4,6 +4,8 @@
 
 GTSS provides comprehensive security scanning for C# code, covering ASP.NET Core web applications, Entity Framework, Razor views, Blazor components, System.DirectoryServices (LDAP), and common .NET libraries. Analysis includes four layers: regex-based pattern rules (348 rules, including 10 C#-specific plus cross-language rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
 
+C# taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through variable declarations, assignments, and invocation expressions by walking the parsed AST. The walker handles C#-specific patterns such as `equals_value_clause` initializers in variable declarations.
+
 ## Detection
 
 C# files are identified by the `.cs` and `.csx` (C# script) file extensions. The `DetectLanguage` function in `internal/analyzer/analyzer.go` maps both extensions to the `LangCSharp` language constant.

@@ -4,6 +4,8 @@
 
 GTSS provides security scanning for Swift/iOS code, covering URLSession TLS validation, App Transport Security configuration, Keychain storage accessibility, WKWebView injection, SQLite injection, hardcoded secrets, insecure random number generation, insecure data storage, deprecated UIWebView usage, and jailbreak detection bypass patterns. Swift is supported through four analysis layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), taint source-to-sink tracking, and interprocedural call graph analysis.
 
+Swift taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `property_declaration` assignments, `call_expression` nodes, and `navigation_expression` member accesses by walking the parsed AST.
+
 ## Detection
 
 Swift files are identified by the `.swift` file extension. Detection is handled in `internal/analyzer/analyzer.go`:

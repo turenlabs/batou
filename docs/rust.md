@@ -4,6 +4,8 @@
 
 GTSS provides security scanning for Rust code, covering the standard library (`std::process`, `std::fs`, `std::mem`, `std::ptr`), popular web frameworks (Actix-web, Axum, Rocket, Warp), database libraries (sqlx, diesel, rusqlite), HTTP clients (reqwest, hyper), serialization (serde, bincode, rmp), and cryptographic patterns. Rust support includes 10 Rust-specific regex rules, taint source-to-sink tracking with 22 sources, 40 sinks, and 15 sanitizers.
 
+Rust taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `let_declaration` assignments (via `pattern` field), call expressions, and `field_expression` member accesses by walking the parsed AST. The walker handles Rust-specific patterns such as `::` scope resolution in method names (e.g., `Command::new`, `env::var`) and method chains like `env::var("CMD").unwrap()`.
+
 ## Detection
 
 Rust files are identified by the `.rs` file extension. Detection is handled in `internal/analyzer/analyzer.go`:

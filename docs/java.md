@@ -4,6 +4,8 @@
 
 GTSS provides comprehensive security scanning for Java code, covering Servlet-based web applications, Spring/Spring Boot, Hibernate/JPA, MyBatis, Thymeleaf, JSP, and common enterprise Java libraries. Analysis includes four layers: regex-based pattern rules (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), intraprocedural taint tracking with source-to-sink and sanitizer recognition (Layer 3), and interprocedural call graph analysis (Layer 4).
 
+Java taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through assignments, variable declarations, method invocations, and field accesses by walking the parsed AST rather than relying on regex patterns.
+
 ## Detection
 
 Java files are identified by the `.java` file extension. The `DetectLanguage` function in `internal/analyzer/analyzer.go` maps `.java` to the `LangJava` language constant. JSP files (`.jsp`) are not currently detected as a separate language type.

@@ -4,6 +4,8 @@
 
 GTSS provides deep security scanning for C++ code across four analysis layers: regex-based rules (Layer 1), tree-sitter AST structural analysis (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). C++ coverage emphasizes memory safety, which is the dominant vulnerability class in C/C++ codebases, while also covering injection, cryptographic misuse, secrets exposure, and other categories through both C++-specific and language-agnostic rules.
 
+C++ taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `init_declarator` assignments and call expressions by walking the parsed AST. The walker handles C++-specific patterns such as `pointer_declarator` wrapper nodes, `::` scope resolution in method names, and `compound_statement` function bodies.
+
 ## Detection
 
 C++ files are identified by file extension in `internal/analyzer/analyzer.go`:

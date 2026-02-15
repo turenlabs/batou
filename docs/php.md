@@ -4,6 +4,8 @@
 
 GTSS provides comprehensive security scanning for PHP code, covering native PHP functions, and framework-specific patterns for Laravel, Symfony/Twig, CodeIgniter, and WordPress. PHP analysis includes all four scanning layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4).
 
+PHP taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through assignments, variable declarations, function calls, and member call expressions by walking the parsed AST. This includes tracking PHP superglobals (`$_GET`, `$_POST`, `$_REQUEST`) as variable-name sources.
+
 ## Detection
 
 PHP files are identified by the `.php` file extension. The detection is case-insensitive and handled by `internal/analyzer/analyzer.go`:

@@ -524,6 +524,98 @@ def handler(input) {
 }
 
 // =========================================================================
+// Perl tests
+// =========================================================================
+
+func TestPerl_CommandInjection_CGIParam(t *testing.T) {
+	code := `
+use CGI;
+sub handler {
+    my $cgi = CGI->new;
+    my $cmd = $cgi->param("cmd");
+    system($cmd);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkCommand) {
+		t.Error("expected command injection flow for $cgi->param -> system()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_SQLInjection_DBIDo(t *testing.T) {
+	code := `
+use CGI;
+use DBI;
+sub handler {
+    my $cgi = CGI->new;
+    my $name = $cgi->param("name");
+    my $query = "SELECT * FROM users WHERE name = '" . $name . "'";
+    $dbi->do($query);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkSQLQuery) {
+		t.Error("expected SQL injection flow for $cgi->param -> string concat -> $dbi->do()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_CodeInjection_Eval(t *testing.T) {
+	code := `
+use CGI;
+sub handler {
+    my $cgi = CGI->new;
+    my $input = $cgi->param("expr");
+    eval($input);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkEval) {
+		t.Error("expected code injection flow for $cgi->param -> eval()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_Reassignment(t *testing.T) {
+	code := `
+use CGI;
+sub handler {
+    my $cgi = CGI->new;
+    my $cmd = $cgi->param("cmd");
+    my $alias = $cmd;
+    system($alias);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkCommand) {
+		t.Error("expected command injection flow through reassignment")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_NoSource_NoFlow(t *testing.T) {
+	code := `
+sub handler {
+    my $cmd = "ls -la";
+    system($cmd);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if hasTaintFlow(flows, taint.SnkCommand) {
+		t.Error("expected NO flow when command is a literal")
+	}
+}
+
+// =========================================================================
 // Supports tests
 // =========================================================================
 
@@ -533,7 +625,7 @@ func TestSupports(t *testing.T) {
 		rules.LangJava, rules.LangPHP, rules.LangRuby,
 		rules.LangC, rules.LangCPP, rules.LangCSharp,
 		rules.LangKotlin, rules.LangRust, rules.LangSwift,
-		rules.LangLua, rules.LangGroovy,
+		rules.LangLua, rules.LangGroovy, rules.LangPerl,
 	}
 	for _, lang := range supported {
 		if !Supports(lang) {

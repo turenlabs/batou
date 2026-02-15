@@ -4,6 +4,8 @@
 
 GTSS provides deep security scanning for Go code, covering the standard library (`net/http`, `database/sql`, `os/exec`, `crypto/*`), popular web frameworks (Gin, Echo, Fiber, Beego), routers (gorilla/mux, chi), ORMs (GORM), logging libraries (slog, zap, logrus), and cloud SDKs (AWS Lambda/SQS/S3, GCP Cloud Functions/Pub/Sub). Go is one of the most comprehensively covered languages, with Go-specific regex rules, taint source-to-sink tracking, and interprocedural call graph analysis.
 
+Go uses a dedicated AST-based taint engine (`internal/taint/astflow/`) built on `go/ast` rather than tree-sitter. This provides precise tracking through Go-specific constructs including channel sends/receives, select statements, goroutines, defer, and multiple return values.
+
 ## Detection
 
 Go files are identified by the `.go` file extension. Detection is handled in `internal/analyzer/analyzer.go`:
@@ -449,7 +451,7 @@ The following are known gaps or areas with reduced accuracy in Go coverage:
 
 - **Struct field propagation**: When tainted data is assigned to a struct field and later read from a different reference to the same struct, the taint engine may lose track. The 0.8x confidence decay for unknown function propagation means deeply nested data flows lose confidence.
 
-- **Goroutine boundaries**: Taint tracking does not follow data across goroutine boundaries (channel sends/receives). A tainted value sent on a channel and received in another goroutine will not be tracked.
+- **Goroutine boundaries**: The `astflow` engine tracks taint through channel sends (`ch <- tainted`) and channel receives (`val := <-ch`), and through `select` statement cases. However, taint propagation across goroutines is intraprocedural -- it works when the send and receive are in the same function scope or in inline goroutine closures, but not across separately defined functions.
 
 - **Build tags and conditional compilation**: Files with build tags (`//go:build`) are scanned regardless of their target platform. Platform-specific code that would never execute on a given platform may still produce findings.
 

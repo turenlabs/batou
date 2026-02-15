@@ -5,7 +5,8 @@
 // and attribute accesses. This provides more accurate tracking than the
 // regex-based engine for reassignment, aliasing, and complex expressions.
 //
-// Supported languages: Python, JavaScript, TypeScript, Java, PHP, Ruby.
+// Supported languages: Python, JavaScript, TypeScript, Java, PHP, Ruby,
+// C, C++, C#, Kotlin, Rust, Swift, Lua, Groovy, Perl.
 // Go uses its own go/ast-based analyzer in internal/taint/astflow.
 package tsflow
 

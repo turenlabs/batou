@@ -230,9 +230,9 @@ def greet(name) {
 
 func TestParse_UnsupportedLanguage(t *testing.T) {
 	src := []byte(`some content`)
-	tree := Parse(src, rules.LangPerl)
+	tree := Parse(src, rules.LangDocker)
 	if tree != nil {
-		t.Error("expected nil tree for unsupported language (Perl)")
+		t.Error("expected nil tree for unsupported language (Docker)")
 	}
 }
 
@@ -347,8 +347,11 @@ func TestSupportsLanguage(t *testing.T) {
 	if !SupportsLanguage(rules.LangPython) {
 		t.Error("expected Python to be supported")
 	}
-	if SupportsLanguage(rules.LangPerl) {
-		t.Error("expected Perl to NOT be supported")
+	if !SupportsLanguage(rules.LangPerl) {
+		t.Error("expected Perl to be supported")
+	}
+	if SupportsLanguage(rules.LangDocker) {
+		t.Error("expected Docker to NOT be supported")
 	}
 }
 

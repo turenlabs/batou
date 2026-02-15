@@ -4,6 +4,8 @@
 
 GTSS provides comprehensive security scanning for JavaScript and TypeScript codebases. Coverage spans server-side frameworks (Express, Fastify, Hapi, Nest.js, Next.js), client-side DOM APIs, React patterns, and common npm ecosystem libraries. Both JavaScript and TypeScript share the same taint analysis definitions, with TypeScript IDs prefixed `ts.` instead of `js.`.
 
+JavaScript and TypeScript taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through assignments, variable declarations, call expressions, and member expressions by walking the parsed AST rather than relying on regex patterns.
+
 Analysis runs in four layers:
 
 1. **Regex rules** -- pattern-based detection of known-vulnerable code constructs (348 rules)

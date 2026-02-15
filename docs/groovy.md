@@ -4,6 +4,8 @@
 
 GTSS provides comprehensive security scanning for Groovy code, covering Grails web applications, Jenkins pipeline scripts (Jenkinsfile), and general Groovy applications. Analysis includes four layers: regex-based pattern rules (348 rules, including 10 Groovy-specific rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
 
+Groovy taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through assignments, method calls, and property accesses by walking the parsed AST rather than relying on regex patterns.
+
 Groovy runs on the JVM and shares many security concerns with Java, but introduces unique risks through GString interpolation, the `.execute()` method on strings, and Jenkins pipeline DSL patterns.
 
 ## Detection

@@ -4,6 +4,8 @@
 
 GTSS provides comprehensive security scanning for Python code, covering web frameworks (Flask, Django, FastAPI, aiohttp, Tornado, Starlette), cloud platforms (AWS Lambda, GCP Cloud Functions, Azure Functions), and standard library patterns. Analysis operates at four layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis (Layer 2), intraprocedural taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4).
 
+Python taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through assignments, variable declarations, function calls, and attribute accesses by walking the parsed AST rather than relying on regex patterns.
+
 ## Detection
 
 Python files are identified by file extension:

@@ -53,6 +53,7 @@ var configs = map[rules.Language]*langConfig{
 	rules.LangSwift:      swiftConfig(),
 	rules.LangLua:        luaConfig(),
 	rules.LangGroovy:     groovyConfig(),
+	rules.LangPerl:       perlConfig(),
 }
 
 func getConfig(lang rules.Language) *langConfig {
@@ -1617,6 +1618,225 @@ func groovyExtractParams(n *ast.Node) []string {
 			}
 		}
 	}
+	return names
+}
+
+// ---------------------------------------------------------------------------
+// Perl
+// ---------------------------------------------------------------------------
+
+func perlConfig() *langConfig {
+	return &langConfig{
+		language:  rules.LangPerl,
+		funcTypes: map[string]bool{"subroutine_declaration_statement": true},
+		callTypes: map[string]bool{
+			"function_call_expression":            true,
+			"method_call_expression":              true,
+			"ambiguous_function_call_expression":  true,
+			"eval_expression":                     true,
+		},
+		assignTypes:  map[string]bool{"assignment_expression": true},
+		varDeclTypes: map[string]bool{},
+		identType:    "varname",
+		attrTypes:    map[string]bool{"hash_element_expression": true, "array_element_expression": true},
+
+		extractCallName: func(n *ast.Node) string {
+			switch n.Type() {
+			case "method_call_expression":
+				m := n.ChildByFieldName("method")
+				if m != nil {
+					return m.Text()
+				}
+			case "function_call_expression", "ambiguous_function_call_expression":
+				fn := n.ChildByFieldName("function")
+				if fn != nil {
+					return fn.Text()
+				}
+			case "eval_expression":
+				return "eval"
+			}
+			return ""
+		},
+		extractCallReceiver: func(n *ast.Node) string {
+			if n.Type() != "method_call_expression" {
+				return ""
+			}
+			inv := n.ChildByFieldName("invocant")
+			if inv == nil {
+				return ""
+			}
+			return perlVarName(inv)
+		},
+		extractAssignLHS: func(n *ast.Node) string {
+			lhs := n.ChildByFieldName("left")
+			if lhs == nil {
+				return ""
+			}
+			// my $x = ... → variable_declaration wrapping a scalar
+			if lhs.Type() == "variable_declaration" {
+				v := lhs.ChildByFieldName("variable")
+				if v == nil {
+					v = lhs.ChildByFieldName("variables")
+				}
+				if v != nil {
+					return perlVarName(v)
+				}
+				// Fallback: find first scalar child
+				for i := 0; i < lhs.ChildCount(); i++ {
+					c := lhs.Child(i)
+					if c.Type() == "scalar" || c.Type() == "array" || c.Type() == "hash" {
+						return perlVarName(c)
+					}
+				}
+				return ""
+			}
+			return perlVarName(lhs)
+		},
+		extractAssignRHS: func(n *ast.Node) *ast.Node {
+			return n.ChildByFieldName("right")
+		},
+		extractAttrName: func(n *ast.Node) string {
+			// hash_element_expression: return "%VARNAME" to match catalog entries like "%ENV"
+			if n.Type() == "hash_element_expression" {
+				h := n.ChildByFieldName("hash")
+				if h != nil {
+					name := perlVarName(h)
+					if name != "" {
+						return "%" + name
+					}
+				}
+				return ""
+			}
+			// array_element_expression: return "@VARNAME" to match catalog entries like "@ARGV"
+			if n.Type() == "array_element_expression" {
+				a := n.ChildByFieldName("array")
+				if a != nil {
+					name := perlVarName(a)
+					if name != "" {
+						return "@" + name
+					}
+				}
+				return ""
+			}
+			return ""
+		},
+		extractAttrReceiver: func(n *ast.Node) string {
+			if n.Type() == "hash_element_expression" {
+				h := n.ChildByFieldName("hash")
+				if h != nil {
+					return perlVarName(h)
+				}
+			}
+			if n.Type() == "array_element_expression" {
+				a := n.ChildByFieldName("array")
+				if a != nil {
+					return perlVarName(a)
+				}
+			}
+			return ""
+		},
+		extractCallArgs: perlExtractCallArgs,
+		extractFuncName: func(n *ast.Node) string {
+			name := n.ChildByFieldName("name")
+			if name != nil {
+				return name.Text()
+			}
+			return ""
+		},
+		extractFuncBody: func(n *ast.Node) *ast.Node {
+			return n.ChildByFieldName("body")
+		},
+		extractFuncParams: perlExtractParams,
+	}
+}
+
+// perlVarName extracts the bare variable name from a Perl variable node.
+// Handles scalar ($x), array (@a), hash (%h), container_variable, and bareword nodes.
+func perlVarName(n *ast.Node) string {
+	if n == nil {
+		return ""
+	}
+	switch n.Type() {
+	case "scalar", "array", "hash", "container_variable":
+		// These nodes contain a sigil child (anon) and a varname child (named).
+		for i := 0; i < n.ChildCount(); i++ {
+			c := n.Child(i)
+			if c.Type() == "varname" {
+				return c.Text()
+			}
+		}
+	case "bareword":
+		return n.Text()
+	case "varname":
+		return n.Text()
+	}
+	// Fallback: try to find a varname descendant.
+	var name string
+	n.Walk(func(c *ast.Node) bool {
+		if c.Type() == "varname" {
+			name = c.Text()
+			return false
+		}
+		return true
+	})
+	return name
+}
+
+func perlExtractCallArgs(n *ast.Node) []*ast.Node {
+	// eval_expression: arguments are unnamed named children (skip the 'eval' keyword)
+	if n.Type() == "eval_expression" {
+		var out []*ast.Node
+		for i := 0; i < n.ChildCount(); i++ {
+			c := n.Child(i)
+			if c.IsNamed() {
+				out = append(out, c)
+			}
+		}
+		return out
+	}
+
+	args := n.ChildByFieldName("arguments")
+	if args == nil {
+		return nil
+	}
+
+	// If arguments is a list_expression, return its named children.
+	if args.Type() == "list_expression" {
+		var out []*ast.Node
+		for i := 0; i < args.ChildCount(); i++ {
+			c := args.Child(i)
+			if c.IsNamed() {
+				out = append(out, c)
+			}
+		}
+		return out
+	}
+
+	// Single argument.
+	return []*ast.Node{args}
+}
+
+func perlExtractParams(n *ast.Node) []string {
+	// Modern Perl signatures: sub foo ($name, $age) { ... }
+	// Look for a signature or prototype_or_signature child.
+	var sigNode *ast.Node
+	for i := 0; i < n.ChildCount(); i++ {
+		c := n.Child(i)
+		if c.Type() == "signature" || c.Type() == "prototype_or_signature" {
+			sigNode = c
+			break
+		}
+	}
+	if sigNode == nil {
+		return nil
+	}
+	var names []string
+	sigNode.Walk(func(c *ast.Node) bool {
+		if c.Type() == "varname" {
+			names = append(names, c.Text())
+		}
+		return true
+	})
 	return names
 }
 

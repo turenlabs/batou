@@ -4,6 +4,8 @@
 
 GTSS provides security scanning for Kotlin code, covering Android applications (SQLite, WebView, Intent, SharedPreferences, exported components), Ktor server-side applications, Spring Boot Kotlin, and kotlinx.serialization. Analysis includes four layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
 
+Kotlin taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `property_declaration` assignments, `call_expression` nodes, and `navigation_expression` member accesses by walking the parsed AST. The walker handles Kotlin-specific patterns such as nested `variable_declaration` wrappers and `simple_identifier` nodes.
+
 ## Detection
 
 Kotlin files are identified by the `.kt` and `.kts` file extensions. The `DetectLanguage` function in `internal/analyzer/analyzer.go` maps these extensions to the `LangKotlin` language constant.
