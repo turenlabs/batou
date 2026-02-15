@@ -257,5 +257,69 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
 			Description: "URL hostname extraction for domain allowlist validation",
 		},
+
+		// --- Path sanitizers ---
+		{
+			ID:          "go.filepath.clean",
+			Language:    rules.LangGo,
+			Pattern:     `filepath\.Clean\(`,
+			ObjectType:  "",
+			MethodName:  "Clean",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Filepath cleaning (resolves . and .. components)",
+		},
+		{
+			ID:          "go.filepath.abs",
+			Language:    rules.LangGo,
+			Pattern:     `filepath\.Abs\(`,
+			ObjectType:  "",
+			MethodName:  "Abs",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Absolute path resolution (anchors path to prevent traversal)",
+		},
+
+		// --- Regex validation ---
+		{
+			ID:          "go.regexp.matchstring",
+			Language:    rules.LangGo,
+			Pattern:     `regexp\.MatchString\(|\.MatchString\(`,
+			ObjectType:  "",
+			MethodName:  "MatchString",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Regex match validation (allowlist pattern check)",
+		},
+
+		// --- String trimming ---
+		{
+			ID:          "go.strings.trimspace",
+			Language:    rules.LangGo,
+			Pattern:     `strings\.TrimSpace\(`,
+			ObjectType:  "",
+			MethodName:  "TrimSpace",
+			Neutralizes: []taint.SinkCategory{taint.SnkHeader, taint.SnkLog},
+			Description: "Whitespace trimming (prevents header injection via leading/trailing control chars)",
+		},
+
+		// --- URL parse for hostname validation ---
+		{
+			ID:          "go.url.parse",
+			Language:    rules.LangGo,
+			Pattern:     `url\.Parse\(`,
+			ObjectType:  "",
+			MethodName:  "Parse",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URL parsing for hostname/scheme validation (SSRF prevention)",
+		},
+
+		// --- LDAP filter escaping ---
+		{
+			ID:          "go.ldap.escapefilter",
+			Language:    rules.LangGo,
+			Pattern:     `ldap\.EscapeFilter\(`,
+			ObjectType:  "",
+			MethodName:  "EscapeFilter",
+			Neutralizes: []taint.SinkCategory{taint.SnkLDAP},
+			Description: "LDAP filter escaping (prevents LDAP injection)",
+		},
 	}
 }

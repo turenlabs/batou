@@ -65,5 +65,21 @@ func (javaCatalog) Sources() []taint.SourceDef {
 		{ID: "java.gcp.cloudfunctions.event", Category: taint.SrcExternal, Language: rules.LangJava, Pattern: `implements\s+(?:HttpFunction|BackgroundFunction|CloudEventsFunction)`, ObjectType: "com.google.cloud.functions", MethodName: "service", Description: "GCP Cloud Functions event data from external trigger", Assigns: "return"},
 		// GCP Pub/Sub pull
 		{ID: "java.gcp.pubsub.pull", Category: taint.SrcExternal, Language: rules.LangJava, Pattern: `subscriber\.pull\s*\(|\.pullMessages\s*\(`, ObjectType: "SubscriptionAdminClient", MethodName: "pull", Description: "GCP Pub/Sub message data", Assigns: "return"},
+
+		// JAX-RS annotations
+		{ID: "java.jaxrs.queryparam", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `@QueryParam`, ObjectType: "JAX-RS", MethodName: "@QueryParam", Description: "JAX-RS query parameter annotation", Assigns: "return"},
+		{ID: "java.jaxrs.pathparam", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `@PathParam`, ObjectType: "JAX-RS", MethodName: "@PathParam", Description: "JAX-RS path parameter annotation", Assigns: "return"},
+		{ID: "java.jaxrs.formparam", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `@FormParam`, ObjectType: "JAX-RS", MethodName: "@FormParam", Description: "JAX-RS form parameter annotation", Assigns: "return"},
+		{ID: "java.jaxrs.headerparam", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `@HeaderParam`, ObjectType: "JAX-RS", MethodName: "@HeaderParam", Description: "JAX-RS header parameter annotation", Assigns: "return"},
+
+		// Spring WebFlux
+		{ID: "java.spring.webflux.serverrequest", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `ServerRequest.*\.queryParam\s*\(|ServerRequest.*\.bodyToMono\s*\(`, ObjectType: "ServerRequest", MethodName: "queryParam/bodyToMono", Description: "Spring WebFlux reactive request input", Assigns: "return"},
+
+		// JAXB deserialization
+		{ID: "java.jaxb.unmarshal", Category: taint.SrcDeserialized, Language: rules.LangJava, Pattern: `(?:Unmarshaller|unmarshaller)\.unmarshal\s*\(`, ObjectType: "Unmarshaller", MethodName: "unmarshal", Description: "JAXB XML deserialized data", Assigns: "return"},
+
+		// Servlet additional parameter sources
+		{ID: "java.servlet.getparametervalues", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getParameterValues\s*\(`, ObjectType: "HttpServletRequest", MethodName: "getParameterValues", Description: "HTTP request parameter values array", Assigns: "return"},
+		{ID: "java.servlet.getparametermap", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getParameterMap\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getParameterMap", Description: "HTTP request all parameters map", Assigns: "return"},
 	}
 }

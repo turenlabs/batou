@@ -116,5 +116,69 @@ func (c *SwiftCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
 			Description: "Manual HTML entity escaping",
 		},
+
+		// --- Vapor Leaf auto-escaping ---
+		{
+			ID:          "swift.leaf.autoescape",
+			Language:    rules.LangSwift,
+			Pattern:     `LeafRenderer|\.leaf\s*\(`,
+			ObjectType:  "Leaf",
+			MethodName:  "LeafRenderer",
+			Neutralizes: []taint.SinkCategory{taint.SnkTemplate, taint.SnkHTMLOutput},
+			Description: "Leaf template engine with auto-escaping",
+		},
+
+		// --- GRDB parameterized queries ---
+		{
+			ID:          "swift.grdb.statement",
+			Language:    rules.LangSwift,
+			Pattern:     `Statement\(\s*sql:.*arguments:|\.arguments\s*=\s*StatementArguments`,
+			ObjectType:  "GRDB",
+			MethodName:  "Statement with arguments",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "GRDB parameterized SQL statement",
+		},
+		{
+			ID:          "swift.fmdb.parameterized",
+			Language:    rules.LangSwift,
+			Pattern:     `\.executeQuery\s*\([^,]+,\s*withArgumentsIn:|\.executeUpdate\s*\([^,]+,\s*withArgumentsIn:`,
+			ObjectType:  "FMDatabase",
+			MethodName:  "executeQuery withArgumentsIn",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "FMDB parameterized query with argument binding",
+		},
+
+		// --- NSRegularExpression validation ---
+		{
+			ID:          "swift.nsregularexpression",
+			Language:    rules.LangSwift,
+			Pattern:     `NSRegularExpression\(.*\)\.matches\(|NSPredicate\(format:\s*"SELF MATCHES`,
+			ObjectType:  "NSRegularExpression",
+			MethodName:  "matches/NSPredicate MATCHES",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
+			Description: "Regex-based input validation",
+		},
+
+		// --- Secure Keychain archiver ---
+		{
+			ID:          "swift.nskeyedarchiver.secure",
+			Language:    rules.LangSwift,
+			Pattern:     `NSKeyedUnarchiver\.unarchivedObject\(\s*ofClass:|requiresSecureCoding\s*=\s*true`,
+			ObjectType:  "NSKeyedUnarchiver",
+			MethodName:  "unarchivedObject(ofClass:)",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Secure coding validation for deserialization",
+		},
+
+		// --- Double conversion ---
+		{
+			ID:          "swift.double.init",
+			Language:    rules.LangSwift,
+			Pattern:     `Double\(\s*\w+\s*\)|Float\(\s*\w+\s*\)`,
+			ObjectType:  "",
+			MethodName:  "Double(_:)/Float(_:)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Floating-point conversion restricts to numeric values",
+		},
 	}
 }

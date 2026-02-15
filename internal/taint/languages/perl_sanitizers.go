@@ -44,5 +44,20 @@ func (perlCatalog) Sanitizers() []taint.SanitizerDef {
 		// Crypto sanitizers
 		{ID: "perl.crypt.urandom", Language: rules.LangPerl, Pattern: `Crypt::URandom|urandom_ub\s*\(`, ObjectType: "Crypt::URandom", MethodName: "urandom", Neutralizes: []taint.SinkCategory{taint.SnkCrypto}, Description: "Cryptographically secure random generation"},
 		{ID: "perl.crypt.bcrypt", Language: rules.LangPerl, Pattern: `Crypt::Bcrypt|bcrypt\s*\(`, ObjectType: "Crypt::Bcrypt", MethodName: "bcrypt", Neutralizes: []taint.SinkCategory{taint.SnkCrypto}, Description: "Bcrypt password hashing"},
+
+		// Template auto-escaping
+		{ID: "perl.tt.autoescape", Language: rules.LangPerl, Pattern: `html_filter|Template.*FILTERS|ENCODING\s*=>\s*1`, ObjectType: "Template::Toolkit", MethodName: "html_filter", Neutralizes: []taint.SinkCategory{taint.SnkTemplate, taint.SnkHTMLOutput}, Description: "Template::Toolkit HTML filtering/encoding"},
+
+		// Mojolicious input validation
+		{ID: "perl.mojo.validation", Language: rules.LangPerl, Pattern: `\$c->validation|\$self->validation|Mojolicious::Validator`, ObjectType: "Mojolicious::Validator", MethodName: "validation", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput}, Description: "Mojolicious input validation"},
+
+		// XML safe options
+		{ID: "perl.xml.libxml.safe", Language: rules.LangPerl, Pattern: `no_network\s*=>\s*1|expand_entities\s*=>\s*0|load_ext_dtd\s*=>\s*0`, ObjectType: "XML::LibXML", MethodName: "safe parser options", Neutralizes: []taint.SinkCategory{taint.SnkXPath, taint.SnkDeserialize}, Description: "XML::LibXML parser with safe options (XXE prevention)"},
+
+		// Dancer2 input validation
+		{ID: "perl.dancer2.validation", Language: rules.LangPerl, Pattern: `Dancer2::Plugin::FormValidator|validated_params`, ObjectType: "Dancer2", MethodName: "FormValidator", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput}, Description: "Dancer2 form validation plugin"},
+
+		// Catalyst input validation
+		{ID: "perl.catalyst.validate", Language: rules.LangPerl, Pattern: `Catalyst::Plugin::FormValidator|\$c->form`, ObjectType: "Catalyst", MethodName: "FormValidator", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput}, Description: "Catalyst form validation plugin"},
 	}
 }

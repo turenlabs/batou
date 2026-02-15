@@ -94,5 +94,27 @@ func (cppCatalog) Sinks() []taint.SinkDef {
 
 		// ── Redirect ──────────────────────────────────────────────────
 		{ID: "cpp.crow.redirect", Category: taint.SnkRedirect, Language: rules.LangCPP, Pattern: `crow::response\s*\(\s*30[12]|res\.redirect\s*\(`, ObjectType: "crow::response", MethodName: "redirect", DangerousArgs: []int{0}, Severity: rules.High, Description: "HTTP redirect with user-controlled URL", CWEID: "CWE-601", OWASPCategory: "A01:2021-Broken Access Control"},
+
+		// ── LDAP injection ────────────────────────────────────────────
+		{ID: "cpp.ldap.search", Category: taint.SnkLDAP, Language: rules.LangCPP, Pattern: `ldap_search(?:_ext)?(?:_s)?\s*\(`, ObjectType: "", MethodName: "ldap_search", DangerousArgs: []int{3}, Severity: rules.High, Description: "LDAP search with tainted filter", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+		{ID: "cpp.ldap.search.st", Category: taint.SnkLDAP, Language: rules.LangCPP, Pattern: `ldap_search_st\s*\(`, ObjectType: "", MethodName: "ldap_search_st", DangerousArgs: []int{3}, Severity: rules.High, Description: "OpenLDAP search with tainted filter and timeout", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+
+		// ── HTTP header injection ─────────────────────────────────────
+		{ID: "cpp.crow.header", Category: taint.SnkHeader, Language: rules.LangCPP, Pattern: `res\.set_header\s*\(|res\.add_header\s*\(`, ObjectType: "crow::response", MethodName: "set_header/add_header", DangerousArgs: []int{1}, Severity: rules.Medium, Description: "Crow HTTP response header with tainted value", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
+		{ID: "cpp.pistache.header", Category: taint.SnkHeader, Language: rules.LangCPP, Pattern: `response\.headers\s*\(\s*\)\s*\.add\s*\(|response\.headers\s*\(\s*\)\s*\.addRaw\s*\(`, ObjectType: "Pistache::Http::ResponseWriter", MethodName: "headers().add/addRaw", DangerousArgs: []int{1}, Severity: rules.Medium, Description: "Pistache HTTP response header with tainted value", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
+		{ID: "cpp.httplib.header", Category: taint.SnkHeader, Language: rules.LangCPP, Pattern: `res\.set_header\s*\(`, ObjectType: "httplib::Response", MethodName: "set_header", DangerousArgs: []int{1}, Severity: rules.Medium, Description: "cpp-httplib response header with tainted value", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
+		{ID: "cpp.drogon.header", Category: taint.SnkHeader, Language: rules.LangCPP, Pattern: `resp->addHeader\s*\(`, ObjectType: "drogon::HttpResponse", MethodName: "addHeader", DangerousArgs: []int{1}, Severity: rules.Medium, Description: "Drogon response header with tainted value", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
+
+		// ── SSRF - Boost.Beast HTTP ───────────────────────────────────
+		{ID: "cpp.boost.beast.http.write", Category: taint.SnkURLFetch, Language: rules.LangCPP, Pattern: `http::async_write\s*\(|http::write\s*\(`, ObjectType: "boost::beast::http", MethodName: "write/async_write", DangerousArgs: []int{1}, Severity: rules.High, Description: "Boost.Beast HTTP request write (SSRF if URL is tainted)", CWEID: "CWE-918", OWASPCategory: "A10:2021-Server-Side Request Forgery"},
+
+		// ── Process creation (Windows) ────────────────────────────────
+		{ID: "cpp.createprocess", Category: taint.SnkCommand, Language: rules.LangCPP, Pattern: `\bCreateProcess\w*\s*\(`, ObjectType: "", MethodName: "CreateProcess", DangerousArgs: []int{0, 1}, Severity: rules.Critical, Description: "Windows process creation with tainted arguments", CWEID: "CWE-78", OWASPCategory: "A03:2021-Injection"},
+
+		// ── Template injection ────────────────────────────────────────
+		{ID: "cpp.inja.render", Category: taint.SnkTemplate, Language: rules.LangCPP, Pattern: `inja::render\s*\(|inja::Environment.*\.render\s*\(`, ObjectType: "inja", MethodName: "render", DangerousArgs: []int{0}, Severity: rules.High, Description: "Inja template rendering with tainted data", CWEID: "CWE-1336", OWASPCategory: "A03:2021-Injection"},
+
+		// ── Dynamic library loading ───────────────────────────────────
+		{ID: "cpp.dlopen", Category: taint.SnkEval, Language: rules.LangCPP, Pattern: `\bdlopen\s*\(`, ObjectType: "", MethodName: "dlopen", DangerousArgs: []int{0}, Severity: rules.High, Description: "Dynamic library loading with tainted path", CWEID: "CWE-829", OWASPCategory: "A08:2021-Software and Data Integrity Failures"},
 	}
 }

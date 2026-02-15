@@ -383,6 +383,79 @@ func csharpCoreSinks() []taint.SinkDef {
 			CWEID:         "CWE-1333",
 			OWASPCategory: "A03:2021-Injection",
 		},
+
+		// --- Template Injection (CWE-1336) ---
+		{
+			ID:            "csharp.razorengine.compile",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangCSharp,
+			Pattern:       `Engine\.Razor\.RunCompile\s*\(|RazorEngine.*\.RunCompile\s*\(|Razor\.Compile\s*\(`,
+			ObjectType:    "RazorEngine",
+			MethodName:    "Engine.Razor.RunCompile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "RazorEngine template compilation with potentially tainted template string",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "csharp.scriban.render",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangCSharp,
+			Pattern:       `Template\.Parse\s*\(.*\.Render\s*\(|Scriban.*\.Render\s*\(`,
+			ObjectType:    "Scriban",
+			MethodName:    "Template.Parse.Render",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Scriban template rendering with potentially tainted template",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- XPath Injection (CWE-643) ---
+		{
+			ID:            "csharp.xpath.selectnodes",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangCSharp,
+			Pattern:       `\.SelectNodes\s*\(|\.SelectSingleNode\s*\(|XPathExpression\.Compile\s*\(`,
+			ObjectType:    "XmlNode",
+			MethodName:    "SelectNodes/SelectSingleNode",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "XPath query with potentially tainted expression",
+			CWEID:         "CWE-643",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- HTTP Header Injection (CWE-113) ---
+		{
+			ID:            "csharp.response.headers",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangCSharp,
+			Pattern:       `Response\.Headers\.Add\(|Response\.Headers\.Append\(|Response\.Headers\[`,
+			ObjectType:    "HttpResponse",
+			MethodName:    "Response.Headers.Add/Append",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "HTTP response header with potentially tainted value",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Dynamic LINQ (CWE-89) ---
+		{
+			ID:            "csharp.dynamiclinq",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangCSharp,
+			Pattern:       `\.Where\s*\(\s*"[^"]*\+|\.OrderBy\s*\(\s*"[^"]*\+`,
+			ObjectType:    "Dynamic LINQ",
+			MethodName:    "Dynamic LINQ Where/OrderBy",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Dynamic LINQ with string concatenation (injection risk)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
 	}
 }
 

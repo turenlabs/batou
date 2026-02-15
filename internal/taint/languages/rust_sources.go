@@ -244,5 +244,107 @@ func (c *RustCatalog) Sources() []taint.SourceDef {
 			Description: "JSON deserialization from byte slice",
 			Assigns:     "return",
 		},
+
+		// --- Actix-web headers/cookies ---
+		{
+			ID:          "rust.actix.headers",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `req\.headers\(\)|\.get_header\(`,
+			ObjectType:  "actix_web",
+			MethodName:  "headers",
+			Description: "Actix-web request headers",
+			Assigns:     "return",
+		},
+		{
+			ID:          "rust.actix.cookie",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `req\.cookie\s*\(`,
+			ObjectType:  "actix_web",
+			MethodName:  "cookie",
+			Description: "Actix-web request cookie",
+			Assigns:     "return",
+		},
+
+		// --- Axum Form/headers ---
+		{
+			ID:          "rust.axum.form",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `extract::Form`,
+			ObjectType:  "axum",
+			MethodName:  "extract::Form",
+			Description: "Axum form data extraction",
+			Assigns:     "return",
+		},
+		{
+			ID:          "rust.axum.headers",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `extract::TypedHeader|HeaderMap`,
+			ObjectType:  "axum",
+			MethodName:  "TypedHeader/HeaderMap",
+			Description: "Axum request headers extraction",
+			Assigns:     "return",
+		},
+
+		// --- Warp path/header ---
+		{
+			ID:          "rust.warp.path",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `warp::path::param`,
+			ObjectType:  "warp",
+			MethodName:  "warp::path::param",
+			Description: "Warp path parameter filter",
+			Assigns:     "return",
+		},
+		{
+			ID:          "rust.warp.header",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `warp::header`,
+			ObjectType:  "warp",
+			MethodName:  "warp::header",
+			Description: "Warp header filter",
+			Assigns:     "return",
+		},
+
+		// --- Poem framework ---
+		{
+			ID:          "rust.poem.query",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `poem::web::Query|poem::web::Form|poem::web::Json`,
+			ObjectType:  "poem",
+			MethodName:  "poem::web::Query/Form/Json",
+			Description: "Poem framework input extraction",
+			Assigns:     "return",
+		},
+
+		// --- Tide framework ---
+		{
+			ID:          "rust.tide.request",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `req\.query\s*\(|req\.body_string\s*\(|req\.body_json\s*\(`,
+			ObjectType:  "tide",
+			MethodName:  "tide request",
+			Description: "Tide framework request input",
+			Assigns:     "return",
+		},
+
+		// --- TOML/YAML deserialization ---
+		{
+			ID:          "rust.toml.from_str",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangRust,
+			Pattern:     `toml::from_str\s*\(|serde_yaml::from_str\s*\(|serde_yaml::from_reader\s*\(`,
+			ObjectType:  "toml/serde_yaml",
+			MethodName:  "toml/yaml::from_str",
+			Description: "TOML or YAML deserialization from string",
+			Assigns:     "return",
+		},
 	}
 }

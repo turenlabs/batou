@@ -330,5 +330,65 @@ func (c *GoCatalog) Sources() []taint.SourceDef {
 			Description: "GCP Pub/Sub message data",
 			Assigns:     "return",
 		},
+
+		// --- Standard library: os (file read) ---
+		{
+			ID:          "go.os.readfile",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangGo,
+			Pattern:     `os\.ReadFile\(`,
+			ObjectType:  "",
+			MethodName:  "ReadFile",
+			Description: "File contents from os.ReadFile",
+			Assigns:     "return",
+		},
+
+		// --- Standard library: net (dial) ---
+		{
+			ID:          "go.net.dial",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangGo,
+			Pattern:     `net\.Dial\(`,
+			ObjectType:  "",
+			MethodName:  "Dial",
+			Description: "Network connection dial",
+			Assigns:     "return",
+		},
+
+		// --- gorilla/websocket ---
+		{
+			ID:          "go.gorilla.websocket.readmessage",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangGo,
+			Pattern:     `\.ReadMessage\(`,
+			ObjectType:  "*websocket.Conn",
+			MethodName:  "ReadMessage",
+			Description: "WebSocket message read",
+			Assigns:     "return",
+		},
+
+		// --- Viper configuration ---
+		{
+			ID:          "go.viper.get",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangGo,
+			Pattern:     `viper\.Get\w*\(`,
+			ObjectType:  "viper",
+			MethodName:  "Get*",
+			Description: "Viper configuration value (potentially from untrusted config)",
+			Assigns:     "return",
+		},
+
+		// --- Cobra CLI framework ---
+		{
+			ID:          "go.cobra.args",
+			Category:    taint.SrcCLIArg,
+			Language:    rules.LangGo,
+			Pattern:     `cobra\.Command.*\.Args|cmd\.Flags\(\)\.GetString\(`,
+			ObjectType:  "*cobra.Command",
+			MethodName:  "Args/Flags.GetString",
+			Description: "Cobra CLI framework arguments",
+			Assigns:     "return",
+		},
 	}
 }
