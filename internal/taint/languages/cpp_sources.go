@@ -67,5 +67,14 @@ func (cppCatalog) Sources() []taint.SourceDef {
 		// ── Deserialization sources ────────────────────────────────────
 		{ID: "cpp.boost.serialization", Category: taint.SrcDeserialized, Language: rules.LangCPP, Pattern: `boost::archive::\w+_iarchive`, ObjectType: "boost::archive", MethodName: "input_archive", Description: "Boost.Serialization deserialized data", Assigns: "return"},
 		{ID: "cpp.protobuf.parsefromstring", Category: taint.SrcDeserialized, Language: rules.LangCPP, Pattern: `\.ParseFromString\s*\(|\.ParseFromArray\s*\(`, ObjectType: "google::protobuf::Message", MethodName: "ParseFromString", Description: "Protocol Buffers deserialized data", Assigns: "return"},
+
+		// ── Boost.Beast HTTP header sources ───────────────────────────
+		{ID: "cpp.boost.beast.http.request.header", Category: taint.SrcUserInput, Language: rules.LangCPP, Pattern: `(?:request|req)\[http::field::\w+\]|(?:request|req)\.at\s*\(\s*http::field::`, ObjectType: "boost::beast::http::request", MethodName: "header_field", Description: "Boost.Beast HTTP request header field", Assigns: "return"},
+
+		// ── Drogon HTTP sources ───────────────────────────────────────
+		{ID: "cpp.drogon.request.input", Category: taint.SrcUserInput, Language: rules.LangCPP, Pattern: `req->(?:getParameter|getBody|getCookie|getHeader)\s*\(`, ObjectType: "drogon::HttpRequest", MethodName: "getParameter/getBody/getCookie/getHeader", Description: "Drogon HTTP request input", Assigns: "return"},
+
+		// ── POCO HTTP sources ────────────────────────────────────────
+		{ID: "cpp.poco.httpserverrequest.input", Category: taint.SrcUserInput, Language: rules.LangCPP, Pattern: `request\.(?:get|getURI|getHost)\s*\(`, ObjectType: "Poco::Net::HTTPServerRequest", MethodName: "get/getURI/getHost", Description: "POCO HTTP server request input", Assigns: "return"},
 	}
 }

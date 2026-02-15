@@ -62,5 +62,19 @@ func (rubyCatalog) Sanitizers() []taint.SanitizerDef {
 		// Infrastructure / Network Sanitizers
 		{ID: "ruby.ipaddr.validate", Language: rules.LangRuby, Pattern: `IPAddr\.new\s*\(|\.include\?\s*\(`, ObjectType: "IPAddr", MethodName: "IPAddr.new/include?", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch}, Description: "IP address parsing and CIDR range validation (SSRF prevention)"},
 		{ID: "ruby.uri.parse.host", Language: rules.LangRuby, Pattern: `URI\.parse\s*\(.*\.host`, ObjectType: "URI", MethodName: "URI.parse.host", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect}, Description: "URL hostname extraction for domain allowlist validation"},
-		}
+
+		// LDAP sanitization
+		{ID: "ruby.net_ldap.filter.escape", Language: rules.LangRuby, Pattern: `Net::LDAP::Filter\.escape\s*\(`, ObjectType: "Net::LDAP::Filter", MethodName: "escape", Neutralizes: []taint.SinkCategory{taint.SnkLDAP}, Description: "Net::LDAP escape filter"},
+
+		// XPath sanitization
+		{ID: "ruby.nokogiri.noblanks", Language: rules.LangRuby, Pattern: `Nokogiri::XML\s*\(.*NOBLANKS`, ObjectType: "Nokogiri::XML", MethodName: "XML(NOBLANKS)", Neutralizes: []taint.SinkCategory{taint.SnkXPath}, Description: "Nokogiri NOBLANKS"},
+		{ID: "ruby.rexml.entity_expansion_limit", Language: rules.LangRuby, Pattern: `REXML::Document\.entity_expansion_text_limit`, ObjectType: "REXML::Document", MethodName: "entity_expansion_text_limit", Neutralizes: []taint.SinkCategory{taint.SnkXPath}, Description: "REXML safe"},
+
+		// Template sanitization
+		{ID: "ruby.liquid.auto_escape", Language: rules.LangRuby, Pattern: `Liquid::Template\.parse\s*\(.*\.render\s*\(`, ObjectType: "Liquid::Template", MethodName: "parse.render", Neutralizes: []taint.SinkCategory{taint.SnkTemplate}, Description: "Liquid safe"},
+
+		// Path sanitization
+		{ID: "ruby.pathname.cleanpath", Language: rules.LangRuby, Pattern: `Pathname\.new\s*\(.*\.cleanpath`, ObjectType: "Pathname", MethodName: "cleanpath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Pathname cleanpath"},
+		{ID: "ruby.file.expand_path", Language: rules.LangRuby, Pattern: `File\.expand_path\s*\(`, ObjectType: "File", MethodName: "expand_path", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "File.expand_path"},
+	}
 }

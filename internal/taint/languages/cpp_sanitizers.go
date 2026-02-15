@@ -67,5 +67,21 @@ func (cppCatalog) Sanitizers() []taint.SanitizerDef {
 
 		// ── RAII pattern sanitizer ─────────────────────────────────────
 		{ID: "cpp.lock_guard", Language: rules.LangCPP, Pattern: `std::lock_guard\s*<|std::scoped_lock\s*<|std::unique_lock\s*<`, ObjectType: "std", MethodName: "lock_guard/scoped_lock", Neutralizes: []taint.SinkCategory{taint.SnkCommand}, Description: "RAII lock guard prevents data races"},
+
+		// ── Path canonicalization ─────────────────────────────────────
+		{ID: "cpp.realpath", Language: rules.LangCPP, Pattern: `\brealpath\s*\(`, ObjectType: "", MethodName: "realpath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "POSIX realpath resolves symlinks and normalizes path (prevents traversal)"},
+		{ID: "cpp.std.filesystem.canonical", Language: rules.LangCPP, Pattern: `std::filesystem::canonical\s*\(|std::filesystem::weakly_canonical\s*\(`, ObjectType: "std::filesystem", MethodName: "canonical/weakly_canonical", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "C++17 filesystem canonical path resolution (prevents traversal)"},
+
+		// ── LDAP escaping ────────────────────────────────────────────
+		{ID: "cpp.ldap.escape.filter", Language: rules.LangCPP, Pattern: `ldap_simple_escape\s*\(|ldap_filter_escape\s*\(`, ObjectType: "", MethodName: "ldap_simple_escape/ldap_filter_escape", Neutralizes: []taint.SinkCategory{taint.SnkLDAP}, Description: "LDAP filter escaping prevents LDAP injection"},
+
+		// ── URL encoding (Boost) ─────────────────────────────────────
+		{ID: "cpp.boost.urls.encode", Language: rules.LangCPP, Pattern: `boost::urls::encode\s*\(`, ObjectType: "boost::urls", MethodName: "encode", Neutralizes: []taint.SinkCategory{taint.SnkRedirect, taint.SnkURLFetch}, Description: "Boost.URL percent-encoding for safe URL construction"},
+
+		// ── Numeric clamping ─────────────────────────────────────────
+		{ID: "cpp.std.clamp", Language: rules.LangCPP, Pattern: `std::clamp\s*\(`, ObjectType: "std", MethodName: "clamp", Neutralizes: []taint.SinkCategory{taint.SnkCommand}, Description: "std::clamp constrains value to safe range (prevents overflow/injection)"},
+
+		// ── Template auto-escaping ───────────────────────────────────
+		{ID: "cpp.inja.autoescape", Language: rules.LangCPP, Pattern: `inja::Environment.*\.set_html_autoescape\s*\(\s*true`, ObjectType: "inja::Environment", MethodName: "set_html_autoescape", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate}, Description: "Inja HTML auto-escaping enabled (prevents XSS/template injection)"},
 	}
 }

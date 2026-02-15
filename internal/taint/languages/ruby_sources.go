@@ -58,5 +58,11 @@ func (rubyCatalog) Sources() []taint.SourceDef {
 		{ID: "ruby.aws.s3.getobject", Category: taint.SrcExternal, Language: rules.LangRuby, Pattern: `\.get_object\s*\(`, ObjectType: "Aws::S3::Client", MethodName: "get_object", Description: "AWS S3 object data from potentially untrusted bucket", Assigns: "return"},
 		// GCP Pub/Sub source
 		{ID: "ruby.gcp.pubsub.pull", Category: taint.SrcExternal, Language: rules.LangRuby, Pattern: `subscription\.pull`, ObjectType: "Google::Cloud::PubSub", MethodName: "pull", Description: "GCP Pub/Sub message data", Assigns: "return"},
+
+		// Additional Rails request sources
+		{ID: "ruby.rails.request.referer", Category: taint.SrcUserInput, Language: rules.LangRuby, Pattern: `request\.referer|request\.referrer`, ObjectType: "ActionDispatch::Request", MethodName: "referer", Description: "Rails request referer header", Assigns: "return"},
+		{ID: "ruby.rails.request.user_agent", Category: taint.SrcUserInput, Language: rules.LangRuby, Pattern: `request\.user_agent`, ObjectType: "ActionDispatch::Request", MethodName: "user_agent", Description: "Rails request user agent header", Assigns: "return"},
+		{ID: "ruby.rails.request.remote_ip", Category: taint.SrcUserInput, Language: rules.LangRuby, Pattern: `request\.remote_ip`, ObjectType: "ActionDispatch::Request", MethodName: "remote_ip", Description: "Rails request remote IP", Assigns: "return"},
+		{ID: "ruby.rack.env.path_info", Category: taint.SrcUserInput, Language: rules.LangRuby, Pattern: `env\s*\[\s*['"]PATH_INFO['"]\s*\]`, ObjectType: "Rack", MethodName: "env['PATH_INFO']", Description: "Rack PATH_INFO from environment", Assigns: "return"},
 	}
 }

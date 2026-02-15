@@ -65,5 +65,19 @@ func (javaCatalog) Sanitizers() []taint.SanitizerDef {
 		{ID: "java.inetaddress.validate", Language: rules.LangJava, Pattern: `InetAddress\.getByName\s*\(.*\.isSiteLocalAddress\(|\.isLoopbackAddress\(|\.isLinkLocalAddress\(`, ObjectType: "InetAddress", MethodName: "isSiteLocal/isLoopback", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch}, Description: "IP address validation for internal network detection (SSRF prevention)"},
 		{ID: "java.apache.urlvalidator", Language: rules.LangJava, Pattern: `UrlValidator.*\.isValid\s*\(|new\s+UrlValidator\s*\(`, ObjectType: "UrlValidator", MethodName: "isValid", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect}, Description: "Apache Commons URL validation (SSRF prevention)"},
 		{ID: "java.url.gethost", Language: rules.LangJava, Pattern: `\.getHost\s*\(\s*\)`, ObjectType: "URL", MethodName: "getHost", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect}, Description: "URL hostname extraction for domain allowlist validation"},
+
+		// XPath sanitization
+		{ID: "java.esapi.encodeforxpath", Language: rules.LangJava, Pattern: `ESAPI\.encoder\s*\(\s*\)\s*\.encodeForXPath\s*\(`, ObjectType: "ESAPI", MethodName: "encodeForXPath", Neutralizes: []taint.SinkCategory{taint.SnkXPath}, Description: "ESAPI XPath encoding"},
+
+		// OWASP Encode additional methods
+		{ID: "java.owasp.encode.forhtmlattribute", Language: rules.LangJava, Pattern: `Encode\.forHtmlAttribute\s*\(`, ObjectType: "Encode", MethodName: "forHtmlAttribute", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "OWASP Java Encoder HTML attribute encoding"},
+		{ID: "java.owasp.encode.forcssstring", Language: rules.LangJava, Pattern: `Encode\.forCssString\s*\(`, ObjectType: "Encode", MethodName: "forCssString", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate}, Description: "OWASP Java Encoder CSS string encoding"},
+
+		// LDAP sanitization
+		{ID: "java.spring.ldapencoder.filterencode", Language: rules.LangJava, Pattern: `LdapEncoder\.filterEncode\s*\(|LdapUtils\.encode\s*\(`, ObjectType: "LdapEncoder", MethodName: "filterEncode", Neutralizes: []taint.SinkCategory{taint.SnkLDAP}, Description: "Spring LDAP filter encoding"},
+
+		// Path traversal sanitization
+		{ID: "java.file.getcanonicalpath", Language: rules.LangJava, Pattern: `\.getCanonicalPath\s*\(`, ObjectType: "File", MethodName: "getCanonicalPath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Canonical path validation (resolves symlinks and relative paths)"},
+		{ID: "java.file.topath.normalize", Language: rules.LangJava, Pattern: `\.toPath\s*\(\s*\)\s*\.normalize\s*\(`, ObjectType: "File", MethodName: "toPath().normalize()", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Path normalization via File.toPath().normalize()"},
 	}
 }

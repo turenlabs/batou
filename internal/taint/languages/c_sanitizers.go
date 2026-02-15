@@ -207,5 +207,87 @@ func (c *CCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
 			Description: "Extract base filename (strips directory traversal)",
 		},
+		{
+			ID:          "c.path.realpath",
+			Language:    rules.LangC,
+			Pattern:     `\brealpath\s*\(`,
+			ObjectType:  "",
+			MethodName:  "realpath",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Resolve canonical absolute path (prevents path traversal)",
+		},
+
+		// --- Secure cryptography ---
+		{
+			ID:          "c.crypto.rand_bytes",
+			Language:    rules.LangC,
+			Pattern:     `RAND_bytes\s*\(`,
+			ObjectType:  "",
+			MethodName:  "RAND_bytes",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "Cryptographically secure random number generation",
+		},
+		{
+			ID:          "c.crypto.sha256",
+			Language:    rules.LangC,
+			Pattern:     `SHA256\s*\(|EVP_sha256\s*\(`,
+			ObjectType:  "",
+			MethodName:  "SHA256",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "SHA-256 strong hash function (safe replacement for MD5/SHA1)",
+		},
+
+		// --- XML security ---
+		{
+			ID:          "c.xml.disable_entities",
+			Language:    rules.LangC,
+			Pattern:     `xmlSubstituteEntitiesDefault\s*\(\s*0\s*\)`,
+			ObjectType:  "",
+			MethodName:  "xmlSubstituteEntitiesDefault(0)",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "Disable XML entity substitution (prevents XXE)",
+		},
+		{
+			ID:          "c.xml.parse_nonet",
+			Language:    rules.LangC,
+			Pattern:     `XML_PARSE_NONET`,
+			ObjectType:  "",
+			MethodName:  "XML_PARSE_NONET",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "Disable network access during XML parsing (prevents XXE)",
+		},
+
+		// --- LDAP escaping ---
+		{
+			ID:          "c.ldap.escape",
+			Language:    rules.LangC,
+			Pattern:     `ldap_simple_escape\s*\(|ldap_filter_escape\s*\(`,
+			ObjectType:  "",
+			MethodName:  "ldap_filter_escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkLDAP},
+			Description: "LDAP filter escaping (prevents LDAP injection)",
+		},
+
+		// --- URL escaping ---
+		{
+			ID:          "c.url.curl_escape",
+			Language:    rules.LangC,
+			Pattern:     `curl_easy_escape\s*\(`,
+			ObjectType:  "",
+			MethodName:  "curl_easy_escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URL encoding via libcurl (prevents SSRF and open redirect)",
+		},
+
+		// --- Input length validation ---
+		{
+			ID:          "c.validate.strlen_check",
+			Language:    rules.LangC,
+			Pattern:     `strlen\s*\([^)]+\)\s*(?:<|>|<=|>=)\s*\d+`,
+			ObjectType:  "",
+			MethodName:  "strlen check",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand, taint.SnkSQLQuery},
+			Description: "Input length validation (limits attack surface for injection)",
+		},
 	}
 }

@@ -126,5 +126,25 @@ func (rubyCatalog) Sinks() []taint.SinkDef {
 		{ID: "ruby.rails.logger.warn", Category: taint.SnkLog, Language: rules.LangRuby, Pattern: `Rails\.logger\.warn\s*[\(\s]`, ObjectType: "Rails.logger", MethodName: "warn", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Rails.logger.warn with potentially tainted data (log injection)", CWEID: "CWE-117", OWASPCategory: "A09:2021-Security Logging and Monitoring Failures"},
 		{ID: "ruby.rails.logger.error", Category: taint.SnkLog, Language: rules.LangRuby, Pattern: `Rails\.logger\.error\s*[\(\s]`, ObjectType: "Rails.logger", MethodName: "error", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Rails.logger.error with potentially tainted data (log injection)", CWEID: "CWE-117", OWASPCategory: "A09:2021-Security Logging and Monitoring Failures"},
 		{ID: "ruby.rails.logger.debug", Category: taint.SnkLog, Language: rules.LangRuby, Pattern: `Rails\.logger\.debug\s*[\(\s]`, ObjectType: "Rails.logger", MethodName: "debug", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Rails.logger.debug with potentially tainted data (log injection)", CWEID: "CWE-117", OWASPCategory: "A09:2021-Security Logging and Monitoring Failures"},
+
+		// LDAP injection
+		{ID: "ruby.net_ldap.search", Category: taint.SnkLDAP, Language: rules.LangRuby, Pattern: `(?:ldap|LDAP)\.search\s*\(`, ObjectType: "Net::LDAP", MethodName: "search", DangerousArgs: []int{0}, Severity: rules.High, Description: "LDAP search with tainted filter via net-ldap", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+		{ID: "ruby.net_ldap.filter.eq", Category: taint.SnkLDAP, Language: rules.LangRuby, Pattern: `Net::LDAP::Filter\.eq\s*\(`, ObjectType: "Net::LDAP::Filter", MethodName: "eq", DangerousArgs: []int{0}, Severity: rules.High, Description: "LDAP filter construction with tainted values", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+
+		// XPath injection
+		{ID: "ruby.nokogiri.xpath", Category: taint.SnkXPath, Language: rules.LangRuby, Pattern: `\.xpath\s*\(|\.css\s*\(`, ObjectType: "Nokogiri::XML::Node", MethodName: "xpath/css", DangerousArgs: []int{0}, Severity: rules.High, Description: "Nokogiri XPath/CSS query with tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "ruby.rexml.xpath", Category: taint.SnkXPath, Language: rules.LangRuby, Pattern: `REXML::XPath\.(?:first|each|match)\s*\(`, ObjectType: "REXML::XPath", MethodName: "first/each/match", DangerousArgs: []int{0}, Severity: rules.High, Description: "REXML XPath query with tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+
+		// Additional template injection
+		{ID: "ruby.liquid.template.parse", Category: taint.SnkTemplate, Language: rules.LangRuby, Pattern: `Liquid::Template\.parse\s*\(`, ObjectType: "Liquid::Template", MethodName: "parse", DangerousArgs: []int{0}, Severity: rules.High, Description: "Liquid template parsing with tainted template", CWEID: "CWE-1336", OWASPCategory: "A03:2021-Injection"},
+		{ID: "ruby.haml.engine.new", Category: taint.SnkTemplate, Language: rules.LangRuby, Pattern: `Haml::Engine\.new\s*\(`, ObjectType: "Haml::Engine", MethodName: "new", DangerousArgs: []int{0}, Severity: rules.High, Description: "Haml template rendering with tainted template", CWEID: "CWE-1336", OWASPCategory: "A03:2021-Injection"},
+		{ID: "ruby.slim.template.new", Category: taint.SnkTemplate, Language: rules.LangRuby, Pattern: `Slim::Template\.new\s*\(`, ObjectType: "Slim::Template", MethodName: "new", DangerousArgs: []int{0}, Severity: rules.High, Description: "Slim template rendering with tainted template", CWEID: "CWE-1336", OWASPCategory: "A03:2021-Injection"},
+
+		// HTTP response header injection
+		{ID: "ruby.rails.response.headers", Category: taint.SnkHeader, Language: rules.LangRuby, Pattern: `response\.headers\s*\[|response\.set_header\s*\(`, ObjectType: "ActionDispatch::Response", MethodName: "headers[]/set_header", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "HTTP response header injection via Rails response", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
+		{ID: "ruby.sinatra.headers", Category: taint.SnkHeader, Language: rules.LangRuby, Pattern: `headers\s*\[|header\s*\(`, ObjectType: "Sinatra::Base", MethodName: "headers[]/header", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "HTTP response header injection via Sinatra", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
+
+		// Dynamic class instantiation
+		{ID: "ruby.constantize", Category: taint.SnkEval, Language: rules.LangRuby, Pattern: `\.constantize`, ObjectType: "String", MethodName: "constantize", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "Dynamic class instantiation via constantize (RCE)", CWEID: "CWE-470", OWASPCategory: "A03:2021-Injection"},
 	}
 }

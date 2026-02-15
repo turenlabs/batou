@@ -120,5 +120,26 @@ func (javaCatalog) Sinks() []taint.SinkDef {
 
 		// Kafka message construction
 		{ID: "java.kafka.producer.send", Category: taint.SnkCommand, Language: rules.LangJava, Pattern: `producer\.send\s*\(|KafkaProducer.*\.send\s*\(`, ObjectType: "KafkaProducer", MethodName: "send", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Kafka message produced with tainted data", CWEID: "CWE-77", OWASPCategory: "A03:2021-Injection"},
+
+		// XPath injection
+		{ID: "java.xpath.evaluate", Category: taint.SnkXPath, Language: rules.LangJava, Pattern: `(?:XPath|xpath)\.evaluate\s*\(`, ObjectType: "XPath", MethodName: "evaluate", DangerousArgs: []int{0}, Severity: rules.High, Description: "XPath evaluation with tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "java.xpathexpression.evaluate", Category: taint.SnkXPath, Language: rules.LangJava, Pattern: `(?:XPathExpression|xpathExpr)\.evaluate\s*\(`, ObjectType: "XPathExpression", MethodName: "evaluate", DangerousArgs: []int{0}, Severity: rules.High, Description: "Compiled XPath evaluation with tainted input", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "java.xpathfactory.compile", Category: taint.SnkXPath, Language: rules.LangJava, Pattern: `XPathFactory.*\.newXPath\s*\(\s*\)\.compile\s*\(`, ObjectType: "XPathFactory", MethodName: "compile", DangerousArgs: []int{0}, Severity: rules.High, Description: "XPath compile with tainted expression string", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+
+		// Template injection
+		{ID: "java.velocity.mergetemplate", Category: taint.SnkTemplate, Language: rules.LangJava, Pattern: `(?:VelocityEngine|velocity|ve)\.mergeTemplate\s*\(|(?:Template|template)\.merge\s*\(`, ObjectType: "VelocityEngine", MethodName: "mergeTemplate", DangerousArgs: []int{0}, Severity: rules.High, Description: "Apache Velocity template merge with tainted data", CWEID: "CWE-1336", OWASPCategory: "A03:2021-Injection"},
+		{ID: "java.freemarker.process", Category: taint.SnkTemplate, Language: rules.LangJava, Pattern: `(?:Template|template)\.process\s*\(`, ObjectType: "Template", MethodName: "process", DangerousArgs: []int{0}, Severity: rules.High, Description: "FreeMarker template processing with tainted data", CWEID: "CWE-1336", OWASPCategory: "A03:2021-Injection"},
+		{ID: "java.pebble.evaluate", Category: taint.SnkTemplate, Language: rules.LangJava, Pattern: `(?:PebbleTemplate|template)\.evaluate\s*\(`, ObjectType: "PebbleTemplate", MethodName: "evaluate", DangerousArgs: []int{0}, Severity: rules.High, Description: "Pebble template evaluation with tainted data", CWEID: "CWE-1336", OWASPCategory: "A03:2021-Injection"},
+
+		// LDAP injection (deeper coverage)
+		{ID: "java.spring.ldaptemplate.search", Category: taint.SnkLDAP, Language: rules.LangJava, Pattern: `(?:LdapTemplate|ldapTemplate)\.search\s*\(`, ObjectType: "LdapTemplate", MethodName: "search", DangerousArgs: []int{0}, Severity: rules.High, Description: "Spring LDAP template search with tainted filter", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+		{ID: "java.jndi.initialdircontext.search", Category: taint.SnkLDAP, Language: rules.LangJava, Pattern: `(?:InitialDirContext|dirContext|ctx)\.search\s*\(`, ObjectType: "InitialDirContext", MethodName: "search", DangerousArgs: []int{1}, Severity: rules.High, Description: "JNDI LDAP search with tainted filter", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+
+		// Expression Language injection
+		{ID: "java.el.createvalueexpression", Category: taint.SnkEval, Language: rules.LangJava, Pattern: `(?:ExpressionFactory|elFactory)\.createValueExpression\s*\(`, ObjectType: "ExpressionFactory", MethodName: "createValueExpression", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "EL expression evaluation with tainted input", CWEID: "CWE-917", OWASPCategory: "A03:2021-Injection"},
+		{ID: "java.spring.spel.parseexpression", Category: taint.SnkEval, Language: rules.LangJava, Pattern: `(?:SpelExpressionParser|expressionParser)\.parseExpression\s*\(`, ObjectType: "SpelExpressionParser", MethodName: "parseExpression", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "Spring Expression Language with tainted input", CWEID: "CWE-917", OWASPCategory: "A03:2021-Injection"},
+
+		// HTTP Content-Type injection
+		{ID: "java.servlet.setcontenttype", Category: taint.SnkHeader, Language: rules.LangJava, Pattern: `response\.setContentType\s*\(`, ObjectType: "HttpServletResponse", MethodName: "setContentType", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "HTTP Content-Type header with tainted value", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
 	}
 }
