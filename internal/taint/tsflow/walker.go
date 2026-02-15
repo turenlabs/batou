@@ -43,9 +43,22 @@ func walkFunc(body *ast.Node, fnNode *ast.Node, scopeName, filePath string, cfg 
 	// Seed taint for framework parameters.
 	seedParams(fnNode, tm, cfg, matcher)
 
-	// Walk every node in the function body.
+	// Walk the body with taint tracking.
+	walkBody(body, tm, cfg, matcher, scopeName, fb)
+
+	return fb.flows
+}
+
+// walkBody walks AST nodes, tracking taint through assignments, calls, and
+// allowlist-guarded branches.
+func walkBody(body *ast.Node, tm *taintMap, cfg *langConfig, matcher *tsMatcher, scopeName string, fb *flowBuilder) {
 	body.Walk(func(n *ast.Node) bool {
 		nodeType := n.Type()
+
+		// Handle if-statements with allowlist/validation checks.
+		if cfg.ifTypes[nodeType] && cfg.extractIfCondition != nil {
+			return processIfAllowlist(n, tm, cfg, matcher, scopeName, fb)
+		}
 
 		// Handle assignments: x = expr
 		if cfg.assignTypes[nodeType] {
@@ -73,8 +86,37 @@ func walkFunc(body *ast.Node, fnNode *ast.Node, scopeName, filePath string, cfg 
 
 		return true
 	})
+}
 
-	return fb.flows
+// processIfAllowlist handles if-statements by checking whether the condition
+// contains an allowlist/membership validation on a tainted variable. If so,
+// the then-branch is walked with taint cleared for that variable. The
+// else-branch (if any) is walked with the original taint map. Returns false
+// to prevent the outer walk from descending into children (we handle them here).
+func processIfAllowlist(n *ast.Node, tm *taintMap, cfg *langConfig, matcher *tsMatcher, scopeName string, fb *flowBuilder) bool {
+	cond := cfg.extractIfCondition(n)
+	check := detectAllowlistCheck(cond, tm, cfg)
+
+	consequence := cfg.extractIfConsequence(n)
+	alternative := cfg.extractIfAlternative(n)
+
+	if check != nil && consequence != nil {
+		// Walk the then-branch with taint cleared for the validated variable.
+		branchTm := tm.cloneMap()
+		branchTm.delete(check.varName)
+		walkBody(consequence, branchTm, cfg, matcher, scopeName, fb)
+
+		// Walk the else-branch (if any) with the original taint map.
+		if alternative != nil {
+			walkBody(alternative, tm, cfg, matcher, scopeName, fb)
+		}
+
+		// Don't descend into children — we handled them.
+		return false
+	}
+
+	// No allowlist detected; let normal walk descend into the if-statement children.
+	return true
 }
 
 // seedParams seeds taint for common framework parameters.

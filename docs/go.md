@@ -24,7 +24,7 @@ Test files (paths matching `_test.go`) are excluded from scanning to reduce fals
 
 ## Taint Analysis Coverage
 
-The Go taint catalog is defined in `internal/taint/languages/go_*.go` and tracks 29 sources, 100 sinks, and 25 sanitizers.
+The Go taint catalog is defined in `internal/taint/languages/go_*.go` and tracks 29 sources, 100 sinks, and 26 sanitizers.
 
 ### Sources (User Input Entry Points)
 
@@ -184,6 +184,7 @@ Detects weak hash algorithms, deprecated ciphers, insecure random sources, and h
 | `go.url.queryescape` | `url.QueryEscape(` | HTML output, redirect | URL query escaping |
 | `go.url.pathescape` | `url.PathEscape(` | Redirect, file write | URL path escaping |
 | `go.filepath.base` | `filepath.Base(` | File write | Strips directory traversal |
+| `go.filepath.clean` | `filepath.Clean(` | File write | Filepath cleaning (resolves .., ., double slashes) |
 | `go.strconv.atoi` | `strconv.Atoi(` | SQL, command, file | Integer conversion |
 | `go.strconv.parseint` | `strconv.ParseInt(` | SQL, command | Integer parsing |
 | `go.prepared.stmt` | `stmt.Query(` / `stmt.Exec(` | SQL | Prepared statement execution |

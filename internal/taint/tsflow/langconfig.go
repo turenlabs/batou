@@ -15,6 +15,9 @@ type langConfig struct {
 	identType    string          // node type for identifiers
 	attrTypes    map[string]bool // node types for attribute/member access (sources like request.args)
 
+	// Allowlist/validation-aware sanitization config.
+	ifTypes map[string]bool // node types for if statements (e.g., "if_statement")
+
 	// extractCallName returns the method/function name from a call node.
 	extractCallName func(*ast.Node) string
 	// extractCallReceiver returns the receiver/object name from a call node.
@@ -35,6 +38,12 @@ type langConfig struct {
 	extractFuncBody func(*ast.Node) *ast.Node
 	// extractFuncParams returns parameter names from a function definition.
 	extractFuncParams func(*ast.Node) []string
+	// extractIfCondition returns the condition node from an if-statement node.
+	extractIfCondition func(*ast.Node) *ast.Node
+	// extractIfConsequence returns the "then" body node from an if-statement.
+	extractIfConsequence func(*ast.Node) *ast.Node
+	// extractIfAlternative returns the "else" body node (may be nil).
+	extractIfAlternative func(*ast.Node) *ast.Node
 }
 
 // configs maps languages to their configurations.
@@ -73,6 +82,7 @@ func pythonConfig() *langConfig {
 		varDeclTypes: map[string]bool{},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{"attribute": true},
+		ifTypes:      map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
@@ -169,8 +179,23 @@ func pythonConfig() *langConfig {
 			}
 			return n.ChildByFieldName("body")
 		},
-		extractFuncParams: pyExtractParams,
+		extractFuncParams:    pyExtractParams,
+		extractIfCondition:   pyExtractIfCondition,
+		extractIfConsequence: pyExtractIfConsequence,
+		extractIfAlternative: pyExtractIfAlternative,
 	}
+}
+
+func pyExtractIfCondition(n *ast.Node) *ast.Node {
+	return n.ChildByFieldName("condition")
+}
+
+func pyExtractIfConsequence(n *ast.Node) *ast.Node {
+	return n.ChildByFieldName("consequence")
+}
+
+func pyExtractIfAlternative(n *ast.Node) *ast.Node {
+	return n.ChildByFieldName("alternative")
 }
 
 func pyFuncName(n *ast.Node) string {
@@ -228,6 +253,7 @@ func jsConfig() *langConfig {
 		varDeclTypes: map[string]bool{"variable_declarator": true},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{"member_expression": true},
+		ifTypes:      map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
@@ -293,7 +319,10 @@ func jsConfig() *langConfig {
 		extractFuncBody: func(n *ast.Node) *ast.Node {
 			return n.ChildByFieldName("body")
 		},
-		extractFuncParams: jsExtractParams,
+		extractFuncParams:    jsExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -362,6 +391,7 @@ func javaConfig() *langConfig {
 		varDeclTypes: map[string]bool{"variable_declarator": true},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{"field_access": true},
+		ifTypes:      map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			name := n.ChildByFieldName("name")
@@ -430,7 +460,10 @@ func javaConfig() *langConfig {
 		extractFuncBody: func(n *ast.Node) *ast.Node {
 			return n.ChildByFieldName("body")
 		},
-		extractFuncParams: javaExtractParams,
+		extractFuncParams:    javaExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -465,6 +498,7 @@ func phpConfig() *langConfig {
 		varDeclTypes: map[string]bool{},
 		identType:    "variable_name",
 		attrTypes:    map[string]bool{"member_access_expression": true},
+		ifTypes:      map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			// function_call_expression: function field
@@ -545,7 +579,10 @@ func phpConfig() *langConfig {
 		extractFuncBody: func(n *ast.Node) *ast.Node {
 			return n.ChildByFieldName("body")
 		},
-		extractFuncParams: phpExtractParams,
+		extractFuncParams:    phpExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -580,6 +617,7 @@ func rubyConfig() *langConfig {
 		varDeclTypes: map[string]bool{},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{}, // Ruby attribute access is a method call
+		ifTypes:      map[string]bool{"if": true},
 
 		extractCallName: func(n *ast.Node) string {
 			// Ruby call: object.method(args)
@@ -648,7 +686,10 @@ func rubyConfig() *langConfig {
 		extractFuncBody: func(n *ast.Node) *ast.Node {
 			return n.ChildByFieldName("body")
 		},
-		extractFuncParams: rubyExtractParams,
+		extractFuncParams:    rubyExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -685,6 +726,7 @@ func cConfig() *langConfig {
 		varDeclTypes: map[string]bool{"init_declarator": true},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{"field_expression": true},
+		ifTypes:      map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
@@ -737,10 +779,13 @@ func cConfig() *langConfig {
 			}
 			return ""
 		},
-		extractCallArgs:  genericExtractCallArgs,
-		extractFuncName:  cExtractFuncName,
-		extractFuncBody:  genericExtractFuncBody,
-		extractFuncParams: cExtractParams,
+		extractCallArgs:      genericExtractCallArgs,
+		extractFuncName:      cExtractFuncName,
+		extractFuncBody:      genericExtractFuncBody,
+		extractFuncParams:    cExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -836,6 +881,7 @@ func csharpConfig() *langConfig {
 		varDeclTypes: map[string]bool{"variable_declarator": true},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{"member_access_expression": true},
+		ifTypes:      map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
@@ -912,8 +958,11 @@ func csharpConfig() *langConfig {
 			}
 			return ""
 		},
-		extractFuncBody:  genericExtractFuncBody,
-		extractFuncParams: csharpExtractParams,
+		extractFuncBody:      genericExtractFuncBody,
+		extractFuncParams:    csharpExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -948,6 +997,7 @@ func kotlinConfig() *langConfig {
 		varDeclTypes: map[string]bool{"property_declaration": true},
 		identType:    "simple_identifier",
 		attrTypes:    map[string]bool{"navigation_expression": true},
+		ifTypes:      map[string]bool{"if_expression": true},
 
 		extractCallName: func(n *ast.Node) string {
 			// Kotlin call_expression: function part + call_suffix
@@ -1012,8 +1062,11 @@ func kotlinConfig() *langConfig {
 			}
 			return ""
 		},
-		extractFuncBody: genericExtractFuncBody,
-		extractFuncParams: kotlinExtractParams,
+		extractFuncBody:      genericExtractFuncBody,
+		extractFuncParams:    kotlinExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -1083,6 +1136,7 @@ func rustConfig() *langConfig {
 		varDeclTypes: map[string]bool{"let_declaration": true},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{"field_expression": true},
+		ifTypes:      map[string]bool{"if_expression": true},
 
 		extractCallName: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
@@ -1166,8 +1220,11 @@ func rustConfig() *langConfig {
 			}
 			return ""
 		},
-		extractFuncBody: genericExtractFuncBody,
-		extractFuncParams: rustExtractParams,
+		extractFuncBody:      genericExtractFuncBody,
+		extractFuncParams:    rustExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -1202,6 +1259,7 @@ func swiftConfig() *langConfig {
 		varDeclTypes: map[string]bool{"property_declaration": true},
 		identType:    "simple_identifier",
 		attrTypes:    map[string]bool{"navigation_expression": true},
+		ifTypes:      map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			// Swift call_expression: function_expression + call_suffix
@@ -1262,8 +1320,11 @@ func swiftConfig() *langConfig {
 			}
 			return ""
 		},
-		extractFuncBody: genericExtractFuncBody,
-		extractFuncParams: swiftExtractParams,
+		extractFuncBody:      genericExtractFuncBody,
+		extractFuncParams:    swiftExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -1335,6 +1396,7 @@ func luaConfig() *langConfig {
 		varDeclTypes: map[string]bool{"variable_declaration": true},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{"dot_index_expression": true},
+		ifTypes:      map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			// Lua function_call: prefix contains the function expression
@@ -1458,7 +1520,10 @@ func luaConfig() *langConfig {
 			}
 			return nil
 		},
-		extractFuncParams: luaExtractParams,
+		extractFuncParams:    luaExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -1506,6 +1571,7 @@ func groovyConfig() *langConfig {
 		varDeclTypes: map[string]bool{"declaration": true},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{"dotted_identifier": true},
+		ifTypes:      map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
@@ -1596,8 +1662,11 @@ func groovyConfig() *langConfig {
 			}
 			return ""
 		},
-		extractFuncBody: genericExtractFuncBody,
-		extractFuncParams: groovyExtractParams,
+		extractFuncBody:      genericExtractFuncBody,
+		extractFuncParams:    groovyExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -1629,6 +1698,7 @@ func perlConfig() *langConfig {
 	return &langConfig{
 		language:  rules.LangPerl,
 		funcTypes: map[string]bool{"subroutine_declaration_statement": true},
+		ifTypes:   map[string]bool{"if_statement": true},
 		callTypes: map[string]bool{
 			"function_call_expression":            true,
 			"method_call_expression":              true,
@@ -1746,7 +1816,10 @@ func perlConfig() *langConfig {
 		extractFuncBody: func(n *ast.Node) *ast.Node {
 			return n.ChildByFieldName("body")
 		},
-		extractFuncParams: perlExtractParams,
+		extractFuncParams:    perlExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
 	}
 }
 
@@ -1843,6 +1916,23 @@ func perlExtractParams(n *ast.Node) []string {
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Generic if-statement extraction (condition/consequence/alternative fields)
+// Works for JS, Java, PHP, C, C++, C#, Kotlin, Rust, Groovy.
+// ---------------------------------------------------------------------------
+
+func genericExtractIfCondition(n *ast.Node) *ast.Node {
+	return n.ChildByFieldName("condition")
+}
+
+func genericExtractIfConsequence(n *ast.Node) *ast.Node {
+	return n.ChildByFieldName("consequence")
+}
+
+func genericExtractIfAlternative(n *ast.Node) *ast.Node {
+	return n.ChildByFieldName("alternative")
+}
 
 func genericExtractCallArgs(n *ast.Node) []*ast.Node {
 	args := n.ChildByFieldName("arguments")

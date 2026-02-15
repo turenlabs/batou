@@ -57,9 +57,18 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 		return nodeIsTainted(right, tm, cfg)
 	}
 
-	// String interpolation — check embedded expressions
+	// String interpolation — check embedded expressions.
+	// Handles interpolation wrapper nodes across languages:
+	//   Python: interpolation (inside f-string)
+	//   JS/TS:  template_substitution (inside template_string)
+	//   Ruby:   interpolation (inside string)
+	//   PHP:    encapsed_string (contains variable_name children directly)
+	//   C#:     interpolation (inside interpolated_string_expression)
+	//   Kotlin: interpolated_expression (inside string_literal, for ${expr})
+	//   Perl:   string_content (inside interpolated_string_literal, contains scalar)
 	if nodeType == "interpolation" || nodeType == "template_substitution" ||
-		nodeType == "string_interpolation" || nodeType == "encapsed_string" {
+		nodeType == "string_interpolation" || nodeType == "encapsed_string" ||
+		nodeType == "interpolated_expression" {
 		for i := 0; i < n.ChildCount(); i++ {
 			c := n.Child(i)
 			if ts, ok := nodeIsTainted(c, tm, cfg); ok {
@@ -69,8 +78,52 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 		return nil, false
 	}
 
-	// Template string / f-string — check children for interpolations
-	if nodeType == "template_string" || nodeType == "string" {
+	// Kotlin interpolated_identifier: "$var" produces an interpolated_identifier
+	// node whose text is the bare variable name (without $).
+	if nodeType == "interpolated_identifier" {
+		name := n.Text()
+		if ts := tm.get(name); ts != nil && ts.source != nil {
+			return ts, true
+		}
+		return nil, false
+	}
+
+	// Perl scalar/array/hash nodes inside interpolated strings: "$var" produces
+	// a scalar node containing a varname child with the bare name.
+	if nodeType == "scalar" || nodeType == "array_variable" || nodeType == "hash_variable" {
+		name := perlVarName(n)
+		if name != "" {
+			if ts := tm.get(name); ts != nil && ts.source != nil {
+				return ts, true
+			}
+		}
+		return nil, false
+	}
+
+	// Template string / f-string / interpolated string containers — walk all
+	// children looking for interpolation nodes or embedded variables.
+	// Handles:
+	//   JS/TS:  template_string
+	//   Python: string (f-strings)
+	//   Ruby:   string (with #{} interpolation)
+	//   Kotlin: string_literal (with $var or ${expr})
+	//   C#:     interpolated_string_expression ($"...{expr}...")
+	//   Perl:   interpolated_string_literal ("...$var...")
+	if nodeType == "template_string" || nodeType == "string" ||
+		nodeType == "string_literal" || nodeType == "interpolated_string_expression" ||
+		nodeType == "interpolated_string_literal" {
+		for i := 0; i < n.ChildCount(); i++ {
+			c := n.Child(i)
+			if ts, ok := nodeIsTainted(c, tm, cfg); ok {
+				return ts, true
+			}
+		}
+		return nil, false
+	}
+
+	// Perl string_content nodes may contain embedded scalar/array children
+	// (e.g., "Hello $name" has string_content with a scalar child inside).
+	if nodeType == "string_content" && n.ChildCount() > 0 {
 		for i := 0; i < n.ChildCount(); i++ {
 			c := n.Child(i)
 			if ts, ok := nodeIsTainted(c, tm, cfg); ok {
@@ -156,6 +209,41 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 		return nil, false
 	}
 
+	// Object/dictionary/hash literal — check if any value field is tainted.
+	// Handles: JS {username: username}, JS shorthand {username}, Python {"k": v}, Ruby {k: v}.
+	if nodeType == "object" || nodeType == "dictionary" || nodeType == "hash" {
+		for i := 0; i < n.ChildCount(); i++ {
+			c := n.Child(i)
+			if !c.IsNamed() {
+				continue
+			}
+			ct := c.Type()
+			// pair / dictionary_element: key-value entry — check the value child
+			if ct == "pair" {
+				val := c.ChildByFieldName("value")
+				if val != nil {
+					if ts, ok := nodeIsTainted(val, tm, cfg); ok {
+						return ts, true
+					}
+				}
+				continue
+			}
+			// JS/TS shorthand property: {username} means {username: username}
+			if ct == "shorthand_property_identifier" || ct == "shorthand_property_identifier_pattern" {
+				name := c.Text()
+				if ts := tm.get(name); ts != nil && ts.source != nil {
+					return ts, true
+				}
+				continue
+			}
+			// Fallback: recurse into any other named child
+			if ts, ok := nodeIsTainted(c, tm, cfg); ok {
+				return ts, true
+			}
+		}
+		return nil, false
+	}
+
 	// Fallback: for named children, recursively check the first named child
 	// to handle language-specific wrapper nodes we haven't explicitly handled.
 	named := n.NamedChildren()
@@ -179,8 +267,13 @@ func propagationConfidence(n *ast.Node) float64 {
 		return 0.85 // unknown function call
 	case "subscript", "subscript_expression", "element_reference":
 		return 0.9 // indexing
-	case "template_string", "interpolation", "template_substitution":
+	case "template_string", "interpolation", "template_substitution",
+		"interpolated_string_expression", "interpolated_string_literal",
+		"string_literal", "interpolated_expression", "interpolated_identifier",
+		"encapsed_string":
 		return 0.95 // string interpolation
+	case "object", "dictionary", "hash":
+		return 0.95 // object/dict/hash literal wrapping tainted value
 	default:
 		return 1.0
 	}

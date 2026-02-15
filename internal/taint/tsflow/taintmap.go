@@ -63,6 +63,22 @@ func (tm *taintMap) get(name string) *taintState {
 	return tm.vars[name]
 }
 
+// cloneMap returns a shallow copy of the taint map. Each entry still points
+// to the same taintState (immutable in practice), but deleting or overwriting
+// an entry in the clone does not affect the original.
+func (tm *taintMap) cloneMap() *taintMap {
+	cp := &taintMap{vars: make(map[string]*taintState, len(tm.vars))}
+	for k, v := range tm.vars {
+		cp.vars[k] = v
+	}
+	return cp
+}
+
+// delete removes a variable from the taint map.
+func (tm *taintMap) delete(name string) {
+	delete(tm.vars, name)
+}
+
 // flowBuilder accumulates taint flows detected during analysis.
 type flowBuilder struct {
 	flows    []taint.TaintFlow

@@ -195,7 +195,7 @@ Seven crypto-related sinks are tracked. These detect weak hashing (`py.hashlib.m
 
 ### Sanitizers (Functions That Neutralize Taint)
 
-GTSS recognizes 26 sanitizer patterns for Python.
+GTSS recognizes 28 sanitizer patterns for Python.
 
 #### HTML/XSS Sanitizers
 
@@ -203,6 +203,8 @@ GTSS recognizes 26 sanitizer patterns for Python.
 |--------------|---------|-------------|
 | `py.html.escape` | `html.escape()` / `markupsafe.escape()` | HTML output |
 | `py.bleach.clean` | `bleach.clean()` | HTML output |
+| `py.markupsafe.markup` | `markupsafe.Markup()` / `Markup()` | HTML output |
+| `py.django.strip_tags` | `django.utils.html.strip_tags()` / `strip_tags()` | HTML output |
 | `py.quote_plus` | `urllib.parse.quote_plus()` | Redirect, HTML output |
 | `py.django.escapers` | `force_escape` / `escapejs` / `urlencode` | HTML output |
 | `py.django.conditional_escape` | `conditional_escape()` | HTML output |

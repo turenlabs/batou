@@ -44,6 +44,15 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Description: "Extract base filename (strips directory traversal)",
 		},
 		{
+			ID:          "go.filepath.clean",
+			Language:    rules.LangGo,
+			Pattern:     `filepath\.Clean\(`,
+			ObjectType:  "",
+			MethodName:  "Clean",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Filepath cleaning (resolves .., ., double slashes)",
+		},
+		{
 			ID:          "go.strconv.atoi",
 			Language:    rules.LangGo,
 			Pattern:     `strconv\.Atoi\(`,
