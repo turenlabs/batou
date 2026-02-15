@@ -98,4 +98,17 @@ var jsSources = []taint.SourceDef{
 	{ID: "js.gcp.cloudfunctions.event", Category: taint.SrcExternal, Pattern: `exports\.\w+\s*=\s*(?:async\s*)?\(\s*(?:req|event|message)\s*,\s*(?:res|context)\s*\)`, ObjectType: "cloud.google.com/functions", MethodName: "Cloud Function handler", Description: "GCP Cloud Functions event data from external trigger", Assigns: "return"},
 	// GCP Pub/Sub pull
 	{ID: "js.gcp.pubsub.pull", Category: taint.SrcExternal, Pattern: `subscription\.on\s*\(\s*['"]message['"]`, ObjectType: "PubSub", MethodName: "subscription.on(message)", Description: "GCP Pub/Sub message data via subscription", Assigns: "return"},
+
+	// Koa.js sources
+	{ID: "js.koa.ctx.query", Category: taint.SrcUserInput, Pattern: `ctx\.query`, ObjectType: "KoaContext", MethodName: "query", Description: "Koa.js context query parameters", Assigns: "return"},
+	{ID: "js.koa.ctx.request.body", Category: taint.SrcUserInput, Pattern: `ctx\.request\.body`, ObjectType: "KoaContext", MethodName: "request.body", Description: "Koa.js context request body", Assigns: "return"},
+	{ID: "js.koa.ctx.params", Category: taint.SrcUserInput, Pattern: `ctx\.params`, ObjectType: "KoaContext", MethodName: "params", Description: "Koa.js context route parameters", Assigns: "return"},
+
+	// Express additional sources
+	{ID: "js.express.req.get", Category: taint.SrcUserInput, Pattern: `req\.get\s*\(`, ObjectType: "Request", MethodName: "get", Description: "Express req.get() header accessor", Assigns: "return"},
+	{ID: "js.express.req.ip", Category: taint.SrcUserInput, Pattern: `req\.ip\b|req\.ips\b`, ObjectType: "Request", MethodName: "ip/ips", Description: "Express client IP address (spoofable via X-Forwarded-For)", Assigns: "return"},
+	{ID: "js.express.req.hostname", Category: taint.SrcUserInput, Pattern: `req\.hostname`, ObjectType: "Request", MethodName: "hostname", Description: "Express request hostname (spoofable via Host header)", Assigns: "return"},
+
+	// FormData API
+	{ID: "js.formdata.get", Category: taint.SrcUserInput, Pattern: `formData\.get\s*\(|formData\.getAll\s*\(`, ObjectType: "FormData", MethodName: "get/getAll", Description: "FormData API value retrieval", Assigns: "return"},
 }

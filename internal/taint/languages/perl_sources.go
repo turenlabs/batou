@@ -69,5 +69,37 @@ func (perlCatalog) Sources() []taint.SourceDef {
 
 		// YAML deserialization
 		{ID: "perl.yaml.load", Category: taint.SrcDeserialized, Language: rules.LangPerl, Pattern: `YAML::Load\s*\(|YAML::XS::Load\s*\(|LoadFile\s*\(`, ObjectType: "YAML", MethodName: "YAML::Load", Description: "YAML deserialized data", Assigns: "return"},
+
+		// --- Additional Perl sources ---
+		{
+			ID:          "perl.lwp.response",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangPerl,
+			Pattern:     `LWP::UserAgent.*->get\s*\(|HTTP::Response.*->content`,
+			ObjectType:  "LWP::UserAgent",
+			MethodName:  "get/content",
+			Description: "LWP HTTP response content",
+			Assigns:     "return",
+		},
+		{
+			ID:          "perl.file.read",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangPerl,
+			Pattern:     `read\s*\(\s*\w+\s*,|sysread\s*\(`,
+			ObjectType:  "",
+			MethodName:  "read/sysread",
+			Description: "Perl file read into buffer",
+			Assigns:     "return",
+		},
+		{
+			ID:          "perl.dbi.fetchrow",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangPerl,
+			Pattern:     `->fetchrow_array\s*\(|->fetchrow_hashref\s*\(|->fetchall_arrayref\s*\(`,
+			ObjectType:  "DBI",
+			MethodName:  "fetchrow_array/fetchrow_hashref",
+			Description: "DBI database query result data",
+			Assigns:     "return",
+		},
 	}
 }

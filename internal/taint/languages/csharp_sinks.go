@@ -456,6 +456,107 @@ func csharpCoreSinks() []taint.SinkDef {
 			CWEID:         "CWE-89",
 			OWASPCategory: "A03:2021-Injection",
 		},
+
+		// --- File operations (CWE-22) ---
+		{
+			ID:            "csharp.file.copy",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangCSharp,
+			Pattern:       `File\.Copy\s*\(`,
+			ObjectType:    "File",
+			MethodName:    "Copy",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "File copy with potentially tainted paths",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "csharp.file.move",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangCSharp,
+			Pattern:       `File\.Move\s*\(`,
+			ObjectType:    "File",
+			MethodName:    "Move",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "File move with potentially tainted paths",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "csharp.directory.createdirectory",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangCSharp,
+			Pattern:       `Directory\.CreateDirectory\s*\(`,
+			ObjectType:    "Directory",
+			MethodName:    "CreateDirectory",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Directory creation with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- ReDoS ---
+		{
+			ID:            "csharp.regex.new.tainted",
+			Category:      taint.SnkEval,
+			Language:      rules.LangCSharp,
+			Pattern:       `new\s+Regex\s*\(`,
+			ObjectType:    "Regex",
+			MethodName:    "Regex (constructor)",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Regex construction with potentially tainted pattern (ReDoS risk)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- SSRF additional ---
+		{
+			ID:            "csharp.httpclient.postasync",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangCSharp,
+			Pattern:       `HttpClient.*\.PostAsync\s*\(|HttpClient.*\.PutAsync\s*\(|HttpClient.*\.SendAsync\s*\(`,
+			ObjectType:    "HttpClient",
+			MethodName:    "PostAsync/PutAsync/SendAsync",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "HttpClient request with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- Cookie injection ---
+		{
+			ID:            "csharp.response.cookies.append",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangCSharp,
+			Pattern:       `Response\.Cookies\.Append\s*\(`,
+			ObjectType:    "HttpResponse",
+			MethodName:    "Cookies.Append",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.Medium,
+			Description:   "Cookie set with potentially tainted value",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Process start with tainted args ---
+		{
+			ID:            "csharp.process.start.filename",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangCSharp,
+			Pattern:       `ProcessStartInfo.*FileName\s*=`,
+			ObjectType:    "ProcessStartInfo",
+			MethodName:    "FileName",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Process start with potentially tainted executable path",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
 	}
 }
 

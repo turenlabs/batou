@@ -116,5 +116,151 @@ func (cppCatalog) Sinks() []taint.SinkDef {
 
 		// ── Dynamic library loading ───────────────────────────────────
 		{ID: "cpp.dlopen", Category: taint.SnkEval, Language: rules.LangCPP, Pattern: `\bdlopen\s*\(`, ObjectType: "", MethodName: "dlopen", DangerousArgs: []int{0}, Severity: rules.High, Description: "Dynamic library loading with tainted path", CWEID: "CWE-829", OWASPCategory: "A08:2021-Software and Data Integrity Failures"},
+
+		// --- Symlink attacks (CWE-59) ---
+		{
+			ID:            "cpp.file.symlink",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangCPP,
+			Pattern:       `\bsymlink\s*\(|std::filesystem::create_symlink\s*\(`,
+			ObjectType:    "",
+			MethodName:    "symlink/create_symlink",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Symlink creation with potentially tainted paths (symlink attack)",
+			CWEID:         "CWE-59",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- std::filesystem operations ---
+		{
+			ID:            "cpp.filesystem.copy",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangCPP,
+			Pattern:       `std::filesystem::copy\s*\(|std::filesystem::copy_file\s*\(`,
+			ObjectType:    "std::filesystem",
+			MethodName:    "copy/copy_file",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Filesystem copy with potentially tainted paths",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "cpp.filesystem.rename",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangCPP,
+			Pattern:       `std::filesystem::rename\s*\(`,
+			ObjectType:    "std::filesystem",
+			MethodName:    "rename",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Filesystem rename with potentially tainted paths",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "cpp.filesystem.create_directories",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangCPP,
+			Pattern:       `std::filesystem::create_director(?:y|ies)\s*\(`,
+			ObjectType:    "std::filesystem",
+			MethodName:    "create_directories",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Directory creation with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- ReDoS (CWE-1333) ---
+		{
+			ID:            "cpp.regex.construct",
+			Category:      taint.SnkEval,
+			Language:      rules.LangCPP,
+			Pattern:       `std::regex\s*\(|std::regex\s+\w+\s*\(|boost::regex\s*\(`,
+			ObjectType:    "std::regex",
+			MethodName:    "regex constructor",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Regex construction with potentially tainted pattern (ReDoS risk)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Format string (CWE-134) ---
+		{
+			ID:            "cpp.spdlog.format.tainted",
+			Category:      taint.SnkLog,
+			Language:      rules.LangCPP,
+			Pattern:       `spdlog::(?:debug|trace|critical)\s*\(`,
+			ObjectType:    "spdlog",
+			MethodName:    "debug/trace/critical",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "spdlog logger with potentially tainted data (log injection)",
+			CWEID:         "CWE-117",
+			OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
+		},
+
+		// --- Additional SSRF ---
+		{
+			ID:            "cpp.boost.beast.http.request",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangCPP,
+			Pattern:       `boost::beast::http::request`,
+			ObjectType:    "boost::beast::http",
+			MethodName:    "request",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Boost.Beast HTTP request construction with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- Privilege (CWE-250) ---
+		{
+			ID:            "cpp.setuid",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangCPP,
+			Pattern:       `\bsetuid\s*\(|setgid\s*\(|seteuid\s*\(`,
+			ObjectType:    "",
+			MethodName:    "setuid/setgid",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Privilege change with potentially tainted value",
+			CWEID:         "CWE-250",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Memory: use-after-free ---
+		{
+			ID:            "cpp.delete.dangling",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangCPP,
+			Pattern:       `\bdelete\s+`,
+			ObjectType:    "",
+			MethodName:    "delete",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Delete operation with potentially dangling or tainted pointer",
+			CWEID:         "CWE-416",
+			OWASPCategory: "A06:2021-Vulnerable and Outdated Components",
+		},
+
+		// --- Poco HTTP redirect ---
+		{
+			ID:            "cpp.poco.redirect",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangCPP,
+			Pattern:       `response\.redirect\s*\(|HTTPServerResponse.*redirect\s*\(`,
+			ObjectType:    "Poco::Net::HTTPServerResponse",
+			MethodName:    "redirect",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "POCO HTTP redirect with potentially tainted URL",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
 	}
 }

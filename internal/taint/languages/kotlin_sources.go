@@ -298,5 +298,37 @@ func (c *KotlinCatalog) Sources() []taint.SourceDef {
 			Description: "kotlinx.serialization deserialization from stream or bytes",
 			Assigns:     "return",
 		},
+
+		// --- Additional sources ---
+		{
+			ID:          "kotlin.ktor.receivetext.raw",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangKotlin,
+			Pattern:     `call\.receiveText\s*\(|call\.receive<String>`,
+			ObjectType:  "io.ktor.server.application",
+			MethodName:  "receiveText/receive<String>",
+			Description: "Ktor raw text body from HTTP request",
+			Assigns:     "return",
+		},
+		{
+			ID:          "kotlin.file.readtext",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangKotlin,
+			Pattern:     `\.readText\s*\(|File\(.*\)\.readText`,
+			ObjectType:  "java.io.File",
+			MethodName:  "readText",
+			Description: "File contents read as text",
+			Assigns:     "return",
+		},
+		{
+			ID:          "kotlin.android.sharedpreferences",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangKotlin,
+			Pattern:     `getSharedPreferences\s*\(.*\.getString\s*\(|SharedPreferences.*\.getString\s*\(`,
+			ObjectType:  "SharedPreferences",
+			MethodName:  "getString",
+			Description: "Android SharedPreferences data (potentially tampered on rooted devices)",
+			Assigns:     "return",
+		},
 	}
 }

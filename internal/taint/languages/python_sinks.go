@@ -764,5 +764,140 @@ func (c *PythonCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-117",
 			OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
 		},
+
+		// --- Symlink Creation (CWE-59) ---
+		{
+			ID:            "py.os.symlink",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPython,
+			Pattern:       `os\.symlink\(`,
+			ObjectType:    "",
+			MethodName:    "os.symlink",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Symlink creation with potentially tainted path (symlink attack)",
+			CWEID:         "CWE-59",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Directory Creation (CWE-22) ---
+		{
+			ID:            "py.os.makedirs",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPython,
+			Pattern:       `os\.makedirs\(|os\.mkdir\(`,
+			ObjectType:    "",
+			MethodName:    "os.makedirs/mkdir",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Directory creation with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- File Rename (CWE-22) ---
+		{
+			ID:            "py.os.rename",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPython,
+			Pattern:       `os\.rename\(|os\.renames\(`,
+			ObjectType:    "",
+			MethodName:    "os.rename",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "File rename with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- File Copy/Move (CWE-22) ---
+		{
+			ID:            "py.shutil.copy",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPython,
+			Pattern:       `shutil\.copy\(|shutil\.copy2\(|shutil\.move\(|shutil\.copytree\(`,
+			ObjectType:    "",
+			MethodName:    "shutil.copy/move",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "File copy/move with potentially tainted source or destination path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- ReDoS (CWE-1333) ---
+		{
+			ID:            "py.re.compile",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPython,
+			Pattern:       `re\.compile\(|re\.match\(|re\.search\(|re\.findall\(`,
+			ObjectType:    "",
+			MethodName:    "re.compile/match/search",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Regex compilation with potentially tainted pattern (ReDoS)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Dynamic Import (CWE-94) ---
+		{
+			ID:            "py.importlib.import_module",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPython,
+			Pattern:       `importlib\.import_module\(|__import__\(`,
+			ObjectType:    "",
+			MethodName:    "importlib.import_module/__import__",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Dynamic module import with potentially tainted module name",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Compile (CWE-94) ---
+		{
+			ID:            "py.compile",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPython,
+			Pattern:       `compile\(`,
+			ObjectType:    "",
+			MethodName:    "compile",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Code compilation with potentially tainted source string",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Shelve Deserialization (CWE-502) ---
+		{
+			ID:            "py.shelve.open",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangPython,
+			Pattern:       `shelve\.open\(`,
+			ObjectType:    "",
+			MethodName:    "shelve.open",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Shelve deserialization from potentially tainted file path",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+
+		// --- Additional SSRF vectors (CWE-918) ---
+		{
+			ID:            "py.requests.post",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPython,
+			Pattern:       `requests\.post\(|requests\.put\(|requests\.delete\(|requests\.patch\(`,
+			ObjectType:    "",
+			MethodName:    "requests.post/put/delete/patch",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "HTTP request with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
 	}
 }

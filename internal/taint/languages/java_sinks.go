@@ -141,5 +141,27 @@ func (javaCatalog) Sinks() []taint.SinkDef {
 
 		// HTTP Content-Type injection
 		{ID: "java.servlet.setcontenttype", Category: taint.SnkHeader, Language: rules.LangJava, Pattern: `response\.setContentType\s*\(`, ObjectType: "HttpServletResponse", MethodName: "setContentType", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "HTTP Content-Type header with tainted value", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
+
+		// --- NIO File Operations (CWE-22) ---
+		{ID: "java.nio.files.write", Category: taint.SnkFileWrite, Language: rules.LangJava, Pattern: `Files\.write\s*\(`, ObjectType: "Files", MethodName: "write", DangerousArgs: []int{0}, Severity: rules.High, Description: "NIO Files.write with potentially tainted path", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+		{ID: "java.nio.files.copy", Category: taint.SnkFileWrite, Language: rules.LangJava, Pattern: `Files\.copy\s*\(`, ObjectType: "Files", MethodName: "copy", DangerousArgs: []int{0, 1}, Severity: rules.High, Description: "NIO Files.copy with potentially tainted path", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+		{ID: "java.nio.files.move", Category: taint.SnkFileWrite, Language: rules.LangJava, Pattern: `Files\.move\s*\(`, ObjectType: "Files", MethodName: "move", DangerousArgs: []int{0, 1}, Severity: rules.High, Description: "NIO Files.move with potentially tainted path", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+		{ID: "java.nio.files.createsymboliclink", Category: taint.SnkFileWrite, Language: rules.LangJava, Pattern: `Files\.createSymbolicLink\s*\(`, ObjectType: "Files", MethodName: "createSymbolicLink", DangerousArgs: []int{0, 1}, Severity: rules.High, Description: "NIO symlink creation with potentially tainted paths (symlink attack)", CWEID: "CWE-59", OWASPCategory: "A01:2021-Broken Access Control"},
+		{ID: "java.nio.files.createdirectories", Category: taint.SnkFileWrite, Language: rules.LangJava, Pattern: `Files\.createDirectories\s*\(|Files\.createDirectory\s*\(`, ObjectType: "Files", MethodName: "createDirectories", DangerousArgs: []int{0}, Severity: rules.High, Description: "NIO directory creation with potentially tainted path", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+		{ID: "java.nio.paths.get", Category: taint.SnkFileWrite, Language: rules.LangJava, Pattern: `Paths\.get\s*\(`, ObjectType: "Paths", MethodName: "get", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Path construction with potentially tainted components", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+
+		// --- SSRF via newer HTTP clients (CWE-918) ---
+		{ID: "java.httpclient.send", Category: taint.SnkURLFetch, Language: rules.LangJava, Pattern: `HttpClient.*\.send\s*\(|httpClient\.send\s*\(`, ObjectType: "HttpClient", MethodName: "send", DangerousArgs: []int{0}, Severity: rules.High, Description: "Java 11+ HttpClient.send with potentially tainted request (SSRF)", CWEID: "CWE-918", OWASPCategory: "A10:2021-Server-Side Request Forgery"},
+		{ID: "java.spring.webclient", Category: taint.SnkURLFetch, Language: rules.LangJava, Pattern: `WebClient.*\.uri\s*\(|webClient\.get\s*\(\s*\)\s*\.uri\s*\(`, ObjectType: "WebClient", MethodName: "uri", DangerousArgs: []int{0}, Severity: rules.High, Description: "Spring WebClient with potentially tainted URI (SSRF)", CWEID: "CWE-918", OWASPCategory: "A10:2021-Server-Side Request Forgery"},
+		{ID: "java.uri.create", Category: taint.SnkURLFetch, Language: rules.LangJava, Pattern: `URI\.create\s*\(`, ObjectType: "URI", MethodName: "create", DangerousArgs: []int{0}, Severity: rules.High, Description: "URI creation with potentially tainted string (SSRF)", CWEID: "CWE-918", OWASPCategory: "A10:2021-Server-Side Request Forgery"},
+
+		// --- String.format injection (CWE-134) ---
+		{ID: "java.string.format", Category: taint.SnkLog, Language: rules.LangJava, Pattern: `String\.format\s*\(`, ObjectType: "String", MethodName: "format", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "String.format with potentially tainted format string", CWEID: "CWE-134", OWASPCategory: "A03:2021-Injection"},
+
+		// --- OGNL injection (CWE-917) ---
+		{ID: "java.ognl.getvalue", Category: taint.SnkEval, Language: rules.LangJava, Pattern: `Ognl\.getValue\s*\(|OgnlUtil.*\.getValue\s*\(`, ObjectType: "Ognl", MethodName: "getValue", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "OGNL expression evaluation with tainted input (RCE)", CWEID: "CWE-917", OWASPCategory: "A03:2021-Injection"},
+
+		// --- Cookie injection (CWE-113) ---
+		{ID: "java.servlet.addcookie", Category: taint.SnkHeader, Language: rules.LangJava, Pattern: `response\.addCookie\s*\(`, ObjectType: "HttpServletResponse", MethodName: "addCookie", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "HTTP cookie set with potentially tainted value", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
 	}
 }

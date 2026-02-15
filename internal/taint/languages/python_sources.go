@@ -359,5 +359,65 @@ func (c *PythonCatalog) Sources() []taint.SourceDef {
 			Description: "Azure Functions HTTP trigger request data",
 			Assigns:     "return",
 		},
+
+		// --- Flask request path ---
+		{
+			ID:          "py.flask.request.url",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.url\b|request\.path\b|request\.full_path`,
+			ObjectType:  "flask.Request",
+			MethodName:  "url/path/full_path",
+			Description: "Flask request URL/path (user-controlled)",
+			Assigns:     "return",
+		},
+
+		// --- Flask request stream ---
+		{
+			ID:          "py.flask.request.stream",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.stream`,
+			ObjectType:  "flask.Request",
+			MethodName:  "stream",
+			Description: "Flask request stream for raw data reading",
+			Assigns:     "return",
+		},
+
+		// --- argparse ---
+		{
+			ID:          "py.argparse.parse_args",
+			Category:    taint.SrcCLIArg,
+			Language:    rules.LangPython,
+			Pattern:     `\.parse_args\(|argparse\.ArgumentParser`,
+			ObjectType:  "argparse",
+			MethodName:  "parse_args",
+			Description: "Parsed command-line arguments via argparse",
+			Assigns:     "return",
+		},
+
+		// --- Django request path ---
+		{
+			ID:          "py.django.request.path",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.path\b|request\.get_full_path\(|request\.META`,
+			ObjectType:  "django.http.HttpRequest",
+			MethodName:  "path/get_full_path/META",
+			Description: "Django request path and META headers",
+			Assigns:     "return",
+		},
+
+		// --- pathlib file read ---
+		{
+			ID:          "py.pathlib.read_text",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangPython,
+			Pattern:     `Path\(.*\)\.read_text\(|Path\(.*\)\.read_bytes\(`,
+			ObjectType:  "pathlib.Path",
+			MethodName:  "read_text/read_bytes",
+			Description: "File contents via pathlib Path",
+			Assigns:     "return",
+		},
 	}
 }

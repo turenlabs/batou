@@ -65,5 +65,47 @@ func (phpCatalog) Sources() []taint.SourceDef {
 		{ID: "php.aws.s3.getobject", Category: taint.SrcExternal, Language: rules.LangPHP, Pattern: `->getObject\s*\(`, ObjectType: "Aws\\S3\\S3Client", MethodName: "getObject", Description: "AWS S3 object data from potentially untrusted bucket", Assigns: "return"},
 		// GCP Pub/Sub source
 		{ID: "php.gcp.pubsub.pull", Category: taint.SrcExternal, Language: rules.LangPHP, Pattern: `->pull\s*\(`, ObjectType: "Google\\Cloud\\PubSub", MethodName: "pull", Description: "GCP Pub/Sub message data", Assigns: "return"},
+
+		// --- Additional superglobals ---
+		{
+			ID:          "php.superglobal.server.remote_addr",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPHP,
+			Pattern:     `\$_SERVER\s*\[\s*['"]REMOTE_ADDR['"]`,
+			ObjectType:  "",
+			MethodName:  "$_SERVER[REMOTE_ADDR]",
+			Description: "Client IP address (spoofable via proxy headers)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "php.superglobal.server.http_x_forwarded",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPHP,
+			Pattern:     `\$_SERVER\s*\[\s*['"]HTTP_X_FORWARDED`,
+			ObjectType:  "",
+			MethodName:  "$_SERVER[HTTP_X_FORWARDED_*]",
+			Description: "X-Forwarded-* proxy headers (client-controlled)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "php.getallheaders",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPHP,
+			Pattern:     `getallheaders\s*\(|apache_request_headers\s*\(`,
+			ObjectType:  "",
+			MethodName:  "getallheaders/apache_request_headers",
+			Description: "All HTTP request headers",
+			Assigns:     "return",
+		},
+		{
+			ID:          "php.laravel.request.header",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPHP,
+			Pattern:     `\$request->header\s*\(|request\(\)->header\s*\(`,
+			ObjectType:  "Illuminate\\Http\\Request",
+			MethodName:  "header",
+			Description: "Laravel request header value",
+			Assigns:     "return",
+		},
 	}
 }

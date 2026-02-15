@@ -246,5 +246,37 @@ func (c *LuaCatalog) Sources() []taint.SourceDef {
 			Description: "File handle read operation",
 			Assigns:     "return",
 		},
+
+		// --- Additional Lua sources ---
+		{
+			ID:          "lua.socket.receive",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangLua,
+			Pattern:     `socket\.tcp\(\).*:receive\(|:receive\s*\(`,
+			ObjectType:  "socket",
+			MethodName:  "receive",
+			Description: "LuaSocket TCP receive data",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.json.decode",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangLua,
+			Pattern:     `cjson\.decode\s*\(|json\.decode\s*\(|dkjson\.decode\s*\(`,
+			ObjectType:  "cjson",
+			MethodName:  "decode",
+			Description: "JSON decoded data from potentially untrusted source",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.redis.get",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `redis\.call\s*\(\s*['"]GET|redis\.call\s*\(\s*['"]get`,
+			ObjectType:  "redis",
+			MethodName:  "call(GET)",
+			Description: "Redis GET command result",
+			Assigns:     "return",
+		},
 	}
 }

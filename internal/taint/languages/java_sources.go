@@ -81,5 +81,16 @@ func (javaCatalog) Sources() []taint.SourceDef {
 		// Servlet additional parameter sources
 		{ID: "java.servlet.getparametervalues", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getParameterValues\s*\(`, ObjectType: "HttpServletRequest", MethodName: "getParameterValues", Description: "HTTP request parameter values array", Assigns: "return"},
 		{ID: "java.servlet.getparametermap", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getParameterMap\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getParameterMap", Description: "HTTP request all parameters map", Assigns: "return"},
+
+		// Servlet additional sources
+		{ID: "java.servlet.getservletpath", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getServletPath\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getServletPath", Description: "HTTP request servlet path", Assigns: "return"},
+		{ID: "java.servlet.getrequesturl", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getRequestURL\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getRequestURL", Description: "HTTP full request URL", Assigns: "return"},
+		{ID: "java.servlet.getremoteaddr", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getRemoteAddr\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getRemoteAddr", Description: "Client IP address (spoofable via proxy headers)", Assigns: "return"},
+
+		// NIO file read
+		{ID: "java.nio.files.readallbytes", Category: taint.SrcFileRead, Language: rules.LangJava, Pattern: `Files\.readAllBytes\s*\(|Files\.readString\s*\(|Files\.readAllLines\s*\(`, ObjectType: "Files", MethodName: "readAllBytes/readString", Description: "NIO Files read methods", Assigns: "return"},
+
+		// Spring multipart
+		{ID: "java.spring.multipart", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `@RequestPart|MultipartFile`, ObjectType: "Spring", MethodName: "@RequestPart/MultipartFile", Description: "Spring multipart file upload data", Assigns: "return"},
 	}
 }

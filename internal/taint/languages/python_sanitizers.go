@@ -278,5 +278,47 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
 			Description: "URL format validation via validators library or Django URLValidator",
 		},
+
+		// --- Path resolution sanitizers ---
+		{
+			ID:          "py.os.path.realpath",
+			Language:    rules.LangPython,
+			Pattern:     `os\.path\.realpath\(|os\.path\.abspath\(`,
+			ObjectType:  "",
+			MethodName:  "os.path.realpath/abspath",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Path resolution to absolute path (prevents relative path traversal)",
+		},
+		{
+			ID:          "py.pathlib.resolve",
+			Language:    rules.LangPython,
+			Pattern:     `\.resolve\(\)`,
+			ObjectType:  "pathlib.Path",
+			MethodName:  "resolve",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Pathlib path resolution (resolves symlinks and relative components)",
+		},
+
+		// --- Regex escaping ---
+		{
+			ID:          "py.re.escape",
+			Language:    rules.LangPython,
+			Pattern:     `re\.escape\(`,
+			ObjectType:  "",
+			MethodName:  "re.escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
+			Description: "Regex metacharacter escaping (prevents ReDoS and injection in regex patterns)",
+		},
+
+		// --- Float conversion ---
+		{
+			ID:          "py.float",
+			Language:    rules.LangPython,
+			Pattern:     `float\(`,
+			ObjectType:  "",
+			MethodName:  "float",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Float conversion (restricts to numeric values)",
+		},
 	}
 }

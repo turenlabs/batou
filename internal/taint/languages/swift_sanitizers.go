@@ -180,5 +180,27 @@ func (c *SwiftCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
 			Description: "Floating-point conversion restricts to numeric values",
 		},
+
+		// --- Path canonicalization ---
+		{
+			ID:          "swift.url.standardized",
+			Language:    rules.LangSwift,
+			Pattern:     `\.standardizedFileURL|\.standardized\b|\.resolvingSymlinksInPath\b`,
+			ObjectType:  "URL",
+			MethodName:  "standardizedFileURL/resolvingSymlinksInPath",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "URL standardization and symlink resolution (path traversal prevention)",
+		},
+
+		// --- Numeric conversion ---
+		{
+			ID:          "swift.double.init.string",
+			Language:    rules.LangSwift,
+			Pattern:     `Double\s*\(|Float\s*\(|Int\s*\(`,
+			ObjectType:  "",
+			MethodName:  "Double/Float/Int init",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Swift numeric type initialization from string (restricts to numeric values)",
+		},
 	}
 }

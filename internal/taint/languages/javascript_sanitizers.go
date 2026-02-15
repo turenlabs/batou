@@ -49,4 +49,18 @@ var jsSanitizers = []taint.SanitizerDef{
 	{ID: "js.validator.isurl", Pattern: `validator\.isURL\s*\(`, ObjectType: "validator", MethodName: "isURL", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect}, Description: "URL validation via validator.js isURL (SSRF prevention)"},
 	{ID: "js.validator.isip", Pattern: `validator\.isIP\s*\(`, ObjectType: "validator", MethodName: "isIP", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch}, Description: "IP address validation via validator.js isIP (SSRF prevention)"},
 	{ID: "js.url.parse.hostname", Pattern: `new\s+URL\s*\([^)]+\)\.hostname`, ObjectType: "URL", MethodName: "hostname", Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect}, Description: "URL hostname extraction for domain allowlist validation"},
+
+	// Path sanitizers
+	{ID: "js.path.normalize", Pattern: `path\.normalize\s*\(`, ObjectType: "path", MethodName: "normalize", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Path normalization (resolves .. and . components)"},
+	{ID: "js.path.resolve", Pattern: `path\.resolve\s*\(`, ObjectType: "path", MethodName: "resolve", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Path resolution to absolute path"},
+
+	// Numeric coercion
+	{ID: "js.number", Pattern: `Number\s*\(`, MethodName: "Number", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand}, Description: "Number type coercion (restricts to numeric values)"},
+	{ID: "js.parsefloat", Pattern: `parseFloat\s*\(`, MethodName: "parseFloat", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand}, Description: "Float parsing (type coercion to numeric)"},
+
+	// HTML entity encoding
+	{ID: "js.he.encode", Pattern: `he\.encode\s*\(|he\.escape\s*\(`, ObjectType: "he", MethodName: "encode/escape", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "HTML entity encoding via he library"},
+
+	// Safe YAML
+	{ID: "js.yaml.safeload", Pattern: `yaml\.safeLoad\s*\(|YAML\.parse\s*\(`, ObjectType: "yaml", MethodName: "safeLoad/parse", Neutralizes: []taint.SinkCategory{taint.SnkDeserialize}, Description: "Safe YAML loading (disables dangerous types)"},
 }

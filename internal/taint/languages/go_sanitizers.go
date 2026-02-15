@@ -321,5 +321,54 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkLDAP},
 			Description: "LDAP filter escaping (prevents LDAP injection)",
 		},
+
+		// --- Numeric conversion sanitizers ---
+		{
+			ID:          "go.strconv.parsefloat",
+			Language:    rules.LangGo,
+			Pattern:     `strconv\.ParseFloat\(`,
+			ObjectType:  "",
+			MethodName:  "ParseFloat",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Float parsing (restricts to numeric values)",
+		},
+		{
+			ID:          "go.strconv.parsebool",
+			Language:    rules.LangGo,
+			Pattern:     `strconv\.ParseBool\(`,
+			ObjectType:  "",
+			MethodName:  "ParseBool",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Boolean parsing (restricts to true/false values)",
+		},
+		{
+			ID:          "go.strconv.parseuint",
+			Language:    rules.LangGo,
+			Pattern:     `strconv\.ParseUint\(`,
+			ObjectType:  "",
+			MethodName:  "ParseUint",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Unsigned integer parsing (restricts to non-negative numeric values)",
+		},
+		{
+			ID:          "go.strconv.formatint",
+			Language:    rules.LangGo,
+			Pattern:     `strconv\.FormatInt\(`,
+			ObjectType:  "",
+			MethodName:  "FormatInt",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Integer formatting (ensures numeric string output)",
+		},
+
+		// --- Secure random ---
+		{
+			ID:          "go.crypto.rand.read",
+			Language:    rules.LangGo,
+			Pattern:     `crypto/rand|rand\.Read\(|rand\.Int\(`,
+			ObjectType:  "crypto/rand",
+			MethodName:  "rand.Read/rand.Int",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "Cryptographically secure random via crypto/rand",
+		},
 	}
 }

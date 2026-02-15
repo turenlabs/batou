@@ -300,5 +300,37 @@ func (c *CSharpCatalog) Sources() []taint.SourceDef {
 			Description: "XML deserialized data from untrusted source",
 			Assigns:     "return",
 		},
+
+		// --- Additional ASP.NET sources ---
+		{
+			ID:          "csharp.http.request.rawurl",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `Request\.RawUrl|HttpContext\.Request\.Path`,
+			ObjectType:  "HttpRequest",
+			MethodName:  "RawUrl/Path",
+			Description: "HTTP request raw URL or path",
+			Assigns:     "return",
+		},
+		{
+			ID:          "csharp.http.request.useragent",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `Request\.Headers\[.*User-Agent|HttpContext\.Request\.Headers`,
+			ObjectType:  "HttpRequest",
+			MethodName:  "UserAgent/Headers",
+			Description: "HTTP request User-Agent or other headers",
+			Assigns:     "return",
+		},
+		{
+			ID:          "csharp.file.readalltext",
+			Category:    taint.SrcFileRead,
+			Language:    rules.LangCSharp,
+			Pattern:     `File\.ReadAllText\s*\(|File\.ReadAllLines\s*\(|File\.ReadAllBytes\s*\(`,
+			ObjectType:  "System.IO.File",
+			MethodName:  "ReadAllText/Lines/Bytes",
+			Description: "File contents from System.IO.File read methods",
+			Assigns:     "return",
+		},
 	}
 }

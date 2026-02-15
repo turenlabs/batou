@@ -278,5 +278,37 @@ func (c *SwiftCatalog) Sources() []taint.SourceDef {
 			Description: "XML parser with potentially untrusted data",
 			Assigns:     "return",
 		},
+
+		// --- Additional Swift sources ---
+		{
+			ID:          "swift.vapor.request.content",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangSwift,
+			Pattern:     `req\.content|request\.content`,
+			ObjectType:  "Vapor.Request",
+			MethodName:  "content",
+			Description: "Vapor request content (decoded body)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "swift.urlsession.datatask.additional",
+			Category:    taint.SrcNetwork,
+			Language:    rules.LangSwift,
+			Pattern:     `URLSession\.shared\.dataTask|\.dataTask\s*\(`,
+			ObjectType:  "URLSession",
+			MethodName:  "dataTask",
+			Description: "URLSession data task response (network data)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "swift.userdefaults.additional",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangSwift,
+			Pattern:     `UserDefaults\.standard\.string\s*\(|UserDefaults\.standard\.object\s*\(`,
+			ObjectType:  "UserDefaults",
+			MethodName:  "string/object",
+			Description: "UserDefaults data (potentially tampered on jailbroken devices)",
+			Assigns:     "return",
+		},
 	}
 }

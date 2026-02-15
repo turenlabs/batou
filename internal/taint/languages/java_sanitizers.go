@@ -79,5 +79,20 @@ func (javaCatalog) Sanitizers() []taint.SanitizerDef {
 		// Path traversal sanitization
 		{ID: "java.file.getcanonicalpath", Language: rules.LangJava, Pattern: `\.getCanonicalPath\s*\(`, ObjectType: "File", MethodName: "getCanonicalPath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Canonical path validation (resolves symlinks and relative paths)"},
 		{ID: "java.file.topath.normalize", Language: rules.LangJava, Pattern: `\.toPath\s*\(\s*\)\s*\.normalize\s*\(`, ObjectType: "File", MethodName: "toPath().normalize()", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Path normalization via File.toPath().normalize()"},
+
+		// Path normalization
+		{ID: "java.nio.path.normalize", Language: rules.LangJava, Pattern: `\.normalize\s*\(\s*\)`, ObjectType: "Path", MethodName: "normalize", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "NIO Path normalization (resolves .. components)"},
+
+		// Regex escaping
+		{ID: "java.pattern.quote", Language: rules.LangJava, Pattern: `Pattern\.quote\s*\(`, ObjectType: "Pattern", MethodName: "quote", Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery}, Description: "Regex metacharacter escaping (prevents ReDoS and injection in patterns)"},
+
+		// Numeric coercion
+		{ID: "java.double.parsedouble", Language: rules.LangJava, Pattern: `Double\.parseDouble\s*\(|Float\.parseFloat\s*\(`, ObjectType: "Double/Float", MethodName: "parseDouble/parseFloat", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand}, Description: "Floating-point parsing (restricts to numeric values)"},
+
+		// ESAPI additional encoding
+		{ID: "java.esapi.encodeforsql", Language: rules.LangJava, Pattern: `ESAPI\.encoder\s*\(\s*\)\s*\.encodeForSQL\s*\(`, ObjectType: "ESAPI", MethodName: "encodeForSQL", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery}, Description: "ESAPI SQL encoding for safe query construction"},
+
+		// StringUtils escaping
+		{ID: "java.stringescapeutils.escapeecmascript", Language: rules.LangJava, Pattern: `StringEscapeUtils\.escapeEcmaScript\s*\(|StringEscapeUtils\.escapeXml\s*\(`, ObjectType: "StringEscapeUtils", MethodName: "escapeEcmaScript/escapeXml", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate}, Description: "Apache Commons text escaping for JavaScript/XML contexts"},
 	}
 }

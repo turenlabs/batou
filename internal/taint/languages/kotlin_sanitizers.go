@@ -225,5 +225,38 @@ func (c *KotlinCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkEval},
 			Description: "WebView with JavaScript disabled",
 		},
+
+		// --- Regex escaping ---
+		{
+			ID:          "kotlin.regex.escape",
+			Language:    rules.LangKotlin,
+			Pattern:     `Regex\.escape\s*\(|Pattern\.quote\s*\(`,
+			ObjectType:  "Regex",
+			MethodName:  "escape/quote",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
+			Description: "Regex metacharacter escaping (prevents ReDoS and injection)",
+		},
+
+		// --- Numeric conversion ---
+		{
+			ID:          "kotlin.todouble",
+			Language:    rules.LangKotlin,
+			Pattern:     `\.toDouble\s*\(|\.toFloat\s*\(|\.toLong\s*\(`,
+			ObjectType:  "",
+			MethodName:  "toDouble/toFloat/toLong",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Numeric type conversion (restricts to numeric values)",
+		},
+
+		// --- Android input validation ---
+		{
+			ID:          "kotlin.android.uri.parse",
+			Language:    rules.LangKotlin,
+			Pattern:     `Uri\.parse\s*\(.*\.host|android\.net\.Uri.*\.getHost`,
+			ObjectType:  "android.net.Uri",
+			MethodName:  "parse.host",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "Android URI hostname extraction for domain validation",
+		},
 	}
 }

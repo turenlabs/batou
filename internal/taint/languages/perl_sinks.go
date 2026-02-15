@@ -75,5 +75,91 @@ func (perlCatalog) Sinks() []taint.SinkDef {
 
 		// Additional logging
 		{ID: "perl.mojo.log", Category: taint.SnkLog, Language: rules.LangPerl, Pattern: `\$c->app->log->(?:info|warn|error|debug)\s*\(`, ObjectType: "Mojo::Log", MethodName: "app->log->*", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Mojolicious logger with potentially tainted data", CWEID: "CWE-117", OWASPCategory: "A09:2021-Security Logging and Monitoring Failures"},
+
+		// --- File operations (CWE-22) ---
+		{
+			ID:            "perl.rename",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\brename\s*\(`,
+			ObjectType:    "",
+			MethodName:    "rename",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "File rename with potentially tainted paths",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "perl.symlink",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\bsymlink\s*\(`,
+			ObjectType:    "",
+			MethodName:    "symlink",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Symlink creation with potentially tainted paths (symlink attack)",
+			CWEID:         "CWE-59",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "perl.mkdir",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\bmkdir\s*\(`,
+			ObjectType:    "",
+			MethodName:    "mkdir",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Directory creation with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Dynamic code (CWE-94) ---
+		{
+			ID:            "perl.require",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `\brequire\s+\$|do\s+\$`,
+			ObjectType:    "",
+			MethodName:    "require/do (variable)",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Dynamic module loading with potentially tainted filename",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- ReDoS (CWE-1333) ---
+		{
+			ID:            "perl.regex.tainted",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `qr/\$|m/\$`,
+			ObjectType:    "",
+			MethodName:    "qr// (tainted)",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Regex compilation with interpolated tainted variable (ReDoS risk)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- SSRF additional ---
+		{
+			ID:            "perl.http.tiny.get",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `HTTP::Tiny.*->get\s*\(|HTTP::Tiny.*->post\s*\(`,
+			ObjectType:    "HTTP::Tiny",
+			MethodName:    "get/post",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "HTTP::Tiny request with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
 	}
 }
