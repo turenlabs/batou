@@ -110,5 +110,49 @@ func (phpCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput, taint.SnkFileWrite},
 			Description: "Laravel validation for input sanitization",
 		},
+
+		// --- filter_var FILTER_SANITIZE_* ---
+		{
+			ID:          "php.filter_var.sanitize_string",
+			Language:    rules.LangPHP,
+			Pattern:     `filter_var\s*\(.*FILTER_SANITIZE_`,
+			ObjectType:  "",
+			MethodName:  "filter_var(FILTER_SANITIZE_*)",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Variable sanitization via filter_var with FILTER_SANITIZE_* flag",
+		},
+
+		// --- addslashes ---
+		{
+			ID:          "php.addslashes",
+			Language:    rules.LangPHP,
+			Pattern:     `\baddslashes\s*\(`,
+			ObjectType:  "",
+			MethodName:  "addslashes",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Backslash escaping for quotes (use prepared statements instead)",
+		},
+
+		// --- PDO::prepare ---
+		{
+			ID:          "php.pdo.prepare",
+			Language:    rules.LangPHP,
+			Pattern:     `->prepare\s*\(`,
+			ObjectType:  "PDO",
+			MethodName:  "prepare",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "PDO prepared statement (parameterized query)",
+		},
+
+		// --- floatval ---
+		{
+			ID:          "php.floatval",
+			Language:    rules.LangPHP,
+			Pattern:     `\bfloatval\s*\(|\(float\)`,
+			ObjectType:  "",
+			MethodName:  "floatval/(float)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Float conversion (restricts to numeric values)",
+		},
 		}
 }

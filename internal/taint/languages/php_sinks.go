@@ -295,5 +295,80 @@ func (phpCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-918",
 			OWASPCategory: "A10:2021-Server-Side Request Forgery",
 		},
+
+		// --- Laravel DB::select (CWE-89) ---
+		{
+			ID:            "php.laravel.db.select",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangPHP,
+			Pattern:       `DB::select\s*\(`,
+			ObjectType:    "DB",
+			MethodName:    "DB::select",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "SQL injection via Laravel DB::select() with concatenated query",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- PDO exec (CWE-89) ---
+		{
+			ID:            "php.pdo.exec",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangPHP,
+			Pattern:       `->exec\s*\(`,
+			ObjectType:    "PDO",
+			MethodName:    "exec",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "SQL injection via PDO::exec() with tainted SQL",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- File deletion (CWE-22) ---
+		{
+			ID:            "php.unlink",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPHP,
+			Pattern:       `\bunlink\s*\(`,
+			ObjectType:    "",
+			MethodName:    "unlink",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "File deletion with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- SoapClient SSRF (CWE-918) ---
+		{
+			ID:            "php.soapclient",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPHP,
+			Pattern:       `new\s+SoapClient\s*\(`,
+			ObjectType:    "SoapClient",
+			MethodName:    "SoapClient",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via SoapClient with tainted WSDL URL",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- session_set_cookie_params (CWE-384) ---
+		{
+			ID:            "php.session.cookie_params",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangPHP,
+			Pattern:       `\bsession_set_cookie_params\s*\(`,
+			ObjectType:    "",
+			MethodName:    "session_set_cookie_params",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Session cookie parameters set with potentially tainted values",
+			CWEID:         "CWE-384",
+			OWASPCategory: "A07:2021-Identification and Authentication Failures",
+		},
 	}
 }

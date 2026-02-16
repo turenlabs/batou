@@ -107,5 +107,73 @@ func (phpCatalog) Sources() []taint.SourceDef {
 			Description: "Laravel request header value",
 			Assigns:     "return",
 		},
+
+		// --- Additional Laravel sources ---
+		{
+			ID:          "php.laravel.request.file",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPHP,
+			Pattern:     `\$request->file\s*\(`,
+			ObjectType:  "Illuminate\\Http\\Request",
+			MethodName:  "file",
+			Description: "Laravel uploaded file from request",
+			Assigns:     "return",
+		},
+		{
+			ID:          "php.laravel.request.cookie",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPHP,
+			Pattern:     `\$request->cookie\s*\(`,
+			ObjectType:  "Illuminate\\Http\\Request",
+			MethodName:  "cookie",
+			Description: "Laravel cookie value from request",
+			Assigns:     "return",
+		},
+
+		// --- Symfony static Request ---
+		{
+			ID:          "php.symfony.request.static.get",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPHP,
+			Pattern:     `Request::createFromGlobals\s*\(`,
+			ObjectType:  "Symfony\\HttpFoundation\\Request",
+			MethodName:  "createFromGlobals",
+			Description: "Symfony Request created from PHP superglobals",
+			Assigns:     "return",
+		},
+
+		// --- XML from input ---
+		{
+			ID:          "php.simplexml.input",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangPHP,
+			Pattern:     `\bsimplexml_load_string\s*\(`,
+			ObjectType:  "",
+			MethodName:  "simplexml_load_string",
+			Description: "XML parsed from potentially tainted string",
+			Assigns:     "return",
+		},
+
+		// --- Database sources ---
+		{
+			ID:          "php.pdo.fetch",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangPHP,
+			Pattern:     `->fetch\s*\(|->fetchAll\s*\(|->fetchColumn\s*\(`,
+			ObjectType:  "PDOStatement",
+			MethodName:  "fetch/fetchAll/fetchColumn",
+			Description: "Database row data from PDO fetch",
+			Assigns:     "return",
+		},
+		{
+			ID:          "php.mysqli.fetch",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangPHP,
+			Pattern:     `mysqli_fetch_assoc\s*\(|mysqli_fetch_array\s*\(|->fetch_assoc\s*\(`,
+			ObjectType:  "mysqli_result",
+			MethodName:  "fetch_assoc/fetch_array",
+			Description: "Database row data from mysqli fetch",
+			Assigns:     "return",
+		},
 	}
 }

@@ -111,4 +111,35 @@ var jsSources = []taint.SourceDef{
 
 	// FormData API
 	{ID: "js.formdata.get", Category: taint.SrcUserInput, Pattern: `formData\.get\s*\(|formData\.getAll\s*\(`, ObjectType: "FormData", MethodName: "get/getAll", Description: "FormData API value retrieval", Assigns: "return"},
+
+	// Koa.js additional sources
+	{ID: "js.koa.ctx.headers", Category: taint.SrcUserInput, Pattern: `ctx\.headers`, ObjectType: "KoaContext", MethodName: "headers", Description: "Koa.js context request headers", Assigns: "return"},
+	{ID: "js.koa.ctx.cookies.get", Category: taint.SrcUserInput, Pattern: `ctx\.cookies\.get\s*\(`, ObjectType: "KoaContext", MethodName: "cookies.get", Description: "Koa.js cookie value retrieval", Assigns: "return"},
+	{ID: "js.koa.ctx.request.query", Category: taint.SrcUserInput, Pattern: `ctx\.request\.query`, ObjectType: "KoaContext", MethodName: "request.query", Description: "Koa.js request query parameters object", Assigns: "return"},
+
+	// Fastify additional sources
+	{ID: "js.fastify.request.headers", Category: taint.SrcUserInput, Pattern: `request\.headers`, ObjectType: "FastifyRequest", MethodName: "headers", Description: "Fastify request headers", Assigns: "return"},
+
+	// Socket.IO additional sources
+	{ID: "js.socketio.handshake", Category: taint.SrcNetwork, Pattern: `socket\.handshake\.query`, ObjectType: "Socket", MethodName: "handshake.query", Description: "Socket.IO handshake query parameters", Assigns: "return"},
+
+	// GraphQL additional sources
+	{ID: "js.graphql.context", Category: taint.SrcUserInput, Pattern: `context\.req|context\.request`, ObjectType: "GraphQLContext", MethodName: "context.req", Description: "GraphQL context with underlying HTTP request", Assigns: "return"},
+
+	// Hapi additional sources
+	{ID: "js.hapi.request.headers", Category: taint.SrcUserInput, Pattern: `request\.headers`, ObjectType: "HapiRequest", MethodName: "headers", Description: "Hapi request headers", Assigns: "return"},
+	{ID: "js.hapi.request.state", Category: taint.SrcUserInput, Pattern: `request\.state`, ObjectType: "HapiRequest", MethodName: "state", Description: "Hapi request cookies/state", Assigns: "return"},
+
+	// readline input
+	{ID: "js.readline.input", Category: taint.SrcUserInput, Pattern: `readline\.question\s*\(|rl\.question\s*\(`, ObjectType: "readline", MethodName: "question", Description: "readline user input from terminal", Assigns: "return"},
+
+	// WebSocket message data
+	{ID: "js.websocket.message.data", Category: taint.SrcNetwork, Pattern: `ws\.on\s*\(\s*['"]message['"]`, ObjectType: "WebSocket", MethodName: "on(message)", Description: "WebSocket message data from client", Assigns: "return"},
+
+	// Next.js additional sources
+	{ID: "js.nextjs.useSearchParams", Category: taint.SrcUserInput, Pattern: `useSearchParams\s*\(`, ObjectType: "NextJS", MethodName: "useSearchParams", Description: "Next.js App Router useSearchParams hook", Assigns: "return"},
+	{ID: "js.nextjs.useParams", Category: taint.SrcUserInput, Pattern: `useParams\s*\(`, ObjectType: "NextJS", MethodName: "useParams", Description: "Next.js App Router useParams hook", Assigns: "return"},
+
+	// Express req.file (multer)
+	{ID: "js.express.req.file", Category: taint.SrcUserInput, Pattern: `req\.file\b|req\.files\b`, ObjectType: "Request", MethodName: "file/files", Description: "Express file upload via multer middleware", Assigns: "return"},
 }

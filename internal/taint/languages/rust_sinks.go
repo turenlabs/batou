@@ -497,5 +497,95 @@ func (c *RustCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-502",
 			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
 		},
+
+		// --- SQL with format! macro (CWE-89) ---
+		{
+			ID:            "rust.sql.format_query",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangRust,
+			Pattern:       `format!\s*\(\s*"(?:SELECT|INSERT|UPDATE|DELETE|DROP)`,
+			ObjectType:    "",
+			MethodName:    "format! SQL",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Critical,
+			Description:   "SQL query built with format! macro (SQL injection risk)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Tokio fs operations (CWE-22) ---
+		{
+			ID:            "rust.tokio.fs.remove",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangRust,
+			Pattern:       `tokio::fs::remove_file\s*\(|tokio::fs::remove_dir_all\s*\(`,
+			ObjectType:    "tokio::fs",
+			MethodName:    "tokio::fs::remove_file/remove_dir_all",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Async file/directory removal with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Tera render_str (CWE-1336) ---
+		{
+			ID:            "rust.tera.render_str",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangRust,
+			Pattern:       `Tera::one_off\s*\(|tera\.render_str\s*\(`,
+			ObjectType:    "tera",
+			MethodName:    "Tera::one_off/render_str",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Tera template rendering from user-controlled string",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- reqwest Client URL fetch (CWE-918) ---
+		{
+			ID:            "rust.reqwest.client_post",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangRust,
+			Pattern:       `client\.post\s*\(|client\.put\s*\(|client\.delete\s*\(`,
+			ObjectType:    "reqwest::Client",
+			MethodName:    "Client::post/put/delete",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "HTTP client request with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- serde_json from user data (CWE-502) ---
+		{
+			ID:            "rust.serde.from_value",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangRust,
+			Pattern:       `serde_json::from_value\s*\(`,
+			ObjectType:    "serde_json",
+			MethodName:    "serde_json::from_value",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "JSON deserialization from potentially tainted Value",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+
+		// --- log::debug with user data (CWE-117) ---
+		{
+			ID:            "rust.log.debug",
+			Category:      taint.SnkLog,
+			Language:      rules.LangRust,
+			Pattern:       `(?:log::)?debug!\s*\(`,
+			ObjectType:    "log",
+			MethodName:    "debug!",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "Log debug macro with potentially tainted data",
+			CWEID:         "CWE-117",
+			OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
+		},
 	}
 }

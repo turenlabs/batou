@@ -118,5 +118,77 @@ func (rubyCatalog) Sources() []taint.SourceDef {
 			Description: "Rails request full path or URL",
 			Assigns:     "return",
 		},
+
+		// --- Rails cookies ---
+		{
+			ID:          "ruby.rails.cookies.source",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRuby,
+			Pattern:     `cookies\s*\[`,
+			ObjectType:  "ActionDispatch::Cookies",
+			MethodName:  "cookies[]",
+			Description: "Rails cookie value (user-controlled)",
+			Assigns:     "return",
+		},
+
+		// --- ActionDispatch uploaded file ---
+		{
+			ID:          "ruby.rails.upload",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRuby,
+			Pattern:     `ActionDispatch::Http::UploadedFile|\.original_filename`,
+			ObjectType:  "ActionDispatch::Http::UploadedFile",
+			MethodName:  "UploadedFile",
+			Description: "Rails uploaded file data and filename",
+			Assigns:     "return",
+		},
+
+		// --- Rack::Request ---
+		{
+			ID:          "ruby.rack.request.get",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRuby,
+			Pattern:     `Rack::Request\.new\s*\(.*\.params|rack_request\.params`,
+			ObjectType:  "Rack::Request",
+			MethodName:  "params",
+			Description: "Rack request parameters",
+			Assigns:     "return",
+		},
+
+		// --- Sinatra params ---
+		{
+			ID:          "ruby.sinatra.params.source",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRuby,
+			Pattern:     `params\.fetch\s*\(`,
+			ObjectType:  "Sinatra::Base",
+			MethodName:  "params.fetch",
+			Description: "Sinatra parameter fetch",
+			Assigns:     "return",
+		},
+
+		// --- Redis get from user key ---
+		{
+			ID:          "ruby.redis.get",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangRuby,
+			Pattern:     `redis\.get\s*\(|Redis\.current\.get\s*\(`,
+			ObjectType:  "Redis",
+			MethodName:  "get",
+			Description: "Redis value from potentially user-controlled key",
+			Assigns:     "return",
+		},
+
+		// --- Sidekiq worker args ---
+		{
+			ID:          "ruby.sidekiq.worker.args",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangRuby,
+			Pattern:     `def\s+perform\s*\(`,
+			ObjectType:  "Sidekiq::Worker",
+			MethodName:  "perform",
+			Description: "Sidekiq worker arguments from job queue",
+			Assigns:     "return",
+		},
 	}
 }
