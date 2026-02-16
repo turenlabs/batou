@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/taint/astflow"
+	"github.com/turenio/gtss/internal/taint/tsflow"
 )
 
 // TaintRule implements rules.Rule using the taint analysis engine.
@@ -24,14 +26,28 @@ func (t *TaintRule) Languages() []rules.Language {
 		rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript,
 		rules.LangJava, rules.LangPHP, rules.LangRuby,
 		rules.LangC, rules.LangCPP,
+		rules.LangKotlin, rules.LangSwift, rules.LangRust, rules.LangCSharp,
+		rules.LangPerl, rules.LangLua, rules.LangGroovy,
 	}
 }
 
 func (t *TaintRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	start := time.Now()
 
-	// Run taint analysis
-	flows := Analyze(ctx.Content, ctx.FilePath, ctx.Language)
+	// Route to the best taint engine for the language, matching the
+	// logic in scanner.go Phase 3.
+	var flows []TaintFlow
+	if ctx.Language == rules.LangGo {
+		flows = astflow.AnalyzeGo(ctx.Content, ctx.FilePath)
+	} else if tsflow.Supports(ctx.Language) {
+		flows = tsflow.Analyze(ctx.Content, ctx.FilePath, ctx.Language)
+	} else {
+		flows = Analyze(ctx.Content, ctx.FilePath, ctx.Language)
+	}
+
+	// Cache flows on the ScanContext so scanner.go Phase 3 can reuse
+	// them for hint generation without re-running taint analysis.
+	ctx.TaintFlows = flows
 
 	if len(flows) == 0 {
 		return nil

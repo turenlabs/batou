@@ -16,7 +16,7 @@ import (
 //
 // If tree is nil (parsing failed or unsupported language) the original
 // findings are returned unchanged.
-func FilterFindings(tree *Tree, findings []rules.Finding) []rules.Finding {
+func FilterFindings(tree *Tree, filePath string, findings []rules.Finding) []rules.Finding {
 	if tree == nil || len(findings) == 0 {
 		return findings
 	}
@@ -32,6 +32,13 @@ func FilterFindings(tree *Tree, findings []rules.Finding) []rules.Finding {
 
 	out := make([]rules.Finding, 0, len(findings))
 	for _, f := range findings {
+		// Skip filtering for findings from other files (e.g.
+		// interprocedural findings) — the AST tree only covers the
+		// current file, so offset-based suppression would be wrong.
+		if f.FilePath != "" && f.FilePath != filePath {
+			out = append(out, f)
+			continue
+		}
 		if shouldSuppressFinding(tree, f, lineOffsets, content) {
 			continue
 		}

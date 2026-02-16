@@ -219,7 +219,7 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 
 	// AST-based false positive filtering: suppress findings that fall
 	// entirely within comments or string literals in the parsed AST.
-	findings = ast.FilterFindings(tree, findings)
+	findings = ast.FilterFindings(tree, filePath, findings)
 
 	// Deduplicate findings that share the same (line, CWE) — keep the
 	// highest-fidelity finding (taint > AST > interprocedural > regex)
@@ -260,11 +260,13 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 	}
 
 	// Phase 3: Generate hints (always — even for clean code)
-	// Run taint analysis to get raw TaintFlow structs for rich hint output.
-	// For Go, use AST-driven analysis which provides more accurate tracking
-	// through reassignment, aliasing, and complex expressions.
+	// Retrieve cached TaintFlow results from Phase 1 (stored by TaintRule).
+	// Fall back to running taint analysis only if the cache is empty (e.g.
+	// the language was not covered by TaintRule).
 	var taintFlows []taint.TaintFlow
-	if lang == rules.LangGo {
+	if cached, ok := sctx.TaintFlows.([]taint.TaintFlow); ok {
+		taintFlows = cached
+	} else if lang == rules.LangGo {
 		taintFlows = astflow.AnalyzeGo(content, filePath)
 	} else if tsflow.Supports(lang) {
 		taintFlows = tsflow.Analyze(content, filePath, lang)
