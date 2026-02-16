@@ -9,13 +9,15 @@ import (
 
 // ScanResult holds the complete results of a Batou scan.
 type ScanResult struct {
-	FilePath    string          `json:"file_path"`
-	Language    rules.Language  `json:"language"`
-	Event       string          `json:"event"` // PreToolUse or PostToolUse
-	Findings    []rules.Finding `json:"findings"`
-	RulesRun    int             `json:"rules_run"`
-	ScanTimeMs  int64           `json:"scan_time_ms"`
-	HintsOutput string          `json:"hints_output,omitempty"`
+	FilePath           string          `json:"file_path"`
+	Language           rules.Language  `json:"language"`
+	Event              string          `json:"event"` // PreToolUse or PostToolUse
+	Findings           []rules.Finding `json:"findings"`
+	SuppressedCount    int             `json:"suppressed_count,omitempty"`
+	SuppressedFindings []rules.Finding `json:"suppressed_findings,omitempty"`
+	RulesRun           int             `json:"rules_run"`
+	ScanTimeMs         int64           `json:"scan_time_ms"`
+	HintsOutput        string          `json:"hints_output,omitempty"`
 }
 
 // MaxSeverity returns the highest severity among all findings.

@@ -88,6 +88,11 @@ type TaintSignature struct {
 	// that consume tainted data from parameters.
 	SinkCalls []SinkRef `json:"sink_calls,omitempty"`
 
+	// SuppressedSinks lists sink calls that were suppressed by
+	// batou:ignore directives. Callers skip these sinks during
+	// interprocedural analysis.
+	SuppressedSinks []SinkRef `json:"suppressed_sinks,omitempty"`
+
 	// SanitizedPaths notes which param→sink paths pass through sanitizers.
 	SanitizedPaths []SanitizedPath `json:"sanitized_paths,omitempty"`
 

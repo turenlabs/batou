@@ -16,6 +16,7 @@ import (
 	"github.com/turenlabs/batou/internal/hook"
 	"github.com/turenlabs/batou/internal/reporter"
 	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/suppress"
 	"github.com/turenlabs/batou/internal/taint"
 	"github.com/turenlabs/batou/internal/taint/astflow"
 	"github.com/turenlabs/batou/internal/taint/tsflow"
@@ -180,6 +181,11 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		return
 	}
 
+	// Parse inline suppression directives (early, before call graph so
+	// suppressedLines can filter sinks in taint signatures).
+	suppressions := suppress.Parse(content)
+	suppressedLines := suppressions.SuppressedLines()
+
 	// Phase 2: Call graph update and interprocedural analysis
 	var callGraph *graph.CallGraph
 	var interprocFindings []rules.Finding
@@ -222,7 +228,7 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 
 		// Run interprocedural analysis on changed functions
 		fileContents := map[string]string{filePath: content}
-		interprocFindings = graph.PropagateInterproc(callGraph, changedIDs, fileContents, layer3Flows)
+		interprocFindings = graph.PropagateInterproc(callGraph, changedIDs, fileContents, layer3Flows, suppressedLines)
 		findings = append(findings, interprocFindings...)
 
 		// Save updated graph (best-effort)
@@ -237,6 +243,10 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 	// highest-fidelity finding (taint > AST > interprocedural > regex)
 	// and merge tags from suppressed duplicates into the winner.
 	findings = DeduplicateFindings(findings)
+
+	// Apply inline suppressions: partition findings into kept and suppressed.
+	var suppressedFindings []rules.Finding
+	findings, suppressedFindings = suppress.Apply(suppressions, findings)
 
 	// Reduce severity for findings in test / fixture files.
 	// Test code intentionally contains vulnerable patterns so we downgrade
@@ -262,12 +272,12 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 	}
 
 	result.Findings = findings
+	result.SuppressedCount = len(suppressedFindings)
+	result.SuppressedFindings = suppressedFindings
 	result.ScanTimeMs = time.Since(start).Milliseconds()
 
 	// Exit early if the context was cancelled (timeout).
 	if ctx.Err() != nil {
-		result.Findings = findings
-		result.ScanTimeMs = time.Since(start).Milliseconds()
 		return
 	}
 
@@ -293,14 +303,15 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 	}
 
 	hintCtx := &hints.HintContext{
-		FilePath:    filePath,
-		Language:    lang,
-		Findings:    findings,
-		TaintFlows:  taintFlows,
-		CallGraph:   callGraph,
-		ChangedFunc: changedFuncName,
-		IsNewFile:   input.IsWriteOperation(),
-		ScanTimeMs:  result.ScanTimeMs,
+		FilePath:           filePath,
+		Language:           lang,
+		Findings:           findings,
+		SuppressedFindings: suppressedFindings,
+		TaintFlows:         taintFlows,
+		CallGraph:          callGraph,
+		ChangedFunc:        changedFuncName,
+		IsNewFile:          input.IsWriteOperation(),
+		ScanTimeMs:         result.ScanTimeMs,
 	}
 
 	hintList := hints.GenerateHints(hintCtx)

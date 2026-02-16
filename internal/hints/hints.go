@@ -26,27 +26,29 @@ import (
 
 // HintContext contains everything needed to generate hints for a scan.
 type HintContext struct {
-	FilePath   string
-	Language   rules.Language
-	Findings   []rules.Finding
-	TaintFlows []taint.TaintFlow
-	CallGraph  *graph.CallGraph
-	ChangedFunc string    // The function that was just modified
-	IsNewFile  bool       // True if this is a new file (Write), false for Edit
-	ScanTimeMs int64
+	FilePath           string
+	Language           rules.Language
+	Findings           []rules.Finding
+	SuppressedFindings []rules.Finding  // Findings silenced by batou:ignore directives
+	TaintFlows         []taint.TaintFlow
+	CallGraph          *graph.CallGraph
+	ChangedFunc        string    // The function that was just modified
+	IsNewFile          bool      // True if this is a new file (Write), false for Edit
+	ScanTimeMs         int64
 }
 
 // Hint represents a single piece of actionable advice for Claude.
 type Hint struct {
-	Priority    int            // 1 = most urgent
-	Severity    rules.Severity // Matches the finding severity
-	Category    string         // e.g., "taint_flow", "pattern", "architecture", "positive"
-	Title       string         // Short summary
-	Explanation string         // Why this matters
-	FixExample  string         // Concrete code showing the fix
-	Impact      string         // What happens if this isn't fixed
-	References  []string       // CWE, OWASP links
-	AffectedBy  []string       // Other functions impacted (from call graph)
+	Priority          int            // 1 = most urgent
+	Severity          rules.Severity // Matches the finding severity
+	Category          string         // e.g., "taint_flow", "pattern", "architecture", "positive"
+	Title             string         // Short summary
+	Explanation       string         // Why this matters
+	FixExample        string         // Concrete code showing the fix
+	Impact            string         // What happens if this isn't fixed
+	References        []string       // CWE, OWASP links
+	AffectedBy        []string       // Other functions impacted (from call graph)
+	SuppressDirective string         // Exact batou:ignore comment to add if false positive
 }
 
 // GenerateHints produces actionable hints from scan results.
@@ -157,7 +159,16 @@ func FormatForClaude(ctx *HintContext, hints []Hint) string {
 			b.WriteString(fmt.Sprintf("Refs: %s\n", strings.Join(h.References, ", ")))
 		}
 
+		if h.SuppressDirective != "" {
+			b.WriteString(fmt.Sprintf("\nSuppress: If false positive, add above the line: %s\n", h.SuppressDirective))
+		}
+
 		b.WriteString("\n")
+	}
+
+	// Suppression summary
+	if len(ctx.SuppressedFindings) > 0 {
+		b.WriteString(fmt.Sprintf("--- %d finding(s) silenced by batou:ignore directives ---\n\n", len(ctx.SuppressedFindings)))
 	}
 
 	b.WriteString("=== End Batou ===\n")
@@ -195,6 +206,10 @@ func hintFromTaintFlow(flow taint.TaintFlow, ctx *HintContext) Hint {
 		h.References = append(h.References, flow.Sink.OWASPCategory)
 	}
 
+	// Add suppress directive for taint flow hints.
+	h.SuppressDirective = fmt.Sprintf("%s batou:ignore %s -- <reason>",
+		commentPrefixForLang(ctx.Language), flow.Sink.Category)
+
 	// Check call graph for impacted callers
 	if ctx.CallGraph != nil {
 		funcID := graph.FuncID(ctx.FilePath, flow.ScopeName)
@@ -210,13 +225,14 @@ func hintFromTaintFlow(flow taint.TaintFlow, ctx *HintContext) Hint {
 
 func hintFromFinding(f rules.Finding, ctx *HintContext) Hint {
 	h := Hint{
-		Priority:    severityToPriority(f.Severity),
-		Severity:    f.Severity,
-		Category:    "finding",
-		Title:       fmt.Sprintf("[%s] %s (line %d)", f.RuleID, f.Title, f.LineNumber),
-		Explanation: f.Description,
-		Impact:      impactDescription(string(categorizeRule(f.RuleID))),
-		References:  []string{},
+		Priority:          severityToPriority(f.Severity),
+		Severity:          f.Severity,
+		Category:          "finding",
+		Title:             fmt.Sprintf("[%s] %s (line %d)", f.RuleID, f.Title, f.LineNumber),
+		Explanation:       f.Description,
+		Impact:            impactDescription(string(categorizeRule(f.RuleID))),
+		References:        []string{},
+		SuppressDirective: formatSuppressDirective(f, ctx.Language),
 	}
 
 	if f.Suggestion != "" {
@@ -943,6 +959,25 @@ func sortHints(hints []Hint) {
 		for j := i; j > 0 && hints[j].Priority < hints[j-1].Priority; j-- {
 			hints[j], hints[j-1] = hints[j-1], hints[j]
 		}
+	}
+}
+
+// formatSuppressDirective returns the exact comment a developer should add
+// above the flagged line to suppress a false positive.
+func formatSuppressDirective(f rules.Finding, lang rules.Language) string {
+	prefix := commentPrefixForLang(lang)
+	return fmt.Sprintf("%s batou:ignore %s -- <reason>", prefix, f.RuleID)
+}
+
+// commentPrefixForLang returns the single-line comment prefix for a language.
+func commentPrefixForLang(lang rules.Language) string {
+	switch lang {
+	case rules.LangPython, rules.LangRuby, rules.LangPerl, rules.LangShell:
+		return "#"
+	case rules.LangLua, rules.LangSQL:
+		return "--"
+	default:
+		return "//"
 	}
 }
 

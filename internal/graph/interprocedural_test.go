@@ -174,7 +174,7 @@ func TestComputeTaintSig_WithSQLSink(t *testing.T) {
 		EndLine:   4,
 		Language:  rules.LangGo,
 	}
-	sig := ComputeTaintSig(node, content, rules.LangGo, nil)
+	sig := ComputeTaintSig(node, content, rules.LangGo, nil, nil)
 	if sig.IsPure {
 		t.Error("function with HTTP request param and SQL sink should not be pure")
 	}
@@ -194,7 +194,7 @@ func TestComputeTaintSig_PureFunction(t *testing.T) {
 		EndLine:   3,
 		Language:  rules.LangGo,
 	}
-	sig := ComputeTaintSig(node, content, rules.LangGo, nil)
+	sig := ComputeTaintSig(node, content, rules.LangGo, nil, nil)
 	if !sig.IsPure {
 		t.Error("function with no sources/sinks should be pure")
 	}
@@ -208,7 +208,7 @@ func TestComputeTaintSig_EmptyBody(t *testing.T) {
 		EndLine:   1,
 		Language:  rules.LangGo,
 	}
-	sig := ComputeTaintSig(node, "", rules.LangGo, nil)
+	sig := ComputeTaintSig(node, "", rules.LangGo, nil, nil)
 	if !sig.IsPure {
 		t.Error("empty function body should be pure")
 	}
@@ -227,7 +227,7 @@ func TestComputeTaintSig_WithSanitizer(t *testing.T) {
 		EndLine:   5,
 		Language:  rules.LangGo,
 	}
-	sig := ComputeTaintSig(node, content, rules.LangGo, nil)
+	sig := ComputeTaintSig(node, content, rules.LangGo, nil, nil)
 	if len(sig.SanitizedPaths) == 0 {
 		// The sanitizer may or may not be detected depending on line ordering.
 		// This documents the behavior.
@@ -344,7 +344,7 @@ func TestPropagateInterproc_BasicFlow(t *testing.T) {
 		"/app/handler.go": callerContent,
 	}
 
-	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents, nil)
+	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents, nil, nil)
 	// The interprocedural analysis should detect the cross-function flow
 	_ = findings // Document behavior; exact results depend on regex matching
 }
@@ -368,7 +368,7 @@ func TestPropagateInterproc_NoChange(t *testing.T) {
 }`
 	fileContents := map[string]string{"/app/math.go": content}
 
-	findings := PropagateInterproc(cg, []string{"pkg.add"}, fileContents, nil)
+	findings := PropagateInterproc(cg, []string{"pkg.add"}, fileContents, nil, nil)
 	if len(findings) != 0 {
 		t.Error("expected no findings for pure function with no signature change")
 	}
@@ -377,7 +377,7 @@ func TestPropagateInterproc_NoChange(t *testing.T) {
 func TestPropagateInterproc_MissingNode(t *testing.T) {
 	cg := NewCallGraph("/project", "test")
 	fileContents := map[string]string{}
-	findings := PropagateInterproc(cg, []string{"nonexistent"}, fileContents, nil)
+	findings := PropagateInterproc(cg, []string{"nonexistent"}, fileContents, nil, nil)
 	if len(findings) != 0 {
 		t.Error("expected no findings for missing node")
 	}
@@ -430,7 +430,7 @@ func TestPropagateInterproc_CrossFileCallerLoadedFromDisk(t *testing.T) {
 		calleePath: calleeContent,
 	}
 
-	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents, nil)
+	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents, nil, nil)
 
 	// The caller file should have been loaded from disk, enabling
 	// cross-file interprocedural analysis to detect the taint flow.
@@ -690,7 +690,7 @@ func TestComputeTaintSig_WithFlows_SQLInjection(t *testing.T) {
 		},
 	}
 
-	sig := ComputeTaintSig(node, content, rules.LangGo, flows)
+	sig := ComputeTaintSig(node, content, rules.LangGo, flows, nil)
 
 	if sig.IsPure {
 		t.Error("function with SQL injection flow should not be pure")
@@ -739,7 +739,7 @@ func TestComputeTaintSig_WithFlows_Sanitized(t *testing.T) {
 		},
 	}
 
-	sig := ComputeTaintSig(node, content, rules.LangGo, flows)
+	sig := ComputeTaintSig(node, content, rules.LangGo, flows, nil)
 
 	if len(sig.SanitizedPaths) == 0 {
 		t.Error("expected sanitized path to be detected from flow steps")
@@ -785,7 +785,7 @@ func TestComputeTaintSig_WithFlows_OutsideFuncRange(t *testing.T) {
 		},
 	}
 
-	sig := ComputeTaintSig(node, content, rules.LangGo, flows)
+	sig := ComputeTaintSig(node, content, rules.LangGo, flows, nil)
 
 	// Should fall back to regex, which sees no sources/sinks → pure.
 	if !sig.IsPure {
@@ -807,7 +807,7 @@ func TestComputeTaintSig_WithFlows_NilFallsBackToRegex(t *testing.T) {
 	}
 
 	// nil flows → regex fallback.
-	sig := ComputeTaintSig(node, content, rules.LangGo, nil)
+	sig := ComputeTaintSig(node, content, rules.LangGo, nil, nil)
 
 	if sig.IsPure {
 		t.Error("regex fallback should detect HTTP source + SQL sink")
@@ -860,7 +860,7 @@ func TestComputeTaintSig_WithFlows_MultipleFlows(t *testing.T) {
 		},
 	}
 
-	sig := ComputeTaintSig(node, content, rules.LangGo, flows)
+	sig := ComputeTaintSig(node, content, rules.LangGo, flows, nil)
 
 	if len(sig.SinkCalls) != 2 {
 		t.Errorf("expected 2 sink calls from flows, got %d", len(sig.SinkCalls))
@@ -971,7 +971,7 @@ func TestPropagateInterproc_WithFlows(t *testing.T) {
 		},
 	}
 
-	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents, flows)
+	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents, flows, nil)
 
 	// The callee's signature should be flow-informed and detect the SQL sink,
 	// which should then propagate to the caller that passes tainted data.
