@@ -40,7 +40,8 @@ var (
 var (
 	reUploadNoSizePy     = regexp.MustCompile(`(?i)(?:MAX_CONTENT_LENGTH|max_content_length|MAX_UPLOAD_SIZE)\s*[=:]\s*None`)
 	reUploadNoSizePHP    = regexp.MustCompile(`(?i)(?:upload_max_filesize|post_max_size)\s*=\s*(?:0|-1|unlimited)`)
-	reUploadNoSizeJS     = regexp.MustCompile(`(?i)multer\s*\(\s*\{(?:(?!limits)[^}])*\}\s*\)`)
+	reUploadNoSizeJS     = regexp.MustCompile(`(?i)multer\s*\(\s*\{[^}]*\}\s*\)`)
+	reUploadHasLimits    = regexp.MustCompile(`(?i)limits\s*:`)
 	reUploadNoSizeJSNone = regexp.MustCompile(`(?i)(?:limits\s*:\s*\{[^}]*fileSize\s*:\s*(?:Infinity|null|undefined|0))`)
 	reUploadNoSizeJava   = regexp.MustCompile(`(?i)(?:setMaxFileSize|setMaxRequestSize)\s*\(\s*-1\s*\)`)
 )
@@ -322,6 +323,10 @@ func (r *UploadNoSizeLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		for _, re := range patterns {
 			if m := re.FindString(line); m != "" {
+				// For multer(...{...}), skip if the config object contains "limits"
+				if re == reUploadNoSizeJS && reUploadHasLimits.MatchString(m) {
+					continue
+				}
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),

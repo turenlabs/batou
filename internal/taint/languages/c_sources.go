@@ -180,7 +180,7 @@ func (c *CCatalog) Sources() []taint.SourceDef {
 			ID:          "c.file.read",
 			Category:    taint.SrcFileRead,
 			Language:    rules.LangC,
-			Pattern:     `\bread\s*\(\s*(?!(?:STDIN_FILENO|0)\s*,)`,
+			Pattern:     `\bread\s*\(\s*[^0S]`,
 			ObjectType:  "",
 			MethodName:  "read",
 			Description: "POSIX read from file descriptor",
