@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -378,6 +380,102 @@ func TestPropagateInterproc_MissingNode(t *testing.T) {
 	findings := PropagateInterproc(cg, []string{"nonexistent"}, fileContents)
 	if len(findings) != 0 {
 		t.Error("expected no findings for missing node")
+	}
+}
+
+func TestPropagateInterproc_CrossFileCallerLoadedFromDisk(t *testing.T) {
+	// Create a temp dir with a caller file on disk.
+	tmpDir := t.TempDir()
+	callerPath := filepath.Join(tmpDir, "handler.go")
+	calleePath := filepath.Join(tmpDir, "process.go")
+
+	callerContent := `func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	processName(name)
+}`
+	calleeContent := `func processName(name string) {
+	db.Query("SELECT * FROM users WHERE name = '" + name + "'")
+}`
+
+	// Write the caller to disk but do NOT include it in fileContents.
+	if err := os.WriteFile(callerPath, []byte(callerContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cg := NewCallGraph(tmpDir, "test")
+
+	callee := &FuncNode{
+		ID:        "pkg.processName",
+		Name:      "processName",
+		FilePath:  calleePath,
+		StartLine: 1,
+		EndLine:   3,
+		Language:  rules.LangGo,
+	}
+	caller := &FuncNode{
+		ID:        "pkg.handler",
+		Name:      "handler",
+		FilePath:  callerPath,
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	cg.AddNode(callee)
+	cg.AddNode(caller)
+	cg.AddEdge(caller.ID, callee.ID)
+
+	// Only provide the callee's file — the caller must be loaded from disk.
+	fileContents := map[string]string{
+		calleePath: calleeContent,
+	}
+
+	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents)
+
+	// The caller file should have been loaded from disk, enabling
+	// cross-file interprocedural analysis to detect the taint flow.
+	if len(findings) == 0 {
+		t.Error("expected interprocedural findings from cross-file caller loaded from disk, got none")
+	}
+
+	// Verify the caller content was cached in fileContents.
+	if _, ok := fileContents[callerPath]; !ok {
+		t.Error("expected caller file to be cached in fileContents after loading from disk")
+	}
+}
+
+func TestLoadCallerFile_TooLarge(t *testing.T) {
+	tmpDir := t.TempDir()
+	largePath := filepath.Join(tmpDir, "large.go")
+
+	// Create a file just over the limit.
+	data := make([]byte, maxCallerFileSize+1)
+	if err := os.WriteFile(largePath, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cache := map[string]string{}
+	_, ok := loadCallerFile(largePath, cache)
+	if ok {
+		t.Error("expected loadCallerFile to reject file exceeding maxCallerFileSize")
+	}
+}
+
+func TestLoadCallerFile_Missing(t *testing.T) {
+	cache := map[string]string{}
+	_, ok := loadCallerFile("/nonexistent/path.go", cache)
+	if ok {
+		t.Error("expected loadCallerFile to return false for missing file")
+	}
+}
+
+func TestLoadCallerFile_Cached(t *testing.T) {
+	cache := map[string]string{
+		"/some/file.go": "cached content",
+	}
+	content, ok := loadCallerFile("/some/file.go", cache)
+	if !ok || content != "cached content" {
+		t.Error("expected loadCallerFile to return cached content")
 	}
 }
 

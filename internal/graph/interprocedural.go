@@ -15,6 +15,7 @@ package graph
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -22,6 +23,11 @@ import (
 	"github.com/turenio/gtss/internal/rules"
 	"github.com/turenio/gtss/internal/taint"
 )
+
+// maxCallerFileSize is the largest file we'll read from disk for
+// cross-file interprocedural analysis (2 MB). Files larger than this
+// are skipped to avoid slowing down the hook.
+const maxCallerFileSize = 2 * 1024 * 1024
 
 // maxTraversalDepth limits how far we walk up the call graph.
 const maxTraversalDepth = 5
@@ -186,8 +192,11 @@ func PropagateInterproc(cg *CallGraph, changedFuncIDs []string, fileContents map
 		for _, callerNode := range callers {
 			callerContent, ok := fileContents[callerNode.FilePath]
 			if !ok {
-				// We may only have the changed file's content; skip unknown callers.
-				continue
+				// Caller is in a different file — read it from disk.
+				callerContent, ok = loadCallerFile(callerNode.FilePath, fileContents)
+				if !ok {
+					continue
+				}
 			}
 
 			callerFindings := AnalyzeCallerImpact(cg, callerNode, node, callerContent)
@@ -425,6 +434,32 @@ func FindImpactedCallers(cg *CallGraph, changedFuncIDs []string) []ImpactedCalle
 }
 
 // --- Internal helpers ---
+
+// loadCallerFile reads a caller's source file from disk for cross-file
+// interprocedural analysis. Results are cached in fileContents so each
+// file is read at most once per PropagateInterproc invocation.
+// Returns the content and true on success, or ("", false) if the file
+// cannot be read (missing, too large, or unreadable).
+func loadCallerFile(filePath string, fileContents map[string]string) (string, bool) {
+	// Check cache first (another caller in the same file may have loaded it).
+	if content, ok := fileContents[filePath]; ok {
+		return content, true
+	}
+
+	info, err := os.Stat(filePath)
+	if err != nil || info.IsDir() || info.Size() > maxCallerFileSize {
+		return "", false
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", false
+	}
+
+	content := string(data)
+	fileContents[filePath] = content
+	return content, true
+}
 
 // extractFuncBody extracts lines startLine..endLine (1-indexed, inclusive) from content.
 func extractFuncBody(content string, startLine, endLine int) string {
