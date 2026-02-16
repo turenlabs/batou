@@ -985,3 +985,101 @@ func TestPropagateInterproc_WithFlows(t *testing.T) {
 	// Verify findings were produced from interprocedural analysis.
 	_ = findings // Exact results depend on caller analysis matching
 }
+
+// =========================================================================
+// filterSuppressedSinks
+// =========================================================================
+
+func TestFilterSuppressedSinks_MovesSuppressedSinks(t *testing.T) {
+	sig := TaintSignature{
+		SinkCalls: []SinkRef{
+			{SinkCategory: taint.SnkSQLQuery, MethodName: "db.Query", Line: 5},
+			{SinkCategory: taint.SnkCommand, MethodName: "exec.Command", Line: 10},
+			{SinkCategory: taint.SnkHTMLOutput, MethodName: "fmt.Fprint", Line: 15},
+		},
+	}
+
+	suppressed := map[int]bool{10: true}
+	result := filterSuppressedSinks(sig, suppressed)
+
+	if len(result.SinkCalls) != 2 {
+		t.Errorf("expected 2 remaining sink calls, got %d", len(result.SinkCalls))
+	}
+	if len(result.SuppressedSinks) != 1 {
+		t.Errorf("expected 1 suppressed sink, got %d", len(result.SuppressedSinks))
+	}
+	if len(result.SuppressedSinks) > 0 && result.SuppressedSinks[0].SinkCategory != taint.SnkCommand {
+		t.Errorf("expected suppressed sink to be command_exec, got %s", result.SuppressedSinks[0].SinkCategory)
+	}
+}
+
+func TestFilterSuppressedSinks_NilSuppressedLines(t *testing.T) {
+	sig := TaintSignature{
+		SinkCalls: []SinkRef{
+			{SinkCategory: taint.SnkSQLQuery, Line: 5},
+		},
+	}
+
+	result := filterSuppressedSinks(sig, nil)
+
+	if len(result.SinkCalls) != 1 {
+		t.Error("nil suppressedLines should leave all sinks unchanged")
+	}
+	if len(result.SuppressedSinks) != 0 {
+		t.Error("nil suppressedLines should produce no suppressed sinks")
+	}
+}
+
+func TestFilterSuppressedSinks_AllSinksSuppressed(t *testing.T) {
+	sig := TaintSignature{
+		SinkCalls: []SinkRef{
+			{SinkCategory: taint.SnkSQLQuery, Line: 5},
+			{SinkCategory: taint.SnkCommand, Line: 10},
+		},
+	}
+
+	suppressed := map[int]bool{5: true, 10: true}
+	result := filterSuppressedSinks(sig, suppressed)
+
+	if len(result.SinkCalls) != 0 {
+		t.Errorf("expected 0 remaining sink calls, got %d", len(result.SinkCalls))
+	}
+	if len(result.SuppressedSinks) != 2 {
+		t.Errorf("expected 2 suppressed sinks, got %d", len(result.SuppressedSinks))
+	}
+}
+
+func TestFilterSuppressedSinks_NoSinks(t *testing.T) {
+	sig := TaintSignature{}
+	suppressed := map[int]bool{5: true}
+	result := filterSuppressedSinks(sig, suppressed)
+
+	if len(result.SinkCalls) != 0 || len(result.SuppressedSinks) != 0 {
+		t.Error("empty sinks should remain empty")
+	}
+}
+
+func TestComputeTaintSig_WithSuppressedLines(t *testing.T) {
+	content := `func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	db.Query("SELECT * FROM users WHERE name = '" + name + "'")
+}`
+	node := &FuncNode{
+		Name:      "handler",
+		FilePath:  "/app/handler.go",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	// Suppress line 3 (where db.Query is).
+	suppressedLines := map[int]bool{3: true}
+	sig := ComputeTaintSig(node, content, rules.LangGo, nil, suppressedLines)
+
+	if len(sig.SinkCalls) != 0 {
+		t.Errorf("expected 0 active sinks (db.Query on suppressed line), got %d", len(sig.SinkCalls))
+	}
+	if len(sig.SuppressedSinks) == 0 {
+		t.Error("expected db.Query to appear in SuppressedSinks")
+	}
+}

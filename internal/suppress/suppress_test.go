@@ -374,3 +374,251 @@ func TestIsSuppressed_BlockRange(t *testing.T) {
 		t.Error("line 6 should NOT be suppressed (after block end)")
 	}
 }
+
+// =========================================================================
+// Same-line directive (directive on the code line itself)
+// =========================================================================
+
+func TestParse_SameLineDirective(t *testing.T) {
+	// Directive appears on the same line as code — should suppress that line.
+	content := "query := db.Query(sql) // batou:ignore injection\nnextLine()"
+	s := Parse(content)
+
+	if len(s.Directives) != 1 {
+		t.Fatalf("expected 1 directive, got %d", len(s.Directives))
+	}
+	// Line 1 should be suppressed (directive is on line 1).
+	if _, ok := s.lineTargets[1]; !ok {
+		t.Error("expected line 1 to be suppressed (same-line directive)")
+	}
+}
+
+func TestIsSuppressed_SameLineDirective(t *testing.T) {
+	content := "db.Query(sql) // batou:ignore BATOU-INJ-001\nnextLine()"
+	s := Parse(content)
+
+	f := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 1}
+	if !s.IsSuppressed(f) {
+		t.Error("finding on line 1 should be suppressed by same-line directive")
+	}
+}
+
+// =========================================================================
+// Directive at end of file (no following code line)
+// =========================================================================
+
+func TestParse_DirectiveAtEOF(t *testing.T) {
+	content := "code()\n// batou:ignore injection"
+	s := Parse(content)
+
+	if len(s.Directives) != 1 {
+		t.Fatalf("expected 1 directive, got %d", len(s.Directives))
+	}
+	// Line 2 (directive itself) should be suppressed.
+	if _, ok := s.lineTargets[2]; !ok {
+		t.Error("expected line 2 (directive at EOF) to be suppressed")
+	}
+	// No next code line — should not crash or suppress line 3.
+	if _, ok := s.lineTargets[3]; ok {
+		t.Error("nonexistent line 3 should not be suppressed")
+	}
+}
+
+// =========================================================================
+// Nested blocks
+// =========================================================================
+
+func TestParse_NestedBlocks(t *testing.T) {
+	content := "// batou:ignore-start injection\nline2\n// batou:ignore-start xss\nline4\n// batou:ignore-end\nline6\n// batou:ignore-end\nline8"
+	s := Parse(content)
+
+	// Line 4 should be suppressed by both injection and xss.
+	targets := s.lineTargets[4]
+	hasInj, hasXSS := false, false
+	for _, t := range targets {
+		if t == "injection" {
+			hasInj = true
+		}
+		if t == "xss" {
+			hasXSS = true
+		}
+	}
+	if !hasInj || !hasXSS {
+		t.Errorf("expected line 4 to be suppressed by both injection and xss, got targets: %v", targets)
+	}
+
+	// Line 6 should still be suppressed by injection (outer block) but not xss (inner ended).
+	targets6 := s.lineTargets[6]
+	hasInj6 := false
+	for _, t := range targets6 {
+		if t == "injection" {
+			hasInj6 = true
+		}
+	}
+	if !hasInj6 {
+		t.Errorf("expected line 6 to be suppressed by outer injection block, got targets: %v", targets6)
+	}
+
+	// Line 8 should NOT be suppressed.
+	if _, ok := s.lineTargets[8]; ok {
+		t.Error("line 8 should not be suppressed (both blocks ended)")
+	}
+}
+
+// =========================================================================
+// Orphan ignore-end (no matching start)
+// =========================================================================
+
+func TestParse_OrphanEnd(t *testing.T) {
+	// An ignore-end without a matching start should be gracefully ignored.
+	content := "line1\n// batou:ignore-end\nline3"
+	s := Parse(content)
+
+	// Should have one directive (the end).
+	if len(s.Directives) != 1 {
+		t.Fatalf("expected 1 directive (orphan end), got %d", len(s.Directives))
+	}
+	// No lines should be suppressed.
+	if len(s.lineTargets) != 0 {
+		t.Errorf("orphan end should not suppress any lines, got %d suppressed lines", len(s.lineTargets))
+	}
+}
+
+// =========================================================================
+// Block with wrong category
+// =========================================================================
+
+func TestIsSuppressed_BlockWrongCategory(t *testing.T) {
+	content := "// batou:ignore-start xss\nline2\n// batou:ignore-end"
+	s := Parse(content)
+
+	// XSS finding should be suppressed.
+	fXSS := rules.Finding{RuleID: "BATOU-XSS-001", LineNumber: 2}
+	if !s.IsSuppressed(fXSS) {
+		t.Error("XSS finding should be suppressed inside xss block")
+	}
+
+	// Injection finding should NOT be suppressed.
+	fINJ := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 2}
+	if s.IsSuppressed(fINJ) {
+		t.Error("injection finding should NOT be suppressed inside xss-only block")
+	}
+}
+
+// =========================================================================
+// Multiple independent directives in one file
+// =========================================================================
+
+func TestParse_MultipleDirectivesInFile(t *testing.T) {
+	content := "// batou:ignore injection\nline2\nline3\n// batou:ignore xss\nline5"
+	s := Parse(content)
+
+	if len(s.Directives) != 2 {
+		t.Fatalf("expected 2 directives, got %d", len(s.Directives))
+	}
+
+	// Line 2: suppressed for injection.
+	fINJ := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 2}
+	if !s.IsSuppressed(fINJ) {
+		t.Error("injection finding on line 2 should be suppressed")
+	}
+
+	// Line 2: NOT suppressed for xss.
+	fXSS2 := rules.Finding{RuleID: "BATOU-XSS-001", LineNumber: 2}
+	if s.IsSuppressed(fXSS2) {
+		t.Error("xss finding on line 2 should NOT be suppressed (only injection directive)")
+	}
+
+	// Line 5: suppressed for xss.
+	fXSS5 := rules.Finding{RuleID: "BATOU-XSS-001", LineNumber: 5}
+	if !s.IsSuppressed(fXSS5) {
+		t.Error("xss finding on line 5 should be suppressed")
+	}
+
+	// Line 5: NOT suppressed for injection.
+	fINJ5 := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 5}
+	if s.IsSuppressed(fINJ5) {
+		t.Error("injection finding on line 5 should NOT be suppressed")
+	}
+}
+
+// =========================================================================
+// Partial suppression (two findings on same line, one matches)
+// =========================================================================
+
+func TestApply_PartialSuppression(t *testing.T) {
+	s := Parse("// batou:ignore injection\nline2")
+	findings := []rules.Finding{
+		{RuleID: "BATOU-INJ-001", LineNumber: 2},
+		{RuleID: "BATOU-XSS-001", LineNumber: 2},
+		{RuleID: "BATOU-INJ-005", LineNumber: 2},
+	}
+
+	kept, suppressed := Apply(s, findings)
+
+	// INJ-001 and INJ-005 should be suppressed, XSS-001 should remain.
+	if len(suppressed) != 2 {
+		t.Errorf("expected 2 suppressed findings, got %d", len(suppressed))
+	}
+	if len(kept) != 1 {
+		t.Errorf("expected 1 kept finding, got %d", len(kept))
+	}
+	if len(kept) > 0 && kept[0].RuleID != "BATOU-XSS-001" {
+		t.Errorf("expected XSS finding kept, got %s", kept[0].RuleID)
+	}
+}
+
+// =========================================================================
+// Category matching coverage
+// =========================================================================
+
+func TestMatchesTargets_AllCategories(t *testing.T) {
+	tests := []struct {
+		ruleID   string
+		category string
+	}{
+		{"BATOU-INJ-001", "injection"},
+		{"BATOU-XSS-001", "xss"},
+		{"BATOU-SEC-001", "secrets"},
+		{"BATOU-CRY-001", "crypto"},
+		{"BATOU-TRV-001", "traversal"},
+		{"BATOU-AUTH-001", "auth"},
+		{"BATOU-SSRF-001", "ssrf"},
+		{"BATOU-TAINT-001", "taint"},
+		{"BATOU-DESER-001", "deserialize"},
+		{"BATOU-REDIR-001", "redirect"},
+		{"BATOU-NOSQL-001", "injection"},
+		{"BATOU-XXE-001", "xxe"},
+		{"BATOU-CORS-001", "cors"},
+		{"BATOU-LOG-001", "logging"},
+		{"BATOU-MEM-001", "memory"},
+		{"BATOU-PROTO-001", "prototype"},
+		{"BATOU-MASS-001", "massassign"},
+		{"BATOU-GQL-001", "graphql"},
+		{"BATOU-MISCONF-001", "misconfig"},
+		{"BATOU-INTERPROC-SQL", "interprocedural"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.ruleID, func(t *testing.T) {
+			f := rules.Finding{RuleID: tt.ruleID, LineNumber: 1}
+			if !matchesTargets(f, []string{tt.category}) {
+				t.Errorf("expected %s to match category %q", tt.ruleID, tt.category)
+			}
+		})
+	}
+}
+
+func TestMatchesTargets_NoMatchUnrelatedCategory(t *testing.T) {
+	f := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 1}
+	if matchesTargets(f, []string{"xss"}) {
+		t.Error("injection rule should not match xss category")
+	}
+}
+
+func TestMatchesTargets_GeneralFallback(t *testing.T) {
+	f := rules.Finding{RuleID: "BATOU-UNKNOWN-001", LineNumber: 1}
+	if !matchesTargets(f, []string{"general"}) {
+		t.Error("unknown rule should fall back to 'general' category")
+	}
+}
