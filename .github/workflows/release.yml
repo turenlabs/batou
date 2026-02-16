@@ -17,7 +17,7 @@ jobs:
             goos: darwin
             goarch: arm64
             artifact: batou-darwin-arm64
-          - os: macos-13
+          - os: macos-latest
             goos: darwin
             goarch: amd64
             artifact: batou-darwin-amd64
