@@ -24,14 +24,22 @@ func Supports(lang rules.Language) bool {
 // Analyze runs tree-sitter-based taint analysis on source code.
 // Returns nil if the language is unsupported, unparseable, or has no catalog.
 func Analyze(content string, filePath string, lang rules.Language) []taint.TaintFlow {
+	return AnalyzeWithTree(content, filePath, lang, nil)
+}
+
+// AnalyzeWithTree is like Analyze but accepts a pre-parsed tree-sitter tree
+// to avoid redundant parsing. If tree is nil, it falls back to parsing.
+func AnalyzeWithTree(content string, filePath string, lang rules.Language, tree *ast.Tree) []taint.TaintFlow {
 	cfg := getConfig(lang)
 	if cfg == nil {
 		return nil
 	}
 
-	tree := ast.Parse([]byte(content), lang)
 	if tree == nil {
-		return nil
+		tree = ast.Parse([]byte(content), lang)
+		if tree == nil {
+			return nil
+		}
 	}
 
 	cat := taint.GetCatalog(lang)

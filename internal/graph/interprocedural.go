@@ -161,7 +161,10 @@ var sanitizerPatterns = []struct {
 //  2. Compares with the previous signature
 //  3. If changed, walks all callers and computes cross-function flows
 //  4. Returns findings for any new interprocedural taint paths
-func PropagateInterproc(cg *CallGraph, changedFuncIDs []string, fileContents map[string]string) []rules.Finding {
+//
+// When flows (from Layer 3 taint analysis) are provided, ComputeTaintSig
+// uses them for precise signature computation instead of regex heuristics.
+func PropagateInterproc(cg *CallGraph, changedFuncIDs []string, fileContents map[string]string, flows []taint.TaintFlow) []rules.Finding {
 	var findings []rules.Finding
 
 	for _, funcID := range changedFuncIDs {
@@ -176,7 +179,8 @@ func PropagateInterproc(cg *CallGraph, changedFuncIDs []string, fileContents map
 		}
 
 		// Compute the new taint signature for this changed function.
-		newSig := ComputeTaintSig(node, content, node.Language)
+		// Pass Layer 3 flows for precise analysis when available.
+		newSig := ComputeTaintSig(node, content, node.Language, flows)
 
 		// Compare with the old signature.
 		oldSig := node.TaintSig
@@ -210,7 +214,12 @@ func PropagateInterproc(cg *CallGraph, changedFuncIDs []string, fileContents map
 // ComputeTaintSig analyzes a function body and produces its TaintSignature.
 // This summarizes: which params carry taint, which returns carry taint,
 // what sinks exist, what sanitizers are applied.
-func ComputeTaintSig(node *FuncNode, content string, lang rules.Language) TaintSignature {
+//
+// When flows (from Layer 3 taint analysis) are non-empty, the signature is
+// populated from precise dataflow results instead of regex heuristics.
+// Flows are filtered to those within this function's line range. The regex
+// fallback is used when flows is nil or empty.
+func ComputeTaintSig(node *FuncNode, content string, lang rules.Language, flows []taint.TaintFlow) TaintSignature {
 	sig := TaintSignature{
 		TaintedParams:  make(map[int][]taint.SourceCategory),
 		TaintedReturns: make(map[int][]taint.SourceCategory),
@@ -223,6 +232,17 @@ func ComputeTaintSig(node *FuncNode, content string, lang rules.Language) TaintS
 		sig.IsPure = true
 		return sig
 	}
+
+	// Filter flows to those within this function's line range.
+	funcFlows := filterFlowsForFunc(flows, node.StartLine, node.EndLine)
+
+	// When Layer 3 taint flows are available, use them for precise
+	// signature computation instead of regex heuristics.
+	if len(funcFlows) > 0 {
+		return computeSigFromFlows(node, funcFlows, body)
+	}
+
+	// --- Regex fallback (no Layer 3 flows available) ---
 
 	lines := strings.Split(body, "\n")
 
@@ -308,6 +328,101 @@ func ComputeTaintSig(node *FuncNode, content string, lang rules.Language) TaintS
 	}
 
 	// A function is pure if it has no source params, no sinks, and no tainted returns.
+	sig.IsPure = len(sig.SourceParams) == 0 &&
+		len(sig.SinkCalls) == 0 &&
+		len(sig.TaintedReturns) == 0 &&
+		len(sig.TaintedParams) == 0
+
+	return sig
+}
+
+// filterFlowsForFunc returns the subset of flows whose source or sink line
+// falls within the function's line range.
+func filterFlowsForFunc(flows []taint.TaintFlow, startLine, endLine int) []taint.TaintFlow {
+	if len(flows) == 0 {
+		return nil
+	}
+	var out []taint.TaintFlow
+	for _, f := range flows {
+		if (f.SourceLine >= startLine && f.SourceLine <= endLine) ||
+			(f.SinkLine >= startLine && f.SinkLine <= endLine) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// computeSigFromFlows builds a TaintSignature from precise Layer 3 taint
+// flows, mapping sources to SourceParams, sinks to SinkCalls, and detecting
+// sanitizers from flow steps.
+func computeSigFromFlows(node *FuncNode, flows []taint.TaintFlow, body string) TaintSignature {
+	sig := TaintSignature{
+		TaintedParams:  make(map[int][]taint.SourceCategory),
+		TaintedReturns: make(map[int][]taint.SourceCategory),
+		SourceParams:   make(map[int]taint.SourceCategory),
+	}
+
+	// Also run regex-based source param identification so we can map
+	// flow sources to parameter indices.
+	lines := strings.Split(body, "\n")
+	if len(lines) > 0 {
+		identifySourceParams(lines[0], &sig)
+	}
+
+	// Track which sink categories have sanitizers from the flows.
+	sanitizedCategories := make(map[taint.SinkCategory]bool)
+
+	for _, flow := range flows {
+		// Map flow sink to a SinkRef.
+		sinkRef := SinkRef{
+			SinkCategory: flow.Sink.Category,
+			MethodName:   flow.Sink.MethodName,
+			Line:         flow.SinkLine,
+			ArgFromParam: -1,
+		}
+
+		// Try to match the flow source to a parameter index.
+		// Check if any source param category matches the flow source category.
+		for paramIdx, srcCat := range sig.SourceParams {
+			if srcCat == flow.Source.Category {
+				sinkRef.ArgFromParam = paramIdx
+				break
+			}
+		}
+
+		// Check flow steps for sanitizer presence.
+		hasSanitizer := false
+		for _, step := range flow.Steps {
+			if strings.Contains(step.Description, "sanitiz") ||
+				strings.Contains(step.Description, "escape") ||
+				strings.Contains(step.Description, "encode") ||
+				strings.Contains(step.Description, "clean") ||
+				strings.Contains(step.Description, "validate") {
+				hasSanitizer = true
+				sanitizedCategories[flow.Sink.Category] = true
+				break
+			}
+		}
+
+		sig.SinkCalls = append(sig.SinkCalls, sinkRef)
+
+		// If no sanitizer, mark the param as tainted for this sink.
+		if !hasSanitizer && sinkRef.ArgFromParam >= 0 {
+			srcCat := sig.SourceParams[sinkRef.ArgFromParam]
+			sig.TaintedParams[sinkRef.ArgFromParam] = appendUniqueCat(
+				sig.TaintedParams[sinkRef.ArgFromParam], srcCat,
+			)
+		}
+
+		// Record sanitized paths.
+		if hasSanitizer && sinkRef.ArgFromParam >= 0 {
+			sig.SanitizedPaths = append(sig.SanitizedPaths, SanitizedPath{
+				ParamIndex:   sinkRef.ArgFromParam,
+				SinkCategory: flow.Sink.Category,
+			})
+		}
+	}
+
 	sig.IsPure = len(sig.SourceParams) == 0 &&
 		len(sig.SinkCalls) == 0 &&
 		len(sig.TaintedReturns) == 0 &&

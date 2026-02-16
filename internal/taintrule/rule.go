@@ -3,6 +3,7 @@ package taintrule
 import (
 	"time"
 
+	gtssast "github.com/turenio/gtss/internal/ast"
 	"github.com/turenio/gtss/internal/rules"
 	"github.com/turenio/gtss/internal/taint"
 	"github.com/turenio/gtss/internal/taint/astflow"
@@ -36,12 +37,26 @@ func (t *TaintRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	start := time.Now()
 
 	// Route to the best taint engine for the language, matching the
-	// logic in scanner.go Phase 3.
+	// logic in scanner.go Phase 3.  Reuse pre-parsed trees from Layer 2
+	// when available to avoid redundant parsing.
 	var flows []taint.TaintFlow
 	if ctx.Language == rules.LangGo {
-		flows = astflow.AnalyzeGo(ctx.Content, ctx.FilePath)
+		// Reuse cached go/ast parse, or parse once and cache for the
+		// call graph builder (Layer 4) to share.
+		var goParsed *astflow.GoParseResult
+		if cached, ok := ctx.GoASTFile.(*astflow.GoParseResult); ok {
+			goParsed = cached
+		} else {
+			goParsed = astflow.ParseGo(ctx.Content, ctx.FilePath)
+			if goParsed != nil {
+				ctx.GoASTFile = goParsed
+			}
+		}
+		flows = astflow.AnalyzeGoWithAST(ctx.Content, ctx.FilePath, goParsed)
 	} else if tsflow.Supports(ctx.Language) {
-		flows = tsflow.Analyze(ctx.Content, ctx.FilePath, ctx.Language)
+		// Reuse tree-sitter tree from Layer 2 (stored in ctx.Tree).
+		tree := gtssast.TreeFromContext(ctx)
+		flows = tsflow.AnalyzeWithTree(ctx.Content, ctx.FilePath, ctx.Language, tree)
 	} else {
 		flows = taint.Analyze(ctx.Content, ctx.FilePath, ctx.Language)
 	}

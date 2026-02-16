@@ -174,7 +174,7 @@ func TestComputeTaintSig_WithSQLSink(t *testing.T) {
 		EndLine:   4,
 		Language:  rules.LangGo,
 	}
-	sig := ComputeTaintSig(node, content, rules.LangGo)
+	sig := ComputeTaintSig(node, content, rules.LangGo, nil)
 	if sig.IsPure {
 		t.Error("function with HTTP request param and SQL sink should not be pure")
 	}
@@ -194,7 +194,7 @@ func TestComputeTaintSig_PureFunction(t *testing.T) {
 		EndLine:   3,
 		Language:  rules.LangGo,
 	}
-	sig := ComputeTaintSig(node, content, rules.LangGo)
+	sig := ComputeTaintSig(node, content, rules.LangGo, nil)
 	if !sig.IsPure {
 		t.Error("function with no sources/sinks should be pure")
 	}
@@ -208,7 +208,7 @@ func TestComputeTaintSig_EmptyBody(t *testing.T) {
 		EndLine:   1,
 		Language:  rules.LangGo,
 	}
-	sig := ComputeTaintSig(node, "", rules.LangGo)
+	sig := ComputeTaintSig(node, "", rules.LangGo, nil)
 	if !sig.IsPure {
 		t.Error("empty function body should be pure")
 	}
@@ -227,7 +227,7 @@ func TestComputeTaintSig_WithSanitizer(t *testing.T) {
 		EndLine:   5,
 		Language:  rules.LangGo,
 	}
-	sig := ComputeTaintSig(node, content, rules.LangGo)
+	sig := ComputeTaintSig(node, content, rules.LangGo, nil)
 	if len(sig.SanitizedPaths) == 0 {
 		// The sanitizer may or may not be detected depending on line ordering.
 		// This documents the behavior.
@@ -344,7 +344,7 @@ func TestPropagateInterproc_BasicFlow(t *testing.T) {
 		"/app/handler.go": callerContent,
 	}
 
-	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents)
+	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents, nil)
 	// The interprocedural analysis should detect the cross-function flow
 	_ = findings // Document behavior; exact results depend on regex matching
 }
@@ -368,7 +368,7 @@ func TestPropagateInterproc_NoChange(t *testing.T) {
 }`
 	fileContents := map[string]string{"/app/math.go": content}
 
-	findings := PropagateInterproc(cg, []string{"pkg.add"}, fileContents)
+	findings := PropagateInterproc(cg, []string{"pkg.add"}, fileContents, nil)
 	if len(findings) != 0 {
 		t.Error("expected no findings for pure function with no signature change")
 	}
@@ -377,7 +377,7 @@ func TestPropagateInterproc_NoChange(t *testing.T) {
 func TestPropagateInterproc_MissingNode(t *testing.T) {
 	cg := NewCallGraph("/project", "test")
 	fileContents := map[string]string{}
-	findings := PropagateInterproc(cg, []string{"nonexistent"}, fileContents)
+	findings := PropagateInterproc(cg, []string{"nonexistent"}, fileContents, nil)
 	if len(findings) != 0 {
 		t.Error("expected no findings for missing node")
 	}
@@ -430,7 +430,7 @@ func TestPropagateInterproc_CrossFileCallerLoadedFromDisk(t *testing.T) {
 		calleePath: calleeContent,
 	}
 
-	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents)
+	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents, nil)
 
 	// The caller file should have been loaded from disk, enabling
 	// cross-file interprocedural analysis to detect the taint flow.
@@ -655,4 +655,333 @@ func TestIsArgTaintedInCaller_NotTainted(t *testing.T) {
 	if isArgTaintedInCaller("name", lines, 2) {
 		t.Error("literal variable should not be tainted")
 	}
+}
+
+// =========================================================================
+// Flow-informed ComputeTaintSig (Layer 3 → Layer 4)
+// =========================================================================
+
+func TestComputeTaintSig_WithFlows_SQLInjection(t *testing.T) {
+	content := `func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	db.Query("SELECT * FROM users WHERE name = '" + name + "'")
+}`
+	node := &FuncNode{
+		Name:      "handler",
+		FilePath:  "/app/handler.go",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	flows := []taint.TaintFlow{
+		{
+			Source: taint.SourceDef{
+				Category:   taint.SrcUserInput,
+				MethodName: "FormValue",
+			},
+			Sink: taint.SinkDef{
+				Category:   taint.SnkSQLQuery,
+				MethodName: "db.Query",
+			},
+			SourceLine: 2,
+			SinkLine:   3,
+			Confidence: 0.95,
+		},
+	}
+
+	sig := ComputeTaintSig(node, content, rules.LangGo, flows)
+
+	if sig.IsPure {
+		t.Error("function with SQL injection flow should not be pure")
+	}
+	if len(sig.SinkCalls) == 0 {
+		t.Error("expected at least one sink call from flow")
+	}
+	if len(sig.SinkCalls) > 0 && sig.SinkCalls[0].SinkCategory != taint.SnkSQLQuery {
+		t.Errorf("expected sink category sql_query, got %s", sig.SinkCalls[0].SinkCategory)
+	}
+	if len(sig.SinkCalls) > 0 && sig.SinkCalls[0].MethodName != "db.Query" {
+		t.Errorf("expected sink method db.Query, got %s", sig.SinkCalls[0].MethodName)
+	}
+}
+
+func TestComputeTaintSig_WithFlows_Sanitized(t *testing.T) {
+	content := `func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	safe := html.EscapeString(name)
+	fmt.Fprintf(w, safe)
+}`
+	node := &FuncNode{
+		Name:      "handler",
+		FilePath:  "/app/handler.go",
+		StartLine: 1,
+		EndLine:   5,
+		Language:  rules.LangGo,
+	}
+
+	flows := []taint.TaintFlow{
+		{
+			Source: taint.SourceDef{
+				Category:   taint.SrcUserInput,
+				MethodName: "FormValue",
+			},
+			Sink: taint.SinkDef{
+				Category:   taint.SnkHTMLOutput,
+				MethodName: "fmt.Fprintf",
+			},
+			SourceLine: 2,
+			SinkLine:   4,
+			Steps: []taint.FlowStep{
+				{Line: 3, Description: "sanitized via html.EscapeString", VarName: "safe"},
+			},
+			Confidence: 0.9,
+		},
+	}
+
+	sig := ComputeTaintSig(node, content, rules.LangGo, flows)
+
+	if len(sig.SanitizedPaths) == 0 {
+		t.Error("expected sanitized path to be detected from flow steps")
+	}
+	// The param should NOT be in TaintedParams since it was sanitized.
+	for _, cats := range sig.TaintedParams {
+		for _, cat := range cats {
+			if cat == taint.SrcUserInput {
+				t.Error("sanitized param should not appear in TaintedParams")
+			}
+		}
+	}
+}
+
+func TestComputeTaintSig_WithFlows_OutsideFuncRange(t *testing.T) {
+	// Flows outside the function's line range should be ignored,
+	// falling back to regex analysis.
+	content := `func add(a int, b int) int {
+	return a + b
+}`
+	node := &FuncNode{
+		Name:      "add",
+		FilePath:  "/app/math.go",
+		StartLine: 1,
+		EndLine:   3,
+		Language:  rules.LangGo,
+	}
+
+	// This flow is from a different function (lines 10-15).
+	flows := []taint.TaintFlow{
+		{
+			Source: taint.SourceDef{
+				Category:   taint.SrcUserInput,
+				MethodName: "FormValue",
+			},
+			Sink: taint.SinkDef{
+				Category:   taint.SnkSQLQuery,
+				MethodName: "db.Query",
+			},
+			SourceLine: 10,
+			SinkLine:   15,
+			Confidence: 0.95,
+		},
+	}
+
+	sig := ComputeTaintSig(node, content, rules.LangGo, flows)
+
+	// Should fall back to regex, which sees no sources/sinks → pure.
+	if !sig.IsPure {
+		t.Error("function with no relevant flows should be pure (regex fallback)")
+	}
+}
+
+func TestComputeTaintSig_WithFlows_NilFallsBackToRegex(t *testing.T) {
+	content := `func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	db.Query("SELECT * FROM users WHERE name = '" + name + "'")
+}`
+	node := &FuncNode{
+		Name:      "handler",
+		FilePath:  "/app/handler.go",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	// nil flows → regex fallback.
+	sig := ComputeTaintSig(node, content, rules.LangGo, nil)
+
+	if sig.IsPure {
+		t.Error("regex fallback should detect HTTP source + SQL sink")
+	}
+	if len(sig.SinkCalls) == 0 {
+		t.Error("regex fallback should detect db.Query sink")
+	}
+}
+
+func TestComputeTaintSig_WithFlows_MultipleFlows(t *testing.T) {
+	content := `func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	db.Query("SELECT * FROM users WHERE name = '" + name + "'")
+	exec.Command("echo", name)
+}`
+	node := &FuncNode{
+		Name:      "handler",
+		FilePath:  "/app/handler.go",
+		StartLine: 1,
+		EndLine:   5,
+		Language:  rules.LangGo,
+	}
+
+	flows := []taint.TaintFlow{
+		{
+			Source: taint.SourceDef{
+				Category:   taint.SrcUserInput,
+				MethodName: "FormValue",
+			},
+			Sink: taint.SinkDef{
+				Category:   taint.SnkSQLQuery,
+				MethodName: "db.Query",
+			},
+			SourceLine: 2,
+			SinkLine:   3,
+			Confidence: 0.95,
+		},
+		{
+			Source: taint.SourceDef{
+				Category:   taint.SrcUserInput,
+				MethodName: "FormValue",
+			},
+			Sink: taint.SinkDef{
+				Category:   taint.SnkCommand,
+				MethodName: "exec.Command",
+			},
+			SourceLine: 2,
+			SinkLine:   4,
+			Confidence: 0.90,
+		},
+	}
+
+	sig := ComputeTaintSig(node, content, rules.LangGo, flows)
+
+	if len(sig.SinkCalls) != 2 {
+		t.Errorf("expected 2 sink calls from flows, got %d", len(sig.SinkCalls))
+	}
+
+	// Verify both sink categories are present.
+	categories := make(map[taint.SinkCategory]bool)
+	for _, sink := range sig.SinkCalls {
+		categories[sink.SinkCategory] = true
+	}
+	if !categories[taint.SnkSQLQuery] {
+		t.Error("expected sql_query sink category")
+	}
+	if !categories[taint.SnkCommand] {
+		t.Error("expected command_exec sink category")
+	}
+}
+
+// =========================================================================
+// filterFlowsForFunc
+// =========================================================================
+
+func TestFilterFlowsForFunc(t *testing.T) {
+	flows := []taint.TaintFlow{
+		{SourceLine: 5, SinkLine: 8},   // inside [3, 10]
+		{SourceLine: 1, SinkLine: 2},   // outside
+		{SourceLine: 12, SinkLine: 15}, // outside
+		{SourceLine: 3, SinkLine: 10},  // inside (boundary)
+		{SourceLine: 1, SinkLine: 5},   // inside (sink in range)
+	}
+
+	result := filterFlowsForFunc(flows, 3, 10)
+	if len(result) != 3 {
+		t.Errorf("expected 3 flows within range [3,10], got %d", len(result))
+	}
+}
+
+func TestFilterFlowsForFunc_NilFlows(t *testing.T) {
+	result := filterFlowsForFunc(nil, 1, 10)
+	if result != nil {
+		t.Error("expected nil for nil input flows")
+	}
+}
+
+func TestFilterFlowsForFunc_EmptyFlows(t *testing.T) {
+	result := filterFlowsForFunc([]taint.TaintFlow{}, 1, 10)
+	if result != nil {
+		t.Error("expected nil for empty input flows")
+	}
+}
+
+// =========================================================================
+// PropagateInterproc with flows
+// =========================================================================
+
+func TestPropagateInterproc_WithFlows(t *testing.T) {
+	cg := NewCallGraph("/project", "test")
+
+	callee := &FuncNode{
+		ID:        "pkg.processName",
+		Name:      "processName",
+		FilePath:  "/app/process.go",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	caller := &FuncNode{
+		ID:        "pkg.handler",
+		Name:      "handler",
+		FilePath:  "/app/handler.go",
+		StartLine: 1,
+		EndLine:   5,
+		Language:  rules.LangGo,
+	}
+
+	cg.AddNode(callee)
+	cg.AddNode(caller)
+	cg.AddEdge(caller.ID, callee.ID)
+
+	calleeContent := `func processName(name string) {
+	db.Query("SELECT * FROM users WHERE name = '" + name + "'")
+}`
+	callerContent := `func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	processName(name)
+}`
+
+	fileContents := map[string]string{
+		"/app/process.go": calleeContent,
+		"/app/handler.go": callerContent,
+	}
+
+	// Provide Layer 3 flows for the callee function.
+	flows := []taint.TaintFlow{
+		{
+			Source: taint.SourceDef{
+				Category:   taint.SrcUserInput,
+				MethodName: "FormValue",
+			},
+			Sink: taint.SinkDef{
+				Category:   taint.SnkSQLQuery,
+				MethodName: "db.Query",
+			},
+			SourceLine: 2,
+			SinkLine:   3,
+			Confidence: 0.95,
+		},
+	}
+
+	findings := PropagateInterproc(cg, []string{"pkg.processName"}, fileContents, flows)
+
+	// The callee's signature should be flow-informed and detect the SQL sink,
+	// which should then propagate to the caller that passes tainted data.
+	if callee.TaintSig.IsPure {
+		t.Error("callee with SQL injection flow should not have a pure signature")
+	}
+	if len(callee.TaintSig.SinkCalls) == 0 {
+		t.Error("callee signature should contain SQL sink from flow")
+	}
+
+	// Verify findings were produced from interprocedural analysis.
+	_ = findings // Exact results depend on caller analysis matching
 }

@@ -2,23 +2,29 @@ package graph
 
 import (
 	"go/ast"
-	"go/parser"
-	"go/token"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/turenio/gtss/internal/rules"
 	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenio/gtss/internal/taint/astflow"
 )
 
 // UpdateFile parses a file and updates the call graph with its function
 // nodes and call relationships. Returns the list of function IDs that
 // were updated (so we know which callers to re-analyze).
 func UpdateFile(cg *CallGraph, filePath string, content string, lang rules.Language) []string {
+	return UpdateFileWithAST(cg, filePath, content, lang, nil)
+}
+
+// UpdateFileWithAST is like UpdateFile but accepts a pre-parsed Go AST
+// to avoid redundant parsing. The parsed parameter is only used for Go
+// files; for other languages it is ignored. If nil, falls back to parsing.
+func UpdateFileWithAST(cg *CallGraph, filePath string, content string, lang rules.Language, parsed *astflow.GoParseResult) []string {
 	switch lang {
 	case rules.LangGo:
-		return buildGoNodes(cg, filePath, content)
+		return buildGoNodes(cg, filePath, content, parsed)
 	default:
 		return buildGenericNodes(cg, filePath, content, lang)
 	}
@@ -26,13 +32,16 @@ func UpdateFile(cg *CallGraph, filePath string, content string, lang rules.Langu
 
 // buildGoNodes uses go/ast to extract function declarations and call
 // relationships from Go source code.
-func buildGoNodes(cg *CallGraph, filePath string, content string) []string {
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, filePath, content, parser.ParseComments)
-	if err != nil {
-		// Parse error — skip this file but don't fail.
-		return nil
+func buildGoNodes(cg *CallGraph, filePath string, content string, parsed *astflow.GoParseResult) []string {
+	if parsed == nil {
+		parsed = astflow.ParseGo(content, filePath)
+		if parsed == nil {
+			return nil
+		}
 	}
+
+	fset := parsed.Fset
+	f := parsed.File
 
 	// Snapshot old nodes from this file so we can detect changes.
 	oldNodes := make(map[string]*FuncNode)

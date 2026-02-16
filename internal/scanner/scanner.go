@@ -193,8 +193,13 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 	// Load or create call graph (best-effort, don't fail the scan)
 	callGraph, _ = graph.LoadGraph(projectRoot, input.SessionID)
 	if callGraph != nil {
-		// Update graph with the current file
-		changedIDs := graph.UpdateFile(callGraph, filePath, content, lang)
+		// Update graph with the current file, reusing the go/ast parse
+		// from Layer 3 (taint analysis) when available.
+		var goParsed *astflow.GoParseResult
+		if cached, ok := sctx.GoASTFile.(*astflow.GoParseResult); ok {
+			goParsed = cached
+		}
+		changedIDs := graph.UpdateFileWithAST(callGraph, filePath, content, lang, goParsed)
 
 		// Track which function was changed (for hints)
 		if len(changedIDs) > 0 {
@@ -208,9 +213,16 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 			}
 		}
 
+		// Extract cached Layer 3 taint flows (if available) to pass to
+		// interprocedural analysis for precise signature computation.
+		var layer3Flows []taint.TaintFlow
+		if cached, ok := sctx.TaintFlows.([]taint.TaintFlow); ok {
+			layer3Flows = cached
+		}
+
 		// Run interprocedural analysis on changed functions
 		fileContents := map[string]string{filePath: content}
-		interprocFindings = graph.PropagateInterproc(callGraph, changedIDs, fileContents)
+		interprocFindings = graph.PropagateInterproc(callGraph, changedIDs, fileContents, layer3Flows)
 		findings = append(findings, interprocFindings...)
 
 		// Save updated graph (best-effort)
@@ -267,9 +279,15 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 	if cached, ok := sctx.TaintFlows.([]taint.TaintFlow); ok {
 		taintFlows = cached
 	} else if lang == rules.LangGo {
-		taintFlows = astflow.AnalyzeGo(content, filePath)
+		// Reuse cached go/ast parse if available.
+		var goParsed *astflow.GoParseResult
+		if cached, ok := sctx.GoASTFile.(*astflow.GoParseResult); ok {
+			goParsed = cached
+		}
+		taintFlows = astflow.AnalyzeGoWithAST(content, filePath, goParsed)
 	} else if tsflow.Supports(lang) {
-		taintFlows = tsflow.Analyze(content, filePath, lang)
+		// Reuse tree-sitter tree from Layer 2 if available.
+		taintFlows = tsflow.AnalyzeWithTree(content, filePath, lang, tree)
 	} else {
 		taintFlows = taint.Analyze(content, filePath, lang)
 	}

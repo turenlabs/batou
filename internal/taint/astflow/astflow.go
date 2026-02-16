@@ -19,20 +19,47 @@ import (
 	"github.com/turenio/gtss/internal/taint"
 )
 
+// GoParseResult holds a parsed Go file and its FileSet so that multiple
+// layers (taint analysis, call graph builder) can share the same parse.
+type GoParseResult struct {
+	Fset *token.FileSet
+	File *ast.File
+}
+
+// ParseGo parses Go source code and returns the result. Returns nil on error.
+func ParseGo(content string, filePath string) *GoParseResult {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, filePath, content, parser.ParseComments|parser.AllErrors)
+	if err != nil || file == nil {
+		return nil
+	}
+	return &GoParseResult{Fset: fset, File: file}
+}
+
 // AnalyzeGo runs AST-driven taint analysis on Go source code.
 // It parses the file, builds a type environment and catalog matcher,
 // then walks each function body tracking taint flows.
 func AnalyzeGo(content string, filePath string) []taint.TaintFlow {
+	return AnalyzeGoWithAST(content, filePath, nil)
+}
+
+// AnalyzeGoWithAST is like AnalyzeGo but accepts a pre-parsed Go AST to
+// avoid redundant parsing. If parsed is nil, it falls back to parsing.
+func AnalyzeGoWithAST(content string, filePath string, parsed *GoParseResult) []taint.TaintFlow {
 	cat := taint.GetCatalog(rules.LangGo)
 	if cat == nil {
 		return nil
 	}
 
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, filePath, content, parser.AllErrors)
-	if err != nil || file == nil {
-		return nil
+	if parsed == nil {
+		parsed = ParseGo(content, filePath)
+		if parsed == nil {
+			return nil
+		}
 	}
+
+	fset := parsed.Fset
+	file := parsed.File
 
 	sources := cat.Sources()
 	sinks := cat.Sinks()

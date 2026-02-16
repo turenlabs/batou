@@ -164,6 +164,12 @@ type ScanContext struct {
 	// reuse them without re-running the engine.  It is an interface{}
 	// to avoid import cycles (same pattern as Tree).
 	TaintFlows interface{}
+
+	// GoASTFile caches the parsed go/ast result for Go files so that
+	// the taint engine (astflow) and call graph builder can share the
+	// same parse.  Stored as interface{} to avoid import cycles.
+	// The concrete type is *astflow.GoParseResult.
+	GoASTFile interface{}
 }
 
 // Rule is the interface all vulnerability detection rules must implement.
