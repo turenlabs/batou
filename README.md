@@ -1,6 +1,9 @@
-# Batou - Code guard for your AI agents
+# Batou - Runtime SAST For Claude Code
 
 [![Architecture](https://img.shields.io/badge/architecture-excalidraw-6965db)](https://excalidraw.com/#json=Y_aI4C8JAMHOkHY9T5ojj,94pBf-Q-VasP2l606DwPvQ)
+
+<img width="512" height="512" alt="logo_2" src="https://github.com/user-attachments/assets/a3157fb7-68cb-40af-878f-02dc54f62df9" />
+
 
 A security scanner that catches vulnerabilities in real-time as AI writes code. Built as a [Claude Code hook](https://docs.anthropic.com/en/docs/claude-code/hooks), Batou analyzes every file write for security issues across 16 programming languages using a four-layer analysis pipeline.
 
@@ -18,25 +21,6 @@ Claude writes code → Batou intercepts → 4-layer scan → Block critical vuln
 ## Four-Layer Analysis Pipeline
 
 Each layer builds on the previous one. Every file write passes through all four layers in sequence. Parsed trees and taint flows are shared across layers — each file is parsed once per parser type, and Layer 3's precise dataflow results feed directly into Layer 4's interprocedural analysis.
-
-```
-                         ┌─────────────────────────────────────────────┐
-                         │              Shared Parse Cache             │
-                         │                                             │
-                         │  tree-sitter tree ──→ Layer 2 + tsflow (L3) │
-                         │  go/ast parse ──────→ astflow (L3) + L4     │
-                         └─────────────────────────────────────────────┘
-                                          │
-  ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-  │ Layer 1   │────→│ Layer 2   │────→│ Layer 3   │────→│ Layer 4   │
-  │ Regex     │     │ AST       │     │ Taint     │     │ Call Graph│
-  │           │     │           │     │           │     │           │
-  │ 862 rules │     │ 15 langs  │     │ 3 engines │     │ Interproc │
-  │ 44 cats   │     │ filter +  │     │ 1,631     │     │ cross-fn  │
-  │           │     │ structure │     │ entries   │     │ cross-file│
-  └──────────┘     └──────────┘     └──────────┘     └──────────┘
-   findings[]        filtered[]    + taint flows ────→ precise sigs
-```
 
 ### Layer 1: Regex Pattern Matching (862 rules, 44 categories)
 
