@@ -298,3 +298,74 @@ func TestFormatBlockMessageExcludesNonCritical(t *testing.T) {
 		t.Error("expected Critical finding in block message")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// False-positive suppression guidance
+// ---------------------------------------------------------------------------
+
+func TestFormatForClaude_IncludesSuppressGuidance(t *testing.T) {
+	result := &reporter.ScanResult{
+		FilePath: "/app/handler.go",
+		Language: rules.LangGo,
+		Findings: []rules.Finding{
+			{Severity: rules.Medium, RuleID: "R1", Title: "Issue"},
+		},
+	}
+
+	output := reporter.FormatForClaude(result)
+
+	if !strings.Contains(output, "batou:ignore") {
+		t.Error("expected batou:ignore suppression guidance in FormatForClaude output")
+	}
+	if !strings.Contains(output, "//") {
+		t.Error("expected Go comment prefix // in suppression guidance")
+	}
+}
+
+func TestFormatForClaude_PythonCommentPrefix(t *testing.T) {
+	result := &reporter.ScanResult{
+		FilePath: "/app/handler.py",
+		Language: rules.LangPython,
+		Findings: []rules.Finding{
+			{Severity: rules.Medium, RuleID: "R1", Title: "Issue"},
+		},
+	}
+
+	output := reporter.FormatForClaude(result)
+
+	if !strings.Contains(output, "# batou:ignore") {
+		t.Error("expected Python comment prefix # in suppression guidance")
+	}
+}
+
+func TestFormatBlockMessage_IncludesSuppressGuidance(t *testing.T) {
+	result := &reporter.ScanResult{
+		FilePath: "/app/handler.go",
+		Language: rules.LangGo,
+		Findings: []rules.Finding{
+			{Severity: rules.Critical, RuleID: "R1", Title: "SQL Injection", Description: "bad"},
+		},
+	}
+
+	msg := reporter.FormatBlockMessage(result)
+
+	if !strings.Contains(msg, "batou:ignore") {
+		t.Error("expected batou:ignore suppression guidance in FormatBlockMessage output")
+	}
+}
+
+func TestFormatBlockMessage_LuaCommentPrefix(t *testing.T) {
+	result := &reporter.ScanResult{
+		FilePath: "/app/script.lua",
+		Language: rules.LangLua,
+		Findings: []rules.Finding{
+			{Severity: rules.Critical, RuleID: "R1", Title: "Issue", Description: "bad"},
+		},
+	}
+
+	msg := reporter.FormatBlockMessage(result)
+
+	if !strings.Contains(msg, "-- batou:ignore") {
+		t.Error("expected Lua comment prefix -- in suppression guidance")
+	}
+}

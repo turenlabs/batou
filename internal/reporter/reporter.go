@@ -89,6 +89,9 @@ func FormatForClaude(result *ScanResult) string {
 		b.WriteString("\nWARNING: High-severity vulnerability detected. Please review and fix.\n")
 	}
 
+	b.WriteString("\nFalse positive? Add above the flagged line:\n")
+	b.WriteString(fmt.Sprintf("  %s batou:ignore <RULE-ID> -- <reason>\n", commentPrefixForLang(result.Language)))
+
 	b.WriteString("--- End Batou Scan ---\n")
 
 	return b.String()
@@ -135,6 +138,20 @@ func FormatBlockMessage(result *ScanResult) string {
 	}
 
 	b.WriteString("ACTION: Rewrite the code to fix the critical vulnerabilities above, then retry the write.\n")
+	b.WriteString(fmt.Sprintf("\nFalse positive? Add above the flagged line:\n  %s batou:ignore <RULE-ID> -- <reason>\n",
+		commentPrefixForLang(result.Language)))
 
 	return b.String()
+}
+
+// commentPrefixForLang returns the single-line comment prefix for a language.
+func commentPrefixForLang(lang rules.Language) string {
+	switch lang {
+	case rules.LangPython, rules.LangRuby, rules.LangPerl, rules.LangShell:
+		return "#"
+	case rules.LangLua, rules.LangSQL:
+		return "--"
+	default:
+		return "//"
+	}
 }
