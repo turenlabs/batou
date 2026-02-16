@@ -11,6 +11,7 @@ coverage.html
 
 # Cache
 .batou/
+.gtss/
 
 # IDE
 .idea/
