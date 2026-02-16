@@ -186,7 +186,6 @@ echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_p
 
 - **2,000+ tests** across 60+ packages
 - **430+ test fixtures** across 16 languages (vulnerable + safe code samples)
-- Dedicated benchmarks for WebGoat, OWASP Juice Shop, DVWA, and RailsGoat vulnerability patterns
 - Race-condition free (verified with `-race`)
 
 ## Project Stats

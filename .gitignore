@@ -13,6 +13,9 @@ coverage.html
 .batou/
 .gtss/
 
+# Benchmarks (private)
+bench/
+
 # IDE
 .idea/
 .vscode/

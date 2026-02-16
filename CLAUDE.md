@@ -22,7 +22,6 @@ internal/hook/              Hook I/O (JSON stdin/stdout, exit codes)
 internal/reporter/          Result formatting (block messages with CWE/OWASP refs)
 internal/ledger/            Session audit logging
 internal/testutil/          Test framework helpers
-bench/eval/                 Vulnerability app benchmarks (WebGoat, Juice Shop, DVWA, RailsGoat)
 ```
 
 ## Key Concepts
@@ -79,7 +78,6 @@ Note: Tree-sitter requires CGo. The Makefile sets `CGO_ENABLED=1` automatically.
 - `internal/scanner/` - scanner_test.go (integration), preprocess_test.go (multi-line joining)
 - `internal/hook/` - hook_test.go (I/O layer tests)
 - `internal/hints/hints_test.go` - Hint generation tests (language-specific fix examples)
-- `bench/eval/vulnapps_test.go` - WebGoat/Juice Shop/DVWA/RailsGoat benchmark
 - `testdata/fixtures/{lang}/vulnerable/` - Vulnerable code samples (should trigger rules)
 - `testdata/fixtures/{lang}/safe/` - Safe code samples (should NOT trigger rules)
 - `internal/testutil/` - Test helpers (ScanContent, MustFindRule, LoadFixture, etc.)

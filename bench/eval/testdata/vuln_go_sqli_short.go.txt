@@ -1,7 +1,0 @@
-package main
-
-import "database/sql"
-
-func bad(db *sql.DB, input string) {
-	db.Query("SELECT * FROM t WHERE x = '" + input + "'")
-}
