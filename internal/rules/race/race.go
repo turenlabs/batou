@@ -53,14 +53,14 @@ var (
 	reGoGoroutineWrite     = regexp.MustCompile(`(?i)\bgo\s+(?:func\s*\(|[a-zA-Z_]\w*\s*\()`)
 	reGoSharedWrite        = regexp.MustCompile(`(?i)(?:\w+\s*=\s*|(?:append|delete)\s*\()`)
 	reGoSyncMechanism      = regexp.MustCompile(`(?i)(?:sync\.Mutex|sync\.RWMutex|sync\.WaitGroup|sync\.Once|sync\.Map|chan\s+|<-\s*\w+|\w+\s*<-|atomic\.)`)
-	reJavaSyncAccess       = regexp.MustCompile(`(?i)(?:private|public|protected)?\s*(?:static\s+)?(?:(?!volatile)\w+\s+)+\w+\s*;`)
+	reJavaSyncAccess       = regexp.MustCompile(`(?i)(?:private|public|protected)?\s*(?:static\s+)?\w+\s+\w+\s*;`)
 	reJavaThreadStart      = regexp.MustCompile(`(?i)(?:\.start\(\)|ExecutorService|ThreadPoolExecutor|new\s+Thread|CompletableFuture\.(?:runAsync|supplyAsync))`)
 )
 
 // BATOU-RACE-007: Non-atomic read-modify-write
 var (
 	reReadModifyWrite   = regexp.MustCompile(`(?i)(\w+)\s*(?:\+=|-=|\*=|/=|%=|\+\+|--)`)
-	reReadModifyWriteExplicit = regexp.MustCompile(`(?i)(\w+)\s*=\s*\1\s*[-+*/]`)
+	reReadModifyWriteExplicit = regexp.MustCompile(`(?i)(\w+)\s*=\s*\w+\s*[-+*/]`)
 	reAtomicOrLock      = regexp.MustCompile(`(?i)(?:atomic|Atomic|\.Lock\(\)|synchronized|lock\s*\(|Interlocked|sync\.Mutex|chan\b)`)
 )
 

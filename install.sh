@@ -286,9 +286,16 @@ JSONEOF
             success "Batou hooks already in global settings"
             return
         fi
-        warn "Global settings exist. Please manually merge Batou hooks."
-        echo "  Batou hook config:"
-        echo "$batou_hooks" | head -20
+        if command -v jq &>/dev/null; then
+            local tmp_file
+            tmp_file=$(mktemp)
+            echo "$batou_hooks" | jq -s '.[0] * .[1]' "$settings_file" - > "$tmp_file"
+            mv "$tmp_file" "$settings_file"
+            success "Merged Batou hooks into global settings"
+        else
+            warn "$settings_file exists. Install jq to auto-merge, or add manually:"
+            echo "$batou_hooks"
+        fi
     else
         echo "$batou_hooks" > "$settings_file"
         success "Batou hooks installed globally in $settings_file"
@@ -338,6 +345,10 @@ info "Latest version: $VERSION"
 download_binary "$VERSION" "$PLATFORM"
 
 case "$MODE" in
+    install)
+        # Default: install globally so hooks work out of the box
+        setup_global
+        ;;
     setup)
         PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
         setup_hooks "$PROJECT_DIR"
