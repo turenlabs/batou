@@ -1,5 +1,5 @@
 # Source: PayloadsAllTheThings - Jinja2 SSTI
-# Expected: GTSS-INJ-005 (Template Injection)
+# Expected: BATOU-INJ-005 (Template Injection)
 # OWASP: A03:2021 - Injection (Server-Side Template Injection)
 
 from flask import Flask, request, render_template_string

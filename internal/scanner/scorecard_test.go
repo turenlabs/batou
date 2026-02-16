@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // TestProductSecurityScorecard produces a comprehensive scorecard comparing
-// GTSS-augmented Claude Code vs vanilla Claude Code (no scanner).
+// BATOU-augmented Claude Code vs vanilla Claude Code (no scanner).
 //
 // Metrics:
 //   - Block rate:      Critical findings that prevent code from being written
@@ -198,8 +198,8 @@ func TestProductSecurityScorecard(t *testing.T) {
 
 	sb.WriteString("\n")
 	sb.WriteString("╔══════════════════════════════════════════════════════════════════╗\n")
-	sb.WriteString("║            GTSS Product Security Scorecard                      ║\n")
-	sb.WriteString("║            Claude Code + GTSS  vs  Vanilla Claude Code          ║\n")
+	sb.WriteString("║            Batou Product Security Scorecard                      ║\n")
+	sb.WriteString("║            Claude Code + Batou  vs  Vanilla Claude Code          ║\n")
 	sb.WriteString("╚══════════════════════════════════════════════════════════════════╝\n")
 	sb.WriteString("\n")
 
@@ -207,7 +207,7 @@ func TestProductSecurityScorecard(t *testing.T) {
 	sb.WriteString("┌─────────────────────────────────────────────────────────────────┐\n")
 	sb.WriteString("│  VULNERABLE CODE INTERVENTION  (higher = better)                │\n")
 	sb.WriteString("├──────────────────────┬──────────────┬───────────────────────────┤\n")
-	sb.WriteString("│  Metric              │  GTSS+Claude │  Vanilla Claude Code      │\n")
+	sb.WriteString("│  Metric              │  Batou+Claude │  Vanilla Claude Code      │\n")
 	sb.WriteString("├──────────────────────┼──────────────┼───────────────────────────┤\n")
 	sb.WriteString(fmt.Sprintf("│  Blocked (Critical)  │  %3d/%d %4.0f%% │  0/%d   0%%  (no scanner)  │\n",
 		blocked, totalVuln, pct(blocked, totalVuln), totalVuln))
@@ -223,7 +223,7 @@ func TestProductSecurityScorecard(t *testing.T) {
 	sb.WriteString("┌─────────────────────────────────────────────────────────────────┐\n")
 	sb.WriteString("│  SAFE CODE ACCURACY  (lower = better)                           │\n")
 	sb.WriteString("├──────────────────────┬──────────────┬───────────────────────────┤\n")
-	sb.WriteString("│  Metric              │  GTSS+Claude │  Vanilla Claude Code      │\n")
+	sb.WriteString("│  Metric              │  Batou+Claude │  Vanilla Claude Code      │\n")
 	sb.WriteString("├──────────────────────┼──────────────┼───────────────────────────┤\n")
 	sb.WriteString(fmt.Sprintf("│  False positives     │  %3d/%d %4.0f%% │  0/%d   0%%  (no scanner)  │\n",
 		safeFPs, totalSafe, pct(safeFPs, totalSafe), totalSafe))

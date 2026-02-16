@@ -4,42 +4,42 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns -- Echo
 // ---------------------------------------------------------------------------
 
-// GTSS-FW-ECHO-001: CORS wildcard
+// BATOU-FW-ECHO-001: CORS wildcard
 var reEchoCORSWildcard = regexp.MustCompile(`AllowOrigins\s*:\s*\[\s*\]\s*string\s*\{\s*"\*"\s*\}`)
 var reEchoCORSAllowAll = regexp.MustCompile(`middleware\.CORSWithConfig\s*\(\s*middleware\.CORSConfig\s*\{`)
 var reEchoCORSDefault = regexp.MustCompile(`middleware\.CORS\s*\(\s*\)`)
 
-// GTSS-FW-ECHO-002: SQL injection via c.QueryParam
+// BATOU-FW-ECHO-002: SQL injection via c.QueryParam
 var reEchoSQLConcat = regexp.MustCompile(`(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\b[^"]*"\s*\+\s*c\.(?:QueryParam|Param|FormValue)\s*\(`)
 var reEchoSQLFmt = regexp.MustCompile(`fmt\.Sprintf\s*\(\s*"[^"]*(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)[^"]*"\s*,\s*c\.(?:QueryParam|Param|FormValue)\s*\(`)
 
-// GTSS-FW-ECHO-003: Static file with user path
+// BATOU-FW-ECHO-003: Static file with user path
 var reEchoStaticUser = regexp.MustCompile(`(?:e|echo)\.(?:Static|File)\s*\(\s*[^,]+,\s*(?:c\.(?:QueryParam|Param|FormValue)|[a-zA-Z_]\w*\s*\+)`)
 
-// GTSS-FW-ECHO-004: Template without escaping
+// BATOU-FW-ECHO-004: Template without escaping
 var reEchoHTMLUnescaped = regexp.MustCompile(`template\.HTML\s*\(`)
 var reEchoRenderRaw = regexp.MustCompile(`c\.HTML\s*\([^)]*template\.HTML`)
 
-// GTSS-FW-ECHO-005: JWT with hardcoded key
+// BATOU-FW-ECHO-005: JWT with hardcoded key
 var reEchoJWTHardcoded = regexp.MustCompile(`middleware\.JWT\s*\(\s*\[\s*\]\s*byte\s*\(\s*"[^"]{4,}"`)
 var reEchoJWTConfig = regexp.MustCompile(`SigningKey\s*:\s*\[\s*\]\s*byte\s*\(\s*"[^"]{4,}"`)
 
-// GTSS-FW-ECHO-006: CSRF not applied
+// BATOU-FW-ECHO-006: CSRF not applied
 var reEchoCSRF = regexp.MustCompile(`middleware\.CSRF\s*\(`)
 var reEchoCSRFConfig = regexp.MustCompile(`middleware\.CSRFWithConfig`)
 
-// GTSS-FW-ECHO-007: Binding without validation
+// BATOU-FW-ECHO-007: Binding without validation
 var reEchoBind = regexp.MustCompile(`c\.Bind\s*\(`)
 var reEchoValidate = regexp.MustCompile(`(?:Validate|validator|validate\.Struct)`)
 
-// GTSS-FW-ECHO-008: Debug mode
+// BATOU-FW-ECHO-008: Debug mode
 var reEchoDebug = regexp.MustCompile(`e\.Debug\s*=\s*true`)
 
 func init() {
@@ -54,12 +54,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ECHO-001: CORS with AllowOrigins wildcard
+// BATOU-FW-ECHO-001: CORS with AllowOrigins wildcard
 // ---------------------------------------------------------------------------
 
 type EchoCORSWildcard struct{}
 
-func (r *EchoCORSWildcard) ID() string                      { return "GTSS-FW-ECHO-001" }
+func (r *EchoCORSWildcard) ID() string                      { return "BATOU-FW-ECHO-001" }
 func (r *EchoCORSWildcard) Name() string                    { return "EchoCORSWildcard" }
 func (r *EchoCORSWildcard) DefaultSeverity() rules.Severity { return rules.High }
 func (r *EchoCORSWildcard) Description() string {
@@ -109,12 +109,12 @@ func (r *EchoCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ECHO-002: SQL injection via c.QueryParam
+// BATOU-FW-ECHO-002: SQL injection via c.QueryParam
 // ---------------------------------------------------------------------------
 
 type EchoSQLInjection struct{}
 
-func (r *EchoSQLInjection) ID() string                      { return "GTSS-FW-ECHO-002" }
+func (r *EchoSQLInjection) ID() string                      { return "BATOU-FW-ECHO-002" }
 func (r *EchoSQLInjection) Name() string                    { return "EchoSQLInjection" }
 func (r *EchoSQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *EchoSQLInjection) Description() string {
@@ -164,12 +164,12 @@ func (r *EchoSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ECHO-003: Static file serving with user path
+// BATOU-FW-ECHO-003: Static file serving with user path
 // ---------------------------------------------------------------------------
 
 type EchoStaticTraversal struct{}
 
-func (r *EchoStaticTraversal) ID() string                      { return "GTSS-FW-ECHO-003" }
+func (r *EchoStaticTraversal) ID() string                      { return "BATOU-FW-ECHO-003" }
 func (r *EchoStaticTraversal) Name() string                    { return "EchoStaticTraversal" }
 func (r *EchoStaticTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *EchoStaticTraversal) Description() string {
@@ -213,12 +213,12 @@ func (r *EchoStaticTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ECHO-004: Template rendering without escaping
+// BATOU-FW-ECHO-004: Template rendering without escaping
 // ---------------------------------------------------------------------------
 
 type EchoTemplateUnescaped struct{}
 
-func (r *EchoTemplateUnescaped) ID() string                      { return "GTSS-FW-ECHO-004" }
+func (r *EchoTemplateUnescaped) ID() string                      { return "BATOU-FW-ECHO-004" }
 func (r *EchoTemplateUnescaped) Name() string                    { return "EchoTemplateUnescaped" }
 func (r *EchoTemplateUnescaped) DefaultSeverity() rules.Severity { return rules.High }
 func (r *EchoTemplateUnescaped) Description() string {
@@ -267,12 +267,12 @@ func (r *EchoTemplateUnescaped) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ECHO-005: JWT middleware with hardcoded key
+// BATOU-FW-ECHO-005: JWT middleware with hardcoded key
 // ---------------------------------------------------------------------------
 
 type EchoJWTHardcoded struct{}
 
-func (r *EchoJWTHardcoded) ID() string                      { return "GTSS-FW-ECHO-005" }
+func (r *EchoJWTHardcoded) ID() string                      { return "BATOU-FW-ECHO-005" }
 func (r *EchoJWTHardcoded) Name() string                    { return "EchoJWTHardcoded" }
 func (r *EchoJWTHardcoded) DefaultSeverity() rules.Severity { return rules.High }
 func (r *EchoJWTHardcoded) Description() string {
@@ -322,12 +322,12 @@ func (r *EchoJWTHardcoded) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ECHO-006: CSRF middleware not applied
+// BATOU-FW-ECHO-006: CSRF middleware not applied
 // ---------------------------------------------------------------------------
 
 type EchoNoCSRF struct{}
 
-func (r *EchoNoCSRF) ID() string                      { return "GTSS-FW-ECHO-006" }
+func (r *EchoNoCSRF) ID() string                      { return "BATOU-FW-ECHO-006" }
 func (r *EchoNoCSRF) Name() string                    { return "EchoNoCSRF" }
 func (r *EchoNoCSRF) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *EchoNoCSRF) Description() string {
@@ -382,12 +382,12 @@ func (r *EchoNoCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ECHO-007: Binding without validation
+// BATOU-FW-ECHO-007: Binding without validation
 // ---------------------------------------------------------------------------
 
 type EchoBindNoValidation struct{}
 
-func (r *EchoBindNoValidation) ID() string                      { return "GTSS-FW-ECHO-007" }
+func (r *EchoBindNoValidation) ID() string                      { return "BATOU-FW-ECHO-007" }
 func (r *EchoBindNoValidation) Name() string                    { return "EchoBindNoValidation" }
 func (r *EchoBindNoValidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *EchoBindNoValidation) Description() string {
@@ -437,12 +437,12 @@ func (r *EchoBindNoValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ECHO-008: Debug mode enabled
+// BATOU-FW-ECHO-008: Debug mode enabled
 // ---------------------------------------------------------------------------
 
 type EchoDebugMode struct{}
 
-func (r *EchoDebugMode) ID() string                      { return "GTSS-FW-ECHO-008" }
+func (r *EchoDebugMode) ID() string                      { return "BATOU-FW-ECHO-008" }
 func (r *EchoDebugMode) Name() string                    { return "EchoDebugMode" }
 func (r *EchoDebugMode) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *EchoDebugMode) Description() string {

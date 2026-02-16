@@ -4,56 +4,56 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended CORS rules
 // ---------------------------------------------------------------------------
 
-// GTSS-CORS-003: CORS allowing null origin
+// BATOU-CORS-003: CORS allowing null origin
 var (
 	reNullOrigin      = regexp.MustCompile(`(?i)(?:Access-Control-Allow-Origin|allowedOrigins?|origin)\s*[:=]\s*['"]null['"]`)
 	reNullOriginCheck = regexp.MustCompile(`(?i)(?:origin\s*===?\s*['"]null['"]|['"]null['"]\s*===?\s*origin|origin\s*==\s*['"]null['"])`)
 )
 
-// GTSS-CORS-004: Too permissive Allow-Methods
+// BATOU-CORS-004: Too permissive Allow-Methods
 var (
 	reAllowMethodsAll = regexp.MustCompile(`(?i)Access-Control-Allow-Methods\s*[:'"=]\s*['"]?\s*(?:\*|GET,\s*POST,\s*PUT,\s*DELETE,\s*PATCH,\s*OPTIONS,\s*HEAD)`)
 	reMethodsPermissive = regexp.MustCompile(`(?i)(?:allowedMethods|allowed_methods|methods)\s*[:=]\s*(?:\[?\s*['"]?\*['"]?\]?|['"](?:GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)(?:,\s*(?:GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)){5,}['"])`)
 )
 
-// GTSS-CORS-005: Expose-Headers leaking sensitive headers
+// BATOU-CORS-005: Expose-Headers leaking sensitive headers
 var (
 	reExposeHeaders = regexp.MustCompile(`(?i)Access-Control-Expose-Headers\s*[:'"=]\s*['"]?[^'"]*(?:Authorization|X-API-Key|X-Auth-Token|Set-Cookie|X-CSRF-Token|X-Session-ID)`)
 	reExposeSensitive = regexp.MustCompile(`(?i)(?:exposeHeaders|expose_headers|exposedHeaders)\s*[:=]\s*\[[^\]]*(?:Authorization|X-API-Key|X-Auth-Token|Set-Cookie|X-CSRF-Token|X-Session-ID)`)
 )
 
-// GTSS-CORS-006: Preflight cache too long
+// BATOU-CORS-006: Preflight cache too long
 var (
 	reMaxAge = regexp.MustCompile(`(?i)(?:Access-Control-Max-Age|maxAge|max_age|MaxAge)\s*[:='"]\s*['"]?(\d+)`)
 )
 
-// GTSS-CORS-007: Origin validation regex without anchoring
+// BATOU-CORS-007: Origin validation regex without anchoring
 var (
 	reOriginRegexNoAnchor = regexp.MustCompile(`(?i)(?:origin|allowed).*(?:\.test|\.match|RegExp|re\.compile|regexp\.MustCompile)\s*\(\s*[/'"](?:[^^]|[^$])`)
 	reOriginRegexFull     = regexp.MustCompile(`(?i)(?:origin|allowed).*(?:\.test|\.match|RegExp)\s*\(`)
 	reAnchorPresent       = regexp.MustCompile(`[\^$]`)
 )
 
-// GTSS-CORS-008: Origin check using string contains
+// BATOU-CORS-008: Origin check using string contains
 var (
 	reOriginContains = regexp.MustCompile(`(?i)(?:origin|requestOrigin|reqOrigin|request_origin)\s*\.(?:includes|indexOf|contains|search)\s*\(`)
 	reOriginEndsWith = regexp.MustCompile(`(?i)(?:origin|requestOrigin|reqOrigin|request_origin)\s*\.endsWith\s*\(`)
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-CORS-003: CORS Allowing Null Origin
+// BATOU-CORS-003: CORS Allowing Null Origin
 // ---------------------------------------------------------------------------
 
 type CORSNullOrigin struct{}
 
-func (r *CORSNullOrigin) ID() string                     { return "GTSS-CORS-003" }
+func (r *CORSNullOrigin) ID() string                     { return "BATOU-CORS-003" }
 func (r *CORSNullOrigin) Name() string                   { return "CORSNullOrigin" }
 func (r *CORSNullOrigin) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CORSNullOrigin) Description() string {
@@ -100,12 +100,12 @@ func (r *CORSNullOrigin) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CORS-004: Access-Control-Allow-Methods Too Permissive
+// BATOU-CORS-004: Access-Control-Allow-Methods Too Permissive
 // ---------------------------------------------------------------------------
 
 type CORSMethodsTooPermissive struct{}
 
-func (r *CORSMethodsTooPermissive) ID() string                     { return "GTSS-CORS-004" }
+func (r *CORSMethodsTooPermissive) ID() string                     { return "BATOU-CORS-004" }
 func (r *CORSMethodsTooPermissive) Name() string                   { return "CORSMethodsTooPermissive" }
 func (r *CORSMethodsTooPermissive) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *CORSMethodsTooPermissive) Description() string {
@@ -152,12 +152,12 @@ func (r *CORSMethodsTooPermissive) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CORS-005: Expose-Headers Leaking Sensitive Headers
+// BATOU-CORS-005: Expose-Headers Leaking Sensitive Headers
 // ---------------------------------------------------------------------------
 
 type CORSExposeHeadersLeak struct{}
 
-func (r *CORSExposeHeadersLeak) ID() string                     { return "GTSS-CORS-005" }
+func (r *CORSExposeHeadersLeak) ID() string                     { return "BATOU-CORS-005" }
 func (r *CORSExposeHeadersLeak) Name() string                   { return "CORSExposeHeadersLeak" }
 func (r *CORSExposeHeadersLeak) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *CORSExposeHeadersLeak) Description() string {
@@ -204,12 +204,12 @@ func (r *CORSExposeHeadersLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CORS-006: Preflight Cache Too Long
+// BATOU-CORS-006: Preflight Cache Too Long
 // ---------------------------------------------------------------------------
 
 type CORSPreflightCacheTooLong struct{}
 
-func (r *CORSPreflightCacheTooLong) ID() string                     { return "GTSS-CORS-006" }
+func (r *CORSPreflightCacheTooLong) ID() string                     { return "BATOU-CORS-006" }
 func (r *CORSPreflightCacheTooLong) Name() string                   { return "CORSPreflightCacheTooLong" }
 func (r *CORSPreflightCacheTooLong) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *CORSPreflightCacheTooLong) Description() string {
@@ -261,12 +261,12 @@ func (r *CORSPreflightCacheTooLong) Scan(ctx *rules.ScanContext) []rules.Finding
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CORS-007: Origin Validation Regex Without Anchoring
+// BATOU-CORS-007: Origin Validation Regex Without Anchoring
 // ---------------------------------------------------------------------------
 
 type CORSOriginRegexNoAnchor struct{}
 
-func (r *CORSOriginRegexNoAnchor) ID() string                     { return "GTSS-CORS-007" }
+func (r *CORSOriginRegexNoAnchor) ID() string                     { return "BATOU-CORS-007" }
 func (r *CORSOriginRegexNoAnchor) Name() string                   { return "CORSOriginRegexNoAnchor" }
 func (r *CORSOriginRegexNoAnchor) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CORSOriginRegexNoAnchor) Description() string {
@@ -308,12 +308,12 @@ func (r *CORSOriginRegexNoAnchor) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CORS-008: Origin Check Using String Contains
+// BATOU-CORS-008: Origin Check Using String Contains
 // ---------------------------------------------------------------------------
 
 type CORSOriginContainsCheck struct{}
 
-func (r *CORSOriginContainsCheck) ID() string                     { return "GTSS-CORS-008" }
+func (r *CORSOriginContainsCheck) ID() string                     { return "BATOU-CORS-008" }
 func (r *CORSOriginContainsCheck) Name() string                   { return "CORSOriginContainsCheck" }
 func (r *CORSOriginContainsCheck) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CORSOriginContainsCheck) Description() string {

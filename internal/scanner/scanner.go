@@ -8,17 +8,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/turenio/gtss/internal/analyzer"
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/fpfilter"
-	"github.com/turenio/gtss/internal/graph"
-	"github.com/turenio/gtss/internal/hints"
-	"github.com/turenio/gtss/internal/hook"
-	"github.com/turenio/gtss/internal/reporter"
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
-	"github.com/turenio/gtss/internal/taint/astflow"
-	"github.com/turenio/gtss/internal/taint/tsflow"
+	"github.com/turenlabs/batou/internal/analyzer"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/fpfilter"
+	"github.com/turenlabs/batou/internal/graph"
+	"github.com/turenlabs/batou/internal/hints"
+	"github.com/turenlabs/batou/internal/hook"
+	"github.com/turenlabs/batou/internal/reporter"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
+	"github.com/turenlabs/batou/internal/taint/astflow"
+	"github.com/turenlabs/batou/internal/taint/tsflow"
 )
 
 // scanTimeout is the maximum time a scan may take before we return partial results.
@@ -89,7 +89,7 @@ func Scan(input *hook.Input) *reporter.ScanResult {
 	case <-ctx.Done():
 		result.ScanTimeMs = time.Since(start).Milliseconds()
 		result.Findings = append(result.Findings, rules.Finding{
-			RuleID:        "GTSS-TIMEOUT",
+			RuleID:        "BATOU-TIMEOUT",
 			Severity:      rules.Medium,
 			SeverityLabel: rules.Medium.String(),
 			Title:         "Scan timed out",
@@ -152,7 +152,7 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 					// A rule panicked — don't crash the whole scan.
 					mu.Lock()
 					findings = append(findings, rules.Finding{
-						RuleID:      "GTSS-PANIC",
+						RuleID:      "BATOU-PANIC",
 						Severity:    rules.Medium,
 						Title:       fmt.Sprintf("Rule %s panicked: %v", rule.ID(), rec),
 						Description: "A scan rule panicked during analysis. This finding is informational and indicates a bug in the rule implementation.",

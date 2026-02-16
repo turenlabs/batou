@@ -3,7 +3,7 @@ package lua
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // --- LUA-001: Command Injection ---
@@ -13,7 +13,7 @@ func TestLUA001_OsExecuteConcat(t *testing.T) {
 os.execute("ls " .. user_input)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-001")
+	testutil.MustFindRule(t, result, "BATOU-LUA-001")
 }
 
 func TestLUA001_IoPopenConcat(t *testing.T) {
@@ -23,7 +23,7 @@ local result = handle:read("*a")
 handle:close()
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-001")
+	testutil.MustFindRule(t, result, "BATOU-LUA-001")
 }
 
 func TestLUA001_OsExecuteVariable(t *testing.T) {
@@ -31,14 +31,14 @@ func TestLUA001_OsExecuteVariable(t *testing.T) {
 os.execute(cmd)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-001")
+	testutil.MustFindRule(t, result, "BATOU-LUA-001")
 }
 
 func TestLUA001_Safe_StaticCommand(t *testing.T) {
 	content := `os.execute("ls -la /tmp")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-001")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-001")
 }
 
 func TestLUA001_Safe_StaticPopen(t *testing.T) {
@@ -47,7 +47,7 @@ local result = handle:read("*a")
 handle:close()
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-001")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-001")
 }
 
 // --- LUA-002: Code Injection ---
@@ -58,7 +58,7 @@ local fn = loadstring(code)
 fn()
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-002")
+	testutil.MustFindRule(t, result, "BATOU-LUA-002")
 }
 
 func TestLUA002_LoadVariable(t *testing.T) {
@@ -67,7 +67,7 @@ local fn = load(chunk)
 fn()
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-002")
+	testutil.MustFindRule(t, result, "BATOU-LUA-002")
 }
 
 func TestLUA002_DofileVariable(t *testing.T) {
@@ -75,7 +75,7 @@ func TestLUA002_DofileVariable(t *testing.T) {
 dofile(filepath)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-002")
+	testutil.MustFindRule(t, result, "BATOU-LUA-002")
 }
 
 func TestLUA002_LoadfileVariable(t *testing.T) {
@@ -83,21 +83,21 @@ func TestLUA002_LoadfileVariable(t *testing.T) {
 local fn = loadfile(filepath)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-002")
+	testutil.MustFindRule(t, result, "BATOU-LUA-002")
 }
 
 func TestLUA002_Safe_StaticLoadstring(t *testing.T) {
 	content := `local fn = loadstring("return 1 + 2")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-002")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-002")
 }
 
 func TestLUA002_Safe_StaticDofile(t *testing.T) {
 	content := `dofile("/usr/local/lib/lua/config.lua")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-002")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-002")
 }
 
 // --- LUA-003: SQL Injection ---
@@ -108,7 +108,7 @@ local sql = "SELECT * FROM users WHERE name = '" .. name .. "'"
 local res, err = db:query(sql)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-003")
+	testutil.MustFindRule(t, result, "BATOU-LUA-003")
 }
 
 func TestLUA003_SQLFormat(t *testing.T) {
@@ -117,7 +117,7 @@ local sql = string.format("SELECT * FROM users WHERE id = '%s'", id)
 db:query(sql)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-003")
+	testutil.MustFindRule(t, result, "BATOU-LUA-003")
 }
 
 func TestLUA003_Safe_QuotedSQL(t *testing.T) {
@@ -127,7 +127,7 @@ local sql = "SELECT * FROM users WHERE name = " .. quoted
 db:query(sql)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-003")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-003")
 }
 
 func TestLUA003_Safe_NoSQL(t *testing.T) {
@@ -135,7 +135,7 @@ func TestLUA003_Safe_NoSQL(t *testing.T) {
 ngx.say(name)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-003")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-003")
 }
 
 // --- LUA-004: Path Traversal ---
@@ -145,7 +145,7 @@ func TestLUA004_IoOpenVariable(t *testing.T) {
 local f = io.open(filename, "r")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-004")
+	testutil.MustFindRule(t, result, "BATOU-LUA-004")
 }
 
 func TestLUA004_IoOpenConcat(t *testing.T) {
@@ -153,14 +153,14 @@ func TestLUA004_IoOpenConcat(t *testing.T) {
 local f = io.open("/data/" .. filename, "r")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-004")
+	testutil.MustFindRule(t, result, "BATOU-LUA-004")
 }
 
 func TestLUA004_Safe_StaticPath(t *testing.T) {
 	content := `local f = io.open("/etc/config.lua", "r")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-004")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-004")
 }
 
 func TestLUA004_Safe_WithSanitization(t *testing.T) {
@@ -169,7 +169,7 @@ filename = string.gsub(filename, "%.%.", "")
 local f = io.open("/data/" .. filename, "r")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-004")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-004")
 }
 
 // --- LUA-005: XSS via ngx.say/ngx.print ---
@@ -179,7 +179,7 @@ func TestLUA005_NgxSayConcat(t *testing.T) {
 ngx.say("<h1>Hello, " .. name .. "</h1>")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-005")
+	testutil.MustFindRule(t, result, "BATOU-LUA-005")
 }
 
 func TestLUA005_NgxPrintVariable(t *testing.T) {
@@ -187,7 +187,7 @@ func TestLUA005_NgxPrintVariable(t *testing.T) {
 ngx.print(data)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-005")
+	testutil.MustFindRule(t, result, "BATOU-LUA-005")
 }
 
 func TestLUA005_Safe_Escaped(t *testing.T) {
@@ -196,14 +196,14 @@ local escaped = ngx.escape_uri(name)
 ngx.say("<h1>Hello, " .. escaped .. "</h1>")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-005")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-005")
 }
 
 func TestLUA005_Safe_NoUserInput(t *testing.T) {
 	content := `ngx.say("Hello, world!")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-005")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-005")
 }
 
 // --- LUA-006: Insecure Deserialization ---
@@ -214,7 +214,7 @@ local fn = loadstring(data)
 fn()
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-006")
+	testutil.MustFindRule(t, result, "BATOU-LUA-006")
 }
 
 func TestLUA006_SerpentLoad(t *testing.T) {
@@ -223,7 +223,7 @@ local data = get_remote_data()
 local ok, result = serpent.load(data)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-006")
+	testutil.MustFindRule(t, result, "BATOU-LUA-006")
 }
 
 func TestLUA006_Safe_CjsonDecode(t *testing.T) {
@@ -232,7 +232,7 @@ local data = ngx.req.get_body_data()
 local obj = cjson.decode(data)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-006")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-006")
 }
 
 // --- LUA-007: Open Redirect ---
@@ -242,7 +242,7 @@ func TestLUA007_RedirectVariable(t *testing.T) {
 ngx.redirect(url)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-007")
+	testutil.MustFindRule(t, result, "BATOU-LUA-007")
 }
 
 func TestLUA007_RedirectConcat(t *testing.T) {
@@ -250,14 +250,14 @@ func TestLUA007_RedirectConcat(t *testing.T) {
 ngx.redirect("https://example.com" .. path)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-007")
+	testutil.MustFindRule(t, result, "BATOU-LUA-007")
 }
 
 func TestLUA007_Safe_StaticRedirect(t *testing.T) {
 	content := `ngx.redirect("/login")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-007")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-007")
 }
 
 func TestLUA007_Safe_NoUserInput(t *testing.T) {
@@ -265,7 +265,7 @@ func TestLUA007_Safe_NoUserInput(t *testing.T) {
 ngx.redirect(target)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-007")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-007")
 }
 
 // --- LUA-008: Debug Library in Production ---
@@ -274,28 +274,28 @@ func TestLUA008_DebugSetmetatable(t *testing.T) {
 	content := `debug.setmetatable(string, {__index = custom_string})
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-008")
+	testutil.MustFindRule(t, result, "BATOU-LUA-008")
 }
 
 func TestLUA008_DebugSethook(t *testing.T) {
 	content := `debug.sethook(function() end, "c")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-008")
+	testutil.MustFindRule(t, result, "BATOU-LUA-008")
 }
 
 func TestLUA008_DebugGetinfo(t *testing.T) {
 	content := `local info = debug.getinfo(2, "Sl")
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-008")
+	testutil.MustFindRule(t, result, "BATOU-LUA-008")
 }
 
 func TestLUA008_DebugSetupvalue(t *testing.T) {
 	content := `debug.setupvalue(target_fn, 1, malicious_value)
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustFindRule(t, result, "GTSS-LUA-008")
+	testutil.MustFindRule(t, result, "BATOU-LUA-008")
 }
 
 func TestLUA008_Safe_NoDebug(t *testing.T) {
@@ -305,7 +305,7 @@ func TestLUA008_Safe_NoDebug(t *testing.T) {
 end
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-008")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-008")
 }
 
 func TestLUA008_Safe_Comment(t *testing.T) {
@@ -313,7 +313,7 @@ func TestLUA008_Safe_Comment(t *testing.T) {
 local x = 42
 `
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-008")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-008")
 }
 
 // --- Fixture Tests ---
@@ -333,7 +333,7 @@ func TestFixture_Safe(t *testing.T) {
 	}
 	content := testutil.LoadFixture(t, "lua/safe/openresty_handler.lua")
 	result := testutil.ScanContent(t, "/app/handler.lua", content)
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-001")
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-002")
-	testutil.MustNotFindRule(t, result, "GTSS-LUA-003")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-001")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-002")
+	testutil.MustNotFindRule(t, result, "BATOU-LUA-003")
 }

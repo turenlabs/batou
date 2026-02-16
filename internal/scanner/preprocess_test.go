@@ -3,7 +3,7 @@ package scanner
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func TestJoinContinuationLines_BackslashPython(t *testing.T) {

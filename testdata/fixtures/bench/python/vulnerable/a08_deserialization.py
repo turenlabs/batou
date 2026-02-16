@@ -1,5 +1,5 @@
 # Source: CWE-502 - Deserialization of untrusted data via pickle
-# Expected: GTSS-GEN-002 (Unsafe Deserialization - pickle.loads)
+# Expected: BATOU-GEN-002 (Unsafe Deserialization - pickle.loads)
 # OWASP: A08:2021 - Software and Data Integrity Failures
 
 import pickle

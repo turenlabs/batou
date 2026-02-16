@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,25 +12,25 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-RAILS-007: protect_from_forgery missing in ApplicationController
+	// BATOU-FW-RAILS-007: protect_from_forgery missing in ApplicationController
 	reRailsExtAppController    = regexp.MustCompile(`class\s+ApplicationController\s*<\s*ActionController::Base`)
 	reRailsExtProtectForgery   = regexp.MustCompile(`protect_from_forgery`)
 
-	// GTSS-FW-RAILS-008: Mass assignment via params.permit!
+	// BATOU-FW-RAILS-008: Mass assignment via params.permit!
 	reRailsExtPermitBang       = regexp.MustCompile(`params\s*\.permit!`)
 
-	// GTSS-FW-RAILS-009: send_file with user-controlled path
+	// BATOU-FW-RAILS-009: send_file with user-controlled path
 	reRailsExtSendFile         = regexp.MustCompile(`send_file\s*\(\s*(?:params\[|"[^"]*#\{params|request\.|File\.join\s*\([^)]*params)`)
 	reRailsExtSendFileVar      = regexp.MustCompile(`send_file\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
 
-	// GTSS-FW-RAILS-010: config.force_ssl not enabled
+	// BATOU-FW-RAILS-010: config.force_ssl not enabled
 	reRailsExtForceSSLFalse    = regexp.MustCompile(`config\.force_ssl\s*=\s*false`)
 
-	// GTSS-FW-RAILS-011: secret_key_base hardcoded in secrets.yml
+	// BATOU-FW-RAILS-011: secret_key_base hardcoded in secrets.yml
 	reRailsExtSecretKeyBase    = regexp.MustCompile(`(?i)secret_key_base\s*:\s*[A-Za-z0-9]{30,}`)
 	reRailsExtSecretKeyBaseStr = regexp.MustCompile(`(?i)secret_key_base\s*[=:]\s*["'][A-Za-z0-9+/=]{30,}["']`)
 
-	// GTSS-FW-RAILS-012: Devise without lockable
+	// BATOU-FW-RAILS-012: Devise without lockable
 	reRailsExtDevise           = regexp.MustCompile(`devise\s*:`)
 	reRailsExtDeviseLockable   = regexp.MustCompile(`:lockable`)
 )
@@ -45,12 +45,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-007: protect_from_forgery not set in ApplicationController
+// BATOU-FW-RAILS-007: protect_from_forgery not set in ApplicationController
 // ---------------------------------------------------------------------------
 
 type RailsNoCSRFProtection struct{}
 
-func (r *RailsNoCSRFProtection) ID() string                      { return "GTSS-FW-RAILS-007" }
+func (r *RailsNoCSRFProtection) ID() string                      { return "BATOU-FW-RAILS-007" }
 func (r *RailsNoCSRFProtection) Name() string                    { return "RailsNoCSRFProtection" }
 func (r *RailsNoCSRFProtection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RailsNoCSRFProtection) Description() string {
@@ -104,12 +104,12 @@ func (r *RailsNoCSRFProtection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-008: Mass assignment via params.permit!
+// BATOU-FW-RAILS-008: Mass assignment via params.permit!
 // ---------------------------------------------------------------------------
 
 type RailsPermitBangExt struct{}
 
-func (r *RailsPermitBangExt) ID() string                      { return "GTSS-FW-RAILS-008" }
+func (r *RailsPermitBangExt) ID() string                      { return "BATOU-FW-RAILS-008" }
 func (r *RailsPermitBangExt) Name() string                    { return "RailsPermitBangExt" }
 func (r *RailsPermitBangExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RailsPermitBangExt) Description() string {
@@ -155,12 +155,12 @@ func (r *RailsPermitBangExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-009: send_file with user-controlled path
+// BATOU-FW-RAILS-009: send_file with user-controlled path
 // ---------------------------------------------------------------------------
 
 type RailsSendFileTraversal struct{}
 
-func (r *RailsSendFileTraversal) ID() string                      { return "GTSS-FW-RAILS-009" }
+func (r *RailsSendFileTraversal) ID() string                      { return "BATOU-FW-RAILS-009" }
 func (r *RailsSendFileTraversal) Name() string                    { return "RailsSendFileTraversal" }
 func (r *RailsSendFileTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RailsSendFileTraversal) Description() string {
@@ -231,12 +231,12 @@ func (r *RailsSendFileTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-010: config.force_ssl not enabled
+// BATOU-FW-RAILS-010: config.force_ssl not enabled
 // ---------------------------------------------------------------------------
 
 type RailsForceSSLDisabled struct{}
 
-func (r *RailsForceSSLDisabled) ID() string                      { return "GTSS-FW-RAILS-010" }
+func (r *RailsForceSSLDisabled) ID() string                      { return "BATOU-FW-RAILS-010" }
 func (r *RailsForceSSLDisabled) Name() string                    { return "RailsForceSSLDisabled" }
 func (r *RailsForceSSLDisabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RailsForceSSLDisabled) Description() string {
@@ -282,12 +282,12 @@ func (r *RailsForceSSLDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-011: secret_key_base hardcoded
+// BATOU-FW-RAILS-011: secret_key_base hardcoded
 // ---------------------------------------------------------------------------
 
 type RailsHardcodedSecretKey struct{}
 
-func (r *RailsHardcodedSecretKey) ID() string                      { return "GTSS-FW-RAILS-011" }
+func (r *RailsHardcodedSecretKey) ID() string                      { return "BATOU-FW-RAILS-011" }
 func (r *RailsHardcodedSecretKey) Name() string                    { return "RailsHardcodedSecretKey" }
 func (r *RailsHardcodedSecretKey) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RailsHardcodedSecretKey) Description() string {
@@ -344,12 +344,12 @@ func (r *RailsHardcodedSecretKey) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-012: Devise without lockable (brute force)
+// BATOU-FW-RAILS-012: Devise without lockable (brute force)
 // ---------------------------------------------------------------------------
 
 type RailsDeviseNoLockable struct{}
 
-func (r *RailsDeviseNoLockable) ID() string                      { return "GTSS-FW-RAILS-012" }
+func (r *RailsDeviseNoLockable) ID() string                      { return "BATOU-FW-RAILS-012" }
 func (r *RailsDeviseNoLockable) Name() string                    { return "RailsDeviseNoLockable" }
 func (r *RailsDeviseNoLockable) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RailsDeviseNoLockable) Description() string {

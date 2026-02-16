@@ -3,8 +3,8 @@ package javaast
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanJava(code string) []rules.Finding {
@@ -38,7 +38,7 @@ class Handler {
 }
 `
 	findings := scanJava(code)
-	f := findByRule(findings, "GTSS-JAVAAST-001")
+	f := findByRule(findings, "BATOU-JAVAAST-001")
 	if f == nil {
 		t.Error("expected SQL injection finding for executeQuery with concat")
 		for _, f := range findings {
@@ -58,7 +58,7 @@ class Handler {
 `
 	findings := scanJava(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-JAVAAST-001" {
+		if f.RuleID == "BATOU-JAVAAST-001" {
 			t.Errorf("should not flag PreparedStatement: %s", f.Title)
 		}
 	}
@@ -73,7 +73,7 @@ class Handler {
 }
 `
 	findings := scanJava(code)
-	f := findByRule(findings, "GTSS-JAVAAST-002")
+	f := findByRule(findings, "BATOU-JAVAAST-002")
 	if f == nil {
 		t.Error("expected command injection finding for Runtime.exec")
 		for _, f := range findings {
@@ -92,7 +92,7 @@ class Handler {
 `
 	findings := scanJava(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-JAVAAST-002" {
+		if f.RuleID == "BATOU-JAVAAST-002" {
 			t.Errorf("should not flag Runtime.exec with literal: %s", f.Title)
 		}
 	}
@@ -111,7 +111,7 @@ class Handler {
 	// Should find both the constructor and readObject
 	count := 0
 	for _, f := range findings {
-		if f.RuleID == "GTSS-JAVAAST-003" {
+		if f.RuleID == "BATOU-JAVAAST-003" {
 			count++
 		}
 	}
@@ -133,7 +133,7 @@ class Handler {
 }
 `
 	findings := scanJava(code)
-	f := findByRule(findings, "GTSS-JAVAAST-004")
+	f := findByRule(findings, "BATOU-JAVAAST-004")
 	if f == nil {
 		t.Error("expected JNDI injection finding for lookup with variable")
 		for _, f := range findings {
@@ -152,7 +152,7 @@ class Handler {
 `
 	findings := scanJava(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-JAVAAST-004" {
+		if f.RuleID == "BATOU-JAVAAST-004" {
 			t.Errorf("should not flag lookup with literal: %s", f.Title)
 		}
 	}
@@ -167,7 +167,7 @@ class Handler {
 }
 `
 	findings := scanJava(code)
-	f := findByRule(findings, "GTSS-JAVAAST-005")
+	f := findByRule(findings, "BATOU-JAVAAST-005")
 	if f == nil {
 		t.Error("expected unsafe reflection finding for Class.forName with variable")
 		for _, f := range findings {
@@ -186,7 +186,7 @@ class Handler {
 `
 	findings := scanJava(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-JAVAAST-005" {
+		if f.RuleID == "BATOU-JAVAAST-005" {
 			t.Errorf("should not flag Class.forName with literal: %s", f.Title)
 		}
 	}
@@ -229,7 +229,7 @@ class Handler {
 }
 `
 	findings := scanJava(code)
-	f := findByRule(findings, "GTSS-JAVAAST-002")
+	f := findByRule(findings, "BATOU-JAVAAST-002")
 	if f == nil {
 		t.Fatal("expected finding")
 	}

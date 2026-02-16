@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/hook"
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/scanner"
-	"github.com/turenio/gtss/internal/taint"
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/hook"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/scanner"
+	"github.com/turenlabs/batou/internal/taint"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // sampleEntry represents a single gold-standard sample with its scan results.
@@ -89,7 +89,7 @@ func scanRegexOnly(code, lang string) []rules.Finding {
 	applicable := rules.ForLanguage(langEnum)
 	var findings []rules.Finding
 	for _, r := range applicable {
-		if r.ID() == "GTSS-TAINT" {
+		if r.ID() == "BATOU-TAINT" {
 			continue
 		}
 		findings = append(findings, r.Scan(ctx)...)

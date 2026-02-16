@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ var (
 
 type JNDIInjection struct{}
 
-func (r *JNDIInjection) ID() string                      { return "GTSS-JAVA-001" }
+func (r *JNDIInjection) ID() string                      { return "BATOU-JAVA-001" }
 func (r *JNDIInjection) Name() string                    { return "JNDIInjection" }
 func (r *JNDIInjection) Description() string             { return "Detects JNDI lookup with user-controlled input, enabling remote code execution via Log4Shell-style attacks." }
 func (r *JNDIInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -283,7 +283,7 @@ func (r *JNDIInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ELInjection struct{}
 
-func (r *ELInjection) ID() string                      { return "GTSS-JAVA-002" }
+func (r *ELInjection) ID() string                      { return "BATOU-JAVA-002" }
 func (r *ELInjection) Name() string                    { return "ELInjection" }
 func (r *ELInjection) Description() string             { return "Detects Java Expression Language (EL) injection where user input is evaluated as EL expressions." }
 func (r *ELInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -349,7 +349,7 @@ func (r *ELInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SpELInjection struct{}
 
-func (r *SpELInjection) ID() string                      { return "GTSS-JAVA-003" }
+func (r *SpELInjection) ID() string                      { return "BATOU-JAVA-003" }
 func (r *SpELInjection) Name() string                    { return "SpELInjection" }
 func (r *SpELInjection) Description() string             { return "Detects Spring Expression Language (SpEL) injection where user input is parsed as SpEL expressions." }
 func (r *SpELInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -410,7 +410,7 @@ func (r *SpELInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HQLInjection struct{}
 
-func (r *HQLInjection) ID() string                      { return "GTSS-JAVA-004" }
+func (r *HQLInjection) ID() string                      { return "BATOU-JAVA-004" }
 func (r *HQLInjection) Name() string                    { return "HQLInjection" }
 func (r *HQLInjection) Description() string             { return "Detects Hibernate HQL/JPQL queries built with string concatenation." }
 func (r *HQLInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -470,7 +470,7 @@ func (r *HQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JDBCConnectionInjection struct{}
 
-func (r *JDBCConnectionInjection) ID() string                      { return "GTSS-JAVA-005" }
+func (r *JDBCConnectionInjection) ID() string                      { return "BATOU-JAVA-005" }
 func (r *JDBCConnectionInjection) Name() string                    { return "JDBCConnectionInjection" }
 func (r *JDBCConnectionInjection) Description() string             { return "Detects JDBC connection strings built with user-controlled input, enabling connection string injection." }
 func (r *JDBCConnectionInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -526,7 +526,7 @@ func (r *JDBCConnectionInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RMIDeserialization struct{}
 
-func (r *RMIDeserialization) ID() string                      { return "GTSS-JAVA-006" }
+func (r *RMIDeserialization) ID() string                      { return "BATOU-JAVA-006" }
 func (r *RMIDeserialization) Name() string                    { return "RMIDeserialization" }
 func (r *RMIDeserialization) Description() string             { return "Detects Java RMI usage which is vulnerable to deserialization attacks." }
 func (r *RMIDeserialization) DefaultSeverity() rules.Severity { return rules.High }
@@ -585,7 +585,7 @@ func (r *RMIDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureSSLTrustManager struct{}
 
-func (r *InsecureSSLTrustManager) ID() string                      { return "GTSS-JAVA-007" }
+func (r *InsecureSSLTrustManager) ID() string                      { return "BATOU-JAVA-007" }
 func (r *InsecureSSLTrustManager) Name() string                    { return "InsecureSSLTrustManager" }
 func (r *InsecureSSLTrustManager) Description() string             { return "Detects X509TrustManager implementations that accept all certificates, disabling SSL/TLS validation." }
 func (r *InsecureSSLTrustManager) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -648,7 +648,7 @@ func (r *InsecureSSLTrustManager) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnrestrictedFileUpload struct{}
 
-func (r *UnrestrictedFileUpload) ID() string                      { return "GTSS-JAVA-008" }
+func (r *UnrestrictedFileUpload) ID() string                      { return "BATOU-JAVA-008" }
 func (r *UnrestrictedFileUpload) Name() string                    { return "UnrestrictedFileUpload" }
 func (r *UnrestrictedFileUpload) Description() string             { return "Detects MultipartFile usage without file type validation, enabling arbitrary file upload." }
 func (r *UnrestrictedFileUpload) DefaultSeverity() rules.Severity { return rules.High }
@@ -701,7 +701,7 @@ func (r *UnrestrictedFileUpload) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaSSTI struct{}
 
-func (r *JavaSSTI) ID() string                      { return "GTSS-JAVA-009" }
+func (r *JavaSSTI) ID() string                      { return "BATOU-JAVA-009" }
 func (r *JavaSSTI) Name() string                    { return "JavaSSTI" }
 func (r *JavaSSTI) Description() string             { return "Detects Java server-side template injection via Velocity, Freemarker, and Thymeleaf with user-controlled templates." }
 func (r *JavaSSTI) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -764,7 +764,7 @@ func (r *JavaSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ImproperCertValidation struct{}
 
-func (r *ImproperCertValidation) ID() string                      { return "GTSS-JAVA-010" }
+func (r *ImproperCertValidation) ID() string                      { return "BATOU-JAVA-010" }
 func (r *ImproperCertValidation) Name() string                    { return "ImproperCertValidation" }
 func (r *ImproperCertValidation) Description() string             { return "Detects disabled or permissive hostname verification in HTTPS connections." }
 func (r *ImproperCertValidation) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -824,7 +824,7 @@ func (r *ImproperCertValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HardcodedJDBCCredentials struct{}
 
-func (r *HardcodedJDBCCredentials) ID() string                      { return "GTSS-JAVA-011" }
+func (r *HardcodedJDBCCredentials) ID() string                      { return "BATOU-JAVA-011" }
 func (r *HardcodedJDBCCredentials) Name() string                    { return "HardcodedJDBCCredentials" }
 func (r *HardcodedJDBCCredentials) Description() string             { return "Detects hardcoded database credentials in JDBC connection strings or DataSource configuration." }
 func (r *HardcodedJDBCCredentials) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -881,7 +881,7 @@ func (r *HardcodedJDBCCredentials) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type RegexDoS struct{}
 
-func (r *RegexDoS) ID() string                      { return "GTSS-JAVA-012" }
+func (r *RegexDoS) ID() string                      { return "BATOU-JAVA-012" }
 func (r *RegexDoS) Name() string                    { return "RegexDoS" }
 func (r *RegexDoS) Description() string             { return "Detects Pattern.compile or String.matches with user-controlled regex input, enabling ReDoS attacks." }
 func (r *RegexDoS) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -942,7 +942,7 @@ func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InfoExposureErrors struct{}
 
-func (r *InfoExposureErrors) ID() string                      { return "GTSS-JAVA-013" }
+func (r *InfoExposureErrors) ID() string                      { return "BATOU-JAVA-013" }
 func (r *InfoExposureErrors) Name() string                    { return "InfoExposureErrors" }
 func (r *InfoExposureErrors) Description() string             { return "Detects stack traces and exception details exposed to HTTP responses." }
 func (r *InfoExposureErrors) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -1004,7 +1004,7 @@ func (r *InfoExposureErrors) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaInsecureRandom struct{}
 
-func (r *JavaInsecureRandom) ID() string                      { return "GTSS-JAVA-014" }
+func (r *JavaInsecureRandom) ID() string                      { return "BATOU-JAVA-014" }
 func (r *JavaInsecureRandom) Name() string                    { return "JavaInsecureRandom" }
 func (r *JavaInsecureRandom) Description() string             { return "Detects java.util.Random or ThreadLocalRandom used for security-sensitive operations." }
 func (r *JavaInsecureRandom) DefaultSeverity() rules.Severity { return rules.High }
@@ -1071,7 +1071,7 @@ func (r *JavaInsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaInsecureCookies struct{}
 
-func (r *JavaInsecureCookies) ID() string                      { return "GTSS-JAVA-015" }
+func (r *JavaInsecureCookies) ID() string                      { return "BATOU-JAVA-015" }
 func (r *JavaInsecureCookies) Name() string                    { return "JavaInsecureCookies" }
 func (r *JavaInsecureCookies) Description() string             { return "Detects cookies created without HttpOnly or Secure flags, especially for sensitive cookies." }
 func (r *JavaInsecureCookies) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -1144,7 +1144,7 @@ func (r *JavaInsecureCookies) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaSSRF struct{}
 
-func (r *JavaSSRF) ID() string                      { return "GTSS-JAVA-016" }
+func (r *JavaSSRF) ID() string                      { return "BATOU-JAVA-016" }
 func (r *JavaSSRF) Name() string                    { return "JavaSSRF" }
 func (r *JavaSSRF) Description() string             { return "Detects SSRF vulnerabilities via Java URL/URI classes with user-controlled input." }
 func (r *JavaSSRF) DefaultSeverity() rules.Severity { return rules.High }
@@ -1205,7 +1205,7 @@ func (r *JavaSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ZipSlip struct{}
 
-func (r *ZipSlip) ID() string                      { return "GTSS-JAVA-017" }
+func (r *ZipSlip) ID() string                      { return "BATOU-JAVA-017" }
 func (r *ZipSlip) Name() string                    { return "ZipSlip" }
 func (r *ZipSlip) Description() string             { return "Detects Zip Slip vulnerability where archive entries are extracted without validating the path." }
 func (r *ZipSlip) DefaultSeverity() rules.Severity { return rules.High }
@@ -1263,7 +1263,7 @@ func (r *ZipSlip) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ThreadSafetyIssues struct{}
 
-func (r *ThreadSafetyIssues) ID() string                      { return "GTSS-JAVA-018" }
+func (r *ThreadSafetyIssues) ID() string                      { return "BATOU-JAVA-018" }
 func (r *ThreadSafetyIssues) Name() string                    { return "ThreadSafetyIssues" }
 func (r *ThreadSafetyIssues) Description() string             { return "Detects thread-unsafe SimpleDateFormat shared across threads." }
 func (r *ThreadSafetyIssues) DefaultSeverity() rules.Severity { return rules.Medium }

@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides security scanning for Swift/iOS code, covering URLSession TLS validation, App Transport Security configuration, Keychain storage accessibility, WKWebView injection, SQLite injection, hardcoded secrets, insecure random number generation, insecure data storage, deprecated UIWebView usage, and jailbreak detection bypass patterns. Swift is supported through four analysis layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), taint source-to-sink tracking, and interprocedural call graph analysis.
+Batou provides security scanning for Swift/iOS code, covering URLSession TLS validation, App Transport Security configuration, Keychain storage accessibility, WKWebView injection, SQLite injection, hardcoded secrets, insecure random number generation, insecure data storage, deprecated UIWebView usage, and jailbreak detection bypass patterns. Swift is supported through four analysis layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), taint source-to-sink tracking, and interprocedural call graph analysis.
 
 Swift taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `property_declaration` assignments, `call_expression` nodes, and `navigation_expression` member accesses by walking the parsed AST.
 
@@ -140,35 +140,35 @@ The Swift taint catalog is defined in `internal/taint/languages/swift_*.go` and 
 
 | Rule ID | Name | Severity | Description |
 |---------|------|----------|-------------|
-| GTSS-SWIFT-001 | InsecureURLSession | High | URLSession delegates that disable TLS certificate validation |
-| GTSS-SWIFT-002 | ATSBypass | High | App Transport Security bypass (NSAllowsArbitraryLoads) in Info.plist |
-| GTSS-SWIFT-003 | InsecureKeychain | High | Keychain items with kSecAttrAccessibleAlways (accessible when locked) |
-| GTSS-SWIFT-004 | UIWebViewUsage | Medium | Deprecated UIWebView usage (lacks security features) |
-| GTSS-SWIFT-005 | HardcodedSecrets | Critical | Hardcoded API keys, passwords, tokens as string literals |
-| GTSS-SWIFT-006 | InsecureRandom | Medium | Insecure random (srand/rand, arc4random without uniform) |
-| GTSS-SWIFT-007 | SQLiteInjection | Critical | SQL injection via string interpolation in sqlite3_exec/prepare |
-| GTSS-SWIFT-008 | WKWebViewInjection | High | WKWebView evaluateJavaScript/loadHTMLString with user input |
-| GTSS-SWIFT-009 | InsecureDataStorage | High | Sensitive data in UserDefaults or NSCoding archives |
-| GTSS-SWIFT-010 | JailbreakDetectionBypass | Low | Easily bypassed jailbreak detection checks |
+| BATOU-SWIFT-001 | InsecureURLSession | High | URLSession delegates that disable TLS certificate validation |
+| BATOU-SWIFT-002 | ATSBypass | High | App Transport Security bypass (NSAllowsArbitraryLoads) in Info.plist |
+| BATOU-SWIFT-003 | InsecureKeychain | High | Keychain items with kSecAttrAccessibleAlways (accessible when locked) |
+| BATOU-SWIFT-004 | UIWebViewUsage | Medium | Deprecated UIWebView usage (lacks security features) |
+| BATOU-SWIFT-005 | HardcodedSecrets | Critical | Hardcoded API keys, passwords, tokens as string literals |
+| BATOU-SWIFT-006 | InsecureRandom | Medium | Insecure random (srand/rand, arc4random without uniform) |
+| BATOU-SWIFT-007 | SQLiteInjection | Critical | SQL injection via string interpolation in sqlite3_exec/prepare |
+| BATOU-SWIFT-008 | WKWebViewInjection | High | WKWebView evaluateJavaScript/loadHTMLString with user input |
+| BATOU-SWIFT-009 | InsecureDataStorage | High | Sensitive data in UserDefaults or NSCoding archives |
+| BATOU-SWIFT-010 | JailbreakDetectionBypass | Low | Easily bypassed jailbreak detection checks |
 
 ### Cross-Language Rules Applicable to Swift
 
 Rules marked with `LangAny` also apply to Swift files, including:
 
-- GTSS-SEC-001: Hardcoded passwords
-- GTSS-SEC-002: API key exposure
-- GTSS-CRY-007: Plaintext HTTP URLs
-- GTSS-AUTH-007: Privilege escalation patterns (CWE-269) - HIGH
-- GTSS-GEN-012: Insecure download patterns (CWE-494) - HIGH
-- GTSS-MISC-003: Missing security headers (CWE-1021, CWE-693) - MEDIUM
-- GTSS-VAL-005: File upload hardening (CWE-434) - HIGH
+- BATOU-SEC-001: Hardcoded passwords
+- BATOU-SEC-002: API key exposure
+- BATOU-CRY-007: Plaintext HTTP URLs
+- BATOU-AUTH-007: Privilege escalation patterns (CWE-269) - HIGH
+- BATOU-GEN-012: Insecure download patterns (CWE-494) - HIGH
+- BATOU-MISC-003: Missing security headers (CWE-1021, CWE-693) - MEDIUM
+- BATOU-VAL-005: File upload hardening (CWE-434) - HIGH
 
 ## Example Detections
 
 ### SQL Injection via String Interpolation
 
 ```swift
-// DETECTED: GTSS-SWIFT-007 (Critical) + taint flow swift.uitextfield.text -> swift.sqlite3.exec
+// DETECTED: BATOU-SWIFT-007 (Critical) + taint flow swift.uitextfield.text -> swift.sqlite3.exec
 func searchUser(db: OpaquePointer?, searchField: UITextField) {
     let name = searchField.text ?? ""
     let query = "SELECT * FROM users WHERE name = '\(name)'"
@@ -176,12 +176,12 @@ func searchUser(db: OpaquePointer?, searchField: UITextField) {
 }
 ```
 
-GTSS flags the string interpolation `\(name)` inside a SQL query string passed to `sqlite3_exec`, and traces taint from `textField.text` (source) through `name` into the SQL query (sink).
+Batou flags the string interpolation `\(name)` inside a SQL query string passed to `sqlite3_exec`, and traces taint from `textField.text` (source) through `name` into the SQL query (sink).
 
 ### WKWebView JavaScript Injection
 
 ```swift
-// DETECTED: GTSS-SWIFT-008 (High) + taint flow swift.url.queryitems -> swift.wkwebview.evaluatejavascript
+// DETECTED: BATOU-SWIFT-008 (High) + taint flow swift.url.queryitems -> swift.wkwebview.evaluatejavascript
 func handleDeepLink(url: URL) {
     let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
     let message = components?.queryItems?.first(where: { $0.name == "msg" })?.value ?? ""
@@ -189,12 +189,12 @@ func handleDeepLink(url: URL) {
 }
 ```
 
-GTSS detects string interpolation in `evaluateJavaScript` with a value derived from URL query parameters.
+Batou detects string interpolation in `evaluateJavaScript` with a value derived from URL query parameters.
 
 ### Insecure Keychain Storage
 
 ```swift
-// DETECTED: GTSS-SWIFT-003 (High)
+// DETECTED: BATOU-SWIFT-003 (High)
 let query: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
     kSecAttrAccessible as String: kSecAttrAccessibleAlways,
@@ -202,7 +202,7 @@ let query: [String: Any] = [
 ]
 ```
 
-GTSS flags `kSecAttrAccessibleAlways` because it makes the Keychain item accessible even when the device is locked.
+Batou flags `kSecAttrAccessibleAlways` because it makes the Keychain item accessible even when the device is locked.
 
 ## Safe Patterns
 
@@ -219,7 +219,7 @@ func findUser(db: OpaquePointer?, name: String) {
 }
 ```
 
-The parameterized query uses `?` placeholders with `sqlite3_bind_text` to safely bind user input. GTSS recognizes `sqlite3_bind_*` functions as sanitizers for SQL injection sinks.
+The parameterized query uses `?` placeholders with `sqlite3_bind_text` to safely bind user input. Batou recognizes `sqlite3_bind_*` functions as sanitizers for SQL injection sinks.
 
 ### Secure Keychain Storage
 
@@ -243,7 +243,7 @@ webView.evaluateJavaScript("document.title") { result, error in
 }
 ```
 
-GTSS does not flag `evaluateJavaScript` calls that use static string literals without interpolation or concatenation.
+Batou does not flag `evaluateJavaScript` calls that use static string literals without interpolation or concatenation.
 
 ## Limitations
 
@@ -253,7 +253,7 @@ GTSS does not flag `evaluateJavaScript` calls that use static string literals wi
 
 - **Third-party libraries**: While SQLite3 and WKWebView sinks are covered, third-party database wrappers (GRDB, SQLite.swift) are only partially detected through their SQLite3 usage patterns.
 
-- **Info.plist detection**: ATS bypass detection (GTSS-SWIFT-002) works on `.plist` XML files. Binary plist files or entitlement files in non-standard locations may not be scanned.
+- **Info.plist detection**: ATS bypass detection (BATOU-SWIFT-002) works on `.plist` XML files. Binary plist files or entitlement files in non-standard locations may not be scanned.
 
 - **Objective-C bridging**: When Swift code calls Objective-C methods via bridging headers, the taint engine may not track data flow across the language boundary.
 

@@ -6,7 +6,7 @@ import (
 )
 
 // VULN: Command injection via exec.Command with shell interpreter and user input.
-// Should trigger GTSS-INJ-002 (Command Injection).
+// Should trigger BATOU-INJ-002 (Command Injection).
 
 func HandlePing(w http.ResponseWriter, r *http.Request) {
 	host := r.URL.Query().Get("host")

@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-MASS-001: JavaScript/TypeScript mass assignment
+// BATOU-MASS-001: JavaScript/TypeScript mass assignment
 var (
 	// Object.assign(model, req.body) — direct mass assignment
 	jsObjectAssignModel = regexp.MustCompile(`Object\.assign\s*\(\s*(?:user|model|record|entity|account|profile|doc|document|item|obj|instance|data)\w*\s*,\s*(?:req\.body|req\.query|req\.params|request\.body|body|payload|input|data)`)
@@ -21,7 +21,7 @@ var (
 	jsModelConstructor = regexp.MustCompile(`new\s+(?:User|Model|Account|Profile|Record|Entity|Document|Item)\w*\s*\(\s*(?:req\.body|req\.query|request\.body|body|payload|input)`)
 )
 
-// GTSS-MASS-002: Python mass assignment
+// BATOU-MASS-002: Python mass assignment
 var (
 	// Django: Model.objects.create(**request.data) or Model(**request.data)
 	pyDjangoCreateUnpack = regexp.MustCompile(`(?:\.objects\.create|\.objects\.update_or_create|\.objects\.get_or_create)\s*\(\s*\*\*\s*(?:request\.data|request\.POST|request\.GET|request\.json|data|payload|input|body)`)
@@ -37,7 +37,7 @@ var (
 	pySetattrLoop = regexp.MustCompile(`setattr\s*\(\s*\w+\s*,\s*(?:key|k|attr|field|prop)\s*,`)
 )
 
-// GTSS-MASS-003: Ruby/Rails mass assignment
+// BATOU-MASS-003: Ruby/Rails mass assignment
 var (
 	// User.new(params[:user]) without strong params
 	rbModelNewParams = regexp.MustCompile(`\.\s*(?:new|create|create!|update|update!|update_attributes|assign_attributes|build)\s*\(\s*params\s*\[\s*:`)
@@ -47,7 +47,7 @@ var (
 	rbParamsDirectAssign = regexp.MustCompile(`\.\s*(?:update|update!|assign_attributes)\s*\(\s*params\)`)
 )
 
-// GTSS-MASS-004: Java/Spring mass assignment
+// BATOU-MASS-004: Java/Spring mass assignment
 var (
 	// @ModelAttribute without @InitBinder
 	javaModelAttribute = regexp.MustCompile(`@ModelAttribute`)
@@ -65,11 +65,11 @@ func init() {
 	rules.Register(&MassAssignJava{})
 }
 
-// --- GTSS-MASS-001: JavaScript Mass Assignment ---
+// --- BATOU-MASS-001: JavaScript Mass Assignment ---
 
 type MassAssignJS struct{}
 
-func (r *MassAssignJS) ID() string                        { return "GTSS-MASS-001" }
+func (r *MassAssignJS) ID() string                        { return "BATOU-MASS-001" }
 func (r *MassAssignJS) Name() string                      { return "MassAssignJS" }
 func (r *MassAssignJS) DefaultSeverity() rules.Severity   { return rules.High }
 func (r *MassAssignJS) Languages() []rules.Language {
@@ -153,11 +153,11 @@ func (r *MassAssignJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-MASS-002: Python Mass Assignment ---
+// --- BATOU-MASS-002: Python Mass Assignment ---
 
 type MassAssignPython struct{}
 
-func (r *MassAssignPython) ID() string                        { return "GTSS-MASS-002" }
+func (r *MassAssignPython) ID() string                        { return "BATOU-MASS-002" }
 func (r *MassAssignPython) Name() string                      { return "MassAssignPython" }
 func (r *MassAssignPython) DefaultSeverity() rules.Severity   { return rules.High }
 func (r *MassAssignPython) Languages() []rules.Language {
@@ -275,11 +275,11 @@ func (r *MassAssignPython) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-MASS-003: Ruby Mass Assignment ---
+// --- BATOU-MASS-003: Ruby Mass Assignment ---
 
 type MassAssignRuby struct{}
 
-func (r *MassAssignRuby) ID() string                        { return "GTSS-MASS-003" }
+func (r *MassAssignRuby) ID() string                        { return "BATOU-MASS-003" }
 func (r *MassAssignRuby) Name() string                      { return "MassAssignRuby" }
 func (r *MassAssignRuby) DefaultSeverity() rules.Severity   { return rules.High }
 func (r *MassAssignRuby) Languages() []rules.Language {
@@ -355,11 +355,11 @@ func (r *MassAssignRuby) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-MASS-004: Java Mass Assignment ---
+// --- BATOU-MASS-004: Java Mass Assignment ---
 
 type MassAssignJava struct{}
 
-func (r *MassAssignJava) ID() string                        { return "GTSS-MASS-004" }
+func (r *MassAssignJava) ID() string                        { return "BATOU-MASS-004" }
 func (r *MassAssignJava) Name() string                      { return "MassAssignJava" }
 func (r *MassAssignJava) DefaultSeverity() rules.Severity   { return rules.High }
 func (r *MassAssignJava) Languages() []rules.Language {

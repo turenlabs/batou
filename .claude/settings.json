@@ -6,9 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gtss-hook.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/batou-hook.sh",
             "timeout": 30,
-            "statusMessage": "GTSS: Scanning for vulnerabilities..."
+            "statusMessage": "Batou: Scanning for vulnerabilities..."
           }
         ]
       }
@@ -19,9 +19,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gtss-hook.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/batou-hook.sh",
             "timeout": 30,
-            "statusMessage": "GTSS: Deep security scan..."
+            "statusMessage": "Batou: Deep security scan..."
           }
         ]
       }

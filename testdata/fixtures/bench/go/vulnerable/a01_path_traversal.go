@@ -1,5 +1,5 @@
 // Source: CWE-22 - Path Traversal in Go file server
-// Expected: GTSS-TRV-001 (Path Traversal via user input in file path)
+// Expected: BATOU-TRV-001 (Path Traversal via user input in file path)
 // OWASP: A01:2021 - Broken Access Control (Path Traversal)
 
 package handler

@@ -3,11 +3,11 @@ package java
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // ==========================================================================
-// GTSS-JAVA-001: JNDI Injection
+// BATOU-JAVA-001: JNDI Injection
 // ==========================================================================
 
 func TestJAVA001_JNDILookup_Concat(t *testing.T) {
@@ -19,7 +19,7 @@ public class JndiService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/JndiService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-001")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-001")
 }
 
 func TestJAVA001_JNDILookup_Variable(t *testing.T) {
@@ -32,7 +32,7 @@ public class JndiService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/JndiService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-001")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-001")
 }
 
 func TestJAVA001_JNDILookup_Static_Safe(t *testing.T) {
@@ -44,11 +44,11 @@ public class JndiService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/JndiService.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-001")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-001")
 }
 
 // ==========================================================================
-// GTSS-JAVA-002: Expression Language Injection
+// BATOU-JAVA-002: Expression Language Injection
 // ==========================================================================
 
 func TestJAVA002_ELValueExpr_Concat(t *testing.T) {
@@ -60,7 +60,7 @@ public class ELService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ELService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-002")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-002")
 }
 
 func TestJAVA002_ELValueExpr_UserInput(t *testing.T) {
@@ -73,11 +73,11 @@ public class ELController {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ELController.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-002")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-002")
 }
 
 // ==========================================================================
-// GTSS-JAVA-003: Spring SpEL Injection
+// BATOU-JAVA-003: Spring SpEL Injection
 // ==========================================================================
 
 func TestJAVA003_SpELParseExpr_UserInput(t *testing.T) {
@@ -89,7 +89,7 @@ public class SpelController {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SpelController.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-003")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-003")
 }
 
 func TestJAVA003_SpELParseExpr_Concat(t *testing.T) {
@@ -101,7 +101,7 @@ public class SpelService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SpelService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-003")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-003")
 }
 
 func TestJAVA003_SpELParseExpr_Static_Safe(t *testing.T) {
@@ -113,11 +113,11 @@ public class SpelService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SpelService.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-003")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-003")
 }
 
 // ==========================================================================
-// GTSS-JAVA-004: Hibernate HQL Injection
+// BATOU-JAVA-004: Hibernate HQL Injection
 // ==========================================================================
 
 func TestJAVA004_HQLCreateQuery_Concat(t *testing.T) {
@@ -127,7 +127,7 @@ func TestJAVA004_HQLCreateQuery_Concat(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-004")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-004")
 }
 
 func TestJAVA004_HQLCreateQuery_Variable(t *testing.T) {
@@ -138,7 +138,7 @@ func TestJAVA004_HQLCreateQuery_Variable(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-004")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-004")
 }
 
 func TestJAVA004_HQLCreateQuery_Parameterized_Safe(t *testing.T) {
@@ -150,11 +150,11 @@ func TestJAVA004_HQLCreateQuery_Parameterized_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-004")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-004")
 }
 
 // ==========================================================================
-// GTSS-JAVA-005: JDBC Connection String Injection
+// BATOU-JAVA-005: JDBC Connection String Injection
 // ==========================================================================
 
 func TestJAVA005_JDBCConnection_Concat(t *testing.T) {
@@ -164,7 +164,7 @@ func TestJAVA005_JDBCConnection_Concat(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DbService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-005")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-005")
 }
 
 func TestJAVA005_JDBCConnection_Static_Safe(t *testing.T) {
@@ -174,11 +174,11 @@ func TestJAVA005_JDBCConnection_Static_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DbService.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-005")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-005")
 }
 
 // ==========================================================================
-// GTSS-JAVA-006: Java RMI Deserialization
+// BATOU-JAVA-006: Java RMI Deserialization
 // ==========================================================================
 
 func TestJAVA006_RMINaming_Lookup(t *testing.T) {
@@ -190,11 +190,11 @@ public class RmiClient {
     }
 }`
 	result := testutil.ScanContent(t, "/app/RmiClient.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-006")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-006")
 }
 
 // ==========================================================================
-// GTSS-JAVA-007: Insecure SSL TrustManager
+// BATOU-JAVA-007: Insecure SSL TrustManager
 // ==========================================================================
 
 func TestJAVA007_TrustAllCerts(t *testing.T) {
@@ -205,7 +205,7 @@ public class InsecureTrustManager implements X509TrustManager {
     public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
 }`
 	result := testutil.ScanContent(t, "/app/InsecureTrustManager.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-007")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-007")
 }
 
 func TestJAVA007_AnonymousTrustManager(t *testing.T) {
@@ -217,11 +217,11 @@ func TestJAVA007_AnonymousTrustManager(t *testing.T) {
     }
 };`
 	result := testutil.ScanContent(t, "/app/SslConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-007")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-007")
 }
 
 // ==========================================================================
-// GTSS-JAVA-008: Unrestricted File Upload
+// BATOU-JAVA-008: Unrestricted File Upload
 // ==========================================================================
 
 func TestJAVA008_MultipartFile_NoValidation(t *testing.T) {
@@ -232,7 +232,7 @@ public String upload(@RequestParam MultipartFile file) throws Exception {
     return "ok";
 }`
 	result := testutil.ScanContent(t, "/app/UploadController.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-008")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-008")
 }
 
 func TestJAVA008_MultipartFile_WithValidation_Safe(t *testing.T) {
@@ -246,11 +246,11 @@ public String upload(@RequestParam MultipartFile file) throws Exception {
     return "ok";
 }`
 	result := testutil.ScanContent(t, "/app/UploadController.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-008")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-008")
 }
 
 // ==========================================================================
-// GTSS-JAVA-009: Server-Side Template Injection
+// BATOU-JAVA-009: Server-Side Template Injection
 // ==========================================================================
 
 func TestJAVA009_VelocityEvaluate_UserInput(t *testing.T) {
@@ -262,7 +262,7 @@ public class TemplateService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/TemplateService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-009")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-009")
 }
 
 func TestJAVA009_ThymeleafProcess_UserInput(t *testing.T) {
@@ -274,11 +274,11 @@ func TestJAVA009_ThymeleafProcess_UserInput(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/TemplateController.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-009")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-009")
 }
 
 // ==========================================================================
-// GTSS-JAVA-010: Improper Certificate Validation
+// BATOU-JAVA-010: Improper Certificate Validation
 // ==========================================================================
 
 func TestJAVA010_AllowAllHostnameVerifier(t *testing.T) {
@@ -289,7 +289,7 @@ public class HttpConfig {
     }
 }`
 	result := testutil.ScanContent(t, "/app/HttpConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-010")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-010")
 }
 
 func TestJAVA010_NoopHostnameVerifier(t *testing.T) {
@@ -300,11 +300,11 @@ public class HttpConfig {
     }
 }`
 	result := testutil.ScanContent(t, "/app/HttpConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-010")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-010")
 }
 
 // ==========================================================================
-// GTSS-JAVA-011: Hardcoded JDBC Credentials
+// BATOU-JAVA-011: Hardcoded JDBC Credentials
 // ==========================================================================
 
 func TestJAVA011_DriverManagerInlineCredentials(t *testing.T) {
@@ -314,7 +314,7 @@ func TestJAVA011_DriverManagerInlineCredentials(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DbConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-011")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-011")
 }
 
 func TestJAVA011_JDBCURLEmbeddedPassword(t *testing.T) {
@@ -322,7 +322,7 @@ func TestJAVA011_JDBCURLEmbeddedPassword(t *testing.T) {
     private String url = "jdbc:mysql://db:3306/app?user=root&password=secret";
 }`
 	result := testutil.ScanContent(t, "/app/DbConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-011")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-011")
 }
 
 func TestJAVA011_DataSourceSetPassword(t *testing.T) {
@@ -334,7 +334,7 @@ func TestJAVA011_DataSourceSetPassword(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DbConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-011")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-011")
 }
 
 func TestJAVA011_EnvironmentVariable_Safe(t *testing.T) {
@@ -345,11 +345,11 @@ func TestJAVA011_EnvironmentVariable_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DbConfig.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-011")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-011")
 }
 
 // ==========================================================================
-// GTSS-JAVA-012: Regex DoS
+// BATOU-JAVA-012: Regex DoS
 // ==========================================================================
 
 func TestJAVA012_PatternCompile_UserInput(t *testing.T) {
@@ -361,7 +361,7 @@ func TestJAVA012_PatternCompile_UserInput(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SearchService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-012")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-012")
 }
 
 func TestJAVA012_PatternCompile_Concat(t *testing.T) {
@@ -371,7 +371,7 @@ func TestJAVA012_PatternCompile_Concat(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SearchService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-012")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-012")
 }
 
 func TestJAVA012_PatternCompile_Static_Safe(t *testing.T) {
@@ -379,11 +379,11 @@ func TestJAVA012_PatternCompile_Static_Safe(t *testing.T) {
     private static final Pattern EMAIL = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
 }`
 	result := testutil.ScanContent(t, "/app/Validator.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-012")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-012")
 }
 
 // ==========================================================================
-// GTSS-JAVA-013: Information Exposure in Error Messages
+// BATOU-JAVA-013: Information Exposure in Error Messages
 // ==========================================================================
 
 func TestJAVA013_PrintStackTrace_ToResponse(t *testing.T) {
@@ -393,7 +393,7 @@ func TestJAVA013_PrintStackTrace_ToResponse(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ErrorHandler.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-013")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-013")
 }
 
 func TestJAVA013_ExceptionMessage_ToResponse(t *testing.T) {
@@ -403,7 +403,7 @@ func TestJAVA013_ExceptionMessage_ToResponse(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ErrorHandler.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-013")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-013")
 }
 
 func TestJAVA013_Logger_Safe(t *testing.T) {
@@ -418,11 +418,11 @@ func TestJAVA013_Logger_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Service.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-013")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-013")
 }
 
 // ==========================================================================
-// GTSS-JAVA-014: Insecure Random in Security Context
+// BATOU-JAVA-014: Insecure Random in Security Context
 // ==========================================================================
 
 func TestJAVA014_UtilRandom_TokenGeneration(t *testing.T) {
@@ -434,7 +434,7 @@ public class TokenService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/TokenService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-014")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-014")
 }
 
 func TestJAVA014_SecureRandom_Safe(t *testing.T) {
@@ -448,11 +448,11 @@ public class TokenService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/TokenService.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-014")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-014")
 }
 
 // ==========================================================================
-// GTSS-JAVA-015: Missing HttpOnly/Secure on Cookies
+// BATOU-JAVA-015: Missing HttpOnly/Secure on Cookies
 // ==========================================================================
 
 func TestJAVA015_Cookie_NoFlags(t *testing.T) {
@@ -463,7 +463,7 @@ func TestJAVA015_Cookie_NoFlags(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/AuthController.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-015")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-015")
 }
 
 func TestJAVA015_Cookie_WithFlags_Safe(t *testing.T) {
@@ -476,11 +476,11 @@ func TestJAVA015_Cookie_WithFlags_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/AuthController.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-015")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-015")
 }
 
 // ==========================================================================
-// GTSS-JAVA-016: SSRF via URL class
+// BATOU-JAVA-016: SSRF via URL class
 // ==========================================================================
 
 func TestJAVA016_NewURL_UserInput(t *testing.T) {
@@ -492,7 +492,7 @@ func TestJAVA016_NewURL_UserInput(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ProxyService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-016")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-016")
 }
 
 func TestJAVA016_NewURL_Concat(t *testing.T) {
@@ -503,7 +503,7 @@ func TestJAVA016_NewURL_Concat(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ApiClient.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-016")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-016")
 }
 
 func TestJAVA016_NewURL_Static_Safe(t *testing.T) {
@@ -515,11 +515,11 @@ func TestJAVA016_NewURL_Static_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/HealthCheck.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-016")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-016")
 }
 
 // ==========================================================================
-// GTSS-JAVA-017: Zip Slip
+// BATOU-JAVA-017: Zip Slip
 // ==========================================================================
 
 func TestJAVA017_ZipEntry_NoValidation(t *testing.T) {
@@ -535,7 +535,7 @@ public class Extractor {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Extractor.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-017")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-017")
 }
 
 func TestJAVA017_ZipEntry_WithValidation_Safe(t *testing.T) {
@@ -553,11 +553,11 @@ public class Extractor {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Extractor.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-017")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-017")
 }
 
 // ==========================================================================
-// GTSS-JAVA-018: Thread Safety Issues
+// BATOU-JAVA-018: Thread Safety Issues
 // ==========================================================================
 
 func TestJAVA018_StaticSimpleDateFormat(t *testing.T) {
@@ -568,7 +568,7 @@ func TestJAVA018_StaticSimpleDateFormat(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DateUtil.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-018")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-018")
 }
 
 func TestJAVA018_SimpleDateFormat_InSpringBean(t *testing.T) {
@@ -580,7 +580,7 @@ public class DateService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DateService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-JAVA-018")
+	testutil.MustFindRule(t, result, "BATOU-JAVA-018")
 }
 
 func TestJAVA018_DateTimeFormatter_Safe(t *testing.T) {
@@ -592,7 +592,7 @@ public class DateUtil {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DateUtil.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-018")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-018")
 }
 
 func TestJAVA018_ThreadLocal_SimpleDateFormat_Safe(t *testing.T) {
@@ -602,5 +602,5 @@ func TestJAVA018_ThreadLocal_SimpleDateFormat_Safe(t *testing.T) {
     );
 }`
 	result := testutil.ScanContent(t, "/app/DateUtil.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-JAVA-018")
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-018")
 }

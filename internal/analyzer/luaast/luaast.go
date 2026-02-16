@@ -3,8 +3,8 @@ package luaast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // LuaASTAnalyzer performs AST-based security analysis of Lua source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&LuaASTAnalyzer{})
 }
 
-func (l *LuaASTAnalyzer) ID() string                        { return "GTSS-LUA-AST" }
+func (l *LuaASTAnalyzer) ID() string                        { return "BATOU-LUA-AST" }
 func (l *LuaASTAnalyzer) Name() string                      { return "Lua AST Security Analyzer" }
 func (l *LuaASTAnalyzer) DefaultSeverity() rules.Severity   { return rules.High }
 func (l *LuaASTAnalyzer) Languages() []rules.Language        { return []rules.Language{rules.LangLua} }
@@ -161,7 +161,7 @@ func (c *luaChecker) checkOsExecute(n *ast.Node) {
 
 	if hasVariableArgument(n) {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-LUA-AST-001",
+			RuleID:        "BATOU-LUA-AST-001",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Command injection via " + pkg + "." + method,
@@ -188,7 +188,7 @@ func (c *luaChecker) checkLoadstring(n *ast.Node) {
 
 	if hasVariableArgument(n) {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-LUA-AST-002",
+			RuleID:        "BATOU-LUA-AST-002",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Code injection via " + method + "()",
@@ -215,7 +215,7 @@ func (c *luaChecker) checkDofileLoadfile(n *ast.Node) {
 
 	if hasVariableArgument(n) {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-LUA-AST-003",
+			RuleID:        "BATOU-LUA-AST-003",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Path injection via " + method + "()",
@@ -257,7 +257,7 @@ func (c *luaChecker) checkDebugLibrary(n *ast.Node) {
 	}
 
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-LUA-AST-004",
+		RuleID:        "BATOU-LUA-AST-004",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "Debug library usage: debug." + method,
@@ -290,7 +290,7 @@ func (c *luaChecker) checkNgxSQLInjection(n *ast.Node) {
 	// Check if the arguments contain SQL keywords and variable concatenation
 	if hasSQLInArguments(n) && hasVariableArgument(n) {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-LUA-AST-005",
+			RuleID:        "BATOU-LUA-AST-005",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "SQL injection in OpenResty/Lua",

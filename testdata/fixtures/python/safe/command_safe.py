@@ -1,5 +1,5 @@
 # Safe: subprocess.run with list arguments and shell=False
-# Expected: No findings for GTSS-INJ-002
+# Expected: No findings for BATOU-INJ-002
 
 import subprocess
 import shlex

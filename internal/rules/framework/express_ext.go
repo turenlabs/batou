@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,29 +12,29 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-EXPRESS-009: app.use without rate limiting
+	// BATOU-FW-EXPRESS-009: app.use without rate limiting
 	reExpressExtAppListen   = regexp.MustCompile(`(?:app|server)\s*\.\s*listen\s*\(`)
 	reExpressExtRateLimit   = regexp.MustCompile(`(?i)(?:rateLimit|rate[_-]?limit|express[_-]?rate[_-]?limit|slowDown|express[_-]?slow[_-]?down)`)
 	reExpressExtThrottle    = regexp.MustCompile(`(?i)(?:throttle|limiter|rateLimiter)`)
 
-	// GTSS-FW-EXPRESS-010: res.send with user input (XSS)
+	// BATOU-FW-EXPRESS-010: res.send with user input (XSS)
 	reExpressExtResSendInput = regexp.MustCompile(`res\s*\.\s*send\s*\(\s*(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|req\s*\.\s*(?:params|query|body)\s*\[)`)
 	reExpressExtResWriteInput = regexp.MustCompile(`res\s*\.\s*write\s*\(\s*(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|req\s*\.\s*(?:params|query|body)\s*\[)`)
 
-	// GTSS-FW-EXPRESS-011: Session secret hardcoded
+	// BATOU-FW-EXPRESS-011: Session secret hardcoded
 	reExpressExtSessionSecret = regexp.MustCompile(`secret\s*:\s*["'][^"']{1,}["']`)
 	reExpressExtSessionBlock  = regexp.MustCompile(`session\s*\(\s*\{`)
 
-	// GTSS-FW-EXPRESS-012: Morgan logging sensitive data
+	// BATOU-FW-EXPRESS-012: Morgan logging sensitive data
 	reExpressExtMorganCustom = regexp.MustCompile(`morgan\s*\(\s*(?:function|["'][^"']*(?:password|token|secret|authorization|cookie|session|credit|ssn)[^"']*["'])`)
 	reExpressExtMorganReq    = regexp.MustCompile(`morgan\.token\s*\([^)]*(?:req\.(?:body|headers\.authorization|cookies))`)
 
-	// GTSS-FW-EXPRESS-013: Multer file upload without filter
+	// BATOU-FW-EXPRESS-013: Multer file upload without filter
 	reExpressExtMulterUpload  = regexp.MustCompile(`multer\s*\(\s*\{`)
 	reExpressExtMulterNoFilter = regexp.MustCompile(`fileFilter\s*:`)
 	reExpressExtMulterLimits  = regexp.MustCompile(`limits\s*:`)
 
-	// GTSS-FW-EXPRESS-014: Express trust proxy misconfigured
+	// BATOU-FW-EXPRESS-014: Express trust proxy misconfigured
 	reExpressExtTrustProxyTrue = regexp.MustCompile(`(?:app|server)\s*\.\s*set\s*\(\s*["']trust\s+proxy["']\s*,\s*true\s*\)`)
 )
 
@@ -48,12 +48,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-EXPRESS-009: Express app without rate limiting
+// BATOU-FW-EXPRESS-009: Express app without rate limiting
 // ---------------------------------------------------------------------------
 
 type ExpressNoRateLimit struct{}
 
-func (r *ExpressNoRateLimit) ID() string                      { return "GTSS-FW-EXPRESS-009" }
+func (r *ExpressNoRateLimit) ID() string                      { return "BATOU-FW-EXPRESS-009" }
 func (r *ExpressNoRateLimit) Name() string                    { return "ExpressNoRateLimit" }
 func (r *ExpressNoRateLimit) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ExpressNoRateLimit) Description() string {
@@ -108,12 +108,12 @@ func (r *ExpressNoRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-EXPRESS-010: res.send with user input (XSS)
+// BATOU-FW-EXPRESS-010: res.send with user input (XSS)
 // ---------------------------------------------------------------------------
 
 type ExpressResSendXSS struct{}
 
-func (r *ExpressResSendXSS) ID() string                      { return "GTSS-FW-EXPRESS-010" }
+func (r *ExpressResSendXSS) ID() string                      { return "BATOU-FW-EXPRESS-010" }
 func (r *ExpressResSendXSS) Name() string                    { return "ExpressResSendXSS" }
 func (r *ExpressResSendXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ExpressResSendXSS) Description() string {
@@ -166,12 +166,12 @@ func (r *ExpressResSendXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-EXPRESS-011: Session secret hardcoded
+// BATOU-FW-EXPRESS-011: Session secret hardcoded
 // ---------------------------------------------------------------------------
 
 type ExpressHardcodedSecret struct{}
 
-func (r *ExpressHardcodedSecret) ID() string                      { return "GTSS-FW-EXPRESS-011" }
+func (r *ExpressHardcodedSecret) ID() string                      { return "BATOU-FW-EXPRESS-011" }
 func (r *ExpressHardcodedSecret) Name() string                    { return "ExpressHardcodedSecret" }
 func (r *ExpressHardcodedSecret) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ExpressHardcodedSecret) Description() string {
@@ -236,12 +236,12 @@ func (r *ExpressHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-EXPRESS-012: Morgan logging sensitive data
+// BATOU-FW-EXPRESS-012: Morgan logging sensitive data
 // ---------------------------------------------------------------------------
 
 type ExpressMorganSensitive struct{}
 
-func (r *ExpressMorganSensitive) ID() string                      { return "GTSS-FW-EXPRESS-012" }
+func (r *ExpressMorganSensitive) ID() string                      { return "BATOU-FW-EXPRESS-012" }
 func (r *ExpressMorganSensitive) Name() string                    { return "ExpressMorganSensitive" }
 func (r *ExpressMorganSensitive) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ExpressMorganSensitive) Description() string {
@@ -294,12 +294,12 @@ func (r *ExpressMorganSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-EXPRESS-013: Multer file upload without filter
+// BATOU-FW-EXPRESS-013: Multer file upload without filter
 // ---------------------------------------------------------------------------
 
 type ExpressMulterNoFilter struct{}
 
-func (r *ExpressMulterNoFilter) ID() string                      { return "GTSS-FW-EXPRESS-013" }
+func (r *ExpressMulterNoFilter) ID() string                      { return "BATOU-FW-EXPRESS-013" }
 func (r *ExpressMulterNoFilter) Name() string                    { return "ExpressMulterNoFilter" }
 func (r *ExpressMulterNoFilter) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ExpressMulterNoFilter) Description() string {
@@ -356,12 +356,12 @@ func (r *ExpressMulterNoFilter) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-EXPRESS-014: Express trust proxy misconfigured
+// BATOU-FW-EXPRESS-014: Express trust proxy misconfigured
 // ---------------------------------------------------------------------------
 
 type ExpressTrustProxyExt struct{}
 
-func (r *ExpressTrustProxyExt) ID() string                      { return "GTSS-FW-EXPRESS-014" }
+func (r *ExpressTrustProxyExt) ID() string                      { return "BATOU-FW-EXPRESS-014" }
 func (r *ExpressTrustProxyExt) Name() string                    { return "ExpressTrustProxyExt" }
 func (r *ExpressTrustProxyExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ExpressTrustProxyExt) Description() string {

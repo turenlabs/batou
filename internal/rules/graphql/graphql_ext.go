@@ -4,57 +4,57 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended GraphQL rules
 // ---------------------------------------------------------------------------
 
-// GTSS-GQL-003: GraphQL introspection enabled in production
+// BATOU-GQL-003: GraphQL introspection enabled in production
 var (
 	reIntrospectionProd    = regexp.MustCompile(`(?i)(?:introspection\s*[:=]\s*true|enableIntrospection\s*[:=]\s*true|introspection\s*=\s*True|\.introspection\s*\(\s*true\s*\))`)
 	reProdFile             = regexp.MustCompile(`(?i)(?:production|prod\.|\.prod|deploy|release)`)
 	reIntrospectionGuarded = regexp.MustCompile(`(?i)(?:process\.env|NODE_ENV|RAILS_ENV|DJANGO_SETTINGS|__debug__|isDev|isProduction|isProd)`)
 )
 
-// GTSS-GQL-004: GraphQL query depth not limited
+// BATOU-GQL-004: GraphQL query depth not limited
 var (
 	reGQLSchemaSetup = regexp.MustCompile(`(?i)(?:new\s+ApolloServer|createYoga|graphqlHTTP|GraphQLModule|new\s+GraphQLServer|graphql\.NewHandler|graphql\.Handler)\s*\(`)
 	reGQLDepthCheck  = regexp.MustCompile(`(?i)(?:depthLimit|maxDepth|depth[_-]?limit|queryDepth|MaxDepth|max_depth)`)
 )
 
-// GTSS-GQL-005: GraphQL field-level authorization missing
+// BATOU-GQL-005: GraphQL field-level authorization missing
 var (
 	reGQLResolverFunc = regexp.MustCompile(`(?i)(?:resolve\s*[:=]\s*(?:async\s+)?(?:function|\()|\w+\s*:\s*\{\s*(?:type|resolve)|def\s+resolve_\w+|@ResolveField|func\s+\(\w+\s+\*\w+Resolver\))`)
 	reGQLAuthCheck    = regexp.MustCompile(`(?i)(?:authorize|auth|permission|isAuthenticated|currentUser|context\.user|ctx\.user|@Authorized|@PreAuthorize|@Secured|requireAuth|checkAuth|hasPermission|@login_required|@permission_required|authenticate)`)
 )
 
-// GTSS-GQL-006: GraphQL batch query attack
+// BATOU-GQL-006: GraphQL batch query attack
 var (
 	reGQLBatchEnabled  = regexp.MustCompile(`(?i)(?:batch\s*[:=]\s*true|batching\s*[:=]\s*true|allowBatchedHttpRequests\s*[:=]\s*true)`)
 	reGQLBatchLimit    = regexp.MustCompile(`(?i)(?:batchLimit|batch_limit|maxBatch|max_batch|BatchLimit|maxOperationsPerRequest)`)
 )
 
-// GTSS-GQL-007: GraphQL SQL injection via resolver
+// BATOU-GQL-007: GraphQL SQL injection via resolver
 var (
 	reGQLResolverSQL = regexp.MustCompile(`(?i)(?:resolve|resolver)\b[^}]*(?:query|execute|raw|rawQuery|executeQuery)\s*\([^)]*(?:\$\{|` + "`" + `|\+\s*(?:args|input|parent|root|context|info)\b|%s|%v|format|f['"])`)
 	reGQLRawQuery    = regexp.MustCompile(`(?i)(?:db\.query|connection\.query|pool\.query|\.raw|\.execute|cursor\.execute|\.rawQuery)\s*\(\s*(?:` + "`" + `[^` + "`" + `]*\$\{|['"][^'"]*['"]\s*\+|f['"])`)
 )
 
-// GTSS-GQL-008: GraphQL mutation without authentication
+// BATOU-GQL-008: GraphQL mutation without authentication
 var (
 	reGQLMutation        = regexp.MustCompile(`(?i)(?:type\s+Mutation|Mutation\s*[:=]|\.mutation\s*\(|@Mutation|mutation_type|MutationType)`)
 	reGQLMutationResolve = regexp.MustCompile(`(?i)(?:Mutation\s*[:=]\s*\{|mutation\s*[:=]\s*new|mutationType\s*[:=])`)
 )
 
-// GTSS-GQL-009: GraphQL persisted queries disabled
+// BATOU-GQL-009: GraphQL persisted queries disabled
 var (
 	reGQLPersistedOff    = regexp.MustCompile(`(?i)(?:persistedQueries\s*[:=]\s*false|persisted[_-]?queries\s*[:=]\s*false|automaticPersistedQueries\s*[:=]\s*false)`)
 	reGQLPersistedOn     = regexp.MustCompile(`(?i)(?:persistedQueries|persisted_queries|automaticPersistedQueries|PersistedQueryLink|persistedQueries\s*[:=]\s*true)`)
 )
 
-// GTSS-GQL-010: GraphQL error message information disclosure
+// BATOU-GQL-010: GraphQL error message information disclosure
 var (
 	reGQLErrorDetail = regexp.MustCompile(`(?i)(?:formatError|format_error|error_formatter)\s*[:=]\s*(?:function|\(|=>)`)
 	reGQLErrorStack  = regexp.MustCompile(`(?i)(?:error|err|e)\.(?:stack|stackTrace|originalError|message)\b`)
@@ -62,12 +62,12 @@ var (
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-GQL-003: GraphQL Introspection Enabled in Production
+// BATOU-GQL-003: GraphQL Introspection Enabled in Production
 // ---------------------------------------------------------------------------
 
 type IntrospectionEnabledProd struct{}
 
-func (r *IntrospectionEnabledProd) ID() string                     { return "GTSS-GQL-003" }
+func (r *IntrospectionEnabledProd) ID() string                     { return "BATOU-GQL-003" }
 func (r *IntrospectionEnabledProd) Name() string                   { return "IntrospectionEnabledProd" }
 func (r *IntrospectionEnabledProd) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *IntrospectionEnabledProd) Description() string {
@@ -118,12 +118,12 @@ func (r *IntrospectionEnabledProd) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GQL-004: GraphQL Query Depth Not Limited
+// BATOU-GQL-004: GraphQL Query Depth Not Limited
 // ---------------------------------------------------------------------------
 
 type GQLQueryDepthNotLimited struct{}
 
-func (r *GQLQueryDepthNotLimited) ID() string                     { return "GTSS-GQL-004" }
+func (r *GQLQueryDepthNotLimited) ID() string                     { return "BATOU-GQL-004" }
 func (r *GQLQueryDepthNotLimited) Name() string                   { return "GQLQueryDepthNotLimited" }
 func (r *GQLQueryDepthNotLimited) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GQLQueryDepthNotLimited) Description() string {
@@ -171,12 +171,12 @@ func (r *GQLQueryDepthNotLimited) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GQL-005: GraphQL Field-Level Authorization Missing
+// BATOU-GQL-005: GraphQL Field-Level Authorization Missing
 // ---------------------------------------------------------------------------
 
 type GQLFieldAuthMissing struct{}
 
-func (r *GQLFieldAuthMissing) ID() string                     { return "GTSS-GQL-005" }
+func (r *GQLFieldAuthMissing) ID() string                     { return "BATOU-GQL-005" }
 func (r *GQLFieldAuthMissing) Name() string                   { return "GQLFieldAuthMissing" }
 func (r *GQLFieldAuthMissing) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GQLFieldAuthMissing) Description() string {
@@ -224,12 +224,12 @@ func (r *GQLFieldAuthMissing) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GQL-006: GraphQL Batch Query Attack
+// BATOU-GQL-006: GraphQL Batch Query Attack
 // ---------------------------------------------------------------------------
 
 type GQLBatchQueryAttack struct{}
 
-func (r *GQLBatchQueryAttack) ID() string                     { return "GTSS-GQL-006" }
+func (r *GQLBatchQueryAttack) ID() string                     { return "BATOU-GQL-006" }
 func (r *GQLBatchQueryAttack) Name() string                   { return "GQLBatchQueryAttack" }
 func (r *GQLBatchQueryAttack) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GQLBatchQueryAttack) Description() string {
@@ -276,12 +276,12 @@ func (r *GQLBatchQueryAttack) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GQL-007: GraphQL SQL Injection via Resolver
+// BATOU-GQL-007: GraphQL SQL Injection via Resolver
 // ---------------------------------------------------------------------------
 
 type GQLSQLInjection struct{}
 
-func (r *GQLSQLInjection) ID() string                     { return "GTSS-GQL-007" }
+func (r *GQLSQLInjection) ID() string                     { return "BATOU-GQL-007" }
 func (r *GQLSQLInjection) Name() string                   { return "GQLSQLInjection" }
 func (r *GQLSQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GQLSQLInjection) Description() string {
@@ -326,12 +326,12 @@ func (r *GQLSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GQL-008: GraphQL Mutation Without Authentication
+// BATOU-GQL-008: GraphQL Mutation Without Authentication
 // ---------------------------------------------------------------------------
 
 type GQLMutationNoAuth struct{}
 
-func (r *GQLMutationNoAuth) ID() string                     { return "GTSS-GQL-008" }
+func (r *GQLMutationNoAuth) ID() string                     { return "BATOU-GQL-008" }
 func (r *GQLMutationNoAuth) Name() string                   { return "GQLMutationNoAuth" }
 func (r *GQLMutationNoAuth) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GQLMutationNoAuth) Description() string {
@@ -379,12 +379,12 @@ func (r *GQLMutationNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GQL-009: GraphQL Persisted Queries Disabled
+// BATOU-GQL-009: GraphQL Persisted Queries Disabled
 // ---------------------------------------------------------------------------
 
 type GQLPersistedQueriesDisabled struct{}
 
-func (r *GQLPersistedQueriesDisabled) ID() string                     { return "GTSS-GQL-009" }
+func (r *GQLPersistedQueriesDisabled) ID() string                     { return "BATOU-GQL-009" }
 func (r *GQLPersistedQueriesDisabled) Name() string                   { return "GQLPersistedQueriesDisabled" }
 func (r *GQLPersistedQueriesDisabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GQLPersistedQueriesDisabled) Description() string {
@@ -426,12 +426,12 @@ func (r *GQLPersistedQueriesDisabled) Scan(ctx *rules.ScanContext) []rules.Findi
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GQL-010: GraphQL Error Message Information Disclosure
+// BATOU-GQL-010: GraphQL Error Message Information Disclosure
 // ---------------------------------------------------------------------------
 
 type GQLErrorDisclosure struct{}
 
-func (r *GQLErrorDisclosure) ID() string                     { return "GTSS-GQL-010" }
+func (r *GQLErrorDisclosure) ID() string                     { return "BATOU-GQL-010" }
 func (r *GQLErrorDisclosure) Name() string                   { return "GQLErrorDisclosure" }
 func (r *GQLErrorDisclosure) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GQLErrorDisclosure) Description() string {

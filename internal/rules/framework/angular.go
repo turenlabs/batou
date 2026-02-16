@@ -4,36 +4,36 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns -- Angular
 // ---------------------------------------------------------------------------
 
-// GTSS-FW-ANGULAR-001: bypassSecurityTrustHtml with user input
+// BATOU-FW-ANGULAR-001: bypassSecurityTrustHtml with user input
 var reAngularBypassTrust = regexp.MustCompile(`bypassSecurityTrust(?:Html|Script|Style|Url|ResourceUrl)\s*\(`)
 var reAngularUserInput = regexp.MustCompile(`(?:this\.\w*[Ii]nput|this\.route|this\.activatedRoute|params\[|queryParams\[|req\.|request\.|formControl|\.value\b|user[Ii]nput|\.nativeElement)`)
 
-// GTSS-FW-ANGULAR-002: [innerHTML] binding
+// BATOU-FW-ANGULAR-002: [innerHTML] binding
 var reAngularInnerHTMLBind = regexp.MustCompile(`\[innerHTML\]\s*=\s*["']`)
 var reAngularInnerHTMLUserData = regexp.MustCompile(`\[innerHTML\]\s*=\s*["'](?:\w*[Uu]ser\w*|\w*[Ii]nput\w*|\w*[Dd]ata\w*|\w*[Cc]ontent\w*|\w*[Hh]tml\w*|\w*[Mm]essage\w*)["']`)
 
-// GTSS-FW-ANGULAR-003: Disabled route guards
+// BATOU-FW-ANGULAR-003: Disabled route guards
 var reAngularCanActivate = regexp.MustCompile(`canActivate\s*:\s*\[\s*\]`)
 var reAngularCanDeactivate = regexp.MustCompile(`canDeactivate\s*:\s*\[\s*\]`)
 var reAngularGuardReturnTrue = regexp.MustCompile(`canActivate\s*\([^)]*\)\s*(?::\s*\w+\s*)?\{[^}]*return\s+true\s*;?\s*\}`)
 
-// GTSS-FW-ANGULAR-004: HTTP interceptor missing token refresh
+// BATOU-FW-ANGULAR-004: HTTP interceptor missing token refresh
 var reAngularInterceptor = regexp.MustCompile(`(?:implements\s+HttpInterceptor|@Injectable)`)
 var reAngularIntercept = regexp.MustCompile(`intercept\s*\(\s*\w+\s*:\s*HttpRequest`)
 var reAngularTokenRefresh = regexp.MustCompile(`(?:refresh[Tt]oken|refreshAuth|tokenRefresh|401|isTokenExpired|jwt.*expir|expir.*jwt)`)
 
-// GTSS-FW-ANGULAR-005: JSONP callback with user input
+// BATOU-FW-ANGULAR-005: JSONP callback with user input
 var reAngularJSONP = regexp.MustCompile(`\.jsonp\s*\(`)
 var reAngularJSONPUserInput = regexp.MustCompile(`\.jsonp\s*\(\s*(?:` + "`" + `[^` + "`" + `]*\$\{|['"][^'"]*['"]\s*\+\s*(?:this\.\w*[Ii]nput|this\.\w*[Pp]aram|user))`)
 
-// GTSS-FW-ANGULAR-006: Template injection via component template
+// BATOU-FW-ANGULAR-006: Template injection via component template
 var reAngularTemplateInterp = regexp.MustCompile(`template\s*:\s*(?:` + "`" + `[^` + "`" + `]*\$\{|['"][^'"]*['"]\s*\+)`)
 var reAngularTemplateUserData = regexp.MustCompile(`template\s*:\s*(?:` + "`" + `[^` + "`" + `]*\$\{(?:this\.\w*[Uu]ser|this\.\w*[Ii]nput|this\.\w*[Dd]ata|this\.\w*[Pp]aram)` + `|['"][^'"]*['"]\s*\+\s*(?:this\.\w*[Uu]ser|this\.\w*[Ii]nput))`)
 
@@ -47,12 +47,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ANGULAR-001: bypassSecurityTrustHtml with user input
+// BATOU-FW-ANGULAR-001: bypassSecurityTrustHtml with user input
 // ---------------------------------------------------------------------------
 
 type AngularBypassTrust struct{}
 
-func (r *AngularBypassTrust) ID() string                      { return "GTSS-FW-ANGULAR-001" }
+func (r *AngularBypassTrust) ID() string                      { return "BATOU-FW-ANGULAR-001" }
 func (r *AngularBypassTrust) Name() string                    { return "AngularBypassTrust" }
 func (r *AngularBypassTrust) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AngularBypassTrust) Description() string {
@@ -104,12 +104,12 @@ func (r *AngularBypassTrust) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ANGULAR-002: [innerHTML] binding with user data
+// BATOU-FW-ANGULAR-002: [innerHTML] binding with user data
 // ---------------------------------------------------------------------------
 
 type AngularInnerHTML struct{}
 
-func (r *AngularInnerHTML) ID() string                      { return "GTSS-FW-ANGULAR-002" }
+func (r *AngularInnerHTML) ID() string                      { return "BATOU-FW-ANGULAR-002" }
 func (r *AngularInnerHTML) Name() string                    { return "AngularInnerHTML" }
 func (r *AngularInnerHTML) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AngularInnerHTML) Description() string {
@@ -155,12 +155,12 @@ func (r *AngularInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ANGULAR-003: Disabled route guards
+// BATOU-FW-ANGULAR-003: Disabled route guards
 // ---------------------------------------------------------------------------
 
 type AngularDisabledGuard struct{}
 
-func (r *AngularDisabledGuard) ID() string                      { return "GTSS-FW-ANGULAR-003" }
+func (r *AngularDisabledGuard) ID() string                      { return "BATOU-FW-ANGULAR-003" }
 func (r *AngularDisabledGuard) Name() string                    { return "AngularDisabledGuard" }
 func (r *AngularDisabledGuard) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AngularDisabledGuard) Description() string {
@@ -217,12 +217,12 @@ func (r *AngularDisabledGuard) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ANGULAR-004: HTTP interceptor missing auth token refresh
+// BATOU-FW-ANGULAR-004: HTTP interceptor missing auth token refresh
 // ---------------------------------------------------------------------------
 
 type AngularInterceptorNoRefresh struct{}
 
-func (r *AngularInterceptorNoRefresh) ID() string { return "GTSS-FW-ANGULAR-004" }
+func (r *AngularInterceptorNoRefresh) ID() string { return "BATOU-FW-ANGULAR-004" }
 func (r *AngularInterceptorNoRefresh) Name() string {
 	return "AngularInterceptorNoRefresh"
 }
@@ -284,12 +284,12 @@ func (r *AngularInterceptorNoRefresh) Scan(ctx *rules.ScanContext) []rules.Findi
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ANGULAR-005: JSONP callback with user input
+// BATOU-FW-ANGULAR-005: JSONP callback with user input
 // ---------------------------------------------------------------------------
 
 type AngularJSONPInjection struct{}
 
-func (r *AngularJSONPInjection) ID() string                      { return "GTSS-FW-ANGULAR-005" }
+func (r *AngularJSONPInjection) ID() string                      { return "BATOU-FW-ANGULAR-005" }
 func (r *AngularJSONPInjection) Name() string                    { return "AngularJSONPInjection" }
 func (r *AngularJSONPInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AngularJSONPInjection) Description() string {
@@ -335,12 +335,12 @@ func (r *AngularJSONPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ANGULAR-006: Template injection via user input in component
+// BATOU-FW-ANGULAR-006: Template injection via user input in component
 // ---------------------------------------------------------------------------
 
 type AngularTemplateInjection struct{}
 
-func (r *AngularTemplateInjection) ID() string { return "GTSS-FW-ANGULAR-006" }
+func (r *AngularTemplateInjection) ID() string { return "BATOU-FW-ANGULAR-006" }
 func (r *AngularTemplateInjection) Name() string {
 	return "AngularTemplateInjection"
 }

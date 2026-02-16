@@ -1,5 +1,5 @@
 // Source: CWE-327/CWE-328 - Weak cryptographic algorithms in Go
-// Expected: GTSS-CRY-001 (Weak Hashing - MD5/SHA1), GTSS-CRY-003 (Weak Cipher - DES)
+// Expected: BATOU-CRY-001 (Weak Hashing - MD5/SHA1), BATOU-CRY-003 (Weak Cipher - DES)
 // OWASP: A02:2021 - Cryptographic Failures
 
 package handler

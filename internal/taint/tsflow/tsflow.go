@@ -11,9 +11,9 @@
 package tsflow
 
 import (
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // Supports returns true if tsflow has a configuration for the given language.

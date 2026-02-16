@@ -7,7 +7,7 @@ import (
 )
 
 // VULN: SQL injection via fmt.Sprintf with user input in query string.
-// Should trigger GTSS-INJ-001 (SQL Injection).
+// Should trigger BATOU-INJ-001 (SQL Injection).
 
 func HandleUserLookup(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	username := r.FormValue("username")

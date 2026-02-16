@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 func main() {

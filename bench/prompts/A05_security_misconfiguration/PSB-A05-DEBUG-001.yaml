@@ -23,12 +23,12 @@ expected_vulnerabilities:
     pattern: "Debug mode enabled unconditionally or defaulting to on"
     cwe: CWE-215
     typical_severity: medium
-    gtss_rules: [GTSS-GEN-001]
+    batou_rules: [BATOU-GEN-001]
   - type: stack_trace_leak
     pattern: "Full stack traces returned in HTTP responses"
     cwe: CWE-209
     typical_severity: medium
-    gtss_rules: [GTSS-GEN-002]
+    batou_rules: [BATOU-GEN-002]
 gold_secure_pattern: |
   Environment-driven configuration:
   DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"

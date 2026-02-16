@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Java code, covering Servlet-based web applications, Spring/Spring Boot, Hibernate/JPA, MyBatis, Thymeleaf, JSP, and common enterprise Java libraries. Analysis includes four layers: regex-based pattern rules (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), intraprocedural taint tracking with source-to-sink and sanitizer recognition (Layer 3), and interprocedural call graph analysis (Layer 4).
+Batou provides comprehensive security scanning for Java code, covering Servlet-based web applications, Spring/Spring Boot, Hibernate/JPA, MyBatis, Thymeleaf, JSP, and common enterprise Java libraries. Analysis includes four layers: regex-based pattern rules (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), intraprocedural taint tracking with source-to-sink and sanitizer recognition (Layer 3), and interprocedural call graph analysis (Layer 4).
 
 Java taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through assignments, variable declarations, method invocations, and field accesses by walking the parsed AST rather than relying on regex patterns.
 
@@ -312,179 +312,179 @@ Rules that explicitly include Java in their `Languages()` method, plus rules wit
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-INJ-001` | SQLInjection | SQL queries built via string concatenation (`Statement.execute`, Hibernate HQL, etc.) |
-| `GTSS-INJ-002` | CommandInjection | OS command construction with unsanitized input (`Runtime.exec`, `ProcessBuilder`) |
-| `GTSS-INJ-004` | LDAPInjection | LDAP queries built with string concatenation |
-| `GTSS-INJ-005` | TemplateInjection | Server-side template injection (Thymeleaf, Freemarker) |
-| `GTSS-INJ-006` | XPathInjection | XPath queries built with string concatenation |
-| `GTSS-INJ-007` | NoSQLInjection | Unsafe NoSQL/MongoDB query patterns |
-| `GTSS-INJ-008` | GraphQLInjection | GraphQL queries built via string concatenation |
-| `GTSS-INJ-009` | HTTPHeaderInjection | HTTP response headers set with `request.getParameter()` or `request.getHeader()` values without CRLF sanitization |
+| `BATOU-INJ-001` | SQLInjection | SQL queries built via string concatenation (`Statement.execute`, Hibernate HQL, etc.) |
+| `BATOU-INJ-002` | CommandInjection | OS command construction with unsanitized input (`Runtime.exec`, `ProcessBuilder`) |
+| `BATOU-INJ-004` | LDAPInjection | LDAP queries built with string concatenation |
+| `BATOU-INJ-005` | TemplateInjection | Server-side template injection (Thymeleaf, Freemarker) |
+| `BATOU-INJ-006` | XPathInjection | XPath queries built with string concatenation |
+| `BATOU-INJ-007` | NoSQLInjection | Unsafe NoSQL/MongoDB query patterns |
+| `BATOU-INJ-008` | GraphQLInjection | GraphQL queries built via string concatenation |
+| `BATOU-INJ-009` | HTTPHeaderInjection | HTTP response headers set with `request.getParameter()` or `request.getHeader()` values without CRLF sanitization |
 
 ### XSS (4 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-XSS-008` | ServerSideRenderingXSS | JSP scriptlets, `th:utext`, `PrintWriter.write()` without escaping |
-| `GTSS-XSS-011` | ReflectedXSS | Request parameters reflected directly in HTTP response body |
-| `GTSS-XSS-014` | JavaHTMLStringConcat | `StringBuilder.append()` or string concatenation building HTML with user input from `@RequestParam`/`request.getParameter()` without OWASP Encoder |
-| `GTSS-XSS-015` | JavaResponseWriterXSS | `response.getWriter().print()` with HTML concatenation, `String.format()` with HTML template and `%s`, Spring `@ResponseBody`/`@RestController` returning HTML via string concatenation |
+| `BATOU-XSS-008` | ServerSideRenderingXSS | JSP scriptlets, `th:utext`, `PrintWriter.write()` without escaping |
+| `BATOU-XSS-011` | ReflectedXSS | Request parameters reflected directly in HTTP response body |
+| `BATOU-XSS-014` | JavaHTMLStringConcat | `StringBuilder.append()` or string concatenation building HTML with user input from `@RequestParam`/`request.getParameter()` without OWASP Encoder |
+| `BATOU-XSS-015` | JavaResponseWriterXSS | `response.getWriter().print()` with HTML concatenation, `String.format()` with HTML template and `%s`, Spring `@ResponseBody`/`@RestController` returning HTML via string concatenation |
 
 ### Cryptography (10 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-CRY-001` | WeakHashing | MessageDigest with broken hash algorithms used for security |
-| `GTSS-CRY-002` | InsecureRandom | `Math.random()` or `java.util.Random` in security contexts |
-| `GTSS-CRY-003` | WeakCipher | Broken or deprecated encryption algorithms and insecure cipher modes |
-| `GTSS-CRY-004` | HardcodedIV | Hardcoded initialization vectors in encryption |
-| `GTSS-CRY-006` | WeakKeySize | RSA keys below 2048 bits, insufficient symmetric key sizes |
-| `GTSS-CRY-010` | WeakPRNG | `java.util.Random` in security-sensitive contexts |
-| `GTSS-CRY-011` | PredictableSeed | Fixed or time-based seeds for Random |
-| `GTSS-CRY-012` | HardcodedKey | Hardcoded AES keys and encryption secrets in source |
-| `GTSS-CRY-013` | UnauthenticatedEncryption | CBC mode without HMAC/MAC authentication |
-| `GTSS-CRY-014` | InsecureRSAPadding | PKCS#1 v1.5 padding (Bleichenbacher attack) |
-| `GTSS-CRY-015` | WeakPasswordHash | Fast hashes used for password storage instead of bcrypt/Argon2 |
+| `BATOU-CRY-001` | WeakHashing | MessageDigest with broken hash algorithms used for security |
+| `BATOU-CRY-002` | InsecureRandom | `Math.random()` or `java.util.Random` in security contexts |
+| `BATOU-CRY-003` | WeakCipher | Broken or deprecated encryption algorithms and insecure cipher modes |
+| `BATOU-CRY-004` | HardcodedIV | Hardcoded initialization vectors in encryption |
+| `BATOU-CRY-006` | WeakKeySize | RSA keys below 2048 bits, insufficient symmetric key sizes |
+| `BATOU-CRY-010` | WeakPRNG | `java.util.Random` in security-sensitive contexts |
+| `BATOU-CRY-011` | PredictableSeed | Fixed or time-based seeds for Random |
+| `BATOU-CRY-012` | HardcodedKey | Hardcoded AES keys and encryption secrets in source |
+| `BATOU-CRY-013` | UnauthenticatedEncryption | CBC mode without HMAC/MAC authentication |
+| `BATOU-CRY-014` | InsecureRSAPadding | PKCS#1 v1.5 padding (Bleichenbacher attack) |
+| `BATOU-CRY-015` | WeakPasswordHash | Fast hashes used for password storage instead of bcrypt/Argon2 |
 
 ### Secrets (4 Java-specific rules + 4 with LangAny)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-SEC-001` | HardcodedPassword | Hardcoded passwords and credentials in string literals |
-| `GTSS-SEC-002` | APIKeyExposure | Hardcoded API keys from known providers (LangAny) |
-| `GTSS-SEC-003` | PrivateKeyInCode | PEM-encoded private keys embedded in source (LangAny) |
-| `GTSS-SEC-004` | ConnectionString | Database connection strings with embedded credentials (LangAny) |
-| `GTSS-SEC-005` | JWTSecret | Hardcoded JWT signing secrets |
-| `GTSS-SEC-006` | EnvironmentLeak | `.env` contents and sensitive env vars logged (LangAny) |
+| `BATOU-SEC-001` | HardcodedPassword | Hardcoded passwords and credentials in string literals |
+| `BATOU-SEC-002` | APIKeyExposure | Hardcoded API keys from known providers (LangAny) |
+| `BATOU-SEC-003` | PrivateKeyInCode | PEM-encoded private keys embedded in source (LangAny) |
+| `BATOU-SEC-004` | ConnectionString | Database connection strings with embedded credentials (LangAny) |
+| `BATOU-SEC-005` | JWTSecret | Hardcoded JWT signing secrets |
+| `BATOU-SEC-006` | EnvironmentLeak | `.env` contents and sensitive env vars logged (LangAny) |
 
 ### Authentication (3 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-AUTH-001` | HardcodedCredentialCheck | Passwords compared against string literals |
-| `GTSS-AUTH-003` | CORSWildcard | Wildcard `*` in CORS origin configuration |
-| `GTSS-AUTH-005` | WeakPasswordPolicy | Password validation with min length below 8 or missing complexity |
-| `GTSS-AUTH-007` | PrivilegeEscalation | Privilege escalation patterns (CWE-269) |
+| `BATOU-AUTH-001` | HardcodedCredentialCheck | Passwords compared against string literals |
+| `BATOU-AUTH-003` | CORSWildcard | Wildcard `*` in CORS origin configuration |
+| `BATOU-AUTH-005` | WeakPasswordPolicy | Password validation with min length below 8 or missing complexity |
+| `BATOU-AUTH-007` | PrivilegeEscalation | Privilege escalation patterns (CWE-269) |
 
 ### Generic (6 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-GEN-001` | DebugModeEnabled | Debug/verbose mode left enabled in production |
-| `GTSS-GEN-002` | UnsafeDeserialization | `ObjectInputStream.readObject()`, `XMLDecoder` |
-| `GTSS-GEN-003` | XXEVulnerability | XML parsing without disabled external entities |
-| `GTSS-GEN-004` | OpenRedirect | `response.sendRedirect()` with user-controlled URL |
-| `GTSS-GEN-005` | LogInjection | Unsanitized user input in log statements |
-| `GTSS-GEN-009` | XMLParserMisconfig | XML parser configurations that explicitly enable external entities |
-| `GTSS-GEN-012` | InsecureDownload | Insecure download patterns (CWE-494) |
+| `BATOU-GEN-001` | DebugModeEnabled | Debug/verbose mode left enabled in production |
+| `BATOU-GEN-002` | UnsafeDeserialization | `ObjectInputStream.readObject()`, `XMLDecoder` |
+| `BATOU-GEN-003` | XXEVulnerability | XML parsing without disabled external entities |
+| `BATOU-GEN-004` | OpenRedirect | `response.sendRedirect()` with user-controlled URL |
+| `BATOU-GEN-005` | LogInjection | Unsanitized user input in log statements |
+| `BATOU-GEN-009` | XMLParserMisconfig | XML parser configurations that explicitly enable external entities |
+| `BATOU-GEN-012` | InsecureDownload | Insecure download patterns (CWE-494) |
 
 ### Logging (3 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-LOG-001` | UnsanitizedLogInput | User input passed directly to Logger/System.out |
-| `GTSS-LOG-002` | CRLFLogInjection | String concatenation with user input in log calls |
-| `GTSS-LOG-003` | SensitiveDataInLogs | Passwords, tokens, API keys logged |
+| `BATOU-LOG-001` | UnsanitizedLogInput | User input passed directly to Logger/System.out |
+| `BATOU-LOG-002` | CRLFLogInjection | String concatenation with user input in log calls |
+| `BATOU-LOG-003` | SensitiveDataInLogs | Passwords, tokens, API keys logged |
 
 ### Validation (3 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-VAL-001` | DirectParamUsage | Request parameters used without any validation |
-| `GTSS-VAL-002` | MissingTypeCoercion | User input used where a type is expected without parsing |
-| `GTSS-VAL-003` | MissingLengthValidation | User input in DB operations without length validation |
-| `GTSS-VAL-005` | FileUploadHardening | File upload without proper validation (CWE-434) |
+| `BATOU-VAL-001` | DirectParamUsage | Request parameters used without any validation |
+| `BATOU-VAL-002` | MissingTypeCoercion | User input used where a type is expected without parsing |
+| `BATOU-VAL-003` | MissingLengthValidation | User input in DB operations without length validation |
+| `BATOU-VAL-005` | FileUploadHardening | File upload without proper validation (CWE-434) |
 
 ### Traversal (4 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-TRV-001` | PathTraversal | File operations with unsanitized user input (LangAny) |
-| `GTSS-TRV-003` | ArchiveExtraction | Zip/tar extraction without path validation (LangAny) |
-| `GTSS-TRV-008` | NullByteFilePath | Null byte in file paths (LangAny) |
-| `GTSS-TRV-010` | ZipSlipTraversal | `ZipEntry.getName()` used in `new File()` or `Paths.get()`/`Path.of()`/`resolve()` without `getCanonicalPath()` or `normalize()`+`startsWith()` validation |
+| `BATOU-TRV-001` | PathTraversal | File operations with unsanitized user input (LangAny) |
+| `BATOU-TRV-003` | ArchiveExtraction | Zip/tar extraction without path validation (LangAny) |
+| `BATOU-TRV-008` | NullByteFilePath | Null byte in file paths (LangAny) |
+| `BATOU-TRV-010` | ZipSlipTraversal | `ZipEntry.getName()` used in `new File()` or `Paths.get()`/`Path.of()`/`resolve()` without `getCanonicalPath()` or `normalize()`+`startsWith()` validation |
 
 ### SSRF (2 rules with LangAny)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-SSRF-001` | URLFromUserInput | HTTP requests where URL comes from user input (LangAny) |
-| `GTSS-SSRF-002` | InternalNetworkAccess | Requests to private IPs or cloud metadata endpoints (LangAny) |
+| `BATOU-SSRF-001` | URLFromUserInput | HTTP requests where URL comes from user input (LangAny) |
+| `BATOU-SSRF-002` | InternalNetworkAccess | Requests to private IPs or cloud metadata endpoints (LangAny) |
 
 ### XXE (1 rule)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-XXE-001` | Java XXE Vulnerability | Java XML parsers (`DocumentBuilderFactory`, `SAXParserFactory`, `XMLInputFactory`, `TransformerFactory`, `XMLReader`, `SchemaFactory`) instantiated without disabling external entity processing. Checks for `setFeature()`/`setProperty()`/`setAttribute()` with `disallow-doctype-decl`, `external-general-entities`, `FEATURE_SECURE_PROCESSING`, or `ACCESS_EXTERNAL_DTD` nearby. |
+| `BATOU-XXE-001` | Java XXE Vulnerability | Java XML parsers (`DocumentBuilderFactory`, `SAXParserFactory`, `XMLInputFactory`, `TransformerFactory`, `XMLReader`, `SchemaFactory`) instantiated without disabling external entity processing. Checks for `setFeature()`/`setProperty()`/`setAttribute()` with `disallow-doctype-decl`, `external-general-entities`, `FEATURE_SECURE_PROCESSING`, or `ACCESS_EXTERNAL_DTD` nearby. |
 
 ### Deserialization (1 rule)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-DESER-001` | ExtendedDeserialization | `XStream.fromXML()` (many CVEs for RCE), `Kryo.readObject()`/`readClassAndObject()` without `setRegistrationRequired(true)`, `new XMLDecoder()` with untrusted data, and `SnakeYAML new Yaml()` without `SafeConstructor` (allows arbitrary object instantiation via `!!` tags) |
+| `BATOU-DESER-001` | ExtendedDeserialization | `XStream.fromXML()` (many CVEs for RCE), `Kryo.readObject()`/`readClassAndObject()` without `setRegistrationRequired(true)`, `new XMLDecoder()` with untrusted data, and `SnakeYAML new Yaml()` without `SafeConstructor` (allows arbitrary object instantiation via `!!` tags) |
 
 ### Mass Assignment (1 rule)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-MASS-004` | MassAssignJava | Spring `@ModelAttribute` without `@InitBinder` field restrictions, and `BeanUtils.copyProperties()` that may copy unintended fields from user-controlled sources |
+| `BATOU-MASS-004` | MassAssignJava | Spring `@ModelAttribute` without `@InitBinder` field restrictions, and `BeanUtils.copyProperties()` that may copy unintended fields from user-controlled sources |
 
 ### CORS (2 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-CORS-001` | CORSWildcardCredentials | `@CrossOrigin(origins = "*")` or `allowedOrigins("*")` combined with `allowCredentials = true` in Spring CORS configuration |
-| `GTSS-CORS-002` | CORSReflectedOrigin | Request `Origin` header reflected directly in `Access-Control-Allow-Origin` response header without validation (Java included in language list) |
+| `BATOU-CORS-001` | CORSWildcardCredentials | `@CrossOrigin(origins = "*")` or `allowedOrigins("*")` combined with `allowCredentials = true` in Spring CORS configuration |
+| `BATOU-CORS-002` | CORSReflectedOrigin | Request `Origin` header reflected directly in `Access-Control-Allow-Origin` response header without validation (Java included in language list) |
 
 ### GraphQL (2 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-GQL-001` | GraphQL Introspection Enabled | GraphQL schema with introspection explicitly enabled (`.introspection(true)` in Java/Spring GraphQL), exposing the entire API schema for attacker reconnaissance |
-| `GTSS-GQL-002` | GraphQL No Depth Limiting | GraphQL server created without query depth limiting or complexity analysis, allowing deeply nested queries that cause denial of service |
+| `BATOU-GQL-001` | GraphQL Introspection Enabled | GraphQL schema with introspection explicitly enabled (`.introspection(true)` in Java/Spring GraphQL), exposing the entire API schema for attacker reconnaissance |
+| `BATOU-GQL-002` | GraphQL No Depth Limiting | GraphQL server created without query depth limiting or complexity analysis, allowing deeply nested queries that cause denial of service |
 
 ### Android Manifest (1 rule, from Kotlin rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-KT-005` | ExportedComponents | Android components (`<activity>`, `<service>`, `<receiver>`, `<provider>`) with `android:exported="true"` in `AndroidManifest.xml` without an `android:permission` attribute. ContentProviders and Services are flagged at High severity; Activities and BroadcastReceivers at Medium. Only scans files ending in `AndroidManifest.xml`. |
+| `BATOU-KT-005` | ExportedComponents | Android components (`<activity>`, `<service>`, `<receiver>`, `<provider>`) with `android:exported="true"` in `AndroidManifest.xml` without an `android:permission` attribute. ContentProviders and Services are flagged at High severity; Activities and BroadcastReceivers at Medium. Only scans files ending in `AndroidManifest.xml`. |
 
 ### Misconfiguration (1 rule)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-MISC-002` | ErrorDisclosure | `printStackTrace()` calls that may leak stack traces to clients, and exception details (`getMessage()`, `getStackTrace()`, `toString()`) written to HTTP response objects |
-| `GTSS-MISC-003` | MissingSecurityHeaders | Missing security headers (CWE-1021, CWE-693) |
+| `BATOU-MISC-002` | ErrorDisclosure | `printStackTrace()` calls that may leak stack traces to clients, and exception details (`getMessage()`, `getStackTrace()`, `toString()`) written to HTTP response objects |
+| `BATOU-MISC-003` | MissingSecurityHeaders | Missing security headers (CWE-1021, CWE-693) |
 
 ### Redirect (1 rule)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-REDIR-001` | ServerRedirectUserInput | `response.sendRedirect()` with `request.getParameter()` or user-controlled variable as the redirect destination, enabling open redirect attacks for phishing |
+| `BATOU-REDIR-001` | ServerRedirectUserInput | `response.sendRedirect()` with `request.getParameter()` or user-controlled variable as the redirect destination, enabling open redirect attacks for phishing |
 
 ### Framework Rules -- Spring (10 rules)
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-FW-SPRING-001` | CSRFDisabled | Spring Security `http.csrf().disable()` or lambda DSL `csrf(csrf -> csrf.disable())` disabling CSRF protection |
-| `GTSS-FW-SPRING-002` | OverlyPermissiveAccess | `antMatchers("/**").permitAll()` or `anyRequest().permitAll()` bypassing authentication on all endpoints |
-| `GTSS-FW-SPRING-003` | InsecureCORS | `setAllowedOrigins("*")` with `setAllowCredentials(true)`, `@CrossOrigin` without origin restrictions or with wildcard origins |
-| `GTSS-FW-SPRING-004` | ActuatorExposure | Actuator endpoints with `permitAll()`, `management.endpoints.web.exposure.include=*`, or `management.security.enabled=false` exposing sensitive operational data |
-| `GTSS-FW-SPRING-005` | NativeQueryInjection | `@Query(nativeQuery=true)` with string concatenation, `EntityManager.createNativeQuery()` or `createQuery()` with string concatenation (SQL/HQL injection) |
-| `GTSS-FW-SPRING-006` | MassAssignment | `@ModelAttribute` on controller parameters without `@InitBinder` defining `setAllowedFields()` or `setDisallowedFields()` |
-| `GTSS-FW-SPRING-007` | InsecureCookie | `setHttpOnly(false)` allowing JavaScript cookie access, `setSecure(false)` allowing cookie transmission over HTTP |
-| `GTSS-FW-SPRING-008` | FrameOptionsDisabled | `frameOptions().disable()` removing clickjacking protection, `headers().disable()` removing all security headers |
-| `GTSS-FW-SPRING-009` | DispatcherForward | `getRequestDispatcher(variable).forward()` with user-controlled path, `new ModelAndView(variable)` with user-controlled view name in controllers handling user input |
-| `GTSS-FW-SPRING-010` | SessionFixation | `sessionFixation().none()` disabling session fixation protection, allowing attackers to fix a session ID before authentication |
+| `BATOU-FW-SPRING-001` | CSRFDisabled | Spring Security `http.csrf().disable()` or lambda DSL `csrf(csrf -> csrf.disable())` disabling CSRF protection |
+| `BATOU-FW-SPRING-002` | OverlyPermissiveAccess | `antMatchers("/**").permitAll()` or `anyRequest().permitAll()` bypassing authentication on all endpoints |
+| `BATOU-FW-SPRING-003` | InsecureCORS | `setAllowedOrigins("*")` with `setAllowCredentials(true)`, `@CrossOrigin` without origin restrictions or with wildcard origins |
+| `BATOU-FW-SPRING-004` | ActuatorExposure | Actuator endpoints with `permitAll()`, `management.endpoints.web.exposure.include=*`, or `management.security.enabled=false` exposing sensitive operational data |
+| `BATOU-FW-SPRING-005` | NativeQueryInjection | `@Query(nativeQuery=true)` with string concatenation, `EntityManager.createNativeQuery()` or `createQuery()` with string concatenation (SQL/HQL injection) |
+| `BATOU-FW-SPRING-006` | MassAssignment | `@ModelAttribute` on controller parameters without `@InitBinder` defining `setAllowedFields()` or `setDisallowedFields()` |
+| `BATOU-FW-SPRING-007` | InsecureCookie | `setHttpOnly(false)` allowing JavaScript cookie access, `setSecure(false)` allowing cookie transmission over HTTP |
+| `BATOU-FW-SPRING-008` | FrameOptionsDisabled | `frameOptions().disable()` removing clickjacking protection, `headers().disable()` removing all security headers |
+| `BATOU-FW-SPRING-009` | DispatcherForward | `getRequestDispatcher(variable).forward()` with user-controlled path, `new ModelAndView(variable)` with user-controlled view name in controllers handling user input |
+| `BATOU-FW-SPRING-010` | SessionFixation | `sessionFixation().none()` disabling session fixation protection, allowing attackers to fix a session ID before authentication |
 
 ## Example Detections
 
 ### SQL Injection via String Concatenation
 
-GTSS flags `Statement.executeQuery()` with a query built by concatenating user input from `request.getParameter()`:
+Batou flags `Statement.executeQuery()` with a query built by concatenating user input from `request.getParameter()`:
 
 ```java
-// DETECTED: GTSS-INJ-001 + taint flow java.servlet.getparameter -> java.sql.statement.executequery
+// DETECTED: BATOU-INJ-001 + taint flow java.servlet.getparameter -> java.sql.statement.executequery
 String userId = request.getParameter("id");
 Statement stmt = conn.createStatement();
 String query = "SELECT * FROM users WHERE id = '" + userId + "'";
@@ -493,10 +493,10 @@ ResultSet rs = stmt.executeQuery(query);
 
 ### Reflected XSS in Servlet Response
 
-GTSS detects request parameters written directly to the HTTP response without encoding:
+Batou detects request parameters written directly to the HTTP response without encoding:
 
 ```java
-// DETECTED: GTSS-XSS-008 + taint flow java.servlet.getparameter -> java.servlet.writer.println
+// DETECTED: BATOU-XSS-008 + taint flow java.servlet.getparameter -> java.servlet.writer.println
 String name = request.getParameter("name");
 PrintWriter out = response.getWriter();
 out.println("<h1>Hello, " + name + "</h1>");
@@ -504,10 +504,10 @@ out.println("<h1>Hello, " + name + "</h1>");
 
 ### OS Command Injection via Runtime.exec
 
-GTSS catches command strings built with user input passed to `Runtime.exec()`:
+Batou catches command strings built with user input passed to `Runtime.exec()`:
 
 ```java
-// DETECTED: GTSS-INJ-002 + taint flow java.servlet.getparameter -> java.runtime.exec
+// DETECTED: BATOU-INJ-002 + taint flow java.servlet.getparameter -> java.runtime.exec
 String host = request.getParameter("host");
 String cmd = "ping -c 3 " + host;
 Process process = Runtime.getRuntime().exec(cmd);
@@ -517,7 +517,7 @@ Process process = Runtime.getRuntime().exec(cmd);
 
 ### Parameterized SQL with PreparedStatement
 
-GTSS recognizes `PreparedStatement` as a sanitizer that neutralizes SQL injection. This code does not trigger findings:
+Batou recognizes `PreparedStatement` as a sanitizer that neutralizes SQL injection. This code does not trigger findings:
 
 ```java
 // SAFE: PreparedStatement neutralizes SQL injection
@@ -530,7 +530,7 @@ ResultSet rs = ps.executeQuery();
 
 ### HTML Output with OWASP Encoder
 
-GTSS recognizes `Encode.forHtml()` as a sanitizer for HTML output sinks:
+Batou recognizes `Encode.forHtml()` as a sanitizer for HTML output sinks:
 
 ```java
 // SAFE: OWASP Encoder neutralizes XSS
@@ -541,7 +541,7 @@ out.println("<h1>Hello, " + Encode.forHtml(name) + "</h1>");
 
 ### Command Execution with Allowlist Validation
 
-GTSS recognizes allowlist validation patterns that prevent command injection:
+Batou recognizes allowlist validation patterns that prevent command injection:
 
 ```java
 // SAFE: allowlist check prevents injection
@@ -562,9 +562,9 @@ ProcessBuilder pb = new ProcessBuilder("/usr/local/bin/tool", "--action", action
 - **Annotation-only sources**: Spring annotations like `@RequestParam` are detected as sources, but the association between the annotation and the specific method parameter it decorates is not tracked through the parameter's variable name with full precision. The taint engine matches the annotation presence rather than the specific annotated variable binding.
 - **Struts/Legacy frameworks**: Struts ActionForm support is limited to `form.get*()` getter patterns. Advanced Struts 2 OGNL injection patterns are not covered.
 - **Spring Expression Language (SpEL)**: SpEL injection (`#{...}` in Spring contexts) is not tracked as a dedicated sink.
-- **Limited Android-specific rules**: The only Android rule covering Java is `GTSS-KT-005` (ExportedComponents in `AndroidManifest.xml`). Other Android-specific security patterns (Intent injection, WebView vulnerabilities, insecure SharedPreferences) are covered only for Kotlin. Java-specific Android patterns (exported components without manifest scanning, content provider SQL injection in Java code) are not covered.
+- **Limited Android-specific rules**: The only Android rule covering Java is `BATOU-KT-005` (ExportedComponents in `AndroidManifest.xml`). Other Android-specific security patterns (Intent injection, WebView vulnerabilities, insecure SharedPreferences) are covered only for Kotlin. Java-specific Android patterns (exported components without manifest scanning, content provider SQL injection in Java code) are not covered.
 - **Build configuration files**: Maven `pom.xml` and Gradle `build.gradle` files are not scanned for dependency vulnerabilities or insecure plugin configurations.
-- **SSRF rules**: While taint analysis tracks Java-specific SSRF sinks (`new URL()`, `HttpURLConnection`, `RestTemplate`), the SSRF regex rules (GTSS-SSRF-003 DNS Rebinding, GTSS-SSRF-004 Redirect Following) do not include Java-specific patterns -- they apply via `LangAny` or are limited to other languages.
-- **Session management**: The GTSS-AUTH-004 SessionFixation rule does not include Java in its language list. However, GTSS-FW-SPRING-010 detects Spring Security configurations that disable session fixation protection (`sessionFixation().none()`). Servlet-level session fixation patterns (`request.getSession()` without invalidation outside Spring Security) are not detected.
-- **Race conditions**: The GTSS-GEN-006 RaceCondition rule does not include Java. Java-specific TOCTOU patterns with `synchronized` blocks are not checked.
-- **Limited Kotlin/Android overlap**: The Kotlin rule `GTSS-KT-005` (ExportedComponents) includes `LangJava` and scans `AndroidManifest.xml` files for exported components without permission protection. Other Kotlin rules (KT-001 through KT-004, KT-006 through KT-008) target Kotlin-only patterns and do not apply to `.java` files. Kotlin (`.kt`) source files are not detected by the Java language detector.
+- **SSRF rules**: While taint analysis tracks Java-specific SSRF sinks (`new URL()`, `HttpURLConnection`, `RestTemplate`), the SSRF regex rules (BATOU-SSRF-003 DNS Rebinding, BATOU-SSRF-004 Redirect Following) do not include Java-specific patterns -- they apply via `LangAny` or are limited to other languages.
+- **Session management**: The BATOU-AUTH-004 SessionFixation rule does not include Java in its language list. However, BATOU-FW-SPRING-010 detects Spring Security configurations that disable session fixation protection (`sessionFixation().none()`). Servlet-level session fixation patterns (`request.getSession()` without invalidation outside Spring Security) are not detected.
+- **Race conditions**: The BATOU-GEN-006 RaceCondition rule does not include Java. Java-specific TOCTOU patterns with `synchronized` blocks are not checked.
+- **Limited Kotlin/Android overlap**: The Kotlin rule `BATOU-KT-005` (ExportedComponents) includes `LangJava` and scans `AndroidManifest.xml` files for exported components without permission protection. Other Kotlin rules (KT-001 through KT-004, KT-006 through KT-008) target Kotlin-only patterns and do not apply to `.java` files. Kotlin (`.kt`) source files are not detected by the Java language detector.

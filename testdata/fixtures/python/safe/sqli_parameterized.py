@@ -1,5 +1,5 @@
 # Safe: Parameterized SQL queries in Python
-# Expected: No findings for GTSS-INJ-001
+# Expected: No findings for BATOU-INJ-001
 
 import sqlite3
 from flask import Flask, request, jsonify

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,36 +12,36 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-SPRING-011: Actuator endpoints exposed without auth (config-level)
+	// BATOU-FW-SPRING-011: Actuator endpoints exposed without auth (config-level)
 	reSpringExtActuatorExpose = regexp.MustCompile(`management\.endpoints\.web\.exposure\.include\s*[=:]\s*\*`)
 	reSpringExtActuatorBase   = regexp.MustCompile(`management\.endpoint\.\w+\.enabled\s*[=:]\s*true`)
 
-	// GTSS-FW-SPRING-012: Spring Data REST without authorization
+	// BATOU-FW-SPRING-012: Spring Data REST without authorization
 	reSpringExtDataRest       = regexp.MustCompile(`@RepositoryRestResource`)
 	reSpringExtDataRestExport = regexp.MustCompile(`exported\s*=\s*true`)
 
-	// GTSS-FW-SPRING-013: Spring Security CSRF disabled (lambda DSL, newer style)
+	// BATOU-FW-SPRING-013: Spring Security CSRF disabled (lambda DSL, newer style)
 	reSpringExtCsrfDisable    = regexp.MustCompile(`\.csrf\s*\(\s*(?:csrf\s*->|AbstractHttpConfigurer::)\s*(?:csrf\.)?disable`)
 	reSpringExtCsrfCustomizer = regexp.MustCompile(`\.csrf\s*\(\s*CsrfConfigurer::disable\s*\)`)
 
-	// GTSS-FW-SPRING-014: DevTools in production
+	// BATOU-FW-SPRING-014: DevTools in production
 	reSpringExtDevToolsDep  = regexp.MustCompile(`spring-boot-devtools`)
 	reSpringExtDevToolsConf = regexp.MustCompile(`spring\.devtools\.`)
 
-	// GTSS-FW-SPRING-015: @ResponseBody with unescaped user data
+	// BATOU-FW-SPRING-015: @ResponseBody with unescaped user data
 	reSpringExtResponseBody    = regexp.MustCompile(`@ResponseBody`)
 	reSpringExtReturnUserInput = regexp.MustCompile(`return\s+(?:request\.getParameter|params\.get|input|userInput|req\.)`)
 	reSpringExtProducesHTML    = regexp.MustCompile(`produces\s*=\s*(?:"text/html"|MediaType\.TEXT_HTML)`)
 
-	// GTSS-FW-SPRING-016: Profile-specific secrets in application.yml
+	// BATOU-FW-SPRING-016: Profile-specific secrets in application.yml
 	reSpringExtSecretInYml   = regexp.MustCompile(`(?i)(?:password|secret|api[_-]?key|token|credential)\s*:\s*["']?[A-Za-z0-9+/=@#$%^&*]{8,}`)
 	reSpringExtYmlProfile    = regexp.MustCompile(`(?i)spring\.profiles\.active|---`)
 
-	// GTSS-FW-SPRING-017: OAuth2 redirect_uri not restricted
+	// BATOU-FW-SPRING-017: OAuth2 redirect_uri not restricted
 	reSpringExtOAuth2Redirect = regexp.MustCompile(`redirect[_-]?uri\s*[=:]\s*(?:["']\*["']|.*\.\*)`)
 	reSpringExtOAuth2Any      = regexp.MustCompile(`\.redirectUriTemplate\s*\(\s*["']\{`)
 
-	// GTSS-FW-SPRING-018: Method security not enabled
+	// BATOU-FW-SPRING-018: Method security not enabled
 	reSpringExtEnableMethodSec  = regexp.MustCompile(`@EnableGlobalMethodSecurity|@EnableMethodSecurity`)
 	reSpringExtPreAuthorize     = regexp.MustCompile(`@PreAuthorize|@Secured|@RolesAllowed`)
 )
@@ -58,12 +58,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SPRING-011: Actuator endpoints exposed without auth
+// BATOU-FW-SPRING-011: Actuator endpoints exposed without auth
 // ---------------------------------------------------------------------------
 
 type SpringActuatorNoAuth struct{}
 
-func (r *SpringActuatorNoAuth) ID() string                      { return "GTSS-FW-SPRING-011" }
+func (r *SpringActuatorNoAuth) ID() string                      { return "BATOU-FW-SPRING-011" }
 func (r *SpringActuatorNoAuth) Name() string                    { return "SpringActuatorNoAuth" }
 func (r *SpringActuatorNoAuth) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SpringActuatorNoAuth) Description() string {
@@ -109,12 +109,12 @@ func (r *SpringActuatorNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SPRING-012: Spring Data REST without authorization
+// BATOU-FW-SPRING-012: Spring Data REST without authorization
 // ---------------------------------------------------------------------------
 
 type SpringDataRESTNoAuth struct{}
 
-func (r *SpringDataRESTNoAuth) ID() string                      { return "GTSS-FW-SPRING-012" }
+func (r *SpringDataRESTNoAuth) ID() string                      { return "BATOU-FW-SPRING-012" }
 func (r *SpringDataRESTNoAuth) Name() string                    { return "SpringDataRESTNoAuth" }
 func (r *SpringDataRESTNoAuth) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SpringDataRESTNoAuth) Description() string {
@@ -169,12 +169,12 @@ func (r *SpringDataRESTNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SPRING-013: Spring Security CSRF disabled
+// BATOU-FW-SPRING-013: Spring Security CSRF disabled
 // ---------------------------------------------------------------------------
 
 type SpringCSRFDisabledExt struct{}
 
-func (r *SpringCSRFDisabledExt) ID() string                      { return "GTSS-FW-SPRING-013" }
+func (r *SpringCSRFDisabledExt) ID() string                      { return "BATOU-FW-SPRING-013" }
 func (r *SpringCSRFDisabledExt) Name() string                    { return "SpringCSRFDisabledExt" }
 func (r *SpringCSRFDisabledExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SpringCSRFDisabledExt) Description() string {
@@ -233,12 +233,12 @@ func (r *SpringCSRFDisabledExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SPRING-014: DevTools in production
+// BATOU-FW-SPRING-014: DevTools in production
 // ---------------------------------------------------------------------------
 
 type SpringDevToolsProd struct{}
 
-func (r *SpringDevToolsProd) ID() string                      { return "GTSS-FW-SPRING-014" }
+func (r *SpringDevToolsProd) ID() string                      { return "BATOU-FW-SPRING-014" }
 func (r *SpringDevToolsProd) Name() string                    { return "SpringDevToolsProd" }
 func (r *SpringDevToolsProd) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SpringDevToolsProd) Description() string {
@@ -288,12 +288,12 @@ func (r *SpringDevToolsProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SPRING-015: @ResponseBody with unescaped user data
+// BATOU-FW-SPRING-015: @ResponseBody with unescaped user data
 // ---------------------------------------------------------------------------
 
 type SpringResponseBodyXSS struct{}
 
-func (r *SpringResponseBodyXSS) ID() string                      { return "GTSS-FW-SPRING-015" }
+func (r *SpringResponseBodyXSS) ID() string                      { return "BATOU-FW-SPRING-015" }
 func (r *SpringResponseBodyXSS) Name() string                    { return "SpringResponseBodyXSS" }
 func (r *SpringResponseBodyXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SpringResponseBodyXSS) Description() string {
@@ -348,12 +348,12 @@ func (r *SpringResponseBodyXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SPRING-016: Profile-specific secrets in application.yml
+// BATOU-FW-SPRING-016: Profile-specific secrets in application.yml
 // ---------------------------------------------------------------------------
 
 type SpringYmlSecrets struct{}
 
-func (r *SpringYmlSecrets) ID() string                      { return "GTSS-FW-SPRING-016" }
+func (r *SpringYmlSecrets) ID() string                      { return "BATOU-FW-SPRING-016" }
 func (r *SpringYmlSecrets) Name() string                    { return "SpringYmlSecrets" }
 func (r *SpringYmlSecrets) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SpringYmlSecrets) Description() string {
@@ -412,12 +412,12 @@ func (r *SpringYmlSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SPRING-017: OAuth2 redirect_uri not restricted
+// BATOU-FW-SPRING-017: OAuth2 redirect_uri not restricted
 // ---------------------------------------------------------------------------
 
 type SpringOAuth2Redirect struct{}
 
-func (r *SpringOAuth2Redirect) ID() string                      { return "GTSS-FW-SPRING-017" }
+func (r *SpringOAuth2Redirect) ID() string                      { return "BATOU-FW-SPRING-017" }
 func (r *SpringOAuth2Redirect) Name() string                    { return "SpringOAuth2Redirect" }
 func (r *SpringOAuth2Redirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SpringOAuth2Redirect) Description() string {
@@ -470,12 +470,12 @@ func (r *SpringOAuth2Redirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SPRING-018: Method security not enabled
+// BATOU-FW-SPRING-018: Method security not enabled
 // ---------------------------------------------------------------------------
 
 type SpringMethodSecMissing struct{}
 
-func (r *SpringMethodSecMissing) ID() string                      { return "GTSS-FW-SPRING-018" }
+func (r *SpringMethodSecMissing) ID() string                      { return "BATOU-FW-SPRING-018" }
 func (r *SpringMethodSecMissing) Name() string                    { return "SpringMethodSecMissing" }
 func (r *SpringMethodSecMissing) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SpringMethodSecMissing) Description() string {

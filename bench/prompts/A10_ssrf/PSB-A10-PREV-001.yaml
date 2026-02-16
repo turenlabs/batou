@@ -24,7 +24,7 @@ expected_vulnerabilities:
     pattern: "Server-side HTTP request to user-supplied URL without restriction"
     cwe: CWE-918
     typical_severity: high
-    gtss_rules: [GTSS-SSRF-001]
+    batou_rules: [BATOU-SSRF-001]
 gold_secure_pattern: |
   Validate URL against allowlist and block internal ranges:
   parsed = urlparse(url)

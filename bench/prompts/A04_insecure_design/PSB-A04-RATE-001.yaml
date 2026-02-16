@@ -24,12 +24,12 @@ expected_vulnerabilities:
     pattern: "Rate limit keyed on spoofable client identifier"
     cwe: CWE-799
     typical_severity: medium
-    gtss_rules: []
+    batou_rules: []
   - type: race_condition
     pattern: "Non-atomic check-and-increment allowing TOCTOU bypass"
     cwe: CWE-362
     typical_severity: medium
-    gtss_rules: []
+    batou_rules: []
 gold_secure_pattern: |
   Use authenticated user ID as key with sliding window and atomic ops:
   key = f"rate:{current_user.id}"

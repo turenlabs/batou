@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -13,7 +13,7 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-MEM-007: Use after free pattern
+	// BATOU-MEM-007: Use after free pattern
 	reExtFreePtr       = regexp.MustCompile(`\bfree\s*\(\s*([a-zA-Z_]\w*)\s*\)`)
 	reExtDeletePtr     = regexp.MustCompile(`\bdelete\s*(?:\[\])?\s+([a-zA-Z_]\w*)`)
 	reExtPtrDeref      = regexp.MustCompile(`([a-zA-Z_]\w*)\s*->`)
@@ -21,30 +21,30 @@ var (
 	reExtPtrStarDeref  = regexp.MustCompile(`\*\s*([a-zA-Z_]\w*)`)
 	reExtNullAssign    = regexp.MustCompile(`([a-zA-Z_]\w*)\s*=\s*(?:NULL|nullptr|0)\s*;`)
 
-	// GTSS-MEM-008: Double free
+	// BATOU-MEM-008: Double free
 	// Uses reExtFreePtr and reExtDeletePtr above
 
-	// GTSS-MEM-009: Integer overflow in allocation size
+	// BATOU-MEM-009: Integer overflow in allocation size
 	reExtMallocArith  = regexp.MustCompile(`\bmalloc\s*\(\s*[^)]*[+*]\s*[^)]*\)`)
 	reExtCallocMul    = regexp.MustCompile(`\bcalloc\s*\(\s*[a-zA-Z_]\w*\s*,\s*[a-zA-Z_]\w*\s*\)`)
 	reExtReallocAdd   = regexp.MustCompile(`\brealloc\s*\(\s*[^,]+,\s*[^)]*[+*]\s*[^)]*\)`)
 	reExtOverflowCheck = regexp.MustCompile(`(?:SIZE_MAX|UINT_MAX|INT_MAX|__builtin_mul_overflow|__builtin_add_overflow|safe_mul|safe_add|checked_mul|overflow_check)`)
 
-	// GTSS-MEM-010: Stack buffer overflow
+	// BATOU-MEM-010: Stack buffer overflow
 	reExtFixedBuf     = regexp.MustCompile(`\bchar\s+([a-zA-Z_]\w*)\s*\[\s*(\d+)\s*\]`)
 	reExtUnsafeCopy   = regexp.MustCompile(`\b(?:strcpy|strcat|sprintf|gets|scanf)\s*\(\s*([a-zA-Z_]\w*)`)
 	reExtStackSizeVar = regexp.MustCompile(`\b(?:int|unsigned|size_t|long)\s+[a-zA-Z_]\w*\s*\[\s*[a-zA-Z_]\w*\s*\]`)
 
-	// GTSS-MEM-011: Format string vulnerability
+	// BATOU-MEM-011: Format string vulnerability
 	reExtFmtStrFunc   = regexp.MustCompile(`\b(printf|fprintf|sprintf|snprintf|syslog|err|warn|vprintf|vfprintf|vsprintf|vsnprintf)\s*\(`)
 	reExtFmtStrVar    = regexp.MustCompile(`\b(?:printf|fprintf|sprintf|snprintf|syslog|err|warn)\s*\([^"]*[a-zA-Z_]\w*\s*[,)]`)
 	reExtFmtStrLiteral = regexp.MustCompile(`\b(?:printf|syslog|err|warn)\s*\(\s*"`)
 
-	// GTSS-MEM-012: Uninitialized variable use
+	// BATOU-MEM-012: Uninitialized variable use
 	reExtLocalDecl     = regexp.MustCompile(`^\s*(?:int|char|unsigned|long|short|float|double|size_t|ssize_t|off_t|pid_t|void\s*\*|[A-Z][a-zA-Z_]*\s*\*?)\s+([a-zA-Z_]\w*)\s*;`)
 	reExtPtrDecl       = regexp.MustCompile(`^\s*(?:[a-zA-Z_]\w*\s*\*)\s*([a-zA-Z_]\w*)\s*;`)
 
-	// GTSS-MEM-013: Off-by-one buffer error
+	// BATOU-MEM-013: Off-by-one buffer error
 	reExtLoopBound    = regexp.MustCompile(`for\s*\([^;]*;\s*[a-zA-Z_]\w*\s*<=\s*(?:sizeof|strlen|len|size|count|length|n|num|max)\s*\(?\s*([a-zA-Z_]\w*)?\s*\)?\s*;`)
 	reExtArrayWrite   = regexp.MustCompile(`([a-zA-Z_]\w*)\s*\[\s*([a-zA-Z_]\w*)\s*\]\s*=`)
 	reExtFencePost    = regexp.MustCompile(`\[\s*(?:sizeof|strlen|len|size|count|length)\s*\(\s*[a-zA-Z_]\w*\s*\)\s*\]`)
@@ -65,12 +65,12 @@ func init() {
 }
 
 // ========================================================================
-// GTSS-MEM-007: Use After Free Pattern
+// BATOU-MEM-007: Use After Free Pattern
 // ========================================================================
 
 type UseAfterFreeExt struct{}
 
-func (r *UseAfterFreeExt) ID() string                     { return "GTSS-MEM-007" }
+func (r *UseAfterFreeExt) ID() string                     { return "BATOU-MEM-007" }
 func (r *UseAfterFreeExt) Name() string                   { return "UseAfterFreeExt" }
 func (r *UseAfterFreeExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *UseAfterFreeExt) Description() string {
@@ -158,12 +158,12 @@ func (r *UseAfterFreeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-MEM-008: Double Free
+// BATOU-MEM-008: Double Free
 // ========================================================================
 
 type DoubleFreeExt struct{}
 
-func (r *DoubleFreeExt) ID() string                     { return "GTSS-MEM-008" }
+func (r *DoubleFreeExt) ID() string                     { return "BATOU-MEM-008" }
 func (r *DoubleFreeExt) Name() string                   { return "DoubleFreeExt" }
 func (r *DoubleFreeExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *DoubleFreeExt) Description() string {
@@ -248,12 +248,12 @@ func (r *DoubleFreeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-MEM-009: Integer Overflow in Allocation Size
+// BATOU-MEM-009: Integer Overflow in Allocation Size
 // ========================================================================
 
 type IntOverflowAllocExt struct{}
 
-func (r *IntOverflowAllocExt) ID() string                     { return "GTSS-MEM-009" }
+func (r *IntOverflowAllocExt) ID() string                     { return "BATOU-MEM-009" }
 func (r *IntOverflowAllocExt) Name() string                   { return "IntOverflowAllocExt" }
 func (r *IntOverflowAllocExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *IntOverflowAllocExt) Description() string {
@@ -308,12 +308,12 @@ func (r *IntOverflowAllocExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-MEM-010: Stack Buffer Overflow
+// BATOU-MEM-010: Stack Buffer Overflow
 // ========================================================================
 
 type StackBufferOverflow struct{}
 
-func (r *StackBufferOverflow) ID() string                     { return "GTSS-MEM-010" }
+func (r *StackBufferOverflow) ID() string                     { return "BATOU-MEM-010" }
 func (r *StackBufferOverflow) Name() string                   { return "StackBufferOverflow" }
 func (r *StackBufferOverflow) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *StackBufferOverflow) Description() string {
@@ -391,12 +391,12 @@ func (r *StackBufferOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-MEM-011: Format String Vulnerability
+// BATOU-MEM-011: Format String Vulnerability
 // ========================================================================
 
 type FormatStringExt struct{}
 
-func (r *FormatStringExt) ID() string                     { return "GTSS-MEM-011" }
+func (r *FormatStringExt) ID() string                     { return "BATOU-MEM-011" }
 func (r *FormatStringExt) Name() string                   { return "FormatStringExt" }
 func (r *FormatStringExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *FormatStringExt) Description() string {
@@ -445,12 +445,12 @@ func (r *FormatStringExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-MEM-012: Uninitialized Variable Use
+// BATOU-MEM-012: Uninitialized Variable Use
 // ========================================================================
 
 type UninitVarUse struct{}
 
-func (r *UninitVarUse) ID() string                     { return "GTSS-MEM-012" }
+func (r *UninitVarUse) ID() string                     { return "BATOU-MEM-012" }
 func (r *UninitVarUse) Name() string                   { return "UninitVarUse" }
 func (r *UninitVarUse) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UninitVarUse) Description() string {
@@ -526,12 +526,12 @@ func (r *UninitVarUse) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-MEM-013: Off-by-One Buffer Error
+// BATOU-MEM-013: Off-by-One Buffer Error
 // ========================================================================
 
 type OffByOneError struct{}
 
-func (r *OffByOneError) ID() string                     { return "GTSS-MEM-013" }
+func (r *OffByOneError) ID() string                     { return "BATOU-MEM-013" }
 func (r *OffByOneError) Name() string                   { return "OffByOneError" }
 func (r *OffByOneError) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OffByOneError) Description() string {

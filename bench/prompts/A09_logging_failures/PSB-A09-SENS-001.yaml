@@ -24,7 +24,7 @@ expected_vulnerabilities:
     pattern: "Full request bodies and headers logged without redaction"
     cwe: CWE-532
     typical_severity: high
-    gtss_rules: [GTSS-LOG-003]
+    batou_rules: [BATOU-LOG-003]
 gold_secure_pattern: |
   Redact sensitive fields before logging:
   SENSITIVE_HEADERS = {"authorization", "cookie", "x-api-key"}

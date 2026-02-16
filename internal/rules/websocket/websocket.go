@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-WS-001: WebSocket without origin validation
+// BATOU-WS-001: WebSocket without origin validation
 var (
 	reWSUpgradeNoOrigin    = regexp.MustCompile(`(?i)(?:websocket\.(?:Upgrader|upgrade)|new\s+WebSocketServer|ws\.Server|Upgrade\s*\()`)
 	reWSCheckOriginFalse   = regexp.MustCompile(`(?i)CheckOrigin\s*:\s*func\s*\([^)]*\)\s*bool\s*\{\s*return\s+true`)
@@ -19,13 +19,13 @@ var (
 	reWSOriginCheck        = regexp.MustCompile(`(?i)(?:CheckOrigin|check_origin|checkOrigin|verifyOrigin|verify_origin|origin_allowed|allowedOrigins|isOriginAllowed)`)
 )
 
-// GTSS-WS-002: WebSocket without authentication
+// BATOU-WS-002: WebSocket without authentication
 var (
 	reWSHandler         = regexp.MustCompile(`(?i)(?:\.on\s*\(\s*["']connection["']|def\s+websocket_connect|def\s+ws_connect|@(?:app\.)?websocket|ws\.on\s*\(\s*["']open["']|func.*websocket.*Handler|HandleFunc\s*\(\s*["']/ws)`)
 	reWSAuth            = regexp.MustCompile(`(?i)(?:authenticate|authorization|auth_token|isAuthenticated|is_authenticated|verify_token|jwt\.verify|passport|session\.user|currentUser|current_user|req\.user|request\.user|@login_required|@authenticated|@requires_auth|middleware.*auth)`)
 )
 
-// GTSS-WS-003: WebSocket message used in eval/exec
+// BATOU-WS-003: WebSocket message used in eval/exec
 var (
 	reWSMessageEval     = regexp.MustCompile(`(?i)(?:message\.data|event\.data|msg\.data|data|payload)\s*.*\b(?:eval|exec|Function)\s*\(`)
 	reWSOnMessage       = regexp.MustCompile(`(?i)\.on\s*\(\s*["']message["']\s*,\s*(?:function|async|\()`)
@@ -33,32 +33,32 @@ var (
 	reWSMsgToExecPy     = regexp.MustCompile(`(?i)(?:on_message|handle_message|receive)\s*\([^)]*\)\s*:.*(?:eval|exec|subprocess|os\.system|os\.popen)\s*\(`)
 )
 
-// GTSS-WS-004: WebSocket without rate limiting
+// BATOU-WS-004: WebSocket without rate limiting
 var (
 	reWSBroadcast       = regexp.MustCompile(`(?i)(?:broadcast|\.send\s*\(|\.emit\s*\(|clients\.forEach|for\s+.*\bclient\b.*\.send)`)
 	reWSRateLimit       = regexp.MustCompile(`(?i)(?:rate.?limit|rateLimit|throttle|debounce|max_messages|message_count|flood|spam|cooldown|bucket)`)
 )
 
-// GTSS-WS-005: WebSocket broadcasting sensitive data
+// BATOU-WS-005: WebSocket broadcasting sensitive data
 var (
 	reWSSensitiveBroadcast = regexp.MustCompile(`(?i)(?:broadcast|\.send|\.emit)\s*\([^)]*(?:password|passwd|secret|token|api_key|apiKey|credit.?card|ssn|social_security|private_key|privateKey)`)
 	reWSBroadcastAll       = regexp.MustCompile(`(?i)(?:broadcast|sendAll|emitAll|io\.emit|wss\.clients\.forEach)\s*\(`)
 )
 
-// GTSS-WS-006: WebSocket without TLS (ws:// not wss://)
+// BATOU-WS-006: WebSocket without TLS (ws:// not wss://)
 var (
 	reWSInsecureURL     = regexp.MustCompile(`(?i)["']ws://[^"']+["']`)
 	reWSInsecureConnect = regexp.MustCompile(`(?i)(?:new\s+WebSocket|WebSocket\.connect|ws\.connect|websocket\.create_connection)\s*\(\s*["']ws://`)
 	reWSSecureURL       = regexp.MustCompile(`(?i)["']wss://`)
 )
 
-// GTSS-WS-007: WebSocket CSWSH (Cross-Site WebSocket Hijacking)
+// BATOU-WS-007: WebSocket CSWSH (Cross-Site WebSocket Hijacking)
 var (
 	reWSNoCORSCheck    = regexp.MustCompile(`(?i)(?:new\s+WebSocket|WebSocket\.connect)\s*\(\s*(?:["'][^"']+["']|url|wsUrl|endpoint)`)
 	reWSCookieAuth     = regexp.MustCompile(`(?i)(?:cookie|session|withCredentials|credentials\s*[=:]\s*["']include)`)
 )
 
-// GTSS-WS-008: WebSocket message SQL/NoSQL injection
+// BATOU-WS-008: WebSocket message SQL/NoSQL injection
 var (
 	reWSMsgToSQL       = regexp.MustCompile(`(?i)(?:\.query|\.execute|\.exec|cursor\.execute|db\.query)\s*\(\s*(?:["'][^"']*["']\s*\+\s*(?:message|msg|data|payload)|f["'][^"']*\{(?:message|msg|data|payload)|["'][^"']*["']\s*%\s*(?:message|msg|data|payload))`)
 	reWSMsgToMongo     = regexp.MustCompile(`(?i)(?:\.find|\.findOne|\.updateOne|\.deleteOne|\.aggregate)\s*\(\s*(?:JSON\.parse\s*\(\s*(?:message|msg|data|payload)|\{[^}]*:\s*(?:message|msg|data|payload))`)
@@ -102,12 +102,12 @@ func hasNearbyPattern(lines []string, idx, before, after int, re *regexp.Regexp)
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-WS-001: WebSocket without origin validation
+// BATOU-WS-001: WebSocket without origin validation
 // ---------------------------------------------------------------------------
 
 type WSNoOriginValidation struct{}
 
-func (r *WSNoOriginValidation) ID() string                     { return "GTSS-WS-001" }
+func (r *WSNoOriginValidation) ID() string                     { return "BATOU-WS-001" }
 func (r *WSNoOriginValidation) Name() string                   { return "WSNoOriginValidation" }
 func (r *WSNoOriginValidation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WSNoOriginValidation) Description() string {
@@ -173,12 +173,12 @@ func (r *WSNoOriginValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-WS-002: WebSocket without authentication
+// BATOU-WS-002: WebSocket without authentication
 // ---------------------------------------------------------------------------
 
 type WSNoAuthentication struct{}
 
-func (r *WSNoAuthentication) ID() string                     { return "GTSS-WS-002" }
+func (r *WSNoAuthentication) ID() string                     { return "BATOU-WS-002" }
 func (r *WSNoAuthentication) Name() string                   { return "WSNoAuthentication" }
 func (r *WSNoAuthentication) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WSNoAuthentication) Description() string {
@@ -221,12 +221,12 @@ func (r *WSNoAuthentication) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-WS-003: WebSocket message used in eval/exec
+// BATOU-WS-003: WebSocket message used in eval/exec
 // ---------------------------------------------------------------------------
 
 type WSMessageEval struct{}
 
-func (r *WSMessageEval) ID() string                     { return "GTSS-WS-003" }
+func (r *WSMessageEval) ID() string                     { return "BATOU-WS-003" }
 func (r *WSMessageEval) Name() string                   { return "WSMessageEval" }
 func (r *WSMessageEval) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *WSMessageEval) Description() string {
@@ -270,12 +270,12 @@ func (r *WSMessageEval) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-WS-004: WebSocket without rate limiting
+// BATOU-WS-004: WebSocket without rate limiting
 // ---------------------------------------------------------------------------
 
 type WSNoRateLimit struct{}
 
-func (r *WSNoRateLimit) ID() string                     { return "GTSS-WS-004" }
+func (r *WSNoRateLimit) ID() string                     { return "BATOU-WS-004" }
 func (r *WSNoRateLimit) Name() string                   { return "WSNoRateLimit" }
 func (r *WSNoRateLimit) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *WSNoRateLimit) Description() string {
@@ -318,12 +318,12 @@ func (r *WSNoRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-WS-005: WebSocket broadcasting sensitive data
+// BATOU-WS-005: WebSocket broadcasting sensitive data
 // ---------------------------------------------------------------------------
 
 type WSSensitiveBroadcast struct{}
 
-func (r *WSSensitiveBroadcast) ID() string                     { return "GTSS-WS-005" }
+func (r *WSSensitiveBroadcast) ID() string                     { return "BATOU-WS-005" }
 func (r *WSSensitiveBroadcast) Name() string                   { return "WSSensitiveBroadcast" }
 func (r *WSSensitiveBroadcast) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *WSSensitiveBroadcast) Description() string {
@@ -364,12 +364,12 @@ func (r *WSSensitiveBroadcast) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-WS-006: WebSocket without TLS (ws:// not wss://)
+// BATOU-WS-006: WebSocket without TLS (ws:// not wss://)
 // ---------------------------------------------------------------------------
 
 type WSInsecure struct{}
 
-func (r *WSInsecure) ID() string                     { return "GTSS-WS-006" }
+func (r *WSInsecure) ID() string                     { return "BATOU-WS-006" }
 func (r *WSInsecure) Name() string                   { return "WSInsecure" }
 func (r *WSInsecure) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *WSInsecure) Description() string {
@@ -422,12 +422,12 @@ func (r *WSInsecure) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-WS-007: WebSocket CSWSH cross-site hijacking
+// BATOU-WS-007: WebSocket CSWSH cross-site hijacking
 // ---------------------------------------------------------------------------
 
 type WSCSWSH struct{}
 
-func (r *WSCSWSH) ID() string                     { return "GTSS-WS-007" }
+func (r *WSCSWSH) ID() string                     { return "BATOU-WS-007" }
 func (r *WSCSWSH) Name() string                   { return "WSCSWSH" }
 func (r *WSCSWSH) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WSCSWSH) Description() string {
@@ -474,12 +474,12 @@ func (r *WSCSWSH) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-WS-008: WebSocket message SQL/NoSQL injection
+// BATOU-WS-008: WebSocket message SQL/NoSQL injection
 // ---------------------------------------------------------------------------
 
 type WSMessageInjection struct{}
 
-func (r *WSMessageInjection) ID() string                     { return "GTSS-WS-008" }
+func (r *WSMessageInjection) ID() string                     { return "BATOU-WS-008" }
 func (r *WSMessageInjection) Name() string                   { return "WSMessageInjection" }
 func (r *WSMessageInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WSMessageInjection) Description() string {

@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended generic rules
 // ---------------------------------------------------------------------------
 
-// GTSS-GEN-013: Hardcoded IP address
+// BATOU-GEN-013: Hardcoded IP address
 var (
 	reHardcodedIPv4 = regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b`)
 	reLocalIP       = regexp.MustCompile(`\b(?:127\.0\.0\.1|0\.0\.0\.0|localhost|::1)\b`)
@@ -19,18 +19,18 @@ var (
 	reIPInConfig    = regexp.MustCompile(`(?i)(?:host|server|addr|address|endpoint|url|bind|listen|connect|ip)\s*[:=]\s*['"]?(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}`)
 )
 
-// GTSS-GEN-014: TODO/FIXME/HACK in security-critical code
+// BATOU-GEN-014: TODO/FIXME/HACK in security-critical code
 var (
 	reTodoSecurity = regexp.MustCompile(`(?i)(?://|#|/\*|\*)\s*(?:TODO|FIXME|HACK|XXX|TEMP|TEMPORARY)\s*[:!]?\s*.*(?:auth|secur|encrypt|password|token|secret|credential|session|permission|access.?control|csrf|xss|injection|sanitiz|validat|vulnerab)`)
 )
 
-// GTSS-GEN-015: Commented-out security code
+// BATOU-GEN-015: Commented-out security code
 var (
 	reCommentedAuth   = regexp.MustCompile(`(?i)(?://|#)\s*(?:if\s*\(|require|import|use\s+).*(?:auth|authenticate|authorize|verify|check_?permission|requireLogin|isAuthenticated|@login_required|@auth|before_action\s*:authenticate)`)
 	reCommentedCrypto = regexp.MustCompile(`(?i)(?://|#)\s*(?:.*(?:encrypt|hash|bcrypt|argon|scrypt|hmac|verify_?password|check_?password|csrf_?protect|rate_?limit|sanitize|escape|validate))`)
 )
 
-// GTSS-GEN-016: Empty catch/except block
+// BATOU-GEN-016: Empty catch/except block
 var (
 	reEmptyCatchJS   = regexp.MustCompile(`catch\s*\([^)]*\)\s*\{\s*\}`)
 	reEmptyCatchJava = regexp.MustCompile(`catch\s*\([^)]*\)\s*\{\s*\}`)
@@ -39,14 +39,14 @@ var (
 	reEmptyRescueRb  = regexp.MustCompile(`rescue\s*(?:=>?\s*\w+)?\s*$`)
 )
 
-// GTSS-GEN-017: chmod 777/666
+// BATOU-GEN-017: chmod 777/666
 var (
 	reChmod777      = regexp.MustCompile(`chmod\s+(?:777|666|a\+rwx)\b`)
 	reChmodFunc777  = regexp.MustCompile(`(?:os\.chmod|chmod|File\.chmod|fs\.chmod(?:Sync)?)\s*\([^,]+,\s*(?:0o?777|0o?666|0x1ff|511)\b`)
 	reOsWriteAll    = regexp.MustCompile(`os\.(?:WriteFile|Create|OpenFile)\s*\([^,]+,\s*[^,]*,\s*(?:0o?777|0o?666)\b`)
 )
 
-// GTSS-GEN-018: dangerouslySetInnerHTML/v-html/[innerHTML]
+// BATOU-GEN-018: dangerouslySetInnerHTML/v-html/[innerHTML]
 var (
 	reDangerousHTML  = regexp.MustCompile(`dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html\s*:`)
 	reVHTML          = regexp.MustCompile(`v-html\s*=\s*['"]`)
@@ -54,19 +54,19 @@ var (
 	reInnerHTMLAssign = regexp.MustCompile(`\.innerHTML\s*=\s*(?:[a-zA-Z_]\w*|` + "`" + `|['"][^'"]*\$)`)
 )
 
-// GTSS-GEN-019: Disabled security feature
+// BATOU-GEN-019: Disabled security feature
 var (
 	reDisabledSecurity = regexp.MustCompile(`(?i)(?:csrf|xss|cors|auth|security|ssl|tls|https|hsts|csp|frame|clickjack|sanitiz|escap|encrypt|verify|validat|protect|secure|defense|guard|shield|firewall|waf|rate.?limit)\w*\s*[:=]\s*(?:false|0|['"]false['"]|['"]off['"]|['"]disabled?['"]|nil|null|None)`)
 	reSkipVerify       = regexp.MustCompile(`(?i)(?:InsecureSkipVerify|skip_?ssl|ssl_?verify|verify_?ssl|verify_?peer|check_?hostname|CURLOPT_SSL_VERIFYPEER|verify_?certs?)\s*[:=]\s*(?:true|false|0|False)`)
 )
 
-// GTSS-GEN-020: Sensitive data in URL query string
+// BATOU-GEN-020: Sensitive data in URL query string
 var (
 	reSensitiveInURL = regexp.MustCompile(`(?i)(?:url|href|link|redirect|src|action|endpoint)\s*[:=]\s*['"\x60][^'"` + "`" + `\n]*[?&](?:password|token|secret|api_key|apikey|access_token|auth|session_id|ssn|credit_card)\s*=`)
 	reSensitiveQuery = regexp.MustCompile(`(?i)(?:\?|&)(?:password|token|secret|api_?key|access_token|auth_token|session_id|ssn|credit_card)\s*=\s*['"\x60$]`)
 )
 
-// GTSS-GEN-021: Insecure temporary file creation
+// BATOU-GEN-021: Insecure temporary file creation
 var (
 	reTmpFilePath    = regexp.MustCompile(`(?i)(?:['"/]tmp/|['"/]temp/|tempfile|tmpfile|os\.path\.join\s*\(\s*['"](?:/tmp|/temp))[^'"]*(?:\.(?:txt|log|json|xml|csv|dat|db|sql|key|pem|conf|cfg|ini|yaml|yml))?['"]?`)
 	reTmpInsecure    = regexp.MustCompile(`(?i)(?:mktemp\s+[^-]|mktemp\s*$|tmpnam|tempnam|os\.tmpnam|tmpfile\(\)|tempfile\.mktemp)\b`)
@@ -74,12 +74,12 @@ var (
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-GEN-013: Hardcoded IP Address in Source Code
+// BATOU-GEN-013: Hardcoded IP Address in Source Code
 // ---------------------------------------------------------------------------
 
 type HardcodedIPAddress struct{}
 
-func (r *HardcodedIPAddress) ID() string                     { return "GTSS-GEN-013" }
+func (r *HardcodedIPAddress) ID() string                     { return "BATOU-GEN-013" }
 func (r *HardcodedIPAddress) Name() string                   { return "HardcodedIPAddress" }
 func (r *HardcodedIPAddress) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *HardcodedIPAddress) Description() string {
@@ -129,12 +129,12 @@ func (r *HardcodedIPAddress) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GEN-014: TODO/FIXME/HACK in Security-Critical Code
+// BATOU-GEN-014: TODO/FIXME/HACK in Security-Critical Code
 // ---------------------------------------------------------------------------
 
 type TodoInSecurityCode struct{}
 
-func (r *TodoInSecurityCode) ID() string                     { return "GTSS-GEN-014" }
+func (r *TodoInSecurityCode) ID() string                     { return "BATOU-GEN-014" }
 func (r *TodoInSecurityCode) Name() string                   { return "TodoInSecurityCode" }
 func (r *TodoInSecurityCode) DefaultSeverity() rules.Severity { return rules.Info }
 func (r *TodoInSecurityCode) Description() string {
@@ -176,12 +176,12 @@ func (r *TodoInSecurityCode) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GEN-015: Commented-Out Security Logic
+// BATOU-GEN-015: Commented-Out Security Logic
 // ---------------------------------------------------------------------------
 
 type CommentedOutSecurityCode struct{}
 
-func (r *CommentedOutSecurityCode) ID() string                     { return "GTSS-GEN-015" }
+func (r *CommentedOutSecurityCode) ID() string                     { return "BATOU-GEN-015" }
 func (r *CommentedOutSecurityCode) Name() string                   { return "CommentedOutSecurityCode" }
 func (r *CommentedOutSecurityCode) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *CommentedOutSecurityCode) Description() string {
@@ -228,12 +228,12 @@ func (r *CommentedOutSecurityCode) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GEN-016: Empty Catch/Except Block
+// BATOU-GEN-016: Empty Catch/Except Block
 // ---------------------------------------------------------------------------
 
 type EmptyCatchBlock struct{}
 
-func (r *EmptyCatchBlock) ID() string                     { return "GTSS-GEN-016" }
+func (r *EmptyCatchBlock) ID() string                     { return "BATOU-GEN-016" }
 func (r *EmptyCatchBlock) Name() string                   { return "EmptyCatchBlock" }
 func (r *EmptyCatchBlock) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *EmptyCatchBlock) Description() string {
@@ -313,12 +313,12 @@ func (r *EmptyCatchBlock) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GEN-017: Unrestricted File Permissions (chmod 777/666)
+// BATOU-GEN-017: Unrestricted File Permissions (chmod 777/666)
 // ---------------------------------------------------------------------------
 
 type UnrestrictedFilePermissions struct{}
 
-func (r *UnrestrictedFilePermissions) ID() string                     { return "GTSS-GEN-017" }
+func (r *UnrestrictedFilePermissions) ID() string                     { return "BATOU-GEN-017" }
 func (r *UnrestrictedFilePermissions) Name() string                   { return "UnrestrictedFilePermissions" }
 func (r *UnrestrictedFilePermissions) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnrestrictedFilePermissions) Description() string {
@@ -371,12 +371,12 @@ func (r *UnrestrictedFilePermissions) Scan(ctx *rules.ScanContext) []rules.Findi
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GEN-018: Unsafe dangerouslySetInnerHTML/v-html/[innerHTML]
+// BATOU-GEN-018: Unsafe dangerouslySetInnerHTML/v-html/[innerHTML]
 // ---------------------------------------------------------------------------
 
 type UnsafeInnerHTML struct{}
 
-func (r *UnsafeInnerHTML) ID() string                     { return "GTSS-GEN-018" }
+func (r *UnsafeInnerHTML) ID() string                     { return "BATOU-GEN-018" }
 func (r *UnsafeInnerHTML) Name() string                   { return "UnsafeInnerHTML" }
 func (r *UnsafeInnerHTML) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnsafeInnerHTML) Description() string {
@@ -436,12 +436,12 @@ func (r *UnsafeInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GEN-019: Disabled Security Feature via Config Flag
+// BATOU-GEN-019: Disabled Security Feature via Config Flag
 // ---------------------------------------------------------------------------
 
 type DisabledSecurityFeature struct{}
 
-func (r *DisabledSecurityFeature) ID() string                     { return "GTSS-GEN-019" }
+func (r *DisabledSecurityFeature) ID() string                     { return "BATOU-GEN-019" }
 func (r *DisabledSecurityFeature) Name() string                   { return "DisabledSecurityFeature" }
 func (r *DisabledSecurityFeature) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DisabledSecurityFeature) Description() string {
@@ -496,12 +496,12 @@ func (r *DisabledSecurityFeature) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GEN-020: Sensitive Data in URL Query String
+// BATOU-GEN-020: Sensitive Data in URL Query String
 // ---------------------------------------------------------------------------
 
 type SensitiveDataInURL struct{}
 
-func (r *SensitiveDataInURL) ID() string                     { return "GTSS-GEN-020" }
+func (r *SensitiveDataInURL) ID() string                     { return "BATOU-GEN-020" }
 func (r *SensitiveDataInURL) Name() string                   { return "SensitiveDataInURL" }
 func (r *SensitiveDataInURL) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SensitiveDataInURL) Description() string {
@@ -552,12 +552,12 @@ func (r *SensitiveDataInURL) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GEN-021: Insecure Temporary File Creation
+// BATOU-GEN-021: Insecure Temporary File Creation
 // ---------------------------------------------------------------------------
 
 type InsecureTempFile struct{}
 
-func (r *InsecureTempFile) ID() string                     { return "GTSS-GEN-021" }
+func (r *InsecureTempFile) ID() string                     { return "BATOU-GEN-021" }
 func (r *InsecureTempFile) Name() string                   { return "InsecureTempFile" }
 func (r *InsecureTempFile) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureTempFile) Description() string {

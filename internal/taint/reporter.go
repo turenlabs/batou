@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // FormatFlowForClaude formats a taint flow for Claude's additionalContext.
@@ -57,7 +57,7 @@ func FormatFlowsReport(flows []TaintFlow, filePath string, lang rules.Language, 
 
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("\n--- GTSS Taint Analysis [%s] ---\n", filePath))
+	b.WriteString(fmt.Sprintf("\n--- Batou Taint Analysis [%s] ---\n", filePath))
 	b.WriteString(fmt.Sprintf("Language: %s | Taint flows: %d | Time: %dms\n\n",
 		lang, len(flows), scanTimeMs))
 

@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/turenio/gtss/internal/ledger"
-	"github.com/turenio/gtss/internal/reporter"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ledger"
+	"github.com/turenlabs/batou/internal/reporter"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // guardedReadFile wraps os.ReadFile with filepath.Clean + strings.HasPrefix
-// validation to satisfy GTSS traversal guard detection.
+// validation to satisfy Batou traversal guard detection.
 func guardedReadFile(base, target string) ([]byte, error) {
 	cleaned := filepath.Clean(target)
 	if !strings.HasPrefix(cleaned, filepath.Clean(base)) {
@@ -100,7 +100,7 @@ func TestRecordWritesJSONL(t *testing.T) {
 		ScanTimeMs: 25,
 		Findings: []rules.Finding{
 			{
-				RuleID:   "GTSS-INJ-001",
+				RuleID:   "BATOU-INJ-001",
 				Severity: rules.Critical,
 				Title:    "SQL Injection",
 			},
@@ -114,7 +114,7 @@ func TestRecordWritesJSONL(t *testing.T) {
 
 	// Build the expected ledger file path with guard validation.
 	dateStr := time.Now().UTC().Format("2006-01-02")
-	ledgerFile := filepath.Clean(filepath.Join(tmpDir, ".gtss", "ledger", "gtss-"+dateStr+".jsonl"))
+	ledgerFile := filepath.Clean(filepath.Join(tmpDir, ".batou", "ledger", "batou-"+dateStr+".jsonl"))
 	if !strings.HasPrefix(ledgerFile, filepath.Clean(tmpDir)) {
 		t.Fatal("unexpected path")
 	}
@@ -171,7 +171,7 @@ func TestRecordAppendsMultipleEntries(t *testing.T) {
 	}
 
 	dateStr := time.Now().UTC().Format("2006-01-02")
-	ledgerFile := filepath.Clean(filepath.Join(tmpDir, ".gtss", "ledger", "gtss-"+dateStr+".jsonl"))
+	ledgerFile := filepath.Clean(filepath.Join(tmpDir, ".batou", "ledger", "batou-"+dateStr+".jsonl"))
 	if !strings.HasPrefix(ledgerFile, filepath.Clean(tmpDir)) {
 		t.Fatal("unexpected path")
 	}
@@ -202,7 +202,7 @@ func TestRecordNoFindingsIsNotBlocked(t *testing.T) {
 	}
 
 	dateStr := time.Now().UTC().Format("2006-01-02")
-	ledgerFile := filepath.Clean(filepath.Join(tmpDir, ".gtss", "ledger", "gtss-"+dateStr+".jsonl"))
+	ledgerFile := filepath.Clean(filepath.Join(tmpDir, ".batou", "ledger", "batou-"+dateStr+".jsonl"))
 	if !strings.HasPrefix(ledgerFile, filepath.Clean(tmpDir)) {
 		t.Fatal("unexpected path")
 	}

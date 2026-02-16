@@ -3,10 +3,10 @@ package taint_test
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 func TestTrackTaintBasicSourceToSink(t *testing.T) {

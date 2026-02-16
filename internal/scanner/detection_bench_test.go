@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // fixtureMetadata holds parsed header comment metadata from a benchmark fixture.
 type fixtureMetadata struct {
 	source      string   // Source description
-	expectedIDs []string // Expected GTSS rule ID prefixes
+	expectedIDs []string // Expected Batou rule ID prefixes
 	owaspCode   string   // OWASP code (e.g., "A01")
 	owaspFull   string   // Full OWASP string
 	category    string   // Inferred rule category
@@ -148,7 +148,7 @@ func parseExpectedIDs(s string) []string {
 		tokens := strings.Fields(part)
 		for _, tok := range tokens {
 			tok = strings.Trim(tok, "(),")
-			if strings.HasPrefix(tok, "GTSS-") {
+			if strings.HasPrefix(tok, "BATOU-") {
 				ids = append(ids, tok)
 			}
 		}
@@ -182,40 +182,40 @@ func inferExpectedFromFilename(name string) []string {
 	var ids []string
 
 	keywordMap := map[string]string{
-		"sql_injection":     "GTSS-INJ",
-		"sqli":              "GTSS-INJ",
-		"nosql":             "GTSS-INJ",
-		"command_injection": "GTSS-INJ",
-		"cmd_injection":     "GTSS-INJ",
-		"code_injection":    "GTSS-INJ",
-		"injection":         "GTSS-INJ",
-		"xss":               "GTSS-XSS",
-		"cross_site":        "GTSS-XSS",
-		"traversal":         "GTSS-TRV",
-		"path_traversal":    "GTSS-TRV",
-		"directory":         "GTSS-TRV",
-		"ssrf":              "GTSS-SSRF",
-		"crypto":            "GTSS-CRY",
-		"weak_hash":         "GTSS-CRY",
-		"weak_cipher":       "GTSS-CRY",
-		"hardcoded":         "GTSS-SEC",
-		"secret":            "GTSS-SEC",
-		"api_key":           "GTSS-SEC",
-		"password":          "GTSS-SEC",
-		"idor":              "GTSS-VAL",
-		"auth":              "GTSS-AUTH",
-		"buffer":            "GTSS-MEM",
-		"overflow":          "GTSS-MEM",
-		"memory":            "GTSS-MEM",
-		"log":               "GTSS-LOG",
-		"deserialization":   "GTSS-INJ",
-		"template":          "GTSS-INJ",
-		"graphql":           "GTSS-INJ",
-		"ldap":              "GTSS-INJ",
-		"xpath":             "GTSS-INJ",
-		"xxe":               "GTSS-INJ",
-		"eval":              "GTSS-INJ",
-		"prototype":         "GTSS-INJ",
+		"sql_injection":     "BATOU-INJ",
+		"sqli":              "BATOU-INJ",
+		"nosql":             "BATOU-INJ",
+		"command_injection": "BATOU-INJ",
+		"cmd_injection":     "BATOU-INJ",
+		"code_injection":    "BATOU-INJ",
+		"injection":         "BATOU-INJ",
+		"xss":               "BATOU-XSS",
+		"cross_site":        "BATOU-XSS",
+		"traversal":         "BATOU-TRV",
+		"path_traversal":    "BATOU-TRV",
+		"directory":         "BATOU-TRV",
+		"ssrf":              "BATOU-SSRF",
+		"crypto":            "BATOU-CRY",
+		"weak_hash":         "BATOU-CRY",
+		"weak_cipher":       "BATOU-CRY",
+		"hardcoded":         "BATOU-SEC",
+		"secret":            "BATOU-SEC",
+		"api_key":           "BATOU-SEC",
+		"password":          "BATOU-SEC",
+		"idor":              "BATOU-VAL",
+		"auth":              "BATOU-AUTH",
+		"buffer":            "BATOU-MEM",
+		"overflow":          "BATOU-MEM",
+		"memory":            "BATOU-MEM",
+		"log":               "BATOU-LOG",
+		"deserialization":   "BATOU-INJ",
+		"template":          "BATOU-INJ",
+		"graphql":           "BATOU-INJ",
+		"ldap":              "BATOU-INJ",
+		"xpath":             "BATOU-INJ",
+		"xxe":               "BATOU-INJ",
+		"eval":              "BATOU-INJ",
+		"prototype":         "BATOU-INJ",
 	}
 
 	for keyword, prefix := range keywordMap {
@@ -260,7 +260,7 @@ func inferCategory(ruleID string) string {
 }
 
 // categoryPrefix extracts the category prefix from a rule ID.
-// "GTSS-XSS-001" -> "GTSS-XSS", "GTSS-INJ" -> "GTSS-INJ", "TAINT" -> "TAINT".
+// "BATOU-XSS-001" -> "BATOU-XSS", "BATOU-INJ" -> "BATOU-INJ", "TAINT" -> "TAINT".
 func categoryPrefix(ruleID string) string {
 	parts := strings.SplitN(ruleID, "-", 3)
 	if len(parts) >= 2 {
@@ -271,8 +271,8 @@ func categoryPrefix(ruleID string) string {
 
 // matchesExpected returns true if any fired rule ID matches any expected ID.
 // Matching is done at three levels:
-//  1. Exact prefix match (GTSS-INJ-001 matches GTSS-INJ-001)
-//  2. Category prefix match (GTSS-XSS-011 matches expected GTSS-XSS-001 via shared "GTSS-XSS")
+//  1. Exact prefix match (BATOU-INJ-001 matches BATOU-INJ-001)
+//  2. Category prefix match (BATOU-XSS-011 matches expected BATOU-XSS-001 via shared "BATOU-XSS")
 //  3. TAINT keyword match
 func matchesExpected(firedIDs []string, expectedIDs []string) bool {
 	// Build set of expected category prefixes for level-2 matching.
@@ -358,7 +358,7 @@ func printDetectionMatrix(t *testing.T, results []detectionResult) {
 
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString("=== GTSS Detection Benchmark Matrix ===\n")
+	sb.WriteString("=== Batou Detection Benchmark Matrix ===\n")
 	sb.WriteString(fmt.Sprintf("%-6s | %-12s | %8s | %8s | %6s | %5s\n",
 		"OWASP", "Language", "Fixtures", "Detected", "Missed", "Rate"))
 	sb.WriteString(strings.Repeat("-", 60) + "\n")

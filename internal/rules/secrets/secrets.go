@@ -6,12 +6,12 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled regex patterns ---
 
-// GTSS-SEC-001: Hardcoded password patterns per language family.
+// BATOU-SEC-001: Hardcoded password patterns per language family.
 var (
 	// Variable names commonly used for secrets.
 	secretVarNames = `(?i)(password|passwd|pwd|pass|secret|api_key|apikey|token|auth_token|access_token|private_key)`
@@ -47,7 +47,7 @@ var (
 	reTestFile = regexp.MustCompile(`(?i)(_test\.go|_test\.py|\.test\.[jt]sx?|\.spec\.[jt]sx?|test_.*\.py|tests?/|__tests__/|spec/|fixtures?/|mock|fake|stub|example)`)
 )
 
-// GTSS-SEC-002: API key patterns.
+// BATOU-SEC-002: API key patterns.
 var (
 	reAWSAccessKey = regexp.MustCompile(`(?:^|[^A-Za-z0-9])(AKIA[0-9A-Z]{16})(?:[^A-Za-z0-9]|$)`)
 	reAWSSecretKey = regexp.MustCompile(`(?i)(?:aws).{0,20}(?:secret|key).{0,10}[:=]\s*["']?([A-Za-z0-9/+=]{40})["']?`)
@@ -69,12 +69,12 @@ var (
 		`(?i)(?:api[_-]?key|api[_-]?secret|client[_-]?secret)\s*[:=]=?\s*["']([A-Za-z0-9+/=_\-]{20,})["']`)
 )
 
-// GTSS-SEC-003: Private key patterns.
+// BATOU-SEC-003: Private key patterns.
 var (
 	rePrivateKey = regexp.MustCompile(`-----BEGIN\s+(RSA |EC |DSA |OPENSSH |ED25519 )?PRIVATE KEY-----`)
 )
 
-// GTSS-SEC-004: Connection string patterns.
+// BATOU-SEC-004: Connection string patterns.
 var (
 	reConnStringURI = regexp.MustCompile(
 		`(?i)(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp|mssql)://[^\s:]+:[^\s@]+@[^\s]+`)
@@ -86,7 +86,7 @@ var (
 		`(?i)(?:Server|Data Source|Host)\s*=.*(?:Password|Pwd)\s*=\s*["']?([^\s;"']+)`)
 )
 
-// GTSS-SEC-005: JWT secret patterns.
+// BATOU-SEC-005: JWT secret patterns.
 var (
 	reJWTSign = regexp.MustCompile(
 		`(?i)jwt\.(?:sign|encode|decode)\s*\([^,]+,\s*["']([^"']{2,})["']`)
@@ -95,7 +95,7 @@ var (
 		`(?i)(?:jwt[_-]?secret|signing[_-]?key|secret[_-]?key)\s*[:=]=?\s*(?:[^"'\n]*\|\|\s*)?["']([^"']{2,})["']`)
 )
 
-// GTSS-SEC-006: Environment variable leak patterns.
+// BATOU-SEC-006: Environment variable leak patterns.
 var (
 	reEnvFileContent = regexp.MustCompile(
 		`(?i)^[A-Z_]{2,50}=["']?[^\s"']+["']?`)
@@ -220,13 +220,13 @@ func isCommentLine(line string) bool {
 }
 
 // ========================================================================
-// Rule 1: GTSS-SEC-001 HardcodedPassword
+// Rule 1: BATOU-SEC-001 HardcodedPassword
 // ========================================================================
 
 // HardcodedPassword detects password and secret values assigned as string literals.
 type HardcodedPassword struct{}
 
-func (r *HardcodedPassword) ID() string          { return "GTSS-SEC-001" }
+func (r *HardcodedPassword) ID() string          { return "BATOU-SEC-001" }
 func (r *HardcodedPassword) Name() string         { return "HardcodedPassword" }
 func (r *HardcodedPassword) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *HardcodedPassword) Description() string {
@@ -303,13 +303,13 @@ func (r *HardcodedPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// Rule 2: GTSS-SEC-002 APIKeyExposure
+// Rule 2: BATOU-SEC-002 APIKeyExposure
 // ========================================================================
 
 // APIKeyExposure detects hardcoded API keys with known provider formats.
 type APIKeyExposure struct{}
 
-func (r *APIKeyExposure) ID() string          { return "GTSS-SEC-002" }
+func (r *APIKeyExposure) ID() string          { return "BATOU-SEC-002" }
 func (r *APIKeyExposure) Name() string         { return "APIKeyExposure" }
 func (r *APIKeyExposure) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *APIKeyExposure) Description() string {
@@ -408,13 +408,13 @@ func (r *APIKeyExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// Rule 3: GTSS-SEC-003 PrivateKeyInCode
+// Rule 3: BATOU-SEC-003 PrivateKeyInCode
 // ========================================================================
 
 // PrivateKeyInCode detects embedded PEM-encoded private keys.
 type PrivateKeyInCode struct{}
 
-func (r *PrivateKeyInCode) ID() string          { return "GTSS-SEC-003" }
+func (r *PrivateKeyInCode) ID() string          { return "BATOU-SEC-003" }
 func (r *PrivateKeyInCode) Name() string         { return "PrivateKeyInCode" }
 func (r *PrivateKeyInCode) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PrivateKeyInCode) Description() string {
@@ -466,13 +466,13 @@ func (r *PrivateKeyInCode) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// Rule 4: GTSS-SEC-004 ConnectionString
+// Rule 4: BATOU-SEC-004 ConnectionString
 // ========================================================================
 
 // ConnectionString detects database connection strings with embedded credentials.
 type ConnectionString struct{}
 
-func (r *ConnectionString) ID() string          { return "GTSS-SEC-004" }
+func (r *ConnectionString) ID() string          { return "BATOU-SEC-004" }
 func (r *ConnectionString) Name() string         { return "ConnectionString" }
 func (r *ConnectionString) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ConnectionString) Description() string {
@@ -545,13 +545,13 @@ func (r *ConnectionString) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// Rule 5: GTSS-SEC-005 JWTSecret
+// Rule 5: BATOU-SEC-005 JWTSecret
 // ========================================================================
 
 // JWTSecret detects hardcoded JWT signing secrets and keys.
 type JWTSecret struct{}
 
-func (r *JWTSecret) ID() string          { return "GTSS-SEC-005" }
+func (r *JWTSecret) ID() string          { return "BATOU-SEC-005" }
 func (r *JWTSecret) Name() string         { return "JWTSecret" }
 func (r *JWTSecret) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JWTSecret) Description() string {
@@ -614,13 +614,13 @@ func (r *JWTSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// Rule 6: GTSS-SEC-006 EnvironmentLeak
+// Rule 6: BATOU-SEC-006 EnvironmentLeak
 // ========================================================================
 
 // EnvironmentLeak detects .env file contents and sensitive env vars being logged.
 type EnvironmentLeak struct{}
 
-func (r *EnvironmentLeak) ID() string          { return "GTSS-SEC-006" }
+func (r *EnvironmentLeak) ID() string          { return "BATOU-SEC-006" }
 func (r *EnvironmentLeak) Name() string         { return "EnvironmentLeak" }
 func (r *EnvironmentLeak) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *EnvironmentLeak) Description() string {

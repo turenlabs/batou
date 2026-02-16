@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Python code, covering web frameworks (Flask, Django, FastAPI, aiohttp, Tornado, Starlette), cloud platforms (AWS Lambda, GCP Cloud Functions, Azure Functions), and standard library patterns. Analysis operates at four layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis (Layer 2), intraprocedural taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4).
+Batou provides comprehensive security scanning for Python code, covering web frameworks (Flask, Django, FastAPI, aiohttp, Tornado, Starlette), cloud platforms (AWS Lambda, GCP Cloud Functions, Azure Functions), and standard library patterns. Analysis operates at four layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis (Layer 2), intraprocedural taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4).
 
 Python taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through assignments, variable declarations, function calls, and attribute accesses by walking the parsed AST rather than relying on regex patterns.
 
@@ -21,7 +21,7 @@ Detection is handled in `internal/analyzer/analyzer.go` via the `extToLanguage` 
 
 ### Sources (User Input Entry Points)
 
-GTSS tracks 33 taint sources for Python, organized by framework and category.
+Batou tracks 33 taint sources for Python, organized by framework and category.
 
 #### Flask
 
@@ -98,7 +98,7 @@ GTSS tracks 33 taint sources for Python, organized by framework and category.
 
 ### Sinks (Dangerous Functions)
 
-GTSS tracks 108 taint sinks for Python.
+Batou tracks 108 taint sinks for Python.
 
 #### SQL Injection (CWE-89)
 
@@ -195,7 +195,7 @@ Seven crypto-related sinks are tracked. These detect weak hashing (`py.hashlib.m
 
 ### Sanitizers (Functions That Neutralize Taint)
 
-GTSS recognizes 28 sanitizer patterns for Python.
+Batou recognizes 28 sanitizer patterns for Python.
 
 #### HTML/XSS Sanitizers
 
@@ -262,210 +262,210 @@ GTSS recognizes 28 sanitizer patterns for Python.
 
 ## Rule Coverage
 
-GTSS applies 76 regex-based rules to Python files across 20 categories.
+Batou applies 76 regex-based rules to Python files across 20 categories.
 
 ### Injection (`internal/rules/injection/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-INJ-001 | SQLInjection | Critical | f-string, %-format, `.format()`, and concatenation in SQL queries |
-| GTSS-INJ-002 | CommandInjection | Critical | `os.system()`, `os.popen()`, `subprocess.*()` with string args or `shell=True` |
-| GTSS-INJ-003 | CodeInjection | Critical | `eval()`, `exec()`, `compile()` with dynamic input |
-| GTSS-INJ-004 | LDAPInjection | High | LDAP filter construction with string interpolation |
-| GTSS-INJ-005 | TemplateInjection | Critical | `render_template_string()` with user-controlled templates |
-| GTSS-INJ-006 | XPathInjection | High | XPath query construction with unsanitized input |
-| GTSS-INJ-007 | NoSQLInjection | High | MongoDB query construction with user input |
-| GTSS-INJ-008 | GraphQLInjection | High | GraphQL query built with f-string, `.format()`, or `%` formatting |
-| GTSS-INJ-009 | HTTPHeaderInjection | High | HTTP response headers set with `request.GET`/`request.headers` values without CRLF sanitization |
+| BATOU-INJ-001 | SQLInjection | Critical | f-string, %-format, `.format()`, and concatenation in SQL queries |
+| BATOU-INJ-002 | CommandInjection | Critical | `os.system()`, `os.popen()`, `subprocess.*()` with string args or `shell=True` |
+| BATOU-INJ-003 | CodeInjection | Critical | `eval()`, `exec()`, `compile()` with dynamic input |
+| BATOU-INJ-004 | LDAPInjection | High | LDAP filter construction with string interpolation |
+| BATOU-INJ-005 | TemplateInjection | Critical | `render_template_string()` with user-controlled templates |
+| BATOU-INJ-006 | XPathInjection | High | XPath query construction with unsanitized input |
+| BATOU-INJ-007 | NoSQLInjection | High | MongoDB query construction with user input |
+| BATOU-INJ-008 | GraphQLInjection | High | GraphQL query built with f-string, `.format()`, or `%` formatting |
+| BATOU-INJ-009 | HTTPHeaderInjection | High | HTTP response headers set with `request.GET`/`request.headers` values without CRLF sanitization |
 
 ### XSS (`internal/rules/xss/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-XSS-004 | UnescapedTemplateOutput | High | Jinja2 `\|safe` filter, `{% autoescape false %}` blocks |
-| GTSS-XSS-008 | ServerSideRenderingXSS | High | `HttpResponse()` / `make_response()` with f-strings containing request data |
-| GTSS-XSS-011 | ReflectedXSS | High | Direct reflection of request parameters in response body |
-| GTSS-XSS-013 | PythonFStringHTML | High | Python f-strings building HTML with embedded variables (Python-only rule) |
+| BATOU-XSS-004 | UnescapedTemplateOutput | High | Jinja2 `\|safe` filter, `{% autoescape false %}` blocks |
+| BATOU-XSS-008 | ServerSideRenderingXSS | High | `HttpResponse()` / `make_response()` with f-strings containing request data |
+| BATOU-XSS-011 | ReflectedXSS | High | Direct reflection of request parameters in response body |
+| BATOU-XSS-013 | PythonFStringHTML | High | Python f-strings building HTML with embedded variables (Python-only rule) |
 
 ### Traversal (`internal/rules/traversal/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-TRV-001 | PathTraversal | Critical | `open()`, `os.path.join()` with user-controlled path components |
-| GTSS-TRV-002 | FileInclusion | Critical | Dynamic `import`, `importlib`, `__import__()` with user input |
-| GTSS-TRV-003 | ArchiveExtraction | High | `zipfile`/`tarfile` extraction without path validation |
-| GTSS-TRV-005 | TemplatePathInjection | High | `render_template()` with user-controlled template name |
-| GTSS-TRV-008 | NullByteFilePath | Medium | File paths without null byte sanitization |
-| GTSS-TRV-010 | ZipSlipTraversal | Critical | `tarfile.extractall()` without `members=` or `filter=` parameter, `os.path.join()` with archive entry `.filename`/`.name` without path validation |
+| BATOU-TRV-001 | PathTraversal | Critical | `open()`, `os.path.join()` with user-controlled path components |
+| BATOU-TRV-002 | FileInclusion | Critical | Dynamic `import`, `importlib`, `__import__()` with user input |
+| BATOU-TRV-003 | ArchiveExtraction | High | `zipfile`/`tarfile` extraction without path validation |
+| BATOU-TRV-005 | TemplatePathInjection | High | `render_template()` with user-controlled template name |
+| BATOU-TRV-008 | NullByteFilePath | Medium | File paths without null byte sanitization |
+| BATOU-TRV-010 | ZipSlipTraversal | Critical | `tarfile.extractall()` without `members=` or `filter=` parameter, `os.path.join()` with archive entry `.filename`/`.name` without path validation |
 
 ### Cryptography (`internal/rules/crypto/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-CRY-001 | WeakHashing | High | `hashlib.md5()`, `hashlib.sha1()` |
-| GTSS-CRY-002 | InsecureRandom | High | `random.random()`, `random.randint()`, `random.choice()` for security |
-| GTSS-CRY-003 | WeakCipher | Critical | Weak/deprecated symmetric ciphers and insecure block modes |
-| GTSS-CRY-004 | HardcodedIV | High | Static initialization vectors in cipher setup |
-| GTSS-CRY-005 | InsecureTLS | Critical | `verify=False` in requests, disabled SSL verification |
-| GTSS-CRY-006 | WeakKeySize | High | RSA keys below 2048 bits, AES keys below 128 bits |
-| GTSS-CRY-007 | PlaintextProtocol | Medium | Unencrypted protocol URLs in code (any language) |
-| GTSS-CRY-009 | PythonRandomSecurity | Critical | `random.seed()` with predictable values, `random` module for tokens/passwords (Python-only rule) |
-| GTSS-CRY-011 | PredictableSeed | High | `random.seed(time.time())` or fixed seed values |
-| GTSS-CRY-012 | HardcodedKey | Critical | Encryption keys assigned as string/byte literals |
-| GTSS-CRY-013 | UnauthenticatedEncryption | High | CBC mode without HMAC or authentication |
-| GTSS-CRY-014 | InsecureRSAPadding | High | PKCS1v15 padding instead of OAEP |
-| GTSS-CRY-015 | WeakPasswordHash | Critical | MD5/SHA for password hashing instead of bcrypt/argon2 |
-| GTSS-CRY-017 | TimingUnsafeCompare | Medium | `==` comparison of tokens, secrets, hashes, or signatures instead of `hmac.compare_digest()` |
-| GTSS-CRY-018 | HardcodedIVBroad | High | `AES.new()` with hardcoded IV bytes (e.g., `AES.new(key, AES.MODE_CBC, b'fixed_iv')`) |
+| BATOU-CRY-001 | WeakHashing | High | `hashlib.md5()`, `hashlib.sha1()` |
+| BATOU-CRY-002 | InsecureRandom | High | `random.random()`, `random.randint()`, `random.choice()` for security |
+| BATOU-CRY-003 | WeakCipher | Critical | Weak/deprecated symmetric ciphers and insecure block modes |
+| BATOU-CRY-004 | HardcodedIV | High | Static initialization vectors in cipher setup |
+| BATOU-CRY-005 | InsecureTLS | Critical | `verify=False` in requests, disabled SSL verification |
+| BATOU-CRY-006 | WeakKeySize | High | RSA keys below 2048 bits, AES keys below 128 bits |
+| BATOU-CRY-007 | PlaintextProtocol | Medium | Unencrypted protocol URLs in code (any language) |
+| BATOU-CRY-009 | PythonRandomSecurity | Critical | `random.seed()` with predictable values, `random` module for tokens/passwords (Python-only rule) |
+| BATOU-CRY-011 | PredictableSeed | High | `random.seed(time.time())` or fixed seed values |
+| BATOU-CRY-012 | HardcodedKey | Critical | Encryption keys assigned as string/byte literals |
+| BATOU-CRY-013 | UnauthenticatedEncryption | High | CBC mode without HMAC or authentication |
+| BATOU-CRY-014 | InsecureRSAPadding | High | PKCS1v15 padding instead of OAEP |
+| BATOU-CRY-015 | WeakPasswordHash | Critical | MD5/SHA for password hashing instead of bcrypt/argon2 |
+| BATOU-CRY-017 | TimingUnsafeCompare | Medium | `==` comparison of tokens, secrets, hashes, or signatures instead of `hmac.compare_digest()` |
+| BATOU-CRY-018 | HardcodedIVBroad | High | `AES.new()` with hardcoded IV bytes (e.g., `AES.new(key, AES.MODE_CBC, b'fixed_iv')`) |
 
 ### Secrets (`internal/rules/secrets/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-SEC-001 | HardcodedPassword | Critical | `password = "..."`, `secret = "..."` assignments |
-| GTSS-SEC-002 | APIKeyExposure | Critical | AWS, GCP, Stripe, GitHub, Slack API keys (any language) |
-| GTSS-SEC-003 | PrivateKeyInCode | Critical | PEM-encoded private keys (any language) |
-| GTSS-SEC-004 | ConnectionString | High | Database URIs with embedded credentials (any language) |
-| GTSS-SEC-005 | JWTSecret | Critical | Hardcoded JWT signing secrets |
-| GTSS-SEC-006 | EnvironmentLeak | Medium | Dumping all env vars to output (any language) |
+| BATOU-SEC-001 | HardcodedPassword | Critical | `password = "..."`, `secret = "..."` assignments |
+| BATOU-SEC-002 | APIKeyExposure | Critical | AWS, GCP, Stripe, GitHub, Slack API keys (any language) |
+| BATOU-SEC-003 | PrivateKeyInCode | Critical | PEM-encoded private keys (any language) |
+| BATOU-SEC-004 | ConnectionString | High | Database URIs with embedded credentials (any language) |
+| BATOU-SEC-005 | JWTSecret | Critical | Hardcoded JWT signing secrets |
+| BATOU-SEC-006 | EnvironmentLeak | Medium | Dumping all env vars to output (any language) |
 
 ### SSRF (`internal/rules/ssrf/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-SSRF-001 | URLFromUserInput | High | `requests.get(user_url)`, `urlopen(user_url)` (any language) |
-| GTSS-SSRF-002 | InternalNetworkAccess | High | Requests to localhost, cloud metadata endpoints, and private IP ranges (any language) |
-| GTSS-SSRF-003 | DNSRebinding | Medium | Separate DNS resolve + HTTP request pattern |
-| GTSS-SSRF-004 | RedirectFollowing | Medium | `allow_redirects=True` with user-controlled URL |
+| BATOU-SSRF-001 | URLFromUserInput | High | `requests.get(user_url)`, `urlopen(user_url)` (any language) |
+| BATOU-SSRF-002 | InternalNetworkAccess | High | Requests to localhost, cloud metadata endpoints, and private IP ranges (any language) |
+| BATOU-SSRF-003 | DNSRebinding | Medium | Separate DNS resolve + HTTP request pattern |
+| BATOU-SSRF-004 | RedirectFollowing | Medium | `allow_redirects=True` with user-controlled URL |
 
 ### Auth (`internal/rules/auth/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-AUTH-001 | HardcodedCredentialCheck | Critical | `if password == "..."` comparison patterns |
-| GTSS-AUTH-002 | MissingAuthCheck | Medium | Route handlers without `@login_required` or auth decorators |
-| GTSS-AUTH-003 | CORSWildcard | High | Overly permissive CORS origin configuration |
-| GTSS-AUTH-004 | SessionFixation | High | Session ID set from request parameter |
-| GTSS-AUTH-005 | WeakPasswordPolicy | Medium | Short minimum password lengths in validation |
-| GTSS-AUTH-006 | InsecureCookie | High | Cookies without `secure`, `httponly`, or `samesite` flags |
-| GTSS-AUTH-007 | PrivilegeEscalation | High | Privilege escalation patterns (CWE-269) |
+| BATOU-AUTH-001 | HardcodedCredentialCheck | Critical | `if password == "..."` comparison patterns |
+| BATOU-AUTH-002 | MissingAuthCheck | Medium | Route handlers without `@login_required` or auth decorators |
+| BATOU-AUTH-003 | CORSWildcard | High | Overly permissive CORS origin configuration |
+| BATOU-AUTH-004 | SessionFixation | High | Session ID set from request parameter |
+| BATOU-AUTH-005 | WeakPasswordPolicy | Medium | Short minimum password lengths in validation |
+| BATOU-AUTH-006 | InsecureCookie | High | Cookies without `secure`, `httponly`, or `samesite` flags |
+| BATOU-AUTH-007 | PrivilegeEscalation | High | Privilege escalation patterns (CWE-269) |
 
 ### Generic (`internal/rules/generic/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-GEN-001 | DebugModeEnabled | High | `app.debug = True`, `DEBUG = True` in settings |
-| GTSS-GEN-002 | UnsafeDeserialization | Critical | `pickle.loads()`, `pickle.load()`, `shelve.open()` |
-| GTSS-GEN-003 | XXEVulnerability | High | `xml.etree` / `lxml` parsing without disabling entities |
-| GTSS-GEN-004 | OpenRedirect | High | `redirect(request.args.get("url"))` |
-| GTSS-GEN-005 | LogInjection | Medium | User input in log calls without sanitization |
-| GTSS-GEN-006 | RaceCondition | Medium | TOCTOU patterns (check-then-use without locking) |
-| GTSS-GEN-007 | MassAssignment | High | `**request.form` or `**request.json` spread into ORM |
-| GTSS-GEN-008 | CodeAsStringEval | High | Multi-line eval/exec with string-built code |
-| GTSS-GEN-009 | XMLParserMisconfig | High | XML parser with external entities or DTD enabled |
-| GTSS-GEN-012 | InsecureDownload | High | Insecure download patterns (CWE-494) |
+| BATOU-GEN-001 | DebugModeEnabled | High | `app.debug = True`, `DEBUG = True` in settings |
+| BATOU-GEN-002 | UnsafeDeserialization | Critical | `pickle.loads()`, `pickle.load()`, `shelve.open()` |
+| BATOU-GEN-003 | XXEVulnerability | High | `xml.etree` / `lxml` parsing without disabling entities |
+| BATOU-GEN-004 | OpenRedirect | High | `redirect(request.args.get("url"))` |
+| BATOU-GEN-005 | LogInjection | Medium | User input in log calls without sanitization |
+| BATOU-GEN-006 | RaceCondition | Medium | TOCTOU patterns (check-then-use without locking) |
+| BATOU-GEN-007 | MassAssignment | High | `**request.form` or `**request.json` spread into ORM |
+| BATOU-GEN-008 | CodeAsStringEval | High | Multi-line eval/exec with string-built code |
+| BATOU-GEN-009 | XMLParserMisconfig | High | XML parser with external entities or DTD enabled |
+| BATOU-GEN-012 | InsecureDownload | High | Insecure download patterns (CWE-494) |
 
 ### Logging (`internal/rules/logging/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-LOG-001 | UnsanitizedLogInput | Medium | Request data logged via f-string or `.format()` |
-| GTSS-LOG-002 | CRLFLogInjection | Medium | Log messages with potential newline injection |
-| GTSS-LOG-003 | SensitiveDataInLogs | Medium | Passwords, tokens, or keys in log statements |
+| BATOU-LOG-001 | UnsanitizedLogInput | Medium | Request data logged via f-string or `.format()` |
+| BATOU-LOG-002 | CRLFLogInjection | Medium | Log messages with potential newline injection |
+| BATOU-LOG-003 | SensitiveDataInLogs | Medium | Passwords, tokens, or keys in log statements |
 
 ### Validation (`internal/rules/validation/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-VAL-001 | DirectParamUsage | Medium | `request.args["id"]` used directly without validation |
-| GTSS-VAL-002 | MissingTypeCoercion | Medium | Request params used without `int()` / type conversion |
-| GTSS-VAL-003 | MissingLengthValidation | Medium | String input accepted without length bounds |
-| GTSS-VAL-004 | MissingAllowlistValidation | Medium | Enum-like values without allowlist check |
-| GTSS-VAL-005 | FileUploadHardening | High | File upload without proper validation (CWE-434) |
+| BATOU-VAL-001 | DirectParamUsage | Medium | `request.args["id"]` used directly without validation |
+| BATOU-VAL-002 | MissingTypeCoercion | Medium | Request params used without `int()` / type conversion |
+| BATOU-VAL-003 | MissingLengthValidation | Medium | String input accepted without length bounds |
+| BATOU-VAL-004 | MissingAllowlistValidation | Medium | Enum-like values without allowlist check |
+| BATOU-VAL-005 | FileUploadHardening | High | File upload without proper validation (CWE-434) |
 
 ### XXE (`internal/rules/xxe/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-XXE-003 | PythonXXE | High | `xml.etree.ElementTree`, `xml.dom.minidom`, `xml.sax`, `lxml.etree`, `xml.dom.pulldom` usage without `defusedxml` (skips files importing `defusedxml`; for lxml, checks `resolve_entities=False`) |
+| BATOU-XXE-003 | PythonXXE | High | `xml.etree.ElementTree`, `xml.dom.minidom`, `xml.sax`, `lxml.etree`, `xml.dom.pulldom` usage without `defusedxml` (skips files importing `defusedxml`; for lxml, checks `resolve_entities=False`) |
 
 ### NoSQL Injection (`internal/rules/nosql/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-NOSQL-001 | WhereInjection | Critical | MongoDB `$where` operator with Python f-string, `.format()`, or `%` string formatting (server-side JavaScript execution) |
-| GTSS-NOSQL-002 | OperatorInjection | High | pymongo queries with unsanitized `request.form`/`request.args`/`request.json`/`request.data`/`request.values` passed directly to `find()`, `find_one()`, `aggregate()`, etc. |
-| GTSS-NOSQL-003 | RawQueryInjection | High | `$regex`, `mapReduce`, `$lookup`, `$merge`/`$out` with user-controlled input, server-side `db.eval()` |
+| BATOU-NOSQL-001 | WhereInjection | Critical | MongoDB `$where` operator with Python f-string, `.format()`, or `%` string formatting (server-side JavaScript execution) |
+| BATOU-NOSQL-002 | OperatorInjection | High | pymongo queries with unsanitized `request.form`/`request.args`/`request.json`/`request.data`/`request.values` passed directly to `find()`, `find_one()`, `aggregate()`, etc. |
+| BATOU-NOSQL-003 | RawQueryInjection | High | `$regex`, `mapReduce`, `$lookup`, `$merge`/`$out` with user-controlled input, server-side `db.eval()` |
 
 ### Deserialization (`internal/rules/deser/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-DESER-001 | ExtendedDeserialization | Critical | `shelve.open()` (uses pickle internally) and `marshal.loads()`/`marshal.load()` (unsafe for untrusted data) |
+| BATOU-DESER-001 | ExtendedDeserialization | Critical | `shelve.open()` (uses pickle internally) and `marshal.loads()`/`marshal.load()` (unsafe for untrusted data) |
 
 ### Mass Assignment (`internal/rules/massassign/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-MASS-002 | MassAssignPython | High | Django `.objects.create(**request.data)`, `Model(**request.POST)`, Flask `Model(**request.json)`, `__dict__.update(request.data)`, `setattr()` loops with dynamic keys, DRF serializer with `fields = '__all__'` |
+| BATOU-MASS-002 | MassAssignPython | High | Django `.objects.create(**request.data)`, `Model(**request.POST)`, Flask `Model(**request.json)`, `__dict__.update(request.data)`, `setattr()` loops with dynamic keys, DRF serializer with `fields = '__all__'` |
 
 ### CORS (`internal/rules/cors/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-CORS-001 | CORSWildcardCredentials | Medium | Django `CORS_ALLOW_ALL_ORIGINS=True` + `CORS_ALLOW_CREDENTIALS=True`, Flask-CORS `origins="*"` + `supports_credentials=True` |
-| GTSS-CORS-002 | CORSReflectedOrigin | High | `response["Access-Control-Allow-Origin"] = request.META.get("HTTP_ORIGIN")` or `request.headers.get("origin")` reflected without validation |
+| BATOU-CORS-001 | CORSWildcardCredentials | Medium | Django `CORS_ALLOW_ALL_ORIGINS=True` + `CORS_ALLOW_CREDENTIALS=True`, Flask-CORS `origins="*"` + `supports_credentials=True` |
+| BATOU-CORS-002 | CORSReflectedOrigin | High | `response["Access-Control-Allow-Origin"] = request.META.get("HTTP_ORIGIN")` or `request.headers.get("origin")` reflected without validation |
 
 ### GraphQL (`internal/rules/graphql/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-GQL-001 | IntrospectionEnabled | Medium | `introspection=True` in Python graphene/strawberry/ariadne GraphQL schema configuration |
-| GTSS-GQL-002 | NoDepthLimiting | Medium | GraphQL server creation without depth limiting or query complexity analysis configured |
+| BATOU-GQL-001 | IntrospectionEnabled | Medium | `introspection=True` in Python graphene/strawberry/ariadne GraphQL schema configuration |
+| BATOU-GQL-002 | NoDepthLimiting | Medium | GraphQL server creation without depth limiting or query complexity analysis configured |
 
 ### Misconfiguration (`internal/rules/misconfig/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-MISC-001 | DebugMode | Medium | Django `DEBUG = True`, Flask `app.debug = True`, `app.run(debug=True)` |
-| GTSS-MISC-002 | ErrorDisclosure | Low | `traceback.format_exc()` in HTTP response, `str(e)` in `return`/`response`/`jsonify` calls |
-| GTSS-MISC-003 | MissingSecurityHeaders | Medium | Missing security headers (CWE-1021, CWE-693) |
+| BATOU-MISC-001 | DebugMode | Medium | Django `DEBUG = True`, Flask `app.debug = True`, `app.run(debug=True)` |
+| BATOU-MISC-002 | ErrorDisclosure | Low | `traceback.format_exc()` in HTTP response, `str(e)` in `return`/`response`/`jsonify` calls |
+| BATOU-MISC-003 | MissingSecurityHeaders | Medium | Missing security headers (CWE-1021, CWE-693) |
 
 ### Redirect (`internal/rules/redirect/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-REDIR-001 | ServerRedirectUserInput | Medium | `redirect()`/`HttpResponseRedirect()` with `request.GET`/`request.POST`/`request.args`/`request.params` (open redirect) |
-| GTSS-REDIR-002 | BypassableURLAllowlist | Medium | `'domain' in url` substring check pattern that can be bypassed via subdomain or path manipulation |
+| BATOU-REDIR-001 | ServerRedirectUserInput | Medium | `redirect()`/`HttpResponseRedirect()` with `request.GET`/`request.POST`/`request.args`/`request.params` (open redirect) |
+| BATOU-REDIR-002 | BypassableURLAllowlist | Medium | `'domain' in url` substring check pattern that can be bypassed via subdomain or path manipulation |
 
 ### Framework Rules - Django (`internal/rules/framework/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-FW-DJANGO-001 | DjangoSettingsMisconfig | Medium-High | `DEBUG=True`, `ALLOWED_HOSTS=['*']`, `SECURE_SSL_REDIRECT=False`, `SESSION_COOKIE_SECURE=False`, `CSRF_COOKIE_SECURE=False`, `SESSION_COOKIE_HTTPONLY=False`, `CORS_ALLOW_ALL_ORIGINS=True` |
-| GTSS-FW-DJANGO-002 | DjangoORMSQLInjection | Critical | `.objects.raw()` with f-string/`.format()`/`%` formatting, `.objects.extra()` usage, `cursor.execute()` with string formatting |
-| GTSS-FW-DJANGO-003 | DjangoTemplateXSS | High | `{{ variable\|safe }}` template filter, `mark_safe()` with dynamic content or f-strings |
-| GTSS-FW-DJANGO-004 | DjangoCsrfExempt | Medium | `@csrf_exempt` decorator that disables CSRF protection on views |
-| GTSS-FW-DJANGO-005 | DjangoMassAssignment | High | `.objects.create(**request.POST/data)`, `ModelForm(request.POST)` without explicit fields |
+| BATOU-FW-DJANGO-001 | DjangoSettingsMisconfig | Medium-High | `DEBUG=True`, `ALLOWED_HOSTS=['*']`, `SECURE_SSL_REDIRECT=False`, `SESSION_COOKIE_SECURE=False`, `CSRF_COOKIE_SECURE=False`, `SESSION_COOKIE_HTTPONLY=False`, `CORS_ALLOW_ALL_ORIGINS=True` |
+| BATOU-FW-DJANGO-002 | DjangoORMSQLInjection | Critical | `.objects.raw()` with f-string/`.format()`/`%` formatting, `.objects.extra()` usage, `cursor.execute()` with string formatting |
+| BATOU-FW-DJANGO-003 | DjangoTemplateXSS | High | `{{ variable\|safe }}` template filter, `mark_safe()` with dynamic content or f-strings |
+| BATOU-FW-DJANGO-004 | DjangoCsrfExempt | Medium | `@csrf_exempt` decorator that disables CSRF protection on views |
+| BATOU-FW-DJANGO-005 | DjangoMassAssignment | High | `.objects.create(**request.POST/data)`, `ModelForm(request.POST)` without explicit fields |
 
 ### Framework Rules - Flask (`internal/rules/framework/`)
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-FW-FLASK-001 | FlaskMisconfiguration | Medium-Critical | `app.run(debug=True)` (interactive debugger), hardcoded `secret_key`/`SECRET_KEY`, `SESSION_COOKIE_SECURE=False` |
-| GTSS-FW-FLASK-002 | FlaskSSTI | Critical | `render_template_string()` with dynamic/user-controlled input (server-side template injection leading to RCE) |
-| GTSS-FW-FLASK-003 | FlaskPathTraversal | High | `send_file()` with user-controlled path, `send_from_directory()` with `request` data in filename |
-| GTSS-FW-FLASK-004 | FlaskMarkupXSS | High | `Markup()` with dynamic content, f-strings, `.format()`, or `request` data (bypasses Jinja2 auto-escaping) |
+| BATOU-FW-FLASK-001 | FlaskMisconfiguration | Medium-Critical | `app.run(debug=True)` (interactive debugger), hardcoded `secret_key`/`SECRET_KEY`, `SESSION_COOKIE_SECURE=False` |
+| BATOU-FW-FLASK-002 | FlaskSSTI | Critical | `render_template_string()` with dynamic/user-controlled input (server-side template injection leading to RCE) |
+| BATOU-FW-FLASK-003 | FlaskPathTraversal | High | `send_file()` with user-controlled path, `send_from_directory()` with `request` data in filename |
+| BATOU-FW-FLASK-004 | FlaskMarkupXSS | High | `Markup()` with dynamic content, f-strings, `.format()`, or `request` data (bypasses Jinja2 auto-escaping) |
 
 ## Example Detections
 
-### SQL Injection via f-string (GTSS-INJ-001)
+### SQL Injection via f-string (BATOU-INJ-001)
 
 The following Flask route is vulnerable because user input is interpolated directly into a SQL query string:
 
 ```python
 # VULNERABLE: f-string SQL query with user input
-# Detected by GTSS-INJ-001 (Layer 1) and taint flow
+# Detected by BATOU-INJ-001 (Layer 1) and taint flow
 #   request.args -> cursor.execute (Layer 2)
 @app.route("/users")
 def get_user():
@@ -473,26 +473,26 @@ def get_user():
     cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
 ```
 
-### Command Injection via os.system (GTSS-INJ-002)
+### Command Injection via os.system (BATOU-INJ-002)
 
 User input concatenated into a shell command string:
 
 ```python
 # VULNERABLE: String concatenation in shell command
-# Detected by GTSS-INJ-002 and taint sink py.os.system
+# Detected by BATOU-INJ-002 and taint sink py.os.system
 @app.route("/ping")
 def ping():
     host = request.args.get("host")
     os.system("ping -c 3 " + host)
 ```
 
-### Unsafe Deserialization via pickle (GTSS-GEN-002)
+### Unsafe Deserialization via pickle (BATOU-GEN-002)
 
 Pickle deserialization of user-controlled data allows arbitrary code execution:
 
 ```python
 # VULNERABLE: Pickle loads on user-controlled cookie data
-# Detected by GTSS-GEN-002 and taint sink py.pickle.loads
+# Detected by BATOU-GEN-002 and taint sink py.pickle.loads
 @app.route("/restore-session", methods=["POST"])
 def restore_session():
     cookie_data = request.cookies.get("session_data")
@@ -562,7 +562,7 @@ The `py.os.path.basename` sanitizer also neutralizes path traversal when used to
 
 - **Decorator-based sanitizers.** Custom decorators that validate input (e.g., `@validate_input`) are not recognized unless they match a known sanitizer pattern like `validate()` or `is_valid()`.
 
-- **Django template auto-escaping.** GTSS does not parse Django template files (`.html`) to verify that auto-escaping is enabled. It only detects unsafe patterns in Python view code like `mark_safe()` or `HttpResponse()` with interpolated data.
+- **Django template auto-escaping.** Batou does not parse Django template files (`.html`) to verify that auto-escaping is enabled. It only detects unsafe patterns in Python view code like `mark_safe()` or `HttpResponse()` with interpolated data.
 
 - **Type annotation awareness.** Pydantic `BaseModel` fields with constrained types (e.g., `conint`, `constr`) are recognized as sanitizers, but custom Pydantic validators using `@validator` or `@field_validator` are not individually tracked.
 
@@ -570,6 +570,6 @@ The `py.os.path.basename` sanitizer also neutralizes path traversal when used to
 
 - **Third-party ORM safety.** SQLAlchemy's query builder methods (`.filter()`, `.filter_by()`) that use parameterized queries are safe but not explicitly marked as sanitizers. Only `bindparam()` and `.params()` are recognized.
 
-- **No `requirements.txt` / `pyproject.toml` analysis.** GTSS does not check for known-vulnerable package versions.
+- **No `requirements.txt` / `pyproject.toml` analysis.** Batou does not check for known-vulnerable package versions.
 
-- **Limited Jupyter notebook coverage.** While GTSS intercepts `NotebookEdit` tool calls, Python-specific cell patterns (like `!` shell commands in notebooks) are not specially handled beyond standard Python scanning.
+- **Limited Jupyter notebook coverage.** While Batou intercepts `NotebookEdit` tool calls, Python-specific cell patterns (like `!` shell commands in notebooks) are not specially handled beyond standard Python scanning.

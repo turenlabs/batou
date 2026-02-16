@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 
 	// Register all catalogs.
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 // ---------------------------------------------------------------------------
@@ -265,8 +265,8 @@ func TestTaintFlowToFinding(t *testing.T) {
 
 	finding := flow.ToFinding()
 
-	if finding.RuleID != "GTSS-TAINT-sql_query" {
-		t.Errorf("expected RuleID 'GTSS-TAINT-sql_query', got %q", finding.RuleID)
+	if finding.RuleID != "BATOU-TAINT-sql_query" {
+		t.Errorf("expected RuleID 'BATOU-TAINT-sql_query', got %q", finding.RuleID)
 	}
 	if finding.Severity != rules.Critical {
 		t.Errorf("expected Critical severity, got %s", finding.Severity)

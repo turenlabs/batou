@@ -1,6 +1,6 @@
-// Cross-function taint propagation for GTSS.
+// Cross-function taint propagation for Batou.
 //
-// When Claude modifies function B, GTSS doesn't just analyze B in isolation.
+// When Claude modifies function B, Batou doesn't just analyze B in isolation.
 // It walks the call graph to find all callers of B, checks if taint from
 // B's parameters flows through callers to dangerous sinks, and reports
 // interprocedural taint paths that would be invisible to single-function analysis.
@@ -20,8 +20,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // maxCallerFileSize is the largest file we'll read from disk for
@@ -869,7 +869,7 @@ func checkCallerPassesTaintToCallee(
 		owasp := owaspForSinkCategory[matchedSink.SinkCategory]
 
 		finding := rules.Finding{
-			RuleID:   fmt.Sprintf("GTSS-INTERPROC-%s", strings.ToUpper(string(matchedSink.SinkCategory))),
+			RuleID:   fmt.Sprintf("BATOU-INTERPROC-%s", strings.ToUpper(string(matchedSink.SinkCategory))),
 			Severity: sev,
 			SeverityLabel: sev.String(),
 			Title: fmt.Sprintf(
@@ -1004,7 +1004,7 @@ func checkCallerUsesTaintedReturn(
 			}
 
 			finding := rules.Finding{
-				RuleID:   fmt.Sprintf("GTSS-INTERPROC-%s", strings.ToUpper(string(sp.category))),
+				RuleID:   fmt.Sprintf("BATOU-INTERPROC-%s", strings.ToUpper(string(sp.category))),
 				Severity: sev,
 				SeverityLabel: sev.String(),
 				Title: fmt.Sprintf(

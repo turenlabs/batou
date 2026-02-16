@@ -3,10 +3,10 @@ package framework
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
-// --- GTSS-FW-SPRING-001: CSRF Disabled ---
+// --- BATOU-FW-SPRING-001: CSRF Disabled ---
 
 func TestSpring001_CSRFDisable_Legacy(t *testing.T) {
 	content := `@Configuration
@@ -19,7 +19,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-001")
+	// Overlapping rules may win dedup; either detection is valid.
+	testutil.MustFindAnyRule(t, result, "BATOU-FW-SPRING-001", "BATOU-FW-SPRING-013")
 }
 
 func TestSpring001_CSRFDisable_Lambda(t *testing.T) {
@@ -30,7 +31,8 @@ public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         .build();
 }`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-001")
+	// Overlapping rules may win dedup; either detection is valid.
+	testutil.MustFindAnyRule(t, result, "BATOU-FW-SPRING-001", "BATOU-FW-SPRING-013")
 }
 
 func TestSpring001_CSRFDisable_MethodRef(t *testing.T) {
@@ -41,7 +43,8 @@ public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         .build();
 }`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-001")
+	// Overlapping rules may win dedup; either detection is valid.
+	testutil.MustFindAnyRule(t, result, "BATOU-FW-SPRING-001", "BATOU-FW-SPRING-013")
 }
 
 func TestSpring001_CSRFEnabled_Safe(t *testing.T) {
@@ -52,16 +55,16 @@ public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         .build();
 }`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-001")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-001")
 }
 
-// --- GTSS-FW-SPRING-002: Overly Permissive Access ---
+// --- BATOU-FW-SPRING-002: Overly Permissive Access ---
 
 func TestSpring002_PermitAll_Wildcard(t *testing.T) {
 	content := `http.authorizeRequests()
     .antMatchers("/**").permitAll();`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-002")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-002")
 }
 
 func TestSpring002_AnyRequestPermitAll(t *testing.T) {
@@ -69,7 +72,7 @@ func TestSpring002_AnyRequestPermitAll(t *testing.T) {
     .anyRequest().permitAll()
 );`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-002")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-002")
 }
 
 func TestSpring002_PermitAll_SpecificPath_Safe(t *testing.T) {
@@ -77,7 +80,7 @@ func TestSpring002_PermitAll_SpecificPath_Safe(t *testing.T) {
     .antMatchers("/login", "/register").permitAll()
     .anyRequest().authenticated();`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-002")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-002")
 }
 
 func TestSpring002_RequestMatchers_Wildcard(t *testing.T) {
@@ -85,10 +88,10 @@ func TestSpring002_RequestMatchers_Wildcard(t *testing.T) {
     .requestMatchers("/**").permitAll()
 );`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-002")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-002")
 }
 
-// --- GTSS-FW-SPRING-003: Insecure CORS ---
+// --- BATOU-FW-SPRING-003: Insecure CORS ---
 
 func TestSpring003_CORS_AllOriginsWithCredentials(t *testing.T) {
 	content := `@Bean
@@ -102,9 +105,9 @@ public CorsConfigurationSource corsConfigurationSource() {
     return source;
 }`
 	result := testutil.ScanContent(t, "/app/CorsConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-003")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-003")
 	// Should be HIGH severity since credentials + wildcard
-	findings := testutil.FindingsByRule(result, "GTSS-FW-SPRING-003")
+	findings := testutil.FindingsByRule(result, "BATOU-FW-SPRING-003")
 	foundHigh := false
 	for _, f := range findings {
 		if f.Severity.String() == "HIGH" {
@@ -127,7 +130,7 @@ public class ApiController {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ApiController.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-003")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-003")
 }
 
 func TestSpring003_CrossOriginNoArgs(t *testing.T) {
@@ -140,7 +143,7 @@ public class ApiController {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ApiController.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-003")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-003")
 }
 
 func TestSpring003_CORS_SpecificOrigin_Safe(t *testing.T) {
@@ -148,24 +151,24 @@ func TestSpring003_CORS_SpecificOrigin_Safe(t *testing.T) {
 config.setAllowedOrigins(Arrays.asList("https://example.com"));
 config.setAllowCredentials(true);`
 	result := testutil.ScanContent(t, "/app/CorsConfig.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-003")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-003")
 }
 
-// --- GTSS-FW-SPRING-004: Actuator Exposure ---
+// --- BATOU-FW-SPRING-004: Actuator Exposure ---
 
 func TestSpring004_ActuatorPermitAll(t *testing.T) {
 	content := `http.authorizeRequests()
     .antMatchers("/actuator/**").permitAll()
     .anyRequest().authenticated();`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-004")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-004")
 }
 
 func TestSpring004_ActuatorExposeAll_Properties(t *testing.T) {
 	content := `management.endpoints.web.exposure.include=*
 management.endpoint.health.show-details=always`
 	result := testutil.ScanContent(t, "/app/application.properties", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-004")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-004")
 }
 
 func TestSpring004_ActuatorExposeAll_YAML(t *testing.T) {
@@ -176,23 +179,23 @@ func TestSpring004_ActuatorExposeAll_YAML(t *testing.T) {
         include: "*"
 management.endpoints.web.exposure.include=*`
 	result := testutil.ScanContent(t, "/app/application.yml", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-004")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-004")
 }
 
 func TestSpring004_ActuatorSecurityDisabled(t *testing.T) {
 	content := `management.security.enabled=false
 server.port=8080`
 	result := testutil.ScanContent(t, "/app/application.properties", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-004")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-004")
 }
 
 func TestSpring004_ActuatorLimited_Safe(t *testing.T) {
 	content := `management.endpoints.web.exposure.include=health,info`
 	result := testutil.ScanContent(t, "/app/application.properties", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-004")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-004")
 }
 
-// --- GTSS-FW-SPRING-005: Native Query Injection ---
+// --- BATOU-FW-SPRING-005: Native Query Injection ---
 
 func TestSpring005_NativeQuery_Concat(t *testing.T) {
 	content := `@Repository
@@ -201,7 +204,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByName(String name);
 }`
 	result := testutil.ScanContent(t, "/app/UserRepository.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-005")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-005")
 }
 
 func TestSpring005_EntityManager_NativeQuery(t *testing.T) {
@@ -210,7 +213,7 @@ func TestSpring005_EntityManager_NativeQuery(t *testing.T) {
         .getResultList();
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-005")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-005")
 }
 
 func TestSpring005_EntityManager_CreateQuery_Concat(t *testing.T) {
@@ -219,7 +222,7 @@ func TestSpring005_EntityManager_CreateQuery_Concat(t *testing.T) {
         .getResultList();
 }`
 	result := testutil.ScanContent(t, "/app/UserService.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-005")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-005")
 }
 
 func TestSpring005_NativeQuery_Parameterized_Safe(t *testing.T) {
@@ -229,7 +232,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByName(@Param("name") String name);
 }`
 	result := testutil.ScanContent(t, "/app/UserRepository.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-005")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-005")
 }
 
 func TestSpring005_EntityManager_Parameterized_Safe(t *testing.T) {
@@ -239,10 +242,10 @@ func TestSpring005_EntityManager_Parameterized_Safe(t *testing.T) {
         .getResultList();
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-005")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-005")
 }
 
-// --- GTSS-FW-SPRING-006: Mass Assignment ---
+// --- BATOU-FW-SPRING-006: Mass Assignment ---
 
 func TestSpring006_ModelAttribute_NoInitBinder(t *testing.T) {
 	content := `@Controller
@@ -274,10 +277,10 @@ public class UserController {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserController.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-006")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-006")
 }
 
-// --- GTSS-FW-SPRING-007: Insecure Cookie ---
+// --- BATOU-FW-SPRING-007: Insecure Cookie ---
 
 func TestSpring007_Cookie_HttpOnlyFalse(t *testing.T) {
 	content := `Cookie cookie = new Cookie("session", token);
@@ -285,7 +288,7 @@ cookie.setHttpOnly(false);
 cookie.setPath("/");
 response.addCookie(cookie);`
 	result := testutil.ScanContent(t, "/app/AuthController.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-007")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-007")
 }
 
 func TestSpring007_Cookie_SecureFalse(t *testing.T) {
@@ -293,7 +296,7 @@ func TestSpring007_Cookie_SecureFalse(t *testing.T) {
 cookie.setSecure(false);
 response.addCookie(cookie);`
 	result := testutil.ScanContent(t, "/app/AuthController.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-007")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-007")
 }
 
 func TestSpring007_Cookie_BothFlagsTrue_Safe(t *testing.T) {
@@ -303,42 +306,42 @@ cookie.setSecure(true);
 cookie.setPath("/");
 response.addCookie(cookie);`
 	result := testutil.ScanContent(t, "/app/AuthController.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-007")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-007")
 }
 
-// --- GTSS-FW-SPRING-008: Frame Options Disabled ---
+// --- BATOU-FW-SPRING-008: Frame Options Disabled ---
 
 func TestSpring008_FrameOptionsDisable(t *testing.T) {
 	content := `http.headers().frameOptions().disable();`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-008")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-008")
 }
 
 func TestSpring008_FrameOptionsDisable_Lambda(t *testing.T) {
 	content := `http.headers(headers -> headers.frameOptions(frame -> frame.disable()));`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-008")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-008")
 }
 
 func TestSpring008_HeadersDisable(t *testing.T) {
 	content := `http.headers().disable();`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-008")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-008")
 }
 
 func TestSpring008_FrameOptionsSameOrigin_Safe(t *testing.T) {
 	content := `http.headers().frameOptions().sameOrigin();`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-008")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-008")
 }
 
-// --- GTSS-FW-SPRING-009: Dispatcher Forward ---
+// --- BATOU-FW-SPRING-009: Dispatcher Forward ---
 
 func TestSpring009_DispatcherForward(t *testing.T) {
 	content := `String page = request.getParameter("page");
 request.getRequestDispatcher(page).forward(request, response);`
 	result := testutil.ScanContent(t, "/app/ForwardServlet.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-009")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-009")
 }
 
 func TestSpring009_ModelAndView_UserInput(t *testing.T) {
@@ -347,29 +350,29 @@ public ModelAndView viewPage(@RequestParam String template) {
     return new ModelAndView(template);
 }`
 	result := testutil.ScanContent(t, "/app/ViewController.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-009")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-009")
 }
 
 func TestSpring009_DispatcherForward_FixedPath_Safe(t *testing.T) {
 	content := `request.getRequestDispatcher("/WEB-INF/views/home.jsp").forward(request, response);`
 	result := testutil.ScanContent(t, "/app/ForwardServlet.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-009")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-009")
 }
 
-// --- GTSS-FW-SPRING-010: Session Fixation ---
+// --- BATOU-FW-SPRING-010: Session Fixation ---
 
 func TestSpring010_SessionFixationNone(t *testing.T) {
 	content := `http.sessionManagement()
     .sessionFixation().none();`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-010")
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-010")
 }
 
 func TestSpring010_SessionFixationMigrateSession_Safe(t *testing.T) {
 	content := `http.sessionManagement()
     .sessionFixation().migrateSession();`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-010")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-010")
 }
 
 // --- Integration: Multiple findings in one config ---
@@ -392,11 +395,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-001") // CSRF disabled
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-002") // permitAll wildcard
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-004") // actuator exposed
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-008") // frame options disabled
-	testutil.MustFindRule(t, result, "GTSS-FW-SPRING-010") // session fixation off
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-001") // CSRF disabled
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-002") // permitAll wildcard
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-004") // actuator exposed
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-008") // frame options disabled
+	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-010") // session fixation off
 }
 
 // --- Fixture-based tests ---
@@ -416,7 +419,7 @@ func TestSpring_Fixture_Safe(t *testing.T) {
 	}
 	content := testutil.LoadFixture(t, "java/safe/SpringSecuritySafe.java")
 	result := testutil.ScanContent(t, "/app/SpringSecuritySafe.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-001")
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-002")
-	testutil.MustNotFindRule(t, result, "GTSS-FW-SPRING-005")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-001")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-002")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-005")
 }

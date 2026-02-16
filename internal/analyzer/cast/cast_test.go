@@ -3,8 +3,8 @@ package cast
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanC(code string) []rules.Finding {
@@ -49,7 +49,7 @@ void handler(char *input) {
 }
 `
 	findings := scanC(code)
-	count := countByRule(findings, "GTSS-CAST-001")
+	count := countByRule(findings, "BATOU-CAST-001")
 	if count != 3 {
 		t.Errorf("expected 3 banned function findings, got %d", count)
 		for _, f := range findings {
@@ -66,7 +66,7 @@ void handler(char *input) {
 }
 `
 	findings := scanC(code)
-	f := findByRule(findings, "GTSS-CAST-001")
+	f := findByRule(findings, "BATOU-CAST-001")
 	if f == nil {
 		t.Error("expected banned function finding for sprintf")
 	}
@@ -79,7 +79,7 @@ void handler(char *input) {
 }
 `
 	findings := scanC(code)
-	f := findByRule(findings, "GTSS-CAST-002")
+	f := findByRule(findings, "BATOU-CAST-002")
 	if f == nil {
 		t.Error("expected format string vulnerability finding")
 		for _, f := range findings {
@@ -96,7 +96,7 @@ void handler(char *input) {
 `
 	findings := scanC(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CAST-002" {
+		if f.RuleID == "BATOU-CAST-002" {
 			t.Errorf("should not flag printf with literal format: %s", f.Title)
 		}
 	}
@@ -109,7 +109,7 @@ void handler(char *cmd) {
 }
 `
 	findings := scanC(code)
-	f := findByRule(findings, "GTSS-CAST-003")
+	f := findByRule(findings, "BATOU-CAST-003")
 	if f == nil {
 		t.Error("expected command injection finding for system()")
 		for _, f := range findings {
@@ -126,7 +126,7 @@ void handler() {
 `
 	findings := scanC(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CAST-003" {
+		if f.RuleID == "BATOU-CAST-003" {
 			t.Errorf("should not flag system with literal: %s", f.Title)
 		}
 	}
@@ -139,7 +139,7 @@ void handler(char *cmd) {
 }
 `
 	findings := scanC(code)
-	f := findByRule(findings, "GTSS-CAST-003")
+	f := findByRule(findings, "BATOU-CAST-003")
 	if f == nil {
 		t.Error("expected command injection finding for popen()")
 		for _, f := range findings {
@@ -164,7 +164,7 @@ void handler(char *cmd) {
 	}
 	a := &CASTAnalyzer{}
 	findings := a.Scan(ctx)
-	f := findByRule(findings, "GTSS-CAST-003")
+	f := findByRule(findings, "BATOU-CAST-003")
 	if f == nil {
 		t.Error("expected finding for C++ system()")
 	}
@@ -205,7 +205,7 @@ void handler(char *input) {
 }
 `
 	findings := scanC(code)
-	f := findByRule(findings, "GTSS-CAST-002")
+	f := findByRule(findings, "BATOU-CAST-002")
 	if f == nil {
 		t.Fatal("expected finding")
 	}

@@ -3,8 +3,8 @@ package pyast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // PythonASTAnalyzer performs AST-based security analysis of Python source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&PythonASTAnalyzer{})
 }
 
-func (p *PythonASTAnalyzer) ID() string                        { return "GTSS-PYAST" }
+func (p *PythonASTAnalyzer) ID() string                        { return "BATOU-PYAST" }
 func (p *PythonASTAnalyzer) Name() string                      { return "Python AST Security Analyzer" }
 func (p *PythonASTAnalyzer) DefaultSeverity() rules.Severity   { return rules.Critical }
 func (p *PythonASTAnalyzer) Languages() []rules.Language       { return []rules.Language{rules.LangPython} }
@@ -100,7 +100,7 @@ func (c *pyChecker) checkDangerousBuiltin(n *ast.Node, funcName, title, desc, cw
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-PYAST-001",
+		RuleID:        "BATOU-PYAST-001",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         title,
@@ -144,7 +144,7 @@ func (c *pyChecker) checkSubprocessShell(n *ast.Node, funcName string) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-PYAST-002",
+		RuleID:        "BATOU-PYAST-002",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Shell injection via " + funcName + " with shell=True",
@@ -173,7 +173,7 @@ func (c *pyChecker) checkPickle(n *ast.Node, funcName string) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-PYAST-003",
+		RuleID:        "BATOU-PYAST-003",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Unsafe deserialization via " + funcName,
@@ -202,7 +202,7 @@ func (c *pyChecker) checkOpenCall(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-PYAST-004",
+		RuleID:        "BATOU-PYAST-004",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "Path traversal via open() with variable path",
@@ -237,7 +237,7 @@ func (c *pyChecker) checkSQLFormatOp(n *ast.Node) {
 	if containsSQLKeyword(left.Text()) {
 		line := int(n.StartRow()) + 1
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-PYAST-005",
+			RuleID:        "BATOU-PYAST-005",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "SQL injection via string % formatting",
@@ -276,7 +276,7 @@ func (c *pyChecker) checkFStringSQLInjection(n *ast.Node) {
 	if containsSQLKeyword(text) {
 		line := int(n.StartRow()) + 1
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-PYAST-005",
+			RuleID:        "BATOU-PYAST-005",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "SQL injection via f-string interpolation",

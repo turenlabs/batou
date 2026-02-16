@@ -1,6 +1,6 @@
 package tsflow
 
-import "github.com/turenio/gtss/internal/taint"
+import "github.com/turenlabs/batou/internal/taint"
 
 // taintState tracks the taint status of a single variable inside a function scope.
 type taintState struct {

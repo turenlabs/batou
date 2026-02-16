@@ -3,8 +3,8 @@ package rubyast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // RubyASTAnalyzer performs AST-based security analysis of Ruby source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&RubyASTAnalyzer{})
 }
 
-func (r *RubyASTAnalyzer) ID() string                      { return "GTSS-RUBYAST" }
+func (r *RubyASTAnalyzer) ID() string                      { return "BATOU-RUBYAST" }
 func (r *RubyASTAnalyzer) Name() string                    { return "Ruby AST Security Analyzer" }
 func (r *RubyASTAnalyzer) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RubyASTAnalyzer) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
@@ -122,7 +122,7 @@ func (c *rubyChecker) checkEvalCall(n *ast.Node, funcName string) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-RUBYAST-001",
+		RuleID:        "BATOU-RUBYAST-001",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Code injection via " + funcName + "()",
@@ -151,7 +151,7 @@ func (c *rubyChecker) checkCommandCall(n *ast.Node, funcName string) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-RUBYAST-002",
+		RuleID:        "BATOU-RUBYAST-002",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Command injection via " + funcName + "()",
@@ -184,7 +184,7 @@ func (c *rubyChecker) checkDynamicDispatch(n *ast.Node, funcName string) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-RUBYAST-003",
+		RuleID:        "BATOU-RUBYAST-003",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "Dynamic method dispatch via " + funcName + "() with variable",
@@ -213,7 +213,7 @@ func (c *rubyChecker) checkIOPopen(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-RUBYAST-004",
+		RuleID:        "BATOU-RUBYAST-004",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Command injection via IO.popen()",
@@ -242,7 +242,7 @@ func (c *rubyChecker) checkERBNew(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-RUBYAST-005",
+		RuleID:        "BATOU-RUBYAST-005",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Template injection via ERB.new()",

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,40 +12,40 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-DESER-005: Java ObjectInputStream.readObject without filter
+	// BATOU-DESER-005: Java ObjectInputStream.readObject without filter
 	reExtObjInputStream  = regexp.MustCompile(`\bObjectInputStream\s*\(`)
 	reExtReadObject      = regexp.MustCompile(`\.readObject\s*\(`)
 	reExtObjectFilter    = regexp.MustCompile(`(?i)(?:setObjectInputFilter|ObjectInputFilter|serialFilter|ClassFilter|lookAheadObjectInputStream|SafeObjectInputStream|ValidatingObjectInputStream)`)
 
-	// GTSS-DESER-006: PHP unserialize with user input
+	// BATOU-DESER-006: PHP unserialize with user input
 	reExtPHPUnserialize    = regexp.MustCompile(`\bunserialize\s*\(\s*\$(?:_GET|_POST|_REQUEST|_COOKIE|input|data|body|payload|param|value|raw)`)
 	reExtPHPUnserializeGen = regexp.MustCompile(`\bunserialize\s*\(\s*\$[a-zA-Z_]\w*`)
 	reExtPHPUserSource     = regexp.MustCompile(`\$_(?:GET|POST|REQUEST|COOKIE)|file_get_contents\s*\(\s*['"]php://input|json_decode`)
 
-	// GTSS-DESER-007: Python yaml.load without SafeLoader
+	// BATOU-DESER-007: Python yaml.load without SafeLoader
 	reExtYAMLLoad      = regexp.MustCompile(`\byaml\.(?:load|unsafe_load)\s*\(`)
 	reExtYAMLSafeLoad  = regexp.MustCompile(`\byaml\.(?:safe_load|load\s*\([^)]*Loader\s*=\s*(?:yaml\.)?SafeLoader)`)
 	reExtYAMLFullLoad  = regexp.MustCompile(`\byaml\.(?:full_load|load\s*\([^)]*Loader\s*=\s*(?:yaml\.)?FullLoader)`)
 
-	// GTSS-DESER-008: .NET BinaryFormatter deserialization
+	// BATOU-DESER-008: .NET BinaryFormatter deserialization
 	reExtBinaryFormatter = regexp.MustCompile(`\bBinaryFormatter\s*\(\s*\)`)
 	reExtBinaryDeser     = regexp.MustCompile(`\.Deserialize\s*\(`)
 	reExtDotNetUnsafe    = regexp.MustCompile(`(?:LosFormatter|SoapFormatter|NetDataContractSerializer|ObjectStateFormatter|JavaScriptSerializer)\s*\(`)
 
-	// GTSS-DESER-009: Ruby Marshal.load with untrusted data
+	// BATOU-DESER-009: Ruby Marshal.load with untrusted data
 	reExtRubyMarshalLoad = regexp.MustCompile(`\bMarshal\.(?:load|restore)\s*\(`)
 	reExtRubyMarshalUser = regexp.MustCompile(`\bMarshal\.(?:load|restore)\s*\(\s*(?:params|request|session|cookies|Base64\.decode|File\.read|IO\.read)`)
 
-	// GTSS-DESER-010: Node.js node-serialize/serialize-javascript RCE
+	// BATOU-DESER-010: Node.js node-serialize/serialize-javascript RCE
 	reExtNodeSerialize    = regexp.MustCompile(`\b(?:node-serialize|serialize|unserialize)\s*\.\s*unserialize\s*\(`)
 	reExtNodeSerializeReq = regexp.MustCompile(`(?i)(?:serialize|unserialize).*(?:req\.|request\.|body|query|params|input|data)`)
 	reExtNodeSerializeLib = regexp.MustCompile(`(?i)require\s*\(\s*['"](?:node-serialize|serialize-javascript|serialize-to-js)['"]`)
 
-	// GTSS-DESER-011: Java XMLDecoder with untrusted input
+	// BATOU-DESER-011: Java XMLDecoder with untrusted input
 	reExtXMLDecoder      = regexp.MustCompile(`\bnew\s+XMLDecoder\s*\(`)
 	reExtXMLDecoderInput = regexp.MustCompile(`\bnew\s+XMLDecoder\s*\(\s*(?:new\s+(?:ByteArrayInputStream|FileInputStream|BufferedInputStream)|request|input|stream|is|body)`)
 
-	// GTSS-DESER-012: Kotlin/JVM serialization of untrusted data
+	// BATOU-DESER-012: Kotlin/JVM serialization of untrusted data
 	reExtKotlinDeser     = regexp.MustCompile(`(?i)(?:ObjectInputStream|readObject|Serializable|Externalizable|Kryo|ObjectMapper\.readValue|Gson\.fromJson|Json\.decodeFromString)`)
 	reExtKotlinUntrusted = regexp.MustCompile(`(?i)(?:ObjectInputStream|readObject)\s*\(.*(?:request|input|stream|socket|body)`)
 )
@@ -66,12 +66,12 @@ func init() {
 }
 
 // ========================================================================
-// GTSS-DESER-005: Java ObjectInputStream.readObject without Filter
+// BATOU-DESER-005: Java ObjectInputStream.readObject without Filter
 // ========================================================================
 
 type JavaObjectInputStreamRule struct{}
 
-func (r *JavaObjectInputStreamRule) ID() string                     { return "GTSS-DESER-005" }
+func (r *JavaObjectInputStreamRule) ID() string                     { return "BATOU-DESER-005" }
 func (r *JavaObjectInputStreamRule) Name() string                   { return "JavaObjectInputStream" }
 func (r *JavaObjectInputStreamRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JavaObjectInputStreamRule) Description() string {
@@ -132,12 +132,12 @@ func (r *JavaObjectInputStreamRule) Scan(ctx *rules.ScanContext) []rules.Finding
 }
 
 // ========================================================================
-// GTSS-DESER-006: PHP unserialize with User Input
+// BATOU-DESER-006: PHP unserialize with User Input
 // ========================================================================
 
 type PHPUnserializeRule struct{}
 
-func (r *PHPUnserializeRule) ID() string                     { return "GTSS-DESER-006" }
+func (r *PHPUnserializeRule) ID() string                     { return "BATOU-DESER-006" }
 func (r *PHPUnserializeRule) Name() string                   { return "PHPUnserialize" }
 func (r *PHPUnserializeRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PHPUnserializeRule) Description() string {
@@ -200,12 +200,12 @@ func (r *PHPUnserializeRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-DESER-007: Python yaml.load without SafeLoader
+// BATOU-DESER-007: Python yaml.load without SafeLoader
 // ========================================================================
 
 type PythonYAMLLoadRule struct{}
 
-func (r *PythonYAMLLoadRule) ID() string                     { return "GTSS-DESER-007" }
+func (r *PythonYAMLLoadRule) ID() string                     { return "BATOU-DESER-007" }
 func (r *PythonYAMLLoadRule) Name() string                   { return "PythonYAMLLoad" }
 func (r *PythonYAMLLoadRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PythonYAMLLoadRule) Description() string {
@@ -258,12 +258,12 @@ func (r *PythonYAMLLoadRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-DESER-008: .NET BinaryFormatter Deserialization
+// BATOU-DESER-008: .NET BinaryFormatter Deserialization
 // ========================================================================
 
 type DotNetBinaryFormatterRule struct{}
 
-func (r *DotNetBinaryFormatterRule) ID() string                     { return "GTSS-DESER-008" }
+func (r *DotNetBinaryFormatterRule) ID() string                     { return "BATOU-DESER-008" }
 func (r *DotNetBinaryFormatterRule) Name() string                   { return "DotNetBinaryFormatter" }
 func (r *DotNetBinaryFormatterRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *DotNetBinaryFormatterRule) Description() string {
@@ -310,12 +310,12 @@ func (r *DotNetBinaryFormatterRule) Scan(ctx *rules.ScanContext) []rules.Finding
 }
 
 // ========================================================================
-// GTSS-DESER-009: Ruby Marshal.load with Untrusted Data
+// BATOU-DESER-009: Ruby Marshal.load with Untrusted Data
 // ========================================================================
 
 type RubyMarshalLoadRule struct{}
 
-func (r *RubyMarshalLoadRule) ID() string                     { return "GTSS-DESER-009" }
+func (r *RubyMarshalLoadRule) ID() string                     { return "BATOU-DESER-009" }
 func (r *RubyMarshalLoadRule) Name() string                   { return "RubyMarshalLoad" }
 func (r *RubyMarshalLoadRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RubyMarshalLoadRule) Description() string {
@@ -373,12 +373,12 @@ func (r *RubyMarshalLoadRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-DESER-010: Node.js node-serialize/serialize-javascript RCE
+// BATOU-DESER-010: Node.js node-serialize/serialize-javascript RCE
 // ========================================================================
 
 type NodeSerializeRule struct{}
 
-func (r *NodeSerializeRule) ID() string                     { return "GTSS-DESER-010" }
+func (r *NodeSerializeRule) ID() string                     { return "BATOU-DESER-010" }
 func (r *NodeSerializeRule) Name() string                   { return "NodeSerialize" }
 func (r *NodeSerializeRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *NodeSerializeRule) Description() string {
@@ -433,12 +433,12 @@ func (r *NodeSerializeRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-DESER-011: Java XMLDecoder with Untrusted Input
+// BATOU-DESER-011: Java XMLDecoder with Untrusted Input
 // ========================================================================
 
 type JavaXMLDecoderRule struct{}
 
-func (r *JavaXMLDecoderRule) ID() string                     { return "GTSS-DESER-011" }
+func (r *JavaXMLDecoderRule) ID() string                     { return "BATOU-DESER-011" }
 func (r *JavaXMLDecoderRule) Name() string                   { return "JavaXMLDecoder" }
 func (r *JavaXMLDecoderRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JavaXMLDecoderRule) Description() string {
@@ -496,12 +496,12 @@ func (r *JavaXMLDecoderRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-DESER-012: Kotlin/JVM Serialization of Untrusted Data
+// BATOU-DESER-012: Kotlin/JVM Serialization of Untrusted Data
 // ========================================================================
 
 type KotlinDeserRule struct{}
 
-func (r *KotlinDeserRule) ID() string                     { return "GTSS-DESER-012" }
+func (r *KotlinDeserRule) ID() string                     { return "BATOU-DESER-012" }
 func (r *KotlinDeserRule) Name() string                   { return "KotlinDeserialization" }
 func (r *KotlinDeserRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *KotlinDeserRule) Description() string {

@@ -3,8 +3,8 @@ package cast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // CASTAnalyzer performs AST-based security analysis of C and C++ source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&CASTAnalyzer{})
 }
 
-func (a *CASTAnalyzer) ID() string                      { return "GTSS-CAST" }
+func (a *CASTAnalyzer) ID() string                      { return "BATOU-CAST" }
 func (a *CASTAnalyzer) Name() string                    { return "C/C++ AST Security Analyzer" }
 func (a *CASTAnalyzer) DefaultSeverity() rules.Severity { return rules.Critical }
 func (a *CASTAnalyzer) Languages() []rules.Language {
@@ -125,7 +125,7 @@ func (c *cChecker) checkCallExpression(n *ast.Node) {
 	if info, ok := bannedFuncs[funcName]; ok {
 		line := int(n.StartRow()) + 1
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-CAST-001",
+			RuleID:        "BATOU-CAST-001",
 			Severity:      info.severity,
 			SeverityLabel: info.severity.String(),
 			Title:         info.title,
@@ -174,7 +174,7 @@ func (c *cChecker) checkFormatString(n *ast.Node, funcName string, fmtArgIdx int
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-CAST-002",
+		RuleID:        "BATOU-CAST-002",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Format string vulnerability in " + funcName + "()",
@@ -204,7 +204,7 @@ func (c *cChecker) checkSystemCall(n *ast.Node) {
 	funcName := cCallName(n)
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-CAST-003",
+		RuleID:        "BATOU-CAST-003",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Command injection via " + funcName + "()",

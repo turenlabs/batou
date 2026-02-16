@@ -3,8 +3,8 @@ package pyast
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanPython(code string) []rules.Finding {
@@ -38,7 +38,7 @@ def handler(request):
 	findings := scanPython(code)
 	count := 0
 	for _, f := range findings {
-		if f.RuleID == "GTSS-PYAST-001" {
+		if f.RuleID == "BATOU-PYAST-001" {
 			count++
 		}
 	}
@@ -57,7 +57,7 @@ exec("print('hello')")
 `
 	findings := scanPython(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-PYAST-001" {
+		if f.RuleID == "BATOU-PYAST-001" {
 			t.Errorf("should not flag literal eval/exec: %s", f.Title)
 		}
 	}
@@ -70,7 +70,7 @@ def handler(name):
     os.system("rm " + name)
 `
 	findings := scanPython(code)
-	f := findByRule(findings, "GTSS-PYAST-001")
+	f := findByRule(findings, "BATOU-PYAST-001")
 	if f == nil {
 		t.Error("expected finding for os.system with variable")
 		for _, f := range findings {
@@ -89,7 +89,7 @@ def handler(cmd):
 	findings := scanPython(code)
 	count := 0
 	for _, f := range findings {
-		if f.RuleID == "GTSS-PYAST-002" {
+		if f.RuleID == "BATOU-PYAST-002" {
 			count++
 		}
 	}
@@ -109,7 +109,7 @@ subprocess.run(cmd, shell=False)
 `
 	findings := scanPython(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-PYAST-002" {
+		if f.RuleID == "BATOU-PYAST-002" {
 			t.Errorf("should not flag subprocess without shell=True: %s", f.Title)
 		}
 	}
@@ -121,7 +121,7 @@ import pickle
 data = pickle.loads(request.data)
 `
 	findings := scanPython(code)
-	f := findByRule(findings, "GTSS-PYAST-003")
+	f := findByRule(findings, "BATOU-PYAST-003")
 	if f == nil {
 		t.Error("expected finding for pickle.loads with variable")
 	}
@@ -133,7 +133,7 @@ def handler(path):
     f = open(path)
 `
 	findings := scanPython(code)
-	f := findByRule(findings, "GTSS-PYAST-004")
+	f := findByRule(findings, "BATOU-PYAST-004")
 	if f == nil {
 		t.Error("expected finding for open() with variable path")
 	}
@@ -145,7 +145,7 @@ f = open("/etc/config.yaml")
 `
 	findings := scanPython(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-PYAST-004" {
+		if f.RuleID == "BATOU-PYAST-004" {
 			t.Errorf("should not flag open() with literal path: %s", f.Title)
 		}
 	}
@@ -157,7 +157,7 @@ def handler(name):
     query = "SELECT * FROM users WHERE name = '%s'" % name
 `
 	findings := scanPython(code)
-	f := findByRule(findings, "GTSS-PYAST-005")
+	f := findByRule(findings, "BATOU-PYAST-005")
 	if f == nil {
 		t.Error("expected finding for SQL % formatting")
 		for _, f := range findings {
@@ -172,7 +172,7 @@ def handler(name):
     query = f"SELECT * FROM users WHERE name = '{name}'"
 `
 	findings := scanPython(code)
-	f := findByRule(findings, "GTSS-PYAST-005")
+	f := findByRule(findings, "BATOU-PYAST-005")
 	if f == nil {
 		t.Error("expected finding for SQL f-string injection")
 		for _, f := range findings {
@@ -215,7 +215,7 @@ def handler(x):
     eval(x)
 `
 	findings := scanPython(code)
-	f := findByRule(findings, "GTSS-PYAST-001")
+	f := findByRule(findings, "BATOU-PYAST-001")
 	if f == nil {
 		t.Fatal("expected finding")
 	}

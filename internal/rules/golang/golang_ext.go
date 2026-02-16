@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ func init() {
 
 type UnhandledSecurityError struct{}
 
-func (r *UnhandledSecurityError) ID() string                      { return "GTSS-GO-015" }
+func (r *UnhandledSecurityError) ID() string                      { return "BATOU-GO-015" }
 func (r *UnhandledSecurityError) Name() string                    { return "UnhandledSecurityError" }
 func (r *UnhandledSecurityError) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnhandledSecurityError) Description() string {
@@ -166,7 +166,7 @@ func (r *UnhandledSecurityError) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SQLXInjection struct{}
 
-func (r *SQLXInjection) ID() string                      { return "GTSS-GO-016" }
+func (r *SQLXInjection) ID() string                      { return "BATOU-GO-016" }
 func (r *SQLXInjection) Name() string                    { return "SQLXInjection" }
 func (r *SQLXInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SQLXInjection) Description() string {
@@ -222,7 +222,7 @@ func (r *SQLXInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeReflect struct{}
 
-func (r *UnsafeReflect) ID() string                      { return "GTSS-GO-017" }
+func (r *UnsafeReflect) ID() string                      { return "BATOU-GO-017" }
 func (r *UnsafeReflect) Name() string                    { return "UnsafeReflect" }
 func (r *UnsafeReflect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnsafeReflect) Description() string {
@@ -276,7 +276,7 @@ func (r *UnsafeReflect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NetDialNoTimeout struct{}
 
-func (r *NetDialNoTimeout) ID() string                      { return "GTSS-GO-018" }
+func (r *NetDialNoTimeout) ID() string                      { return "BATOU-GO-018" }
 func (r *NetDialNoTimeout) Name() string                    { return "NetDialNoTimeout" }
 func (r *NetDialNoTimeout) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NetDialNoTimeout) Description() string {
@@ -330,7 +330,7 @@ func (r *NetDialNoTimeout) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WeakFilePerms struct{}
 
-func (r *WeakFilePerms) ID() string                      { return "GTSS-GO-019" }
+func (r *WeakFilePerms) ID() string                      { return "BATOU-GO-019" }
 func (r *WeakFilePerms) Name() string                    { return "WeakFilePerms" }
 func (r *WeakFilePerms) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WeakFilePerms) Description() string {
@@ -381,7 +381,7 @@ func (r *WeakFilePerms) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafePointerUse struct{}
 
-func (r *UnsafePointerUse) ID() string                      { return "GTSS-GO-020" }
+func (r *UnsafePointerUse) ID() string                      { return "BATOU-GO-020" }
 func (r *UnsafePointerUse) Name() string                    { return "UnsafePointerUse" }
 func (r *UnsafePointerUse) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnsafePointerUse) Description() string {
@@ -430,7 +430,7 @@ func (r *UnsafePointerUse) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ContextNotChecked struct{}
 
-func (r *ContextNotChecked) ID() string                      { return "GTSS-GO-021" }
+func (r *ContextNotChecked) ID() string                      { return "BATOU-GO-021" }
 func (r *ContextNotChecked) Name() string                    { return "ContextNotChecked" }
 func (r *ContextNotChecked) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ContextNotChecked) Description() string {
@@ -483,7 +483,7 @@ func (r *ContextNotChecked) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ResponseWriterRace struct{}
 
-func (r *ResponseWriterRace) ID() string                      { return "GTSS-GO-022" }
+func (r *ResponseWriterRace) ID() string                      { return "BATOU-GO-022" }
 func (r *ResponseWriterRace) Name() string                    { return "ResponseWriterRace" }
 func (r *ResponseWriterRace) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ResponseWriterRace) Description() string {
@@ -532,7 +532,7 @@ func (r *ResponseWriterRace) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnboundedGoroutine struct{}
 
-func (r *UnboundedGoroutine) ID() string                      { return "GTSS-GO-023" }
+func (r *UnboundedGoroutine) ID() string                      { return "BATOU-GO-023" }
 func (r *UnboundedGoroutine) Name() string                    { return "UnboundedGoroutine" }
 func (r *UnboundedGoroutine) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnboundedGoroutine) Languages() []rules.Language     { return []rules.Language{rules.LangGo} }
@@ -589,7 +589,7 @@ func (r *UnboundedGoroutine) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SSRFDefaultClient struct{}
 
-func (r *SSRFDefaultClient) ID() string                      { return "GTSS-GO-024" }
+func (r *SSRFDefaultClient) ID() string                      { return "BATOU-GO-024" }
 func (r *SSRFDefaultClient) Name() string                    { return "SSRFDefaultClient" }
 func (r *SSRFDefaultClient) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SSRFDefaultClient) Description() string {
@@ -641,7 +641,7 @@ func (r *SSRFDefaultClient) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GRPCWithoutTLS struct{}
 
-func (r *GRPCWithoutTLS) ID() string                      { return "GTSS-GO-025" }
+func (r *GRPCWithoutTLS) ID() string                      { return "BATOU-GO-025" }
 func (r *GRPCWithoutTLS) Name() string                    { return "GRPCWithoutTLS" }
 func (r *GRPCWithoutTLS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GRPCWithoutTLS) Description() string {
@@ -701,7 +701,7 @@ func (r *GRPCWithoutTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ExecUnsanitizedEnv struct{}
 
-func (r *ExecUnsanitizedEnv) ID() string                      { return "GTSS-GO-026" }
+func (r *ExecUnsanitizedEnv) ID() string                      { return "BATOU-GO-026" }
 func (r *ExecUnsanitizedEnv) Name() string                    { return "ExecUnsanitizedEnv" }
 func (r *ExecUnsanitizedEnv) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ExecUnsanitizedEnv) Description() string {

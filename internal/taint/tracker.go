@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // unknownFunctionDecay is the confidence multiplier applied when taint

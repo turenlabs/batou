@@ -1,5 +1,5 @@
 # Source: CWE-287 - Improper authentication in JWT handling
-# Expected: GTSS-AUTH-001 (Hardcoded Credentials), GTSS-SEC-005 (JWT Secret)
+# Expected: BATOU-AUTH-001 (Hardcoded Credentials), BATOU-SEC-005 (JWT Secret)
 # OWASP: A07:2021 - Identification and Authentication Failures
 
 import jwt

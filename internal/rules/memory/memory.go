@@ -5,14 +5,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// Banned/dangerous functions (GTSS-MEM-001)
+// Banned/dangerous functions (BATOU-MEM-001)
 var (
 	// gets() — always a buffer overflow, banned in C11
 	reGets = regexp.MustCompile(`\bgets\s*\(`)
@@ -30,7 +30,7 @@ var (
 	reAtoi = regexp.MustCompile(`\b(?:atoi|atol|atoll|atof)\s*\(`)
 )
 
-// Format string vulnerabilities (GTSS-MEM-002)
+// Format string vulnerabilities (BATOU-MEM-002)
 var (
 	// printf(variable) — first arg is a variable, not a string literal
 	rePrintfVar = regexp.MustCompile(`\bprintf\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
@@ -42,7 +42,7 @@ var (
 	reSnprintfVar = regexp.MustCompile(`\bsnprintf\s*\(\s*[^,]+,\s*[^,]+,\s*[a-zA-Z_]\w*\s*[,)]`)
 )
 
-// Buffer overflow patterns (GTSS-MEM-003)
+// Buffer overflow patterns (BATOU-MEM-003)
 var (
 	// memcpy/memmove with variable size (potential overflow)
 	reMemcpyVar = regexp.MustCompile(`\b(?:memcpy|memmove)\s*\(\s*[^,]+,\s*[^,]+,\s*[a-zA-Z_]\w*\s*\)`)
@@ -52,7 +52,7 @@ var (
 	reReadBuf = regexp.MustCompile(`\b(?:read|recv|recvfrom)\s*\([^,]+,\s*[a-zA-Z_]\w*\s*,\s*sizeof\s*\(\s*[a-zA-Z_]\w*\s*\)`)
 )
 
-// Memory management issues (GTSS-MEM-004)
+// Memory management issues (BATOU-MEM-004)
 var (
 	// free() called — we track these across lines in Scan
 	reFreeCall = regexp.MustCompile(`\bfree\s*\(\s*([a-zA-Z_]\w*)\s*\)`)
@@ -64,7 +64,7 @@ var (
 	reNewAlloc = regexp.MustCompile(`\bnew\s+[a-zA-Z_]\w*(?:\s*\[|\s*\()`)
 )
 
-// Integer overflow in allocation (GTSS-MEM-005)
+// Integer overflow in allocation (BATOU-MEM-005)
 var (
 	// malloc(n * sizeof(...)) — multiplication may overflow
 	reMallocMul = regexp.MustCompile(`\bmalloc\s*\(\s*[a-zA-Z_]\w*\s*\*\s*(?:sizeof\s*\([^)]*\)|sizeof\b|[a-zA-Z_]\w*)\s*\)`)
@@ -74,7 +74,7 @@ var (
 	reReallocArith = regexp.MustCompile(`\brealloc\s*\(\s*[^,]+,\s*[a-zA-Z_]\w*\s*[+*]\s*`)
 )
 
-// Null pointer dereference (GTSS-MEM-006)
+// Null pointer dereference (BATOU-MEM-006)
 var (
 	// malloc/calloc/realloc call — tracked in Scan to detect missing null checks
 	reAllocCall = regexp.MustCompile(`\b(malloc|calloc|realloc)\s*\(`)
@@ -102,12 +102,12 @@ func truncate(s string, maxLen int) string {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MEM-001: Use of Banned/Dangerous Functions
+// BATOU-MEM-001: Use of Banned/Dangerous Functions
 // ---------------------------------------------------------------------------
 
 type BannedFunctions struct{}
 
-func (r BannedFunctions) ID() string              { return "GTSS-MEM-001" }
+func (r BannedFunctions) ID() string              { return "BATOU-MEM-001" }
 func (r BannedFunctions) Name() string            { return "Use of Banned/Dangerous Functions" }
 func (r BannedFunctions) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r BannedFunctions) Description() string {
@@ -169,12 +169,12 @@ func (r BannedFunctions) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MEM-002: Format String Vulnerabilities
+// BATOU-MEM-002: Format String Vulnerabilities
 // ---------------------------------------------------------------------------
 
 type FormatString struct{}
 
-func (r FormatString) ID() string              { return "GTSS-MEM-002" }
+func (r FormatString) ID() string              { return "BATOU-MEM-002" }
 func (r FormatString) Name() string            { return "Format String Vulnerability" }
 func (r FormatString) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r FormatString) Description() string {
@@ -232,12 +232,12 @@ func (r FormatString) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MEM-003: Buffer Overflow Patterns
+// BATOU-MEM-003: Buffer Overflow Patterns
 // ---------------------------------------------------------------------------
 
 type BufferOverflow struct{}
 
-func (r BufferOverflow) ID() string              { return "GTSS-MEM-003" }
+func (r BufferOverflow) ID() string              { return "BATOU-MEM-003" }
 func (r BufferOverflow) Name() string            { return "Buffer Overflow" }
 func (r BufferOverflow) DefaultSeverity() rules.Severity { return rules.High }
 func (r BufferOverflow) Description() string {
@@ -295,12 +295,12 @@ func (r BufferOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MEM-004: Memory Management Issues (double free, use after free)
+// BATOU-MEM-004: Memory Management Issues (double free, use after free)
 // ---------------------------------------------------------------------------
 
 type MemoryManagement struct{}
 
-func (r MemoryManagement) ID() string              { return "GTSS-MEM-004" }
+func (r MemoryManagement) ID() string              { return "BATOU-MEM-004" }
 func (r MemoryManagement) Name() string            { return "Memory Management Issue" }
 func (r MemoryManagement) DefaultSeverity() rules.Severity { return rules.High }
 func (r MemoryManagement) Description() string {
@@ -421,12 +421,12 @@ func (r MemoryManagement) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MEM-005: Integer Overflow in Allocation
+// BATOU-MEM-005: Integer Overflow in Allocation
 // ---------------------------------------------------------------------------
 
 type IntegerOverflow struct{}
 
-func (r IntegerOverflow) ID() string              { return "GTSS-MEM-005" }
+func (r IntegerOverflow) ID() string              { return "BATOU-MEM-005" }
 func (r IntegerOverflow) Name() string            { return "Integer Overflow in Allocation" }
 func (r IntegerOverflow) DefaultSeverity() rules.Severity { return rules.High }
 func (r IntegerOverflow) Description() string {
@@ -484,12 +484,12 @@ func (r IntegerOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MEM-006: Null Pointer Dereference (unchecked malloc/calloc return)
+// BATOU-MEM-006: Null Pointer Dereference (unchecked malloc/calloc return)
 // ---------------------------------------------------------------------------
 
 type NullDeref struct{}
 
-func (r NullDeref) ID() string              { return "GTSS-MEM-006" }
+func (r NullDeref) ID() string              { return "BATOU-MEM-006" }
 func (r NullDeref) Name() string            { return "Null Pointer Dereference" }
 func (r NullDeref) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r NullDeref) Description() string {

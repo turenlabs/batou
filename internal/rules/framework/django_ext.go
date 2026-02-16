@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,23 +12,23 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-DJANGO-006: mark_safe with user input
+	// BATOU-FW-DJANGO-006: mark_safe with user input
 	reDjangoExtMarkSafe = regexp.MustCompile(`\bmark_safe\s*\(\s*(?:f["']|["'][^"']*["']\s*%|["'][^"']*["']\s*\.format\s*\(|request\.|user_input|input\b)`)
 
-	// GTSS-FW-DJANGO-007: CSRF_COOKIE_SECURE not set
+	// BATOU-FW-DJANGO-007: CSRF_COOKIE_SECURE not set
 	reDjangoExtCsrfCookieSecureFalse = regexp.MustCompile(`\bCSRF_COOKIE_SECURE\s*=\s*False\b`)
 
-	// GTSS-FW-DJANGO-008: raw() queryset with user input
+	// BATOU-FW-DJANGO-008: raw() queryset with user input
 	reDjangoExtRawQuery = regexp.MustCompile(`\.raw\s*\(\s*(?:f["']|"[^"]*"\s*%|'[^']*'\s*%|"[^"]*"\s*\.format\s*\(|'[^']*'\s*\.format\s*\()`)
 	reDjangoExtRawConcat = regexp.MustCompile(`\.raw\s*\(\s*["'][^"']*["']\s*\+`)
 
-	// GTSS-FW-DJANGO-009: Session serializer using pickle
+	// BATOU-FW-DJANGO-009: Session serializer using pickle
 	reDjangoExtPickleSerializer = regexp.MustCompile(`SESSION_SERIALIZER\s*=\s*["']django\.contrib\.sessions\.serializers\.PickleSerializer["']`)
 
-	// GTSS-FW-DJANGO-010: SECURE_SSL_REDIRECT not enabled
+	// BATOU-FW-DJANGO-010: SECURE_SSL_REDIRECT not enabled
 	reDjangoExtSSLRedirectFalse = regexp.MustCompile(`\bSECURE_SSL_REDIRECT\s*=\s*False\b`)
 
-	// GTSS-FW-DJANGO-011: Default admin URL
+	// BATOU-FW-DJANGO-011: Default admin URL
 	reDjangoExtDefaultAdmin = regexp.MustCompile(`(?:url|path)\s*\(\s*["']admin/["']`)
 	reDjangoExtAdminSiteUrls = regexp.MustCompile(`admin\.site\.urls`)
 )
@@ -43,12 +43,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-006: mark_safe with user input
+// BATOU-FW-DJANGO-006: mark_safe with user input
 // ---------------------------------------------------------------------------
 
 type DjangoMarkSafeExt struct{}
 
-func (r *DjangoMarkSafeExt) ID() string                      { return "GTSS-FW-DJANGO-006" }
+func (r *DjangoMarkSafeExt) ID() string                      { return "BATOU-FW-DJANGO-006" }
 func (r *DjangoMarkSafeExt) Name() string                    { return "DjangoMarkSafeExt" }
 func (r *DjangoMarkSafeExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DjangoMarkSafeExt) Description() string {
@@ -94,12 +94,12 @@ func (r *DjangoMarkSafeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-007: CSRF_COOKIE_SECURE not set
+// BATOU-FW-DJANGO-007: CSRF_COOKIE_SECURE not set
 // ---------------------------------------------------------------------------
 
 type DjangoCsrfCookieSecure struct{}
 
-func (r *DjangoCsrfCookieSecure) ID() string                      { return "GTSS-FW-DJANGO-007" }
+func (r *DjangoCsrfCookieSecure) ID() string                      { return "BATOU-FW-DJANGO-007" }
 func (r *DjangoCsrfCookieSecure) Name() string                    { return "DjangoCsrfCookieSecure" }
 func (r *DjangoCsrfCookieSecure) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DjangoCsrfCookieSecure) Description() string {
@@ -145,12 +145,12 @@ func (r *DjangoCsrfCookieSecure) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-008: raw() queryset with user input
+// BATOU-FW-DJANGO-008: raw() queryset with user input
 // ---------------------------------------------------------------------------
 
 type DjangoRawQueryExt struct{}
 
-func (r *DjangoRawQueryExt) ID() string                      { return "GTSS-FW-DJANGO-008" }
+func (r *DjangoRawQueryExt) ID() string                      { return "BATOU-FW-DJANGO-008" }
 func (r *DjangoRawQueryExt) Name() string                    { return "DjangoRawQueryExt" }
 func (r *DjangoRawQueryExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DjangoRawQueryExt) Description() string {
@@ -203,12 +203,12 @@ func (r *DjangoRawQueryExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-009: Session serializer using pickle
+// BATOU-FW-DJANGO-009: Session serializer using pickle
 // ---------------------------------------------------------------------------
 
 type DjangoPickleSerializer struct{}
 
-func (r *DjangoPickleSerializer) ID() string                      { return "GTSS-FW-DJANGO-009" }
+func (r *DjangoPickleSerializer) ID() string                      { return "BATOU-FW-DJANGO-009" }
 func (r *DjangoPickleSerializer) Name() string                    { return "DjangoPickleSerializer" }
 func (r *DjangoPickleSerializer) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DjangoPickleSerializer) Description() string {
@@ -254,12 +254,12 @@ func (r *DjangoPickleSerializer) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-010: SECURE_SSL_REDIRECT not enabled
+// BATOU-FW-DJANGO-010: SECURE_SSL_REDIRECT not enabled
 // ---------------------------------------------------------------------------
 
 type DjangoSSLRedirectExt struct{}
 
-func (r *DjangoSSLRedirectExt) ID() string                      { return "GTSS-FW-DJANGO-010" }
+func (r *DjangoSSLRedirectExt) ID() string                      { return "BATOU-FW-DJANGO-010" }
 func (r *DjangoSSLRedirectExt) Name() string                    { return "DjangoSSLRedirectExt" }
 func (r *DjangoSSLRedirectExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DjangoSSLRedirectExt) Description() string {
@@ -305,12 +305,12 @@ func (r *DjangoSSLRedirectExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-011: Default admin URL not changed
+// BATOU-FW-DJANGO-011: Default admin URL not changed
 // ---------------------------------------------------------------------------
 
 type DjangoDefaultAdmin struct{}
 
-func (r *DjangoDefaultAdmin) ID() string                      { return "GTSS-FW-DJANGO-011" }
+func (r *DjangoDefaultAdmin) ID() string                      { return "BATOU-FW-DJANGO-011" }
 func (r *DjangoDefaultAdmin) Name() string                    { return "DjangoDefaultAdmin" }
 func (r *DjangoDefaultAdmin) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *DjangoDefaultAdmin) Description() string {

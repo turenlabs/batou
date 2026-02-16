@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanCS(t *testing.T, code string) []rules.Finding {
@@ -33,7 +33,7 @@ class Foo {
 	findings := scanCS(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CS-AST-001" {
+		if f.RuleID == "BATOU-CS-AST-001" {
 			found = true
 			if f.Severity != rules.Critical {
 				t.Errorf("expected Critical, got %s", f.Severity)
@@ -57,7 +57,7 @@ class Foo {
 `
 	findings := scanCS(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CS-AST-001" {
+		if f.RuleID == "BATOU-CS-AST-001" {
 			t.Error("unexpected SQL injection finding for parameterized query")
 		}
 	}
@@ -75,7 +75,7 @@ class Foo {
 	findings := scanCS(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CS-AST-002" && strings.Contains(f.Title, "BinaryFormatter") {
+		if f.RuleID == "BATOU-CS-AST-002" && strings.Contains(f.Title, "BinaryFormatter") {
 			found = true
 			break
 		}
@@ -96,7 +96,7 @@ class Foo {
 	findings := scanCS(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CS-AST-002" {
+		if f.RuleID == "BATOU-CS-AST-002" {
 			found = true
 			break
 		}
@@ -116,7 +116,7 @@ class Foo {
 `
 	findings := scanCS(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CS-AST-002" {
+		if f.RuleID == "BATOU-CS-AST-002" {
 			t.Error("unexpected deserializer finding for JsonSerializer")
 		}
 	}
@@ -134,7 +134,7 @@ class Foo {
 	findings := scanCS(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CS-AST-003" {
+		if f.RuleID == "BATOU-CS-AST-003" {
 			found = true
 			break
 		}
@@ -155,7 +155,7 @@ class Foo {
 `
 	findings := scanCS(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CS-AST-003" {
+		if f.RuleID == "BATOU-CS-AST-003" {
 			t.Error("unexpected ReDoS finding for Regex with literal pattern")
 		}
 	}
@@ -173,7 +173,7 @@ class Foo {
 	findings := scanCS(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CS-AST-004" {
+		if f.RuleID == "BATOU-CS-AST-004" {
 			found = true
 			if f.Severity != rules.Critical {
 				t.Errorf("expected Critical, got %s", f.Severity)
@@ -197,7 +197,7 @@ class Foo {
 	findings := scanCS(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CS-AST-005" {
+		if f.RuleID == "BATOU-CS-AST-005" {
 			found = true
 			break
 		}
@@ -217,7 +217,7 @@ class Foo {
 `
 	findings := scanCS(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-CS-AST-005" {
+		if f.RuleID == "BATOU-CS-AST-005" {
 			t.Error("unexpected EF SQL injection finding for literal query")
 		}
 	}

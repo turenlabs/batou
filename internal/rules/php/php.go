@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -137,12 +137,12 @@ func hasNearbyPattern(lines []string, idx int, pat *regexp.Regexp) bool {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-001: Type Juggling
+// BATOU-PHP-001: Type Juggling
 // ---------------------------------------------------------------------------
 
 type TypeJuggling struct{}
 
-func (r *TypeJuggling) ID() string                      { return "GTSS-PHP-001" }
+func (r *TypeJuggling) ID() string                      { return "BATOU-PHP-001" }
 func (r *TypeJuggling) Name() string                    { return "PHPTypeJuggling" }
 func (r *TypeJuggling) Description() string             { return "Detects PHP loose comparison (== / !=) on security-sensitive values that should use strict comparison (=== / !==)." }
 func (r *TypeJuggling) DefaultSeverity() rules.Severity { return rules.High }
@@ -185,12 +185,12 @@ func (r *TypeJuggling) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-002: SSRF via file_get_contents/fopen/curl
+// BATOU-PHP-002: SSRF via file_get_contents/fopen/curl
 // ---------------------------------------------------------------------------
 
 type SSRF struct{}
 
-func (r *SSRF) ID() string                      { return "GTSS-PHP-002" }
+func (r *SSRF) ID() string                      { return "BATOU-PHP-002" }
 func (r *SSRF) Name() string                    { return "PHPSSRF" }
 func (r *SSRF) Description() string             { return "Detects PHP file_get_contents/fopen/curl_setopt with user-controlled URL, enabling SSRF." }
 func (r *SSRF) DefaultSeverity() rules.Severity { return rules.High }
@@ -248,12 +248,12 @@ func (r *SSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-003: Local/Remote File Inclusion
+// BATOU-PHP-003: Local/Remote File Inclusion
 // ---------------------------------------------------------------------------
 
 type FileInclusion struct{}
 
-func (r *FileInclusion) ID() string                      { return "GTSS-PHP-003" }
+func (r *FileInclusion) ID() string                      { return "BATOU-PHP-003" }
 func (r *FileInclusion) Name() string                    { return "PHPFileInclusion" }
 func (r *FileInclusion) Description() string             { return "Detects PHP include/require with user input, enabling LFI/RFI." }
 func (r *FileInclusion) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -305,12 +305,12 @@ func (r *FileInclusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-004: mail() Header Injection
+// BATOU-PHP-004: mail() Header Injection
 // ---------------------------------------------------------------------------
 
 type MailHeaderInjection struct{}
 
-func (r *MailHeaderInjection) ID() string                      { return "GTSS-PHP-004" }
+func (r *MailHeaderInjection) ID() string                      { return "BATOU-PHP-004" }
 func (r *MailHeaderInjection) Name() string                    { return "PHPMailHeaderInjection" }
 func (r *MailHeaderInjection) Description() string             { return "Detects PHP mail() with user-controlled headers, enabling email header injection." }
 func (r *MailHeaderInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -365,12 +365,12 @@ func (r *MailHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-005: Command Injection (PHP-specific patterns beyond INJ-002)
+// BATOU-PHP-005: Command Injection (PHP-specific patterns beyond INJ-002)
 // ---------------------------------------------------------------------------
 
 type CommandInjection struct{}
 
-func (r *CommandInjection) ID() string                      { return "GTSS-PHP-005" }
+func (r *CommandInjection) ID() string                      { return "BATOU-PHP-005" }
 func (r *CommandInjection) Name() string                    { return "PHPCommandInjection" }
 func (r *CommandInjection) Description() string             { return "Detects PHP shell execution with user input from superglobals." }
 func (r *CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -421,12 +421,12 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-006: Raw SQL queries without prepared statements
+// BATOU-PHP-006: Raw SQL queries without prepared statements
 // ---------------------------------------------------------------------------
 
 type RawSQLQuery struct{}
 
-func (r *RawSQLQuery) ID() string                      { return "GTSS-PHP-006" }
+func (r *RawSQLQuery) ID() string                      { return "BATOU-PHP-006" }
 func (r *RawSQLQuery) Name() string                    { return "PHPRawSQLQuery" }
 func (r *RawSQLQuery) Description() string             { return "Detects PHP mysqli_query/pg_query with variable interpolation instead of prepared statements." }
 func (r *RawSQLQuery) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -478,12 +478,12 @@ func (r *RawSQLQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-007: Insecure Session Cookie Configuration
+// BATOU-PHP-007: Insecure Session Cookie Configuration
 // ---------------------------------------------------------------------------
 
 type InsecureSessionCookie struct{}
 
-func (r *InsecureSessionCookie) ID() string                      { return "GTSS-PHP-007" }
+func (r *InsecureSessionCookie) ID() string                      { return "BATOU-PHP-007" }
 func (r *InsecureSessionCookie) Name() string                    { return "PHPInsecureSessionCookie" }
 func (r *InsecureSessionCookie) Description() string             { return "Detects PHP session cookie configuration with httponly, secure, or samesite disabled." }
 func (r *InsecureSessionCookie) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -569,12 +569,12 @@ func (r *InsecureSessionCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-008: Symfony Process Injection
+// BATOU-PHP-008: Symfony Process Injection
 // ---------------------------------------------------------------------------
 
 type SymfonyProcessInjection struct{}
 
-func (r *SymfonyProcessInjection) ID() string                      { return "GTSS-PHP-008" }
+func (r *SymfonyProcessInjection) ID() string                      { return "BATOU-PHP-008" }
 func (r *SymfonyProcessInjection) Name() string                    { return "PHPSymfonyProcessInjection" }
 func (r *SymfonyProcessInjection) Description() string             { return "Detects Symfony Process class with user input, enabling command injection." }
 func (r *SymfonyProcessInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -625,12 +625,12 @@ func (r *SymfonyProcessInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-009: Twig Autoescape Disabled / |raw Filter
+// BATOU-PHP-009: Twig Autoescape Disabled / |raw Filter
 // ---------------------------------------------------------------------------
 
 type TwigRawFilter struct{}
 
-func (r *TwigRawFilter) ID() string                      { return "GTSS-PHP-009" }
+func (r *TwigRawFilter) ID() string                      { return "BATOU-PHP-009" }
 func (r *TwigRawFilter) Name() string                    { return "PHPTwigRawFilter" }
 func (r *TwigRawFilter) Description() string             { return "Detects Twig |raw filter or autoescape disabled, which bypasses XSS protection." }
 func (r *TwigRawFilter) DefaultSeverity() rules.Severity { return rules.High }
@@ -687,12 +687,12 @@ func (r *TwigRawFilter) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-010: LDAP Injection
+// BATOU-PHP-010: LDAP Injection
 // ---------------------------------------------------------------------------
 
 type LDAPInjection struct{}
 
-func (r *LDAPInjection) ID() string                      { return "GTSS-PHP-010" }
+func (r *LDAPInjection) ID() string                      { return "BATOU-PHP-010" }
 func (r *LDAPInjection) Name() string                    { return "PHPLDAPInjection" }
 func (r *LDAPInjection) Description() string             { return "Detects PHP ldap_search/ldap_bind with unescaped user input, enabling LDAP injection." }
 func (r *LDAPInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -747,12 +747,12 @@ func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-011: Weak Random Number Generation
+// BATOU-PHP-011: Weak Random Number Generation
 // ---------------------------------------------------------------------------
 
 type WeakRandom struct{}
 
-func (r *WeakRandom) ID() string                      { return "GTSS-PHP-011" }
+func (r *WeakRandom) ID() string                      { return "BATOU-PHP-011" }
 func (r *WeakRandom) Name() string                    { return "PHPWeakRandom" }
 func (r *WeakRandom) Description() string             { return "Detects PHP weak random functions (rand, mt_rand) used in security-sensitive contexts." }
 func (r *WeakRandom) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -800,12 +800,12 @@ func (r *WeakRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PHP-012: Display Errors Enabled
+// BATOU-PHP-012: Display Errors Enabled
 // ---------------------------------------------------------------------------
 
 type DisplayErrors struct{}
 
-func (r *DisplayErrors) ID() string                      { return "GTSS-PHP-012" }
+func (r *DisplayErrors) ID() string                      { return "BATOU-PHP-012" }
 func (r *DisplayErrors) Name() string                    { return "PHPDisplayErrors" }
 func (r *DisplayErrors) Description() string             { return "Detects PHP display_errors enabled, which exposes stack traces and sensitive information." }
 func (r *DisplayErrors) DefaultSeverity() rules.Severity { return rules.Medium }

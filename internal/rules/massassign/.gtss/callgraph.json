@@ -1,0 +1,65 @@
+{
+  "nodes": {
+    "/app/UserController.java:initBinder": {
+      "id": "/app/UserController.java:initBinder",
+      "file_path": "/app/UserController.java",
+      "name": "initBinder",
+      "package": "",
+      "start_line": 2,
+      "end_line": 4,
+      "calls": [
+        "/app/UserController.java:initBinder"
+      ],
+      "called_by": [
+        "/app/UserController.java:initBinder"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1417b03a7fa0eab4",
+      "last_scan_at": "2026-02-16T15:25:38.454082-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/UserController.java:update": {
+      "id": "/app/UserController.java:update",
+      "file_path": "/app/UserController.java",
+      "name": "update",
+      "package": "",
+      "start_line": 2,
+      "end_line": 5,
+      "calls": [],
+      "called_by": [
+        "/app/UserController.java:update"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1506957fc9581f84",
+      "last_scan_at": "2026-02-13T10:50:37.207371-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/controllers/users_controller.rb:user_params": {
+      "id": "/app/controllers/users_controller.rb:user_params",
+      "file_path": "/app/controllers/users_controller.rb",
+      "name": "user_params",
+      "package": "",
+      "start_line": 1,
+      "end_line": 3,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "044d873651b881f4",
+      "last_scan_at": "2026-02-16T15:25:38.450565-06:00",
+      "language": "ruby",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/massassign",
+  "session_id": "",
+  "last_updated": "2026-02-16T15:25:38.454097-06:00",
+  "version": 1
+}

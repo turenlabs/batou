@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-OAUTH-001: OAuth state parameter missing (CSRF)
+// BATOU-OAUTH-001: OAuth state parameter missing (CSRF)
 var (
 	reOAuthAuthURL        = regexp.MustCompile(`(?i)(?:authorize_url|authorization_url|auth_url|authorizationEndpoint|authorize_endpoint|/authorize\?|/oauth/authorize)`)
 	reOAuthStateParam     = regexp.MustCompile(`(?i)(?:state\s*[=:&]|[&?]state=|\bstate\b\s*[:=]\s*[^,\s])`)
@@ -19,51 +19,51 @@ var (
 	reOAuthStateVerify    = regexp.MustCompile(`(?i)(?:verify_state|validate_state|check_state|state\s*(?:===?|!==?|==|!=)\s*(?:session|stored|expected|saved)|session\s*\[\s*["']state["']\s*\])`)
 )
 
-// GTSS-OAUTH-002: OAuth implicit grant flow (deprecated)
+// BATOU-OAUTH-002: OAuth implicit grant flow (deprecated)
 var (
 	reOAuthImplicitGrant = regexp.MustCompile(`(?i)(?:response_type\s*[=:]\s*["']token["']|response_type=token(?:&|$|["']))`)
 	reOAuthImplicitFlow  = regexp.MustCompile(`(?i)(?:grant_type\s*[=:]\s*["']implicit["']|implicit\s*(?:grant|flow)|ImplicitGrant)`)
 )
 
-// GTSS-OAUTH-003: OAuth redirect_uri not validated
+// BATOU-OAUTH-003: OAuth redirect_uri not validated
 var (
 	reOAuthRedirectOpen     = regexp.MustCompile(`(?i)(?:redirect_uri|callback_url|return_url)\s*[=:]\s*(?:req\.|request\.|params|input|\$_GET|\$_POST|args)`)
 	reOAuthRedirectConcat   = regexp.MustCompile(`(?i)(?:redirect_uri|callback_url|return_url)\s*[=:]\s*["'][^"']*["']\s*\+`)
 	reOAuthRedirectValidate = regexp.MustCompile(`(?i)(?:validate_redirect|verify_redirect|allowed_redirect|whitelisted_redirect|redirect_whitelist|redirect_allowlist|isValidRedirect|is_valid_redirect)`)
 )
 
-// GTSS-OAUTH-004: OAuth token in URL fragment
+// BATOU-OAUTH-004: OAuth token in URL fragment
 var (
 	reOAuthTokenFragment = regexp.MustCompile(`(?i)(?:window\.location\.hash|location\.hash|fragment|#access_token|#token)`)
 	reOAuthTokenFromHash = regexp.MustCompile(`(?i)(?:location\.hash\.(?:split|match|substring|replace|slice)|URLSearchParams\s*\(\s*(?:window\.)?location\.hash)`)
 )
 
-// GTSS-OAUTH-005: PKCE not used
+// BATOU-OAUTH-005: PKCE not used
 var (
 	reOAuthCodeGrant     = regexp.MustCompile(`(?i)(?:response_type\s*[=:]\s*["']code["']|grant_type\s*[=:]\s*["']authorization_code["']|AuthorizationCode)`)
 	reOAuthPKCE          = regexp.MustCompile(`(?i)(?:code_challenge|code_verifier|PKCE|S256|pkce|proof.?key)`)
 )
 
-// GTSS-OAUTH-006: OAuth client secret exposed in frontend
+// BATOU-OAUTH-006: OAuth client secret exposed in frontend
 var (
 	reOAuthClientSecretFE = regexp.MustCompile(`(?i)(?:client_secret|clientSecret|CLIENT_SECRET)\s*[=:]\s*["'][^"']{5,}["']`)
 	reFrontendContext     = regexp.MustCompile(`(?i)(?:document\.|window\.|localStorage|sessionStorage|fetch\s*\(|XMLHttpRequest|axios\.|React\.|angular\.|Vue\.|\.tsx?$|\.jsx?$|\.component\.)`)
 )
 
-// GTSS-OAUTH-007: OAuth scope not validated server-side
+// BATOU-OAUTH-007: OAuth scope not validated server-side
 var (
 	reOAuthScopeFromUser = regexp.MustCompile(`(?i)(?:scope|scopes)\s*[=:]\s*(?:req\.|request\.|params|input|\$_GET|\$_POST|args)`)
 	reOAuthScopeConcat   = regexp.MustCompile(`(?i)(?:scope|scopes)\s*[=:]\s*[^;]*(?:\+\s*(?:req\.|request\.|params|input)|\.join\s*\()`)
 	reOAuthScopeValidate = regexp.MustCompile(`(?i)(?:validate_scope|verify_scope|allowed_scopes|valid_scopes|scope_whitelist|scope_allowlist|isValidScope|is_valid_scope)`)
 )
 
-// GTSS-OAUTH-008: OAuth token stored in localStorage
+// BATOU-OAUTH-008: OAuth token stored in localStorage
 var (
 	reOAuthTokenLocalStorage = regexp.MustCompile(`(?i)localStorage\.setItem\s*\(\s*["'](?:oauth_token|access_token|refresh_token|auth_token|oauth2_token|oidc_token)["']`)
 	reOAuthTokenLSDirect     = regexp.MustCompile(`(?i)localStorage\s*\[\s*["'](?:oauth_token|access_token|refresh_token|auth_token)["']\s*\]\s*=`)
 )
 
-// GTSS-OAUTH-009: OpenID Connect nonce not validated
+// BATOU-OAUTH-009: OpenID Connect nonce not validated
 var (
 	reOIDCAuthRequest   = regexp.MustCompile(`(?i)(?:openid|id_token|response_type\s*[=:]\s*["'][^"']*id_token)`)
 	reOIDCNonce         = regexp.MustCompile(`(?i)(?:nonce\s*[=:&]|[&?]nonce=|\bnonce\b\s*[:=]\s*[^,\s])`)
@@ -112,12 +112,12 @@ func fileContains(content string, re *regexp.Regexp) bool {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-OAUTH-001: OAuth state parameter missing (CSRF)
+// BATOU-OAUTH-001: OAuth state parameter missing (CSRF)
 // ---------------------------------------------------------------------------
 
 type OAuthNoState struct{}
 
-func (r *OAuthNoState) ID() string                     { return "GTSS-OAUTH-001" }
+func (r *OAuthNoState) ID() string                     { return "BATOU-OAUTH-001" }
 func (r *OAuthNoState) Name() string                   { return "OAuthNoState" }
 func (r *OAuthNoState) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OAuthNoState) Description() string {
@@ -165,12 +165,12 @@ func (r *OAuthNoState) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-OAUTH-002: OAuth implicit grant flow (deprecated)
+// BATOU-OAUTH-002: OAuth implicit grant flow (deprecated)
 // ---------------------------------------------------------------------------
 
 type OAuthImplicitGrant struct{}
 
-func (r *OAuthImplicitGrant) ID() string                     { return "GTSS-OAUTH-002" }
+func (r *OAuthImplicitGrant) ID() string                     { return "BATOU-OAUTH-002" }
 func (r *OAuthImplicitGrant) Name() string                   { return "OAuthImplicitGrant" }
 func (r *OAuthImplicitGrant) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OAuthImplicitGrant) Description() string {
@@ -214,12 +214,12 @@ func (r *OAuthImplicitGrant) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-OAUTH-003: OAuth redirect_uri not validated
+// BATOU-OAUTH-003: OAuth redirect_uri not validated
 // ---------------------------------------------------------------------------
 
 type OAuthOpenRedirect struct{}
 
-func (r *OAuthOpenRedirect) ID() string                     { return "GTSS-OAUTH-003" }
+func (r *OAuthOpenRedirect) ID() string                     { return "BATOU-OAUTH-003" }
 func (r *OAuthOpenRedirect) Name() string                   { return "OAuthOpenRedirect" }
 func (r *OAuthOpenRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OAuthOpenRedirect) Description() string {
@@ -266,12 +266,12 @@ func (r *OAuthOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-OAUTH-004: OAuth token in URL fragment
+// BATOU-OAUTH-004: OAuth token in URL fragment
 // ---------------------------------------------------------------------------
 
 type OAuthTokenFragment struct{}
 
-func (r *OAuthTokenFragment) ID() string                     { return "GTSS-OAUTH-004" }
+func (r *OAuthTokenFragment) ID() string                     { return "BATOU-OAUTH-004" }
 func (r *OAuthTokenFragment) Name() string                   { return "OAuthTokenFragment" }
 func (r *OAuthTokenFragment) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OAuthTokenFragment) Description() string {
@@ -315,12 +315,12 @@ func (r *OAuthTokenFragment) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-OAUTH-005: PKCE not used
+// BATOU-OAUTH-005: PKCE not used
 // ---------------------------------------------------------------------------
 
 type OAuthNoPKCE struct{}
 
-func (r *OAuthNoPKCE) ID() string                     { return "GTSS-OAUTH-005" }
+func (r *OAuthNoPKCE) ID() string                     { return "BATOU-OAUTH-005" }
 func (r *OAuthNoPKCE) Name() string                   { return "OAuthNoPKCE" }
 func (r *OAuthNoPKCE) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OAuthNoPKCE) Description() string {
@@ -365,12 +365,12 @@ func (r *OAuthNoPKCE) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-OAUTH-006: OAuth client secret exposed in frontend
+// BATOU-OAUTH-006: OAuth client secret exposed in frontend
 // ---------------------------------------------------------------------------
 
 type OAuthClientSecretFE struct{}
 
-func (r *OAuthClientSecretFE) ID() string                     { return "GTSS-OAUTH-006" }
+func (r *OAuthClientSecretFE) ID() string                     { return "BATOU-OAUTH-006" }
 func (r *OAuthClientSecretFE) Name() string                   { return "OAuthClientSecretFE" }
 func (r *OAuthClientSecretFE) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OAuthClientSecretFE) Description() string {
@@ -414,12 +414,12 @@ func (r *OAuthClientSecretFE) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-OAUTH-007: OAuth scope not validated server-side
+// BATOU-OAUTH-007: OAuth scope not validated server-side
 // ---------------------------------------------------------------------------
 
 type OAuthScopeNotValidated struct{}
 
-func (r *OAuthScopeNotValidated) ID() string                     { return "GTSS-OAUTH-007" }
+func (r *OAuthScopeNotValidated) ID() string                     { return "BATOU-OAUTH-007" }
 func (r *OAuthScopeNotValidated) Name() string                   { return "OAuthScopeNotValidated" }
 func (r *OAuthScopeNotValidated) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OAuthScopeNotValidated) Description() string {
@@ -466,12 +466,12 @@ func (r *OAuthScopeNotValidated) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-OAUTH-008: OAuth token stored in localStorage
+// BATOU-OAUTH-008: OAuth token stored in localStorage
 // ---------------------------------------------------------------------------
 
 type OAuthTokenLocalStorage struct{}
 
-func (r *OAuthTokenLocalStorage) ID() string                     { return "GTSS-OAUTH-008" }
+func (r *OAuthTokenLocalStorage) ID() string                     { return "BATOU-OAUTH-008" }
 func (r *OAuthTokenLocalStorage) Name() string                   { return "OAuthTokenLocalStorage" }
 func (r *OAuthTokenLocalStorage) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OAuthTokenLocalStorage) Description() string {
@@ -515,12 +515,12 @@ func (r *OAuthTokenLocalStorage) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-OAUTH-009: OpenID Connect nonce not validated
+// BATOU-OAUTH-009: OpenID Connect nonce not validated
 // ---------------------------------------------------------------------------
 
 type OIDCNoNonce struct{}
 
-func (r *OIDCNoNonce) ID() string                     { return "GTSS-OAUTH-009" }
+func (r *OIDCNoNonce) ID() string                     { return "BATOU-OAUTH-009" }
 func (r *OIDCNoNonce) Name() string                   { return "OIDCNoNonce" }
 func (r *OIDCNoNonce) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OIDCNoNonce) Description() string {

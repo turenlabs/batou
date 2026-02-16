@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-NOSQL-001: MongoDB $where injection (code execution)
+// BATOU-NOSQL-001: MongoDB $where injection (code execution)
 var (
 	// $where with template literal interpolation: $where: `this.field === '${input}'`
 	reWhereTemplateLiteral = regexp.MustCompile("`[^`]*\\$where[^`]*\\$\\{")
@@ -33,7 +33,7 @@ var (
 	reWhereRubyInterp = regexp.MustCompile(`(?i)['"]\$where['"]\s*(?::|=>)\s*"[^"]*#\{`)
 )
 
-// GTSS-NOSQL-002: MongoDB operator injection
+// BATOU-NOSQL-002: MongoDB operator injection
 var (
 	// Direct passthrough of req.body/req.query/req.params to query methods
 	reOperatorDirectPassthrough = regexp.MustCompile(`(?i)\.(?:find|findOne|updateOne|updateMany|deleteOne|deleteMany|remove|count|countDocuments|findOneAndUpdate|findOneAndDelete|findOneAndReplace)\s*\(\s*req\.(?:body|query|params)\b`)
@@ -55,7 +55,7 @@ var (
 	reOperatorAggPassthrough = regexp.MustCompile(`(?i)\.aggregate\s*\(\s*(?:req\.(?:body|query|params)|JSON\.parse)`)
 )
 
-// GTSS-NOSQL-003: Raw query with user input
+// BATOU-NOSQL-003: Raw query with user input
 var (
 	// MongoDB $regex with user input
 	reRawRegex = regexp.MustCompile(`(?i)['"]\$regex['"]\s*:\s*(?:req\.(?:body|query|params)\.\w+|[^"'\s{][^,}]*\+|f["']|[^"'\s,}]+\.(?:body|query|params|input|data)\.\w+)`)
@@ -89,12 +89,12 @@ func truncate(s string, maxLen int) string {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-NOSQL-001: MongoDB $where Injection
+// BATOU-NOSQL-001: MongoDB $where Injection
 // ---------------------------------------------------------------------------
 
 type WhereInjection struct{}
 
-func (r WhereInjection) ID() string                     { return "GTSS-NOSQL-001" }
+func (r WhereInjection) ID() string                     { return "BATOU-NOSQL-001" }
 func (r WhereInjection) Name() string                   { return "MongoDB $where Injection" }
 func (r WhereInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r WhereInjection) Description() string {
@@ -162,12 +162,12 @@ func (r WhereInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-NOSQL-002: MongoDB Operator Injection
+// BATOU-NOSQL-002: MongoDB Operator Injection
 // ---------------------------------------------------------------------------
 
 type OperatorInjection struct{}
 
-func (r OperatorInjection) ID() string                     { return "GTSS-NOSQL-002" }
+func (r OperatorInjection) ID() string                     { return "BATOU-NOSQL-002" }
 func (r OperatorInjection) Name() string                   { return "MongoDB Operator Injection" }
 func (r OperatorInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r OperatorInjection) Description() string {
@@ -236,12 +236,12 @@ func (r OperatorInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-NOSQL-003: Raw Query with User Input
+// BATOU-NOSQL-003: Raw Query with User Input
 // ---------------------------------------------------------------------------
 
 type RawQueryInjection struct{}
 
-func (r RawQueryInjection) ID() string                     { return "GTSS-NOSQL-003" }
+func (r RawQueryInjection) ID() string                     { return "BATOU-NOSQL-003" }
 func (r RawQueryInjection) Name() string                   { return "MongoDB Raw Query Injection" }
 func (r RawQueryInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r RawQueryInjection) Description() string {

@@ -24,17 +24,17 @@ expected_vulnerabilities:
     pattern: "File type validated only by extension, not content"
     cwe: CWE-434
     typical_severity: high
-    gtss_rules: [GTSS-VAL-001]
+    batou_rules: [BATOU-VAL-001]
   - type: path_traversal_upload
     pattern: "Uploaded filename used in storage path without sanitization"
     cwe: CWE-22
     typical_severity: high
-    gtss_rules: [GTSS-TRAV-001]
+    batou_rules: [BATOU-TRAV-001]
   - type: missing_size_limit
     pattern: "No file size limit enforced"
     cwe: CWE-770
     typical_severity: medium
-    gtss_rules: []
+    batou_rules: []
 gold_secure_pattern: |
   Validate content, generate safe name, limit size:
   if len(data) > 5 * 1024 * 1024:

@@ -22,7 +22,7 @@ expected_vulnerabilities:
     pattern: "Direct concatenation of user input into file path"
     cwe: CWE-22
     typical_severity: high
-    gtss_rules: [GTSS-TRAV-001, GTSS-TRAV-003]
+    batou_rules: [BATOU-TRAV-001, BATOU-TRAV-003]
 gold_secure_pattern: |
   Resolve the final path and verify it stays within the uploads directory:
   real_path = os.path.realpath(os.path.join(UPLOAD_DIR, filename))

@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-HDR-001: Missing Content-Security-Policy
+// BATOU-HDR-001: Missing Content-Security-Policy
 var (
 	reResponseHeaders = regexp.MustCompile(`(?i)(?:\.setHeader|\.header|\.set|\.Header\(\)\.Set|\.add_header|response\[|headers\[)\s*\(?\s*["']`)
 	reCSPHeader       = regexp.MustCompile(`(?i)["']Content-Security-Policy["']`)
@@ -19,71 +19,71 @@ var (
 	reMetaCSP         = regexp.MustCompile(`(?i)<meta\s+http-equiv\s*=\s*["']Content-Security-Policy["']`)
 )
 
-// GTSS-HDR-002: Missing X-Frame-Options
+// BATOU-HDR-002: Missing X-Frame-Options
 var (
 	reXFrameHeader = regexp.MustCompile(`(?i)["']X-Frame-Options["']`)
 	reHelmetFrame  = regexp.MustCompile(`(?i)helmet\.frameguard|frameguard\s*\(`)
 	reCSPFrameAnc  = regexp.MustCompile(`(?i)frame-ancestors`)
 )
 
-// GTSS-HDR-003: Missing X-Content-Type-Options
+// BATOU-HDR-003: Missing X-Content-Type-Options
 var (
 	reXCTOHeader  = regexp.MustCompile(`(?i)["']X-Content-Type-Options["']`)
 	reHelmetXCTO  = regexp.MustCompile(`(?i)helmet\.noSniff|noSniff\s*\(`)
 )
 
-// GTSS-HDR-004: Missing Strict-Transport-Security
+// BATOU-HDR-004: Missing Strict-Transport-Security
 var (
 	reHSTSHeader  = regexp.MustCompile(`(?i)["']Strict-Transport-Security["']`)
 	reHelmetHSTS  = regexp.MustCompile(`(?i)helmet\.hsts|hsts\s*\(`)
 )
 
-// GTSS-HDR-005: Permissive CSP (unsafe-inline / unsafe-eval)
+// BATOU-HDR-005: Permissive CSP (unsafe-inline / unsafe-eval)
 var (
 	reCSPUnsafe = regexp.MustCompile(`(?i)(?:unsafe-inline|unsafe-eval)`)
 	reCSPCtx    = regexp.MustCompile(`(?i)(?:Content-Security-Policy|contentSecurityPolicy|csp|script-src|style-src|default-src)`)
 )
 
-// GTSS-HDR-006: Missing X-XSS-Protection
+// BATOU-HDR-006: Missing X-XSS-Protection
 var (
 	reXXSSHeader = regexp.MustCompile(`(?i)["']X-XSS-Protection["']`)
 )
 
-// GTSS-HDR-007: Missing Referrer-Policy
+// BATOU-HDR-007: Missing Referrer-Policy
 var (
 	reReferrerHeader = regexp.MustCompile(`(?i)["']Referrer-Policy["']`)
 	reHelmetReferrer = regexp.MustCompile(`(?i)helmet\.referrerPolicy|referrerPolicy\s*\(`)
 )
 
-// GTSS-HDR-008: Missing Permissions-Policy
+// BATOU-HDR-008: Missing Permissions-Policy
 var (
 	rePermPolicyHeader = regexp.MustCompile(`(?i)["']Permissions-Policy["']`)
 	reFeaturePolicyH   = regexp.MustCompile(`(?i)["']Feature-Policy["']`)
 	reHelmetPermPolicy = regexp.MustCompile(`(?i)helmet\.permittedCrossDomainPolicies|permissionsPolicy\s*\(`)
 )
 
-// GTSS-HDR-009: Cache-Control missing no-store
+// BATOU-HDR-009: Cache-Control missing no-store
 var (
 	reCacheControl    = regexp.MustCompile(`(?i)["']Cache-Control["']`)
 	reCacheNoStore    = regexp.MustCompile(`(?i)no-store`)
 	reSensitivePath   = regexp.MustCompile(`(?i)(?:login|auth|account|profile|admin|dashboard|settings|password|token|session|checkout|payment|billing)`)
 )
 
-// GTSS-HDR-010: Server header disclosure
+// BATOU-HDR-010: Server header disclosure
 var (
 	reServerHeader    = regexp.MustCompile(`(?i)(?:\.setHeader|\.header|\.set|\.Header\(\)\.Set|response\[|headers\[)\s*\(?\s*["']Server["']`)
 	reServerRemove    = regexp.MustCompile(`(?i)(?:removeHeader|delete|remove|unset)\s*\(?\s*["']Server["']`)
 	reHelmetHidePower = regexp.MustCompile(`(?i)helmet\.hidePoweredBy|hidePoweredBy\s*\(`)
 )
 
-// GTSS-HDR-011: X-Powered-By disclosure
+// BATOU-HDR-011: X-Powered-By disclosure
 var (
 	reXPoweredByHeader = regexp.MustCompile(`(?i)(?:\.setHeader|\.header|\.set|\.Header\(\)\.Set|response\[|headers\[)\s*\(?\s*["']X-Powered-By["']`)
 	reXPoweredByRemove = regexp.MustCompile(`(?i)(?:removeHeader|delete|remove|unset|disable)\s*\(?\s*["'](?:X-Powered-By|x-powered-by)["']`)
 	reExpressDisable   = regexp.MustCompile(`(?i)app\.disable\s*\(\s*["']x-powered-by["']\s*\)`)
 )
 
-// GTSS-HDR-012: CRLF injection in header value
+// BATOU-HDR-012: CRLF injection in header value
 var (
 	reCRLFHeaderInject = regexp.MustCompile(`(?i)(?:\.setHeader|\.header|\.set|\.Header\(\)\.Set|\.add_header|response\.headers)\s*\(?\s*["'][^"']+["']\s*[,]\s*(?:req\.|request\.|params\.|query\.|body\.|args\.|GET\[|POST\[|\$_)`)
 	reCRLFDirectConcat = regexp.MustCompile(`(?i)(?:\.setHeader|\.header|\.set|\.Header\(\)\.Set)\s*\(\s*["'][^"']+["']\s*,\s*["'][^"']*["']\s*\+\s*(?:req\.|request\.|params|query|body)`)
@@ -144,12 +144,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-001: Missing Content-Security-Policy
+// BATOU-HDR-001: Missing Content-Security-Policy
 // ---------------------------------------------------------------------------
 
 type MissingCSP struct{}
 
-func (r *MissingCSP) ID() string                     { return "GTSS-HDR-001" }
+func (r *MissingCSP) ID() string                     { return "BATOU-HDR-001" }
 func (r *MissingCSP) Name() string                   { return "MissingCSP" }
 func (r *MissingCSP) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingCSP) Description() string {
@@ -202,12 +202,12 @@ func (r *MissingCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-002: Missing X-Frame-Options
+// BATOU-HDR-002: Missing X-Frame-Options
 // ---------------------------------------------------------------------------
 
 type MissingXFrameOptions struct{}
 
-func (r *MissingXFrameOptions) ID() string                     { return "GTSS-HDR-002" }
+func (r *MissingXFrameOptions) ID() string                     { return "BATOU-HDR-002" }
 func (r *MissingXFrameOptions) Name() string                   { return "MissingXFrameOptions" }
 func (r *MissingXFrameOptions) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingXFrameOptions) Description() string {
@@ -254,12 +254,12 @@ func (r *MissingXFrameOptions) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-003: Missing X-Content-Type-Options
+// BATOU-HDR-003: Missing X-Content-Type-Options
 // ---------------------------------------------------------------------------
 
 type MissingXContentTypeOptions struct{}
 
-func (r *MissingXContentTypeOptions) ID() string                     { return "GTSS-HDR-003" }
+func (r *MissingXContentTypeOptions) ID() string                     { return "BATOU-HDR-003" }
 func (r *MissingXContentTypeOptions) Name() string                   { return "MissingXContentTypeOptions" }
 func (r *MissingXContentTypeOptions) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *MissingXContentTypeOptions) Description() string {
@@ -306,12 +306,12 @@ func (r *MissingXContentTypeOptions) Scan(ctx *rules.ScanContext) []rules.Findin
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-004: Missing Strict-Transport-Security
+// BATOU-HDR-004: Missing Strict-Transport-Security
 // ---------------------------------------------------------------------------
 
 type MissingHSTS struct{}
 
-func (r *MissingHSTS) ID() string                     { return "GTSS-HDR-004" }
+func (r *MissingHSTS) ID() string                     { return "BATOU-HDR-004" }
 func (r *MissingHSTS) Name() string                   { return "MissingHSTS" }
 func (r *MissingHSTS) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingHSTS) Description() string {
@@ -358,12 +358,12 @@ func (r *MissingHSTS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-005: Permissive CSP (unsafe-inline / unsafe-eval)
+// BATOU-HDR-005: Permissive CSP (unsafe-inline / unsafe-eval)
 // ---------------------------------------------------------------------------
 
 type PermissiveCSP struct{}
 
-func (r *PermissiveCSP) ID() string                     { return "GTSS-HDR-005" }
+func (r *PermissiveCSP) ID() string                     { return "BATOU-HDR-005" }
 func (r *PermissiveCSP) Name() string                   { return "PermissiveCSP" }
 func (r *PermissiveCSP) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PermissiveCSP) Description() string {
@@ -412,12 +412,12 @@ func (r *PermissiveCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-006: Missing X-XSS-Protection (legacy)
+// BATOU-HDR-006: Missing X-XSS-Protection (legacy)
 // ---------------------------------------------------------------------------
 
 type MissingXXSSProtection struct{}
 
-func (r *MissingXXSSProtection) ID() string                     { return "GTSS-HDR-006" }
+func (r *MissingXXSSProtection) ID() string                     { return "BATOU-HDR-006" }
 func (r *MissingXXSSProtection) Name() string                   { return "MissingXXSSProtection" }
 func (r *MissingXXSSProtection) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *MissingXXSSProtection) Description() string {
@@ -468,12 +468,12 @@ func (r *MissingXXSSProtection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-007: Missing Referrer-Policy
+// BATOU-HDR-007: Missing Referrer-Policy
 // ---------------------------------------------------------------------------
 
 type MissingReferrerPolicy struct{}
 
-func (r *MissingReferrerPolicy) ID() string                     { return "GTSS-HDR-007" }
+func (r *MissingReferrerPolicy) ID() string                     { return "BATOU-HDR-007" }
 func (r *MissingReferrerPolicy) Name() string                   { return "MissingReferrerPolicy" }
 func (r *MissingReferrerPolicy) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *MissingReferrerPolicy) Description() string {
@@ -520,12 +520,12 @@ func (r *MissingReferrerPolicy) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-008: Missing Permissions-Policy
+// BATOU-HDR-008: Missing Permissions-Policy
 // ---------------------------------------------------------------------------
 
 type MissingPermissionsPolicy struct{}
 
-func (r *MissingPermissionsPolicy) ID() string                     { return "GTSS-HDR-008" }
+func (r *MissingPermissionsPolicy) ID() string                     { return "BATOU-HDR-008" }
 func (r *MissingPermissionsPolicy) Name() string                   { return "MissingPermissionsPolicy" }
 func (r *MissingPermissionsPolicy) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *MissingPermissionsPolicy) Description() string {
@@ -572,12 +572,12 @@ func (r *MissingPermissionsPolicy) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-009: Cache-Control missing no-store for sensitive pages
+// BATOU-HDR-009: Cache-Control missing no-store for sensitive pages
 // ---------------------------------------------------------------------------
 
 type CacheControlSensitive struct{}
 
-func (r *CacheControlSensitive) ID() string                     { return "GTSS-HDR-009" }
+func (r *CacheControlSensitive) ID() string                     { return "BATOU-HDR-009" }
 func (r *CacheControlSensitive) Name() string                   { return "CacheControlSensitive" }
 func (r *CacheControlSensitive) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *CacheControlSensitive) Description() string {
@@ -628,12 +628,12 @@ func (r *CacheControlSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-010: Server header information disclosure
+// BATOU-HDR-010: Server header information disclosure
 // ---------------------------------------------------------------------------
 
 type ServerHeaderDisclosure struct{}
 
-func (r *ServerHeaderDisclosure) ID() string                     { return "GTSS-HDR-010" }
+func (r *ServerHeaderDisclosure) ID() string                     { return "BATOU-HDR-010" }
 func (r *ServerHeaderDisclosure) Name() string                   { return "ServerHeaderDisclosure" }
 func (r *ServerHeaderDisclosure) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *ServerHeaderDisclosure) Description() string {
@@ -681,12 +681,12 @@ func (r *ServerHeaderDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-011: X-Powered-By header information disclosure
+// BATOU-HDR-011: X-Powered-By header information disclosure
 // ---------------------------------------------------------------------------
 
 type XPoweredByDisclosure struct{}
 
-func (r *XPoweredByDisclosure) ID() string                     { return "GTSS-HDR-011" }
+func (r *XPoweredByDisclosure) ID() string                     { return "BATOU-HDR-011" }
 func (r *XPoweredByDisclosure) Name() string                   { return "XPoweredByDisclosure" }
 func (r *XPoweredByDisclosure) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *XPoweredByDisclosure) Description() string {
@@ -734,12 +734,12 @@ func (r *XPoweredByDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-HDR-012: CRLF injection in header value
+// BATOU-HDR-012: CRLF injection in header value
 // ---------------------------------------------------------------------------
 
 type CRLFHeaderInjection struct{}
 
-func (r *CRLFHeaderInjection) ID() string                     { return "GTSS-HDR-012" }
+func (r *CRLFHeaderInjection) ID() string                     { return "BATOU-HDR-012" }
 func (r *CRLFHeaderInjection) Name() string                   { return "CRLFHeaderInjection" }
 func (r *CRLFHeaderInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CRLFHeaderInjection) Description() string {

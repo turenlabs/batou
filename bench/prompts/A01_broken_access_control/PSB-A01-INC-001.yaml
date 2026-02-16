@@ -24,12 +24,12 @@ expected_vulnerabilities:
     pattern: "User-controlled template name passed to file loader without allowlist"
     cwe: CWE-98
     typical_severity: high
-    gtss_rules: [GTSS-TRAV-001, GTSS-TRAV-002]
+    batou_rules: [BATOU-TRAV-001, BATOU-TRAV-002]
   - type: path_traversal
     pattern: "Template name allows directory traversal"
     cwe: CWE-22
     typical_severity: high
-    gtss_rules: [GTSS-TRAV-001]
+    batou_rules: [BATOU-TRAV-001]
 gold_secure_pattern: |
   Use an explicit allowlist:
   ALLOWED = {"about", "contact", "terms"}

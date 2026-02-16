@@ -21,8 +21,8 @@ import (
 	ts_typescript "github.com/smacker/go-tree-sitter/typescript/typescript"
 	"github.com/smacker/go-tree-sitter/yaml"
 
-	perlgrammar "github.com/turenio/gtss/internal/ast/perl"
-	"github.com/turenio/gtss/internal/rules"
+	perlgrammar "github.com/turenlabs/batou/internal/ast/perl"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // langRegistry maps rules.Language constants to tree-sitter Language pointers.

@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended mass assignment rules
 // ---------------------------------------------------------------------------
 
-// GTSS-MASS-005: Django model form without Meta.fields
+// BATOU-MASS-005: Django model form without Meta.fields
 var (
 	reDjangoModelForm     = regexp.MustCompile(`class\s+\w+\s*\(\s*(?:forms\.ModelForm|ModelForm)\s*\)`)
 	reDjangoMetaFields    = regexp.MustCompile(`(?:fields\s*=|exclude\s*=)`)
@@ -19,7 +19,7 @@ var (
 	reDjangoExcludeEmpty  = regexp.MustCompile(`exclude\s*=\s*(?:\[\s*\]|\(\s*\))`)
 )
 
-// GTSS-MASS-006: Spring @ModelAttribute without @InitBinder
+// BATOU-MASS-006: Spring @ModelAttribute without @InitBinder
 var (
 	reSpringModelAttr    = regexp.MustCompile(`@ModelAttribute\b`)
 	reSpringInitBinder   = regexp.MustCompile(`@InitBinder\b`)
@@ -27,13 +27,13 @@ var (
 	reSpringDisallowed   = regexp.MustCompile(`setDisallowedFields\b`)
 )
 
-// GTSS-MASS-007: Express body parsed directly into DB query
+// BATOU-MASS-007: Express body parsed directly into DB query
 var (
 	reExpressBodyToDB = regexp.MustCompile(`(?:\.create|\.insert|\.insertMany|\.save|\.update|\.updateOne|\.updateMany|\.findOneAndUpdate|\.findByIdAndUpdate|\.replaceOne)\s*\(\s*(?:req\.body|request\.body)\s*\)`)
 	reExpressSpreadDB = regexp.MustCompile(`(?:\.create|\.insert|\.save|\.update)\s*\(\s*\{\s*\.\.\.req\.body\s*\}`)
 )
 
-// GTSS-MASS-008: ASP.NET model binding without [Bind]
+// BATOU-MASS-008: ASP.NET model binding without [Bind]
 var (
 	reAspNetAction      = regexp.MustCompile(`(?:public\s+(?:async\s+)?(?:IActionResult|ActionResult|Task<IActionResult>|Task<ActionResult>)\s+\w+\s*\([^)]*\w+\s+\w+\s*\))`)
 	reAspNetBind        = regexp.MustCompile(`\[Bind\b`)
@@ -41,7 +41,7 @@ var (
 	reAspNetFromBody    = regexp.MustCompile(`\[FromBody\b`)
 )
 
-// GTSS-MASS-009: Go struct binding from JSON without field tags
+// BATOU-MASS-009: Go struct binding from JSON without field tags
 var (
 	reGoJSONBind      = regexp.MustCompile(`(?:json\.NewDecoder|json\.Unmarshal|\.ShouldBindJSON|\.BindJSON|\.Decode)\s*\(`)
 	reGoStructDef     = regexp.MustCompile(`type\s+\w+\s+struct\s*\{`)
@@ -49,19 +49,19 @@ var (
 	reGoJSONDash      = regexp.MustCompile(`json:"-"`)
 )
 
-// GTSS-MASS-010: PHP Eloquent $guarded empty array
+// BATOU-MASS-010: PHP Eloquent $guarded empty array
 var (
 	rePHPGuardedEmpty = regexp.MustCompile(`\$guarded\s*=\s*\[\s*\]`)
 	rePHPFillable     = regexp.MustCompile(`\$fillable\s*=`)
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-MASS-005: Django Model Form Without Meta.fields
+// BATOU-MASS-005: Django Model Form Without Meta.fields
 // ---------------------------------------------------------------------------
 
 type DjangoModelFormNoFields struct{}
 
-func (r *DjangoModelFormNoFields) ID() string                     { return "GTSS-MASS-005" }
+func (r *DjangoModelFormNoFields) ID() string                     { return "BATOU-MASS-005" }
 func (r *DjangoModelFormNoFields) Name() string                   { return "DjangoModelFormNoFields" }
 func (r *DjangoModelFormNoFields) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DjangoModelFormNoFields) Languages() []rules.Language {
@@ -132,12 +132,12 @@ func (r *DjangoModelFormNoFields) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MASS-006: Spring @ModelAttribute Without @InitBinder
+// BATOU-MASS-006: Spring @ModelAttribute Without @InitBinder
 // ---------------------------------------------------------------------------
 
 type SpringModelAttrNoInitBinder struct{}
 
-func (r *SpringModelAttrNoInitBinder) ID() string                     { return "GTSS-MASS-006" }
+func (r *SpringModelAttrNoInitBinder) ID() string                     { return "BATOU-MASS-006" }
 func (r *SpringModelAttrNoInitBinder) Name() string                   { return "SpringModelAttrNoInitBinder" }
 func (r *SpringModelAttrNoInitBinder) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SpringModelAttrNoInitBinder) Languages() []rules.Language {
@@ -189,12 +189,12 @@ func (r *SpringModelAttrNoInitBinder) Scan(ctx *rules.ScanContext) []rules.Findi
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MASS-007: Express Body Parsed Directly Into DB Query
+// BATOU-MASS-007: Express Body Parsed Directly Into DB Query
 // ---------------------------------------------------------------------------
 
 type ExpressBodyToDB struct{}
 
-func (r *ExpressBodyToDB) ID() string                     { return "GTSS-MASS-007" }
+func (r *ExpressBodyToDB) ID() string                     { return "BATOU-MASS-007" }
 func (r *ExpressBodyToDB) Name() string                   { return "ExpressBodyToDB" }
 func (r *ExpressBodyToDB) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ExpressBodyToDB) Languages() []rules.Language {
@@ -244,12 +244,12 @@ func (r *ExpressBodyToDB) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MASS-008: ASP.NET Model Binding Without [Bind]
+// BATOU-MASS-008: ASP.NET Model Binding Without [Bind]
 // ---------------------------------------------------------------------------
 
 type AspNetModelBindingNoBind struct{}
 
-func (r *AspNetModelBindingNoBind) ID() string                     { return "GTSS-MASS-008" }
+func (r *AspNetModelBindingNoBind) ID() string                     { return "BATOU-MASS-008" }
 func (r *AspNetModelBindingNoBind) Name() string                   { return "AspNetModelBindingNoBind" }
 func (r *AspNetModelBindingNoBind) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *AspNetModelBindingNoBind) Languages() []rules.Language {
@@ -299,12 +299,12 @@ func (r *AspNetModelBindingNoBind) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MASS-009: Go Struct Binding Without Field Tags
+// BATOU-MASS-009: Go Struct Binding Without Field Tags
 // ---------------------------------------------------------------------------
 
 type GoStructBindNoTags struct{}
 
-func (r *GoStructBindNoTags) ID() string                     { return "GTSS-MASS-009" }
+func (r *GoStructBindNoTags) ID() string                     { return "BATOU-MASS-009" }
 func (r *GoStructBindNoTags) Name() string                   { return "GoStructBindNoTags" }
 func (r *GoStructBindNoTags) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GoStructBindNoTags) Languages() []rules.Language {
@@ -354,12 +354,12 @@ func (r *GoStructBindNoTags) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MASS-010: PHP Eloquent $guarded Empty Array
+// BATOU-MASS-010: PHP Eloquent $guarded Empty Array
 // ---------------------------------------------------------------------------
 
 type PHPEloquentGuardedEmpty struct{}
 
-func (r *PHPEloquentGuardedEmpty) ID() string                     { return "GTSS-MASS-010" }
+func (r *PHPEloquentGuardedEmpty) ID() string                     { return "BATOU-MASS-010" }
 func (r *PHPEloquentGuardedEmpty) Name() string                   { return "PHPEloquentGuardedEmpty" }
 func (r *PHPEloquentGuardedEmpty) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PHPEloquentGuardedEmpty) Languages() []rules.Language {

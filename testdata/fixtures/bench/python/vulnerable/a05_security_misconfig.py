@@ -1,5 +1,5 @@
 # Source: CWE-16 - Security misconfiguration in Flask/Django
-# Expected: GTSS-GEN-001 (Debug Mode Enabled), GTSS-AUTH-003 (CORS Wildcard)
+# Expected: BATOU-GEN-001 (Debug Mode Enabled), BATOU-AUTH-003 (CORS Wildcard)
 # OWASP: A05:2021 - Security Misconfiguration
 
 from flask import Flask

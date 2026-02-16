@@ -3,8 +3,8 @@ package phpast
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanPHP(code string) []rules.Finding {
@@ -45,7 +45,7 @@ function handler($input) {
 }
 ?>`
 	findings := scanPHP(code)
-	f := findByRule(findings, "GTSS-PHPAST-001")
+	f := findByRule(findings, "BATOU-PHPAST-001")
 	if f == nil {
 		t.Error("expected eval finding")
 		for _, f := range findings {
@@ -58,7 +58,7 @@ func TestEvalLiteralSafe(t *testing.T) {
 	code := `<?php eval("1 + 2"); ?>`
 	findings := scanPHP(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-PHPAST-001" {
+		if f.RuleID == "BATOU-PHPAST-001" {
 			t.Errorf("should not flag eval with literal: %s", f.Title)
 		}
 	}
@@ -73,7 +73,7 @@ function handler($input) {
 }
 ?>`
 	findings := scanPHP(code)
-	count := countByRule(findings, "GTSS-PHPAST-002")
+	count := countByRule(findings, "BATOU-PHPAST-002")
 	if count != 3 {
 		t.Errorf("expected 3 command injection findings, got %d", count)
 		for _, f := range findings {
@@ -89,7 +89,7 @@ function handler($path) {
 }
 ?>`
 	findings := scanPHP(code)
-	f := findByRule(findings, "GTSS-PHPAST-003")
+	f := findByRule(findings, "BATOU-PHPAST-003")
 	if f == nil {
 		t.Error("expected file inclusion finding for include with variable")
 		for _, f := range findings {
@@ -105,7 +105,7 @@ function handler($path) {
 }
 ?>`
 	findings := scanPHP(code)
-	f := findByRule(findings, "GTSS-PHPAST-003")
+	f := findByRule(findings, "BATOU-PHPAST-003")
 	if f == nil {
 		t.Error("expected file inclusion finding for require with variable")
 		for _, f := range findings {
@@ -121,7 +121,7 @@ function handler($data) {
 }
 ?>`
 	findings := scanPHP(code)
-	f := findByRule(findings, "GTSS-PHPAST-004")
+	f := findByRule(findings, "BATOU-PHPAST-004")
 	if f == nil {
 		t.Error("expected deserialization finding for unserialize")
 		for _, f := range findings {
@@ -137,7 +137,7 @@ function handler($input, $subject) {
 }
 ?>`
 	findings := scanPHP(code)
-	f := findByRule(findings, "GTSS-PHPAST-005")
+	f := findByRule(findings, "BATOU-PHPAST-005")
 	if f == nil {
 		t.Error("expected preg_replace /e finding")
 		for _, f := range findings {
@@ -152,7 +152,7 @@ preg_replace('/pattern/', $replacement, $subject);
 ?>`
 	findings := scanPHP(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-PHPAST-005" {
+		if f.RuleID == "BATOU-PHPAST-005" {
 			t.Errorf("should not flag preg_replace without /e: %s", f.Title)
 		}
 	}
@@ -165,7 +165,7 @@ function handler($input) {
 }
 ?>`
 	findings := scanPHP(code)
-	f := findByRule(findings, "GTSS-PHPAST-006")
+	f := findByRule(findings, "BATOU-PHPAST-006")
 	if f == nil {
 		t.Error("expected SQL injection finding for concat in assignment")
 		for _, f := range findings {
@@ -209,7 +209,7 @@ function handler($input) {
 }
 ?>`
 	findings := scanPHP(code)
-	f := findByRule(findings, "GTSS-PHPAST-001")
+	f := findByRule(findings, "BATOU-PHPAST-001")
 	if f == nil {
 		t.Fatal("expected finding")
 	}

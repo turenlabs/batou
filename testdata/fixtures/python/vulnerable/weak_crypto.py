@@ -1,5 +1,5 @@
 # Vulnerable: Weak cryptography - MD5 hashing and insecure random
-# Expected: GTSS-CRY-001 (WeakHashing), GTSS-CRY-009 (PythonRandomSecurity)
+# Expected: BATOU-CRY-001 (WeakHashing), BATOU-CRY-009 (PythonRandomSecurity)
 
 import hashlib
 import random

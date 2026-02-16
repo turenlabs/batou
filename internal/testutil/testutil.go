@@ -1,4 +1,4 @@
-// Package testutil provides test helpers for GTSS rule and scanner testing.
+// Package testutil provides test helpers for Batou rule and scanner testing.
 //
 // It wraps the scanner pipeline so tests can feed in arbitrary code strings
 // and assert on findings without constructing hook.Input structs by hand.
@@ -13,10 +13,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/turenio/gtss/internal/hook"
-	"github.com/turenio/gtss/internal/reporter"
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/scanner"
+	"github.com/turenlabs/batou/internal/hook"
+	"github.com/turenlabs/batou/internal/reporter"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/scanner"
 )
 
 // ScanResult wraps reporter.ScanResult with convenience accessors for tests.
@@ -133,6 +133,19 @@ func MustFindRule(t *testing.T, result *ScanResult, ruleID string) {
 	}
 }
 
+// MustFindAnyRule asserts that at least one of the given ruleIDs is present.
+// Use this when multiple rules legitimately overlap and dedup keeps one.
+func MustFindAnyRule(t *testing.T, result *ScanResult, ruleIDs ...string) {
+	t.Helper()
+	for _, id := range ruleIDs {
+		if HasFinding(result, id) {
+			return
+		}
+	}
+	t.Errorf("expected finding with any of %v but none found; got %d findings: %s",
+		ruleIDs, len(result.Findings), summarizeFindings(result.Findings))
+}
+
 // MustNotFindRule asserts that no finding with the given ruleID exists.
 func MustNotFindRule(t *testing.T, result *ScanResult, ruleID string) {
 	t.Helper()
@@ -216,16 +229,16 @@ func AssertAllowed(t *testing.T, result *ScanResult) {
 	AssertNotBlocked(t, result)
 }
 
-// RunGTSSBinary compiles and runs the gtss binary with the given hook input
+// RunBatouBinary compiles and runs the batou binary with the given hook input
 // fed as JSON via stdin. Returns the process exit code, stdout, and stderr.
 // The binary is built once per test binary invocation and cached in a temp dir.
 //
 // hookInput is marshaled to JSON and piped to stdin, mimicking how Claude Code
-// hooks invoke GTSS.
-func RunGTSSBinary(t *testing.T, hookInput map[string]interface{}) (exitCode int, stdout string, stderr string) {
+// hooks invoke Batou.
+func RunBatouBinary(t *testing.T, hookInput map[string]interface{}) (exitCode int, stdout string, stderr string) {
 	t.Helper()
 
-	binPath := buildGTSSBinary(t)
+	binPath := buildBatouBinary(t)
 
 	inputJSON, err := json.Marshal(hookInput)
 	if err != nil {
@@ -246,24 +259,24 @@ func RunGTSSBinary(t *testing.T, hookInput map[string]interface{}) (exitCode int
 		if exitErr, ok := runErr.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
-			t.Fatalf("failed to run gtss binary: %v", runErr)
+			t.Fatalf("failed to run batou binary: %v", runErr)
 		}
 	}
 
 	return exitCode, outBuf.String(), errBuf.String()
 }
 
-// gtssBinaryPath caches the compiled binary path for the test session.
-var gtssBinaryPath string
+// batouBinaryPath caches the compiled binary path for the test session.
+var batouBinaryPath string
 
-// buildGTSSBinary compiles cmd/gtss/main.go into a temp binary, reusing it
+// buildBatouBinary compiles cmd/batou/main.go into a temp binary, reusing it
 // across calls within the same test process.
-func buildGTSSBinary(t *testing.T) string {
+func buildBatouBinary(t *testing.T) string {
 	t.Helper()
 
-	if gtssBinaryPath != "" {
-		if _, err := os.Stat(gtssBinaryPath); err == nil {
-			return gtssBinaryPath
+	if batouBinaryPath != "" {
+		if _, err := os.Stat(batouBinaryPath); err == nil {
+			return batouBinaryPath
 		}
 	}
 
@@ -275,17 +288,17 @@ func buildGTSSBinary(t *testing.T) string {
 	projectRoot := filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))
 
 	tmpDir := t.TempDir()
-	binPath := filepath.Join(tmpDir, "gtss")
+	binPath := filepath.Join(tmpDir, "batou")
 
-	cmd := exec.Command("go", "build", "-o", binPath, "./cmd/gtss")
+	cmd := exec.Command("go", "build", "-o", binPath, "./cmd/batou")
 	cmd.Dir = projectRoot
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("failed to build gtss binary: %v\n%s", err, output)
+		t.Fatalf("failed to build batou binary: %v\n%s", err, output)
 	}
 
-	gtssBinaryPath = binPath
+	batouBinaryPath = binPath
 	return binPath
 }
 

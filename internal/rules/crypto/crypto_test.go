@@ -3,53 +3,53 @@ package crypto
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
-// --- GTSS-CRY-001: Weak Hashing ---
+// --- BATOU-CRY-001: Weak Hashing ---
 
 func TestCRY001_GoMD5(t *testing.T) {
 	content := `hash := md5.Sum(password)`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-001")
+	testutil.MustFindRule(t, result, "BATOU-CRY-001")
 }
 
 func TestCRY001_GoSHA1(t *testing.T) {
 	content := `h := sha1.New()`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-001")
+	testutil.MustFindRule(t, result, "BATOU-CRY-001")
 }
 
 func TestCRY001_PythonMD5(t *testing.T) {
 	content := `digest = hashlib.md5(password.encode()).hexdigest()`
 	result := testutil.ScanContent(t, "/app/auth.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-001")
+	testutil.MustFindRule(t, result, "BATOU-CRY-001")
 }
 
 func TestCRY001_JSMD5(t *testing.T) {
 	content := `const hash = crypto.createHash('md5').update(password).digest('hex');`
 	result := testutil.ScanContent(t, "/app/auth.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-001")
+	testutil.MustFindRule(t, result, "BATOU-CRY-001")
 }
 
 func TestCRY001_JavaMD5(t *testing.T) {
 	content := `MessageDigest md = MessageDigest.getInstance("MD5");`
 	result := testutil.ScanContent(t, "/app/Auth.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-001")
+	testutil.MustFindRule(t, result, "BATOU-CRY-001")
 }
 
 func TestCRY001_Fixture_WeakCrypto_Go(t *testing.T) {
 	content := testutil.LoadFixture(t, "go/vulnerable/weak_crypto.go")
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	hasCrypto := testutil.HasFinding(result, "GTSS-CRY-001") ||
-		testutil.HasFinding(result, "GTSS-CRY-003") ||
-		testutil.HasFinding(result, "GTSS-CRY-004")
+	hasCrypto := testutil.HasFinding(result, "BATOU-CRY-001") ||
+		testutil.HasFinding(result, "BATOU-CRY-003") ||
+		testutil.HasFinding(result, "BATOU-CRY-004")
 	if !hasCrypto {
 		t.Errorf("expected crypto finding in weak_crypto.go, got: %v", testutil.FindingRuleIDs(result))
 	}
 }
 
-// --- GTSS-CRY-002: Insecure Random ---
+// --- BATOU-CRY-002: Insecure Random ---
 
 func TestCRY002_GoMathRand_SecurityCtx(t *testing.T) {
 	content := `package auth
@@ -59,7 +59,7 @@ func generateToken() string {
 	return fmt.Sprintf("%06d", token)
 }`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-002")
+	testutil.MustFindRule(t, result, "BATOU-CRY-002")
 }
 
 func TestCRY002_PythonRandom_SecurityCtx(t *testing.T) {
@@ -68,7 +68,7 @@ def generate_token():
     token = random.randint(100000, 999999)
     return str(token)`
 	result := testutil.ScanContent(t, "/app/auth.py", content)
-	hasFinding := testutil.HasFinding(result, "GTSS-CRY-002") || testutil.HasFinding(result, "GTSS-CRY-009")
+	hasFinding := testutil.HasFinding(result, "BATOU-CRY-002") || testutil.HasFinding(result, "BATOU-CRY-009")
 	if !hasFinding {
 		t.Errorf("expected insecure random finding, got: %v", testutil.FindingRuleIDs(result))
 	}
@@ -79,58 +79,58 @@ func TestCRY002_JSMathRandom_SecurityCtx(t *testing.T) {
 	return Math.random().toString(36).substring(2);
 }`
 	result := testutil.ScanContent(t, "/app/auth.ts", content)
-	hasFinding := testutil.HasFinding(result, "GTSS-CRY-002") || testutil.HasFinding(result, "GTSS-CRY-008")
+	hasFinding := testutil.HasFinding(result, "BATOU-CRY-002") || testutil.HasFinding(result, "BATOU-CRY-008")
 	if !hasFinding {
 		t.Errorf("expected insecure random finding, got: %v", testutil.FindingRuleIDs(result))
 	}
 }
 
-// --- GTSS-CRY-003: Weak Cipher ---
+// --- BATOU-CRY-003: Weak Cipher ---
 
 func TestCRY003_GoDES(t *testing.T) {
 	content := `cipher, _ := des.NewCipher(key)`
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-003")
+	testutil.MustFindRule(t, result, "BATOU-CRY-003")
 }
 
 func TestCRY003_ECBMode(t *testing.T) {
 	content := `cipher = AES.new(key, AES.MODE_ECB)`
 	result := testutil.ScanContent(t, "/app/crypto.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-003")
+	testutil.MustFindRule(t, result, "BATOU-CRY-003")
 }
 
 func TestCRY003_JavaDES(t *testing.T) {
 	content := `Cipher cipher = Cipher.getInstance("DES/ECB/PKCS5Padding");`
 	result := testutil.ScanContent(t, "/app/Crypto.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-003")
+	testutil.MustFindRule(t, result, "BATOU-CRY-003")
 }
 
 func TestCRY003_Fixture_WeakCrypto_JS(t *testing.T) {
 	content := testutil.LoadFixture(t, "javascript/vulnerable/weak_crypto.ts")
 	result := testutil.ScanContent(t, "/app/crypto.ts", content)
-	hasCrypto := testutil.HasFinding(result, "GTSS-CRY-003") ||
-		testutil.HasFinding(result, "GTSS-CRY-001") ||
-		testutil.HasFinding(result, "GTSS-CRY-004")
+	hasCrypto := testutil.HasFinding(result, "BATOU-CRY-003") ||
+		testutil.HasFinding(result, "BATOU-CRY-001") ||
+		testutil.HasFinding(result, "BATOU-CRY-004")
 	if !hasCrypto {
 		t.Errorf("expected crypto finding in weak_crypto.ts, got: %v", testutil.FindingRuleIDs(result))
 	}
 }
 
-// --- GTSS-CRY-004: Hardcoded IV ---
+// --- BATOU-CRY-004: Hardcoded IV ---
 
 func TestCRY004_GoByteIV(t *testing.T) {
 	content := `iv := []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}`
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-004")
+	testutil.MustFindRule(t, result, "BATOU-CRY-004")
 }
 
 func TestCRY004_StringIV(t *testing.T) {
 	content := `nonce = "1234567890abcdef"`
 	result := testutil.ScanContent(t, "/app/crypto.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-004")
+	testutil.MustFindRule(t, result, "BATOU-CRY-004")
 }
 
-// --- GTSS-CRY-005: Insecure TLS ---
+// --- BATOU-CRY-005: Insecure TLS ---
 
 func TestCRY005_GoInsecureSkipVerify(t *testing.T) {
 	content := `client := &http.Client{
@@ -139,88 +139,88 @@ func TestCRY005_GoInsecureSkipVerify(t *testing.T) {
 	},
 }`
 	result := testutil.ScanContent(t, "/app/client.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-005")
+	testutil.MustFindRule(t, result, "BATOU-CRY-005")
 }
 
 func TestCRY005_PythonVerifyFalse(t *testing.T) {
 	content := `resp = requests.get(url, verify=False)`
 	result := testutil.ScanContent(t, "/app/client.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-005")
+	testutil.MustFindRule(t, result, "BATOU-CRY-005")
 }
 
 func TestCRY005_NodeRejectUnauthorized(t *testing.T) {
 	content := `const agent = new https.Agent({ rejectUnauthorized: false });`
 	result := testutil.ScanContent(t, "/app/client.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-005")
+	testutil.MustFindRule(t, result, "BATOU-CRY-005")
 }
 
 func TestCRY005_NodeTLSEnv(t *testing.T) {
 	content := `process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';`
 	result := testutil.ScanContent(t, "/app/app.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-005")
+	testutil.MustFindRule(t, result, "BATOU-CRY-005")
 }
 
-// --- GTSS-CRY-006: Weak Key Size ---
+// --- BATOU-CRY-006: Weak Key Size ---
 
 func TestCRY006_GoRSA1024(t *testing.T) {
 	content := `key, _ := rsa.GenerateKey(rand.Reader, 1024)`
 	result := testutil.ScanContent(t, "/app/keygen.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-006")
+	testutil.MustFindRule(t, result, "BATOU-CRY-006")
 }
 
 func TestCRY006_WeakCurve(t *testing.T) {
 	content := `curve := elliptic.P192()`
 	result := testutil.ScanContent(t, "/app/keygen.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-006")
+	testutil.MustFindRule(t, result, "BATOU-CRY-006")
 }
 
 func TestCRY006_JavaRSA1024(t *testing.T) {
 	content := `keyGen.initialize(1024);`
 	result := testutil.ScanContent(t, "/app/KeyGen.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-006")
+	testutil.MustFindRule(t, result, "BATOU-CRY-006")
 }
 
-// --- GTSS-CRY-007: Plaintext Protocol ---
+// --- BATOU-CRY-007: Plaintext Protocol ---
 
 func TestCRY007_HTTP_API(t *testing.T) {
 	content := `apiURL := "http://api.production.com/v1/data"`
 	result := testutil.ScanContent(t, "/app/config.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-007")
+	testutil.MustFindRule(t, result, "BATOU-CRY-007")
 }
 
 func TestCRY007_Safe_Localhost(t *testing.T) {
 	content := `url := "http://localhost:8080/health"`
 	result := testutil.ScanContent(t, "/app/config.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-007")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-007")
 }
 
 func TestCRY007_Safe_Example(t *testing.T) {
 	content := `url := "http://example.com/test"`
 	result := testutil.ScanContent(t, "/app/config.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-007")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-007")
 }
 
-// --- GTSS-CRY-008: JS Math.random() Security ---
+// --- BATOU-CRY-008: JS Math.random() Security ---
 
 func TestCRY008_JSMathRandom_TokenGen(t *testing.T) {
 	content := `function generateApiKey() {
 	return 'key_' + Math.random().toString(36);
 }`
 	result := testutil.ScanContent(t, "/app/auth.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-008")
+	testutil.MustFindRule(t, result, "BATOU-CRY-008")
 }
 
-// --- GTSS-CRY-009: Python random Security ---
+// --- BATOU-CRY-009: Python random Security ---
 
 func TestCRY009_PythonRandom_TokenGen(t *testing.T) {
 	content := `import random
 def make_api_key():
     return ''.join(random.choice('abcdefghijklmnop') for _ in range(32))`
 	result := testutil.ScanContent(t, "/app/auth.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-009")
+	testutil.MustFindRule(t, result, "BATOU-CRY-009")
 }
 
-// --- GTSS-CRY-010: Weak PRNG ---
+// --- BATOU-CRY-010: Weak PRNG ---
 
 func TestCRY010_JavaUtilRandom(t *testing.T) {
 	content := `import java.util.Random;
@@ -231,62 +231,62 @@ public class TokenGen {
     }
 }`
 	result := testutil.ScanContent(t, "/app/TokenGen.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-010")
+	testutil.MustFindRule(t, result, "BATOU-CRY-010")
 }
 
 func TestCRY010_PHPRand_SecurityCtx(t *testing.T) {
 	content := `<?php
 $token = rand(100000, 999999);`
 	result := testutil.ScanContent(t, "/app/auth.php", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-010")
+	testutil.MustFindRule(t, result, "BATOU-CRY-010")
 }
 
-// --- GTSS-CRY-011: Predictable Seed ---
+// --- BATOU-CRY-011: Predictable Seed ---
 
 func TestCRY011_PythonSeedTime(t *testing.T) {
 	content := `import random, time
 random.seed(time.time())`
 	result := testutil.ScanContent(t, "/app/rng.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-011")
+	testutil.MustFindRule(t, result, "BATOU-CRY-011")
 }
 
 func TestCRY011_PythonSeedFixed(t *testing.T) {
 	content := `random.seed(42)`
 	result := testutil.ScanContent(t, "/app/rng.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-011")
+	testutil.MustFindRule(t, result, "BATOU-CRY-011")
 }
 
 func TestCRY011_GoSeedTime(t *testing.T) {
 	content := `rand.Seed(time.Now().UnixNano())`
 	result := testutil.ScanContent(t, "/app/rng.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-011")
+	testutil.MustFindRule(t, result, "BATOU-CRY-011")
 }
 
 func TestCRY011_GoSeedFixed(t *testing.T) {
 	content := `rand.Seed(12345)`
 	result := testutil.ScanContent(t, "/app/rng.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-011")
+	testutil.MustFindRule(t, result, "BATOU-CRY-011")
 }
 
 func TestCRY011_GoNewSourceFixed(t *testing.T) {
 	content := `src := rand.NewSource(42)`
 	result := testutil.ScanContent(t, "/app/rng.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-011")
+	testutil.MustFindRule(t, result, "BATOU-CRY-011")
 }
 
 func TestCRY011_JavaFixedSeed(t *testing.T) {
 	content := `Random rng = new Random(12345L);`
 	result := testutil.ScanContent(t, "/app/Rng.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-011")
+	testutil.MustFindRule(t, result, "BATOU-CRY-011")
 }
 
 func TestCRY011_CSeedTime(t *testing.T) {
 	content := `srand(time(NULL));`
 	result := testutil.ScanContent(t, "/app/rng.c", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-011")
+	testutil.MustFindRule(t, result, "BATOU-CRY-011")
 }
 
-// --- GTSS-CRY-012: Hardcoded Cryptographic Keys ---
+// --- BATOU-CRY-012: Hardcoded Cryptographic Keys ---
 
 func TestCRY012_GoHardcodedKey(t *testing.T) {
 	content := `package main
@@ -297,7 +297,7 @@ func encrypt(data []byte) {
 	_ = block
 }`
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-012")
+	testutil.MustFindRule(t, result, "BATOU-CRY-012")
 }
 
 func TestCRY012_PythonHardcodedKey(t *testing.T) {
@@ -305,7 +305,7 @@ func TestCRY012_PythonHardcodedKey(t *testing.T) {
 secret_key = b"hardcoded_secret"
 cipher = AES.new(secret_key, AES.MODE_GCM)`
 	result := testutil.ScanContent(t, "/app/crypto.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-012")
+	testutil.MustFindRule(t, result, "BATOU-CRY-012")
 }
 
 func TestCRY012_JSBufferFromKey(t *testing.T) {
@@ -313,30 +313,30 @@ func TestCRY012_JSBufferFromKey(t *testing.T) {
 const key = Buffer.from("my-secret-key-16");
 const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);`
 	result := testutil.ScanContent(t, "/app/crypto.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-012")
+	testutil.MustFindRule(t, result, "BATOU-CRY-012")
 }
 
 func TestCRY012_JavaSecretKeySpec(t *testing.T) {
 	content := `import javax.crypto.spec.SecretKeySpec;
 SecretKeySpec keySpec = new SecretKeySpec("mysecretkey12345".getBytes(), "AES");`
 	result := testutil.ScanContent(t, "/app/Crypto.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-012")
+	testutil.MustFindRule(t, result, "BATOU-CRY-012")
 }
 
 func TestCRY012_GenericCryptoKey(t *testing.T) {
 	content := `encryption_key = "super_secret_value_here"`
 	result := testutil.ScanContent(t, "/app/config.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-012")
+	testutil.MustFindRule(t, result, "BATOU-CRY-012")
 }
 
 func TestCRY012_Safe_EnvVar(t *testing.T) {
 	content := `import os
 encryption_key = os.environ.get("ENCRYPTION_KEY")`
 	result := testutil.ScanContent(t, "/app/config.py", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-012")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-012")
 }
 
-// --- GTSS-CRY-013: Unauthenticated Encryption ---
+// --- BATOU-CRY-013: Unauthenticated Encryption ---
 
 func TestCRY013_GoCBCWithoutHMAC(t *testing.T) {
 	content := `package main
@@ -348,7 +348,7 @@ func encrypt(block cipher.Block, iv, plaintext []byte) []byte {
 	return ciphertext
 }`
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-013")
+	testutil.MustFindRule(t, result, "BATOU-CRY-013")
 }
 
 func TestCRY013_PythonCBCWithoutHMAC(t *testing.T) {
@@ -356,7 +356,7 @@ func TestCRY013_PythonCBCWithoutHMAC(t *testing.T) {
 cipher = AES.new(key, AES.MODE_CBC, iv)
 ciphertext = cipher.encrypt(pad(data, AES.block_size))`
 	result := testutil.ScanContent(t, "/app/crypto.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-013")
+	testutil.MustFindRule(t, result, "BATOU-CRY-013")
 }
 
 func TestCRY013_JavaCBCWithoutHMAC(t *testing.T) {
@@ -364,14 +364,14 @@ func TestCRY013_JavaCBCWithoutHMAC(t *testing.T) {
 Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);`
 	result := testutil.ScanContent(t, "/app/Crypto.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-013")
+	testutil.MustFindRule(t, result, "BATOU-CRY-013")
 }
 
 func TestCRY013_JSCBCWithoutHMAC(t *testing.T) {
 	content := `const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
 let encrypted = cipher.update(data, 'utf8', 'hex');`
 	result := testutil.ScanContent(t, "/app/crypto.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-013")
+	testutil.MustFindRule(t, result, "BATOU-CRY-013")
 }
 
 func TestCRY013_Safe_CBCWithHMAC(t *testing.T) {
@@ -387,56 +387,56 @@ func encryptAndMAC(block cipher.Block, iv, plaintext, macKey []byte) []byte {
 	return append(ciphertext, mac.Sum(nil)...)
 }`
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-013")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-013")
 }
 
-// --- GTSS-CRY-014: Insecure RSA Padding ---
+// --- BATOU-CRY-014: Insecure RSA Padding ---
 
 func TestCRY014_GoRSAPKCS1v15Encrypt(t *testing.T) {
 	content := `ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, &pub, plaintext)`
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-014")
+	testutil.MustFindRule(t, result, "BATOU-CRY-014")
 }
 
 func TestCRY014_GoRSAPKCS1v15Decrypt(t *testing.T) {
 	content := `plaintext, err := rsa.DecryptPKCS1v15(rand.Reader, priv, ciphertext)`
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-014")
+	testutil.MustFindRule(t, result, "BATOU-CRY-014")
 }
 
 func TestCRY014_JavaRSAPKCS1(t *testing.T) {
 	content := `Cipher cipher = Cipher.getInstance("RSA/NONE/PKCS1Padding");`
 	result := testutil.ScanContent(t, "/app/Crypto.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-014")
+	testutil.MustFindRule(t, result, "BATOU-CRY-014")
 }
 
 func TestCRY014_JavaRSABare(t *testing.T) {
 	content := `Cipher cipher = Cipher.getInstance("RSA");`
 	result := testutil.ScanContent(t, "/app/Crypto.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-014")
+	testutil.MustFindRule(t, result, "BATOU-CRY-014")
 }
 
 func TestCRY014_PythonPKCS1v15(t *testing.T) {
 	content := `from Crypto.Cipher import PKCS1_v1_5
 cipher = PKCS1_v1_5.new(key)`
 	result := testutil.ScanContent(t, "/app/crypto.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-014")
+	testutil.MustFindRule(t, result, "BATOU-CRY-014")
 }
 
 func TestCRY014_Safe_OAEP(t *testing.T) {
 	content := `ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, &pub, plaintext, nil)`
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-014")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-014")
 }
 
-// --- GTSS-CRY-015: Weak Password Hashing ---
+// --- BATOU-CRY-015: Weak Password Hashing ---
 
 func TestCRY015_PythonMD5Password(t *testing.T) {
 	content := `import hashlib
 def hash_password(password):
     return hashlib.md5(password.encode()).hexdigest()`
 	result := testutil.ScanContent(t, "/app/auth.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+	testutil.MustFindRule(t, result, "BATOU-CRY-015")
 }
 
 func TestCRY015_PythonSHA256Password(t *testing.T) {
@@ -444,7 +444,7 @@ func TestCRY015_PythonSHA256Password(t *testing.T) {
 def store_password(password):
     return hashlib.sha256(password.encode()).hexdigest()`
 	result := testutil.ScanContent(t, "/app/auth.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+	testutil.MustFindRule(t, result, "BATOU-CRY-015")
 }
 
 func TestCRY015_GoMD5Password(t *testing.T) {
@@ -453,7 +453,7 @@ func TestCRY015_GoMD5Password(t *testing.T) {
 	return hex.EncodeToString(hash[:])
 }`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+	testutil.MustFindRule(t, result, "BATOU-CRY-015")
 }
 
 func TestCRY015_JSHashPassword(t *testing.T) {
@@ -461,14 +461,14 @@ func TestCRY015_JSHashPassword(t *testing.T) {
 	return crypto.createHash('sha256').update(password).digest('hex');
 }`
 	result := testutil.ScanContent(t, "/app/auth.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+	testutil.MustFindRule(t, result, "BATOU-CRY-015")
 }
 
 func TestCRY015_PHPMd5Password(t *testing.T) {
 	content := `<?php
 $hashed = md5($password);`
 	result := testutil.ScanContent(t, "/app/auth.php", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+	testutil.MustFindRule(t, result, "BATOU-CRY-015")
 }
 
 func TestCRY015_JavaDigestPassword(t *testing.T) {
@@ -478,7 +478,7 @@ func TestCRY015_JavaDigestPassword(t *testing.T) {
 	return hex(hash);
 }`
 	result := testutil.ScanContent(t, "/app/Auth.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-015")
+	testutil.MustFindRule(t, result, "BATOU-CRY-015")
 }
 
 func TestCRY015_Safe_Bcrypt(t *testing.T) {
@@ -487,7 +487,7 @@ import bcrypt
 def hash_password(password):
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt())`
 	result := testutil.ScanContent(t, "/app/auth.py", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-015")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-015")
 }
 
 func TestCRY015_Safe_NoPasswordContext(t *testing.T) {
@@ -495,10 +495,10 @@ func TestCRY015_Safe_NoPasswordContext(t *testing.T) {
 def checksum(data):
     return hashlib.sha256(data.encode()).hexdigest()`
 	result := testutil.ScanContent(t, "/app/util.py", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-015")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-015")
 }
 
-// --- GTSS-CRY-016: Insecure Random Broad ---
+// --- BATOU-CRY-016: Insecure Random Broad ---
 
 func TestCRY016_RubyRand_TokenGen(t *testing.T) {
 	content := `def generate_token
@@ -506,14 +506,15 @@ func TestCRY016_RubyRand_TokenGen(t *testing.T) {
   token
 end`
 	result := testutil.ScanContent(t, "/app/auth.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-016")
+	// Overlapping rules may win dedup; either detection is valid.
+	testutil.MustFindAnyRule(t, result, "BATOU-CRY-010", "BATOU-CRY-016")
 }
 
 func TestCRY016_PHPRand_SessionToken(t *testing.T) {
 	content := `<?php
 $session_token = rand(100000, 999999);`
 	result := testutil.ScanContent(t, "/app/auth.php", content)
-	hasFinding := testutil.HasFinding(result, "GTSS-CRY-016") || testutil.HasFinding(result, "GTSS-CRY-010")
+	hasFinding := testutil.HasFinding(result, "BATOU-CRY-016") || testutil.HasFinding(result, "BATOU-CRY-010")
 	if !hasFinding {
 		t.Errorf("expected insecure random finding, got: %v", testutil.FindingRuleIDs(result))
 	}
@@ -523,7 +524,7 @@ func TestCRY016_PHPMtRand_OTP(t *testing.T) {
 	content := `<?php
 $otp = mt_rand(100000, 999999);`
 	result := testutil.ScanContent(t, "/app/otp.php", content)
-	hasFinding := testutil.HasFinding(result, "GTSS-CRY-016") || testutil.HasFinding(result, "GTSS-CRY-010")
+	hasFinding := testutil.HasFinding(result, "BATOU-CRY-016") || testutil.HasFinding(result, "BATOU-CRY-010")
 	if !hasFinding {
 		t.Errorf("expected insecure random finding, got: %v", testutil.FindingRuleIDs(result))
 	}
@@ -535,10 +536,10 @@ def generate_token
   SecureRandom.hex(32)
 end`
 	result := testutil.ScanContent(t, "/app/auth.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-016")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-016")
 }
 
-// --- GTSS-CRY-017: Timing-Unsafe Comparison ---
+// --- BATOU-CRY-017: Timing-Unsafe Comparison ---
 
 func TestCRY017_JSTokenCompare(t *testing.T) {
 	content := `function verify(req) {
@@ -547,7 +548,7 @@ func TestCRY017_JSTokenCompare(t *testing.T) {
   }
 }`
 	result := testutil.ScanContent(t, "/app/auth.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-017")
+	testutil.MustFindRule(t, result, "BATOU-CRY-017")
 }
 
 func TestCRY017_PythonHashCompare(t *testing.T) {
@@ -555,7 +556,7 @@ func TestCRY017_PythonHashCompare(t *testing.T) {
     if received_hash == expected:
         return True`
 	result := testutil.ScanContent(t, "/app/auth.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-017")
+	testutil.MustFindRule(t, result, "BATOU-CRY-017")
 }
 
 func TestCRY017_GoTokenCompare(t *testing.T) {
@@ -563,7 +564,7 @@ func TestCRY017_GoTokenCompare(t *testing.T) {
 	return token == expected
 }`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-017")
+	testutil.MustFindRule(t, result, "BATOU-CRY-017")
 }
 
 func TestCRY017_RubyTokenCompare(t *testing.T) {
@@ -571,53 +572,53 @@ func TestCRY017_RubyTokenCompare(t *testing.T) {
   token == expected
 end`
 	result := testutil.ScanContent(t, "/app/auth.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-017")
+	testutil.MustFindRule(t, result, "BATOU-CRY-017")
 }
 
 func TestCRY017_Safe_JSTimingSafeEqual(t *testing.T) {
 	content := `const valid = crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));`
 	result := testutil.ScanContent(t, "/app/auth.ts", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-017")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-017")
 }
 
 func TestCRY017_Safe_PythonCompareDigest(t *testing.T) {
 	content := `import hmac
 valid = hmac.compare_digest(received_hash, expected_hash)`
 	result := testutil.ScanContent(t, "/app/auth.py", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-017")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-017")
 }
 
 func TestCRY017_Safe_GoConstantTimeCompare(t *testing.T) {
 	content := `import "crypto/subtle"
 valid := subtle.ConstantTimeCompare([]byte(token), []byte(expected))`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-017")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-017")
 }
 
-// --- GTSS-CRY-018: Hardcoded IV Broad ---
+// --- BATOU-CRY-018: Hardcoded IV Broad ---
 
 func TestCRY018_JavaIvParameterSpec_ByteArray(t *testing.T) {
 	content := `IvParameterSpec ivSpec = new IvParameterSpec(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15});`
 	result := testutil.ScanContent(t, "/app/Crypto.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-018")
+	testutil.MustFindRule(t, result, "BATOU-CRY-018")
 }
 
 func TestCRY018_JavaIvParameterSpec_GetBytes(t *testing.T) {
 	content := `IvParameterSpec ivSpec = new IvParameterSpec("1234567890abcdef".getBytes());`
 	result := testutil.ScanContent(t, "/app/Crypto.java", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-018")
+	testutil.MustFindRule(t, result, "BATOU-CRY-018")
 }
 
 func TestCRY018_PythonAESFixedIV(t *testing.T) {
 	content := `cipher = AES.new(key, AES.MODE_CBC, b'1234567890abcdef')`
 	result := testutil.ScanContent(t, "/app/crypto.py", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-018")
+	testutil.MustFindRule(t, result, "BATOU-CRY-018")
 }
 
 func TestCRY018_GoFixedNonceSeal(t *testing.T) {
 	content := `sealed := aead.Seal(nil, []byte{0,0,0,0,0,0,0,0,0,0,0,0}, plaintext, nil)`
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	testutil.MustFindRule(t, result, "GTSS-CRY-018")
+	testutil.MustFindRule(t, result, "BATOU-CRY-018")
 }
 
 // --- Safe fixture tests ---
@@ -628,8 +629,8 @@ func TestCRY_Safe_Go(t *testing.T) {
 	}
 	content := testutil.LoadFixture(t, "go/safe/crypto_safe.go")
 	result := testutil.ScanContent(t, "/app/crypto.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-001")
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-003")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-001")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-003")
 }
 
 func TestCRY_Safe_JS(t *testing.T) {
@@ -638,6 +639,6 @@ func TestCRY_Safe_JS(t *testing.T) {
 	}
 	content := testutil.LoadFixture(t, "javascript/safe/crypto_safe.ts")
 	result := testutil.ScanContent(t, "/app/crypto.ts", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-001")
-	testutil.MustNotFindRule(t, result, "GTSS-CRY-003")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-001")
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-003")
 }

@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns — Django
 // ---------------------------------------------------------------------------
 
-// Django Settings Misconfiguration (GTSS-FW-DJANGO-001)
+// Django Settings Misconfiguration (BATOU-FW-DJANGO-001)
 var (
 	// DEBUG = True in settings
 	reDjangoDebugTrue = regexp.MustCompile(`(?i)\bDEBUG\s*=\s*True\b`)
@@ -29,7 +29,7 @@ var (
 	reDjangoCorsAllowAll = regexp.MustCompile(`(?i)\bCORS_(?:ALLOW_ALL_ORIGINS|ORIGIN_ALLOW_ALL)\s*=\s*True\b`)
 )
 
-// Django ORM/View Vulnerabilities (GTSS-FW-DJANGO-002)
+// Django ORM/View Vulnerabilities (BATOU-FW-DJANGO-002)
 var (
 	// Model.objects.raw with f-string / format / % / concat
 	reDjangoRawSQL = regexp.MustCompile(`(?i)\.objects\.raw\s*\(\s*(?:f["']|"[^"]*"\s*%|'[^']*'\s*%|"[^"]*"\s*\.format\s*\(|'[^']*'\s*\.format\s*\(|[^"'\s)][^)]*\+)`)
@@ -39,7 +39,7 @@ var (
 	reDjangoCursorExec = regexp.MustCompile(`(?i)\bcursor\.execute\s*\(\s*(?:f["']|"[^"]*"\s*%|'[^']*'\s*%|"[^"]*"\s*\.format\s*\(|'[^']*'\s*\.format\s*\()`)
 )
 
-// Django Template/View XSS (GTSS-FW-DJANGO-003)
+// Django Template/View XSS (BATOU-FW-DJANGO-003)
 var (
 	// {{ variable|safe }} — Jinja2/Django safe filter
 	reDjangoSafeFilter = regexp.MustCompile(`\{\{\s*\w[^}]*\|\s*safe\s*\}\}`)
@@ -48,13 +48,13 @@ var (
 	reDjangoMarkSafe = regexp.MustCompile(`\bmark_safe\s*\(\s*(?:f["']|["'][^"']*["']\s*\+|request\.|[a-zA-Z_]\w*\s*[,)\.])`)
 )
 
-// Django CSRF Exemption (GTSS-FW-DJANGO-004)
+// Django CSRF Exemption (BATOU-FW-DJANGO-004)
 var (
 	// @csrf_exempt decorator
 	reDjangoCsrfExempt = regexp.MustCompile(`@csrf_exempt\b`)
 )
 
-// Django Mass Assignment (GTSS-FW-DJANGO-005)
+// Django Mass Assignment (BATOU-FW-DJANGO-005)
 var (
 	// Model.objects.create(**request.POST) or (**request.data) or (**request.GET)
 	reDjangoMassAssign = regexp.MustCompile(`(?i)\.(?:objects\.create|update|create)\s*\(\s*\*\*\s*request\.(?:POST|GET|data)\b`)
@@ -70,12 +70,12 @@ func isPyComment(line string) bool {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-001: Django Settings Misconfiguration
+// BATOU-FW-DJANGO-001: Django Settings Misconfiguration
 // ---------------------------------------------------------------------------
 
 type DjangoSettingsMisconfig struct{}
 
-func (r DjangoSettingsMisconfig) ID() string              { return "GTSS-FW-DJANGO-001" }
+func (r DjangoSettingsMisconfig) ID() string              { return "BATOU-FW-DJANGO-001" }
 func (r DjangoSettingsMisconfig) Name() string            { return "Django Settings Misconfiguration" }
 func (r DjangoSettingsMisconfig) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r DjangoSettingsMisconfig) Description() string {
@@ -195,12 +195,12 @@ func (r DjangoSettingsMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-002: Django ORM SQL Injection
+// BATOU-FW-DJANGO-002: Django ORM SQL Injection
 // ---------------------------------------------------------------------------
 
 type DjangoORMSQLInjection struct{}
 
-func (r DjangoORMSQLInjection) ID() string              { return "GTSS-FW-DJANGO-002" }
+func (r DjangoORMSQLInjection) ID() string              { return "BATOU-FW-DJANGO-002" }
 func (r DjangoORMSQLInjection) Name() string            { return "Django ORM SQL Injection" }
 func (r DjangoORMSQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r DjangoORMSQLInjection) Description() string {
@@ -284,12 +284,12 @@ func (r DjangoORMSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-003: Django Template XSS
+// BATOU-FW-DJANGO-003: Django Template XSS
 // ---------------------------------------------------------------------------
 
 type DjangoTemplateXSS struct{}
 
-func (r DjangoTemplateXSS) ID() string              { return "GTSS-FW-DJANGO-003" }
+func (r DjangoTemplateXSS) ID() string              { return "BATOU-FW-DJANGO-003" }
 func (r DjangoTemplateXSS) Name() string            { return "Django Template XSS" }
 func (r DjangoTemplateXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r DjangoTemplateXSS) Description() string {
@@ -360,12 +360,12 @@ func (r DjangoTemplateXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-004: Django CSRF Exemption
+// BATOU-FW-DJANGO-004: Django CSRF Exemption
 // ---------------------------------------------------------------------------
 
 type DjangoCsrfExempt struct{}
 
-func (r DjangoCsrfExempt) ID() string              { return "GTSS-FW-DJANGO-004" }
+func (r DjangoCsrfExempt) ID() string              { return "BATOU-FW-DJANGO-004" }
 func (r DjangoCsrfExempt) Name() string            { return "Django CSRF Exemption" }
 func (r DjangoCsrfExempt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r DjangoCsrfExempt) Description() string {
@@ -411,12 +411,12 @@ func (r DjangoCsrfExempt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-DJANGO-005: Django Mass Assignment
+// BATOU-FW-DJANGO-005: Django Mass Assignment
 // ---------------------------------------------------------------------------
 
 type DjangoMassAssignment struct{}
 
-func (r DjangoMassAssignment) ID() string              { return "GTSS-FW-DJANGO-005" }
+func (r DjangoMassAssignment) ID() string              { return "BATOU-FW-DJANGO-005" }
 func (r DjangoMassAssignment) Name() string            { return "Django Mass Assignment" }
 func (r DjangoMassAssignment) DefaultSeverity() rules.Severity { return rules.High }
 func (r DjangoMassAssignment) Description() string {

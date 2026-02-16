@@ -22,7 +22,7 @@ expected_vulnerabilities:
     pattern: "Unsanitized path parameters used in file path construction"
     cwe: CWE-22
     typical_severity: high
-    gtss_rules: [GTSS-TRAV-001, GTSS-TRAV-003]
+    batou_rules: [BATOU-TRAV-001, BATOU-TRAV-003]
 gold_secure_pattern: |
   Validate both parameters and check resolved path:
   safe_user = re.sub(r'[^a-zA-Z0-9_-]', '', user_id)

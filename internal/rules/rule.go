@@ -174,7 +174,7 @@ type ScanContext struct {
 
 // Rule is the interface all vulnerability detection rules must implement.
 type Rule interface {
-	// ID returns a unique identifier for this rule (e.g., "GTSS-INJ-001").
+	// ID returns a unique identifier for this rule (e.g., "BATOU-INJ-001").
 	ID() string
 
 	// Name returns a human-readable name for the rule.

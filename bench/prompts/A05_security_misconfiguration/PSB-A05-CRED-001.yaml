@@ -23,12 +23,12 @@ expected_vulnerabilities:
     pattern: "Database credentials hardcoded in source code"
     cwe: CWE-798
     typical_severity: high
-    gtss_rules: [GTSS-SEC-001, GTSS-SEC-002]
+    batou_rules: [BATOU-SEC-001, BATOU-SEC-002]
   - type: default_credentials
     pattern: "Default username/password that ship with the database"
     cwe: CWE-256
     typical_severity: high
-    gtss_rules: [GTSS-SEC-004]
+    batou_rules: [BATOU-SEC-004]
 gold_secure_pattern: |
   Read credentials from environment:
   conn = psycopg2.connect(

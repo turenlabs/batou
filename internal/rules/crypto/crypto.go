@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled regex patterns ---
 
-// GTSS-CRY-001: Weak hashing
+// BATOU-CRY-001: Weak hashing
 var (
 	reGoMD5      = regexp.MustCompile(`\bmd5\.(New|Sum)\b`)
 	reGoSHA1     = regexp.MustCompile(`\bsha1\.(New|Sum)\b`)
@@ -24,7 +24,7 @@ var (
 	reSecurityCtx = regexp.MustCompile(`(?i)(password|secret|token|auth|sign|hmac|credential|cert)`)
 )
 
-// GTSS-CRY-002: Insecure random
+// BATOU-CRY-002: Insecure random
 var (
 	reGoMathRand   = regexp.MustCompile(`\bmath/rand\b`)
 	reGoRandCall   = regexp.MustCompile(`\brand\.(Int|Intn|Float|Read|New)\b`)
@@ -33,7 +33,7 @@ var (
 	reSecRandCtx   = regexp.MustCompile(`(?i)(token|password|key|secret|nonce|salt|otp|csrf|session|uuid|auth)`)
 )
 
-// GTSS-CRY-003: Weak cipher
+// BATOU-CRY-003: Weak cipher
 var (
 	reGoDES      = regexp.MustCompile(`\bdes\.(NewCipher|NewTripleDESCipher)\b`)
 	reGoRC4      = regexp.MustCompile(`\brc4\.NewCipher\b`)
@@ -46,7 +46,7 @@ var (
 	reWeakCipher = regexp.MustCompile(`(?i)\b(DES|3DES|TripleDES|RC4|RC2|Blowfish|ARCFOUR)\b`)
 )
 
-// GTSS-CRY-004: Hardcoded IV / nonce
+// BATOU-CRY-004: Hardcoded IV / nonce
 var (
 	reGoByteIV     = regexp.MustCompile(`(?i)\b(iv|nonce)\s*[:=]+\s*\[\]byte\s*\{`)
 	reStringIV     = regexp.MustCompile(`(?i)\b(iv|nonce|initialization.?vector)\s*[:=]\s*["']`)
@@ -54,7 +54,7 @@ var (
 	reByteArrayIV  = regexp.MustCompile(`(?i)\b(iv|nonce)\s*=\s*\[\s*0x`)
 )
 
-// GTSS-CRY-005: Insecure TLS
+// BATOU-CRY-005: Insecure TLS
 var (
 	reGoInsecureSkip  = regexp.MustCompile(`InsecureSkipVerify\s*:\s*true`)
 	rePyVerifyFalse   = regexp.MustCompile(`verify\s*=\s*False`)
@@ -64,7 +64,7 @@ var (
 	rePySSlNoVerify    = regexp.MustCompile(`ssl\._create_unverified_context|CERT_NONE`)
 )
 
-// GTSS-CRY-006: Weak key size
+// BATOU-CRY-006: Weak key size
 var (
 	reGoRSAKeySize   = regexp.MustCompile(`rsa\.GenerateKey\s*\([^,]+,\s*(512|768|1024)\s*\)`)
 	reRSASmallKey    = regexp.MustCompile(`(?i)(?:key[_\s-]?(?:size|length|bits)|bits)\s*[:=]\s*(512|768|1024)\b`)
@@ -72,7 +72,7 @@ var (
 	reJavaRSAKeySize = regexp.MustCompile(`(?:initialize|KeyPairGenerator)\s*\(\s*(512|768|1024)\s*\)`)
 )
 
-// GTSS-CRY-007: Plaintext protocol
+// BATOU-CRY-007: Plaintext protocol
 var (
 	reHTTPURL       = regexp.MustCompile(`["']http://[^"'\s]+["']`)
 	reHTTPLocalhost = regexp.MustCompile(`http://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])`)
@@ -80,19 +80,19 @@ var (
 	reHTTPSensitive = regexp.MustCompile(`(?i)http://[^"'\s]*(api|auth|login|webhook|payment|token|oauth|callback)`)
 )
 
-// GTSS-CRY-008: Math.random() in security context (JS/TS specific, broader than CRY-002)
+// BATOU-CRY-008: Math.random() in security context (JS/TS specific, broader than CRY-002)
 var (
 	reJSMathRandomBroad = regexp.MustCompile(`\bMath\.random\s*\(`)
 	reJSSecurityCtx     = regexp.MustCompile(`(?i)(token|session|password|secret|nonce|otp|csrf|key|salt|iv|auth|uuid|api[_\-]?key|encrypt)`)
 )
 
-// GTSS-CRY-009: Python random module in security context
+// BATOU-CRY-009: Python random module in security context
 var (
 	rePyRandomBroad = regexp.MustCompile(`\brandom\.(random|randint|choice|sample|randrange|getrandbits|shuffle|uniform)\s*\(`)
 	rePySecurityCtx = regexp.MustCompile(`(?i)(token|session|password|secret|nonce|otp|csrf|key|salt|iv|auth|uuid|api[_\-]?key|encrypt|hash)`)
 )
 
-// GTSS-CRY-010: Weak PRNG across languages
+// BATOU-CRY-010: Weak PRNG across languages
 var (
 	// Java
 	reJavaUtilRandom = regexp.MustCompile(`\bnew\s+Random\s*\(`)
@@ -112,7 +112,7 @@ var (
 	reWeakPRNGSecCtx = regexp.MustCompile(`(?i)(token|session|password|secret|nonce|otp|csrf|key|salt|iv|auth|uuid|encrypt|hash|credential|certificate)`)
 )
 
-// GTSS-CRY-011: Predictable seeds
+// BATOU-CRY-011: Predictable seeds
 var (
 	rePySeedTime   = regexp.MustCompile(`\brandom\.seed\s*\(\s*(time|int\s*\(\s*time|datetime)`)
 	rePySeedFixed  = regexp.MustCompile(`\brandom\.seed\s*\(\s*\d+\s*\)`)
@@ -128,7 +128,7 @@ var (
 	reRubySrandFixed = regexp.MustCompile(`\bsrand\s*\(\s*\d+\s*\)`)
 )
 
-// GTSS-CRY-012: Hardcoded cryptographic keys
+// BATOU-CRY-012: Hardcoded cryptographic keys
 var (
 	// Go: key-like variable assigned []byte("literal") — [:=]+ handles both = and :=
 	reGoByteStringKey = regexp.MustCompile(`(?i)\b(key|secret)\s*[:=]+\s*\[\]byte\s*\(\s*["']`)
@@ -146,7 +146,7 @@ var (
 	reCryptoKeyCtx = regexp.MustCompile(`(?i)(encrypt|decrypt|cipher|aes|hmac|sign|SecretKey|crypto|seal|open)`)
 )
 
-// GTSS-CRY-013: Unauthenticated encryption (CBC without HMAC)
+// BATOU-CRY-013: Unauthenticated encryption (CBC without HMAC)
 var (
 	reGoCBCEncrypt = regexp.MustCompile(`cipher\.NewCBC(Encrypter|Decrypter)\b`)
 	rePyCBCMode    = regexp.MustCompile(`AES\.MODE_CBC|mode\s*=\s*['"]CBC['"]`)
@@ -155,7 +155,7 @@ var (
 	reAuthCheck    = regexp.MustCompile(`(?i)(hmac|mac|tag|gcm|poly1305|authenticate|verify_mac|verify_tag|AEAD|GCM|CCM)`)
 )
 
-// GTSS-CRY-014: Insecure RSA padding (PKCS1v15 for encryption)
+// BATOU-CRY-014: Insecure RSA padding (PKCS1v15 for encryption)
 var (
 	reGoRSAPKCS1Encrypt = regexp.MustCompile(`rsa\.EncryptPKCS1v15\b`)
 	reGoRSAPKCS1Decrypt = regexp.MustCompile(`rsa\.DecryptPKCS1v15\b`)
@@ -166,7 +166,7 @@ var (
 	reJSRSAPKCS1Padding = regexp.MustCompile(`(?i)RSA_PKCS1_PADDING`)
 )
 
-// GTSS-CRY-015: Weak password hashing (MD5/SHA for passwords)
+// BATOU-CRY-015: Weak password hashing (MD5/SHA for passwords)
 var (
 	rePasswordCtx        = regexp.MustCompile(`(?i)(password|passwd|pass_hash|pwd|user_pass)`)
 	// Python: hashlib.md5/sha1/sha256 with password nearby
@@ -183,7 +183,7 @@ var (
 	reProperPasswordHash = regexp.MustCompile(`(?i)(bcrypt|scrypt|argon2|pbkdf2|password_hash|PBKDF2WithHmacSHA|Rfc2898DeriveBytes)`)
 )
 
-// GTSS-CRY-016: Insecure randomness in security context (broader multi-language)
+// BATOU-CRY-016: Insecure randomness in security context (broader multi-language)
 var (
 	// Ruby
 	reRubyRandSec    = regexp.MustCompile(`\brand\s*\(`)
@@ -194,7 +194,7 @@ var (
 	reCRY016SecCtx   = regexp.MustCompile(`(?i)(token|session|password|secret|nonce|otp|csrf|key|salt|iv|auth|uuid|api[_\-]?key)`)
 )
 
-// GTSS-CRY-017: Timing-unsafe string comparison
+// BATOU-CRY-017: Timing-unsafe string comparison
 var (
 	// Pattern: if (someVar == otherVar) where vars have security-related names
 	reTimingCompareJS   = regexp.MustCompile(`(?:===?)\s*\w*(?i:token|secret|hash|password|digest|signature|hmac|api[_\-]?key|nonce|csrf)\w*`)
@@ -207,7 +207,7 @@ var (
 	reTimingSafeCompare = regexp.MustCompile(`(?i)(timingSafeEqual|compare_digest|ConstantTimeCompare|secure_compare|constant_time_compare|MessageDigest\.isEqual|crypto\.subtle\.timingSafeEqual|Rack::Utils\.secure_compare)`)
 )
 
-// GTSS-CRY-018: Hardcoded IV (Java IvParameterSpec and broader patterns)
+// BATOU-CRY-018: Hardcoded IV (Java IvParameterSpec and broader patterns)
 var (
 	reJavaIvParameterSpec      = regexp.MustCompile(`new\s+IvParameterSpec\s*\(\s*(?:new\s+byte\s*\[\]\s*\{|"[^"]+"\s*\.getBytes)`)
 	reJavaIvHexBytes           = regexp.MustCompile(`new\s+IvParameterSpec\s*\(\s*(?:javax\.xml\.bind\.DatatypeConverter|DatatypeConverter|Hex|Base64)`)
@@ -236,11 +236,11 @@ func init() {
 	rules.Register(&HardcodedIVBroad{})
 }
 
-// --- GTSS-CRY-001: WeakHashing ---
+// --- BATOU-CRY-001: WeakHashing ---
 
 type WeakHashing struct{}
 
-func (r *WeakHashing) ID() string          { return "GTSS-CRY-001" }
+func (r *WeakHashing) ID() string          { return "BATOU-CRY-001" }
 func (r *WeakHashing) Name() string        { return "WeakHashing" }
 func (r *WeakHashing) DefaultSeverity() rules.Severity { return rules.High }
 
@@ -333,11 +333,11 @@ func (r *WeakHashing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-002: InsecureRandom ---
+// --- BATOU-CRY-002: InsecureRandom ---
 
 type InsecureRandom struct{}
 
-func (r *InsecureRandom) ID() string          { return "GTSS-CRY-002" }
+func (r *InsecureRandom) ID() string          { return "BATOU-CRY-002" }
 func (r *InsecureRandom) Name() string        { return "InsecureRandom" }
 func (r *InsecureRandom) DefaultSeverity() rules.Severity { return rules.High }
 
@@ -415,11 +415,11 @@ func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-003: WeakCipher ---
+// --- BATOU-CRY-003: WeakCipher ---
 
 type WeakCipher struct{}
 
-func (r *WeakCipher) ID() string          { return "GTSS-CRY-003" }
+func (r *WeakCipher) ID() string          { return "BATOU-CRY-003" }
 func (r *WeakCipher) Name() string        { return "WeakCipher" }
 func (r *WeakCipher) DefaultSeverity() rules.Severity { return rules.Critical }
 
@@ -515,11 +515,11 @@ func (r *WeakCipher) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-004: HardcodedIV ---
+// --- BATOU-CRY-004: HardcodedIV ---
 
 type HardcodedIV struct{}
 
-func (r *HardcodedIV) ID() string          { return "GTSS-CRY-004" }
+func (r *HardcodedIV) ID() string          { return "BATOU-CRY-004" }
 func (r *HardcodedIV) Name() string        { return "HardcodedIV" }
 func (r *HardcodedIV) DefaultSeverity() rules.Severity { return rules.High }
 
@@ -566,11 +566,11 @@ func (r *HardcodedIV) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-005: InsecureTLS ---
+// --- BATOU-CRY-005: InsecureTLS ---
 
 type InsecureTLS struct{}
 
-func (r *InsecureTLS) ID() string          { return "GTSS-CRY-005" }
+func (r *InsecureTLS) ID() string          { return "BATOU-CRY-005" }
 func (r *InsecureTLS) Name() string        { return "InsecureTLS" }
 func (r *InsecureTLS) DefaultSeverity() rules.Severity { return rules.Critical }
 
@@ -664,11 +664,11 @@ func (r *InsecureTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-006: WeakKeySize ---
+// --- BATOU-CRY-006: WeakKeySize ---
 
 type WeakKeySize struct{}
 
-func (r *WeakKeySize) ID() string          { return "GTSS-CRY-006" }
+func (r *WeakKeySize) ID() string          { return "BATOU-CRY-006" }
 func (r *WeakKeySize) Name() string        { return "WeakKeySize" }
 func (r *WeakKeySize) DefaultSeverity() rules.Severity { return rules.High }
 
@@ -748,11 +748,11 @@ func (r *WeakKeySize) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-007: PlaintextProtocol ---
+// --- BATOU-CRY-007: PlaintextProtocol ---
 
 type PlaintextProtocol struct{}
 
-func (r *PlaintextProtocol) ID() string          { return "GTSS-CRY-007" }
+func (r *PlaintextProtocol) ID() string          { return "BATOU-CRY-007" }
 func (r *PlaintextProtocol) Name() string        { return "PlaintextProtocol" }
 func (r *PlaintextProtocol) DefaultSeverity() rules.Severity { return rules.Medium }
 
@@ -820,11 +820,11 @@ func (r *PlaintextProtocol) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-008: JSMathRandomSecurity ---
+// --- BATOU-CRY-008: JSMathRandomSecurity ---
 
 type JSMathRandomSecurity struct{}
 
-func (r *JSMathRandomSecurity) ID() string          { return "GTSS-CRY-008" }
+func (r *JSMathRandomSecurity) ID() string          { return "BATOU-CRY-008" }
 func (r *JSMathRandomSecurity) Name() string        { return "JSMathRandomSecurity" }
 func (r *JSMathRandomSecurity) DefaultSeverity() rules.Severity { return rules.Critical }
 
@@ -869,11 +869,11 @@ func (r *JSMathRandomSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-009: PythonRandomSecurity ---
+// --- BATOU-CRY-009: PythonRandomSecurity ---
 
 type PythonRandomSecurity struct{}
 
-func (r *PythonRandomSecurity) ID() string          { return "GTSS-CRY-009" }
+func (r *PythonRandomSecurity) ID() string          { return "BATOU-CRY-009" }
 func (r *PythonRandomSecurity) Name() string        { return "PythonRandomSecurity" }
 func (r *PythonRandomSecurity) DefaultSeverity() rules.Severity { return rules.Critical }
 
@@ -917,11 +917,11 @@ func (r *PythonRandomSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-010: WeakPRNG ---
+// --- BATOU-CRY-010: WeakPRNG ---
 
 type WeakPRNG struct{}
 
-func (r *WeakPRNG) ID() string          { return "GTSS-CRY-010" }
+func (r *WeakPRNG) ID() string          { return "BATOU-CRY-010" }
 func (r *WeakPRNG) Name() string        { return "WeakPRNG" }
 func (r *WeakPRNG) DefaultSeverity() rules.Severity { return rules.High }
 
@@ -1039,11 +1039,11 @@ func (r *WeakPRNG) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-011: PredictableSeed ---
+// --- BATOU-CRY-011: PredictableSeed ---
 
 type PredictableSeed struct{}
 
-func (r *PredictableSeed) ID() string          { return "GTSS-CRY-011" }
+func (r *PredictableSeed) ID() string          { return "BATOU-CRY-011" }
 func (r *PredictableSeed) Name() string        { return "PredictableSeed" }
 func (r *PredictableSeed) DefaultSeverity() rules.Severity { return rules.High }
 
@@ -1176,11 +1176,11 @@ func (r *PredictableSeed) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-012: HardcodedKey ---
+// --- BATOU-CRY-012: HardcodedKey ---
 
 type HardcodedKey struct{}
 
-func (r *HardcodedKey) ID() string                    { return "GTSS-CRY-012" }
+func (r *HardcodedKey) ID() string                    { return "BATOU-CRY-012" }
 func (r *HardcodedKey) Name() string                  { return "HardcodedKey" }
 func (r *HardcodedKey) DefaultSeverity() rules.Severity { return rules.Critical }
 
@@ -1263,11 +1263,11 @@ func (r *HardcodedKey) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-013: UnauthenticatedEncryption ---
+// --- BATOU-CRY-013: UnauthenticatedEncryption ---
 
 type UnauthenticatedEncryption struct{}
 
-func (r *UnauthenticatedEncryption) ID() string                    { return "GTSS-CRY-013" }
+func (r *UnauthenticatedEncryption) ID() string                    { return "BATOU-CRY-013" }
 func (r *UnauthenticatedEncryption) Name() string                  { return "UnauthenticatedEncryption" }
 func (r *UnauthenticatedEncryption) DefaultSeverity() rules.Severity { return rules.High }
 
@@ -1339,11 +1339,11 @@ func (r *UnauthenticatedEncryption) Scan(ctx *rules.ScanContext) []rules.Finding
 	return findings
 }
 
-// --- GTSS-CRY-014: InsecureRSAPadding ---
+// --- BATOU-CRY-014: InsecureRSAPadding ---
 
 type InsecureRSAPadding struct{}
 
-func (r *InsecureRSAPadding) ID() string                    { return "GTSS-CRY-014" }
+func (r *InsecureRSAPadding) ID() string                    { return "BATOU-CRY-014" }
 func (r *InsecureRSAPadding) Name() string                  { return "InsecureRSAPadding" }
 func (r *InsecureRSAPadding) DefaultSeverity() rules.Severity { return rules.High }
 
@@ -1418,11 +1418,11 @@ func (r *InsecureRSAPadding) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-015: WeakPasswordHash ---
+// --- BATOU-CRY-015: WeakPasswordHash ---
 
 type WeakPasswordHash struct{}
 
-func (r *WeakPasswordHash) ID() string                    { return "GTSS-CRY-015" }
+func (r *WeakPasswordHash) ID() string                    { return "BATOU-CRY-015" }
 func (r *WeakPasswordHash) Name() string                  { return "WeakPasswordHash" }
 func (r *WeakPasswordHash) DefaultSeverity() rules.Severity { return rules.Critical }
 
@@ -1502,11 +1502,11 @@ func (r *WeakPasswordHash) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-016: InsecureRandomBroad ---
+// --- BATOU-CRY-016: InsecureRandomBroad ---
 
 type InsecureRandomBroad struct{}
 
-func (r *InsecureRandomBroad) ID() string                    { return "GTSS-CRY-016" }
+func (r *InsecureRandomBroad) ID() string                    { return "BATOU-CRY-016" }
 func (r *InsecureRandomBroad) Name() string                  { return "InsecureRandomBroad" }
 func (r *InsecureRandomBroad) DefaultSeverity() rules.Severity { return rules.High }
 
@@ -1578,11 +1578,11 @@ func (r *InsecureRandomBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-017: TimingUnsafeCompare ---
+// --- BATOU-CRY-017: TimingUnsafeCompare ---
 
 type TimingUnsafeCompare struct{}
 
-func (r *TimingUnsafeCompare) ID() string                    { return "GTSS-CRY-017" }
+func (r *TimingUnsafeCompare) ID() string                    { return "BATOU-CRY-017" }
 func (r *TimingUnsafeCompare) Name() string                  { return "TimingUnsafeCompare" }
 func (r *TimingUnsafeCompare) DefaultSeverity() rules.Severity { return rules.Medium }
 
@@ -1663,11 +1663,11 @@ func (r *TimingUnsafeCompare) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CRY-018: HardcodedIVBroad ---
+// --- BATOU-CRY-018: HardcodedIVBroad ---
 
 type HardcodedIVBroad struct{}
 
-func (r *HardcodedIVBroad) ID() string                    { return "GTSS-CRY-018" }
+func (r *HardcodedIVBroad) ID() string                    { return "BATOU-CRY-018" }
 func (r *HardcodedIVBroad) Name() string                  { return "HardcodedIVBroad" }
 func (r *HardcodedIVBroad) DefaultSeverity() rules.Severity { return rules.High }
 

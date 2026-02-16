@@ -1,18 +1,18 @@
-# GTSS - Generation Time Security Scanning
+# Batou - Code guard for your AI agents
 
 [![Architecture](https://img.shields.io/badge/architecture-excalidraw-6965db)](https://excalidraw.com/#json=Y_aI4C8JAMHOkHY9T5ojj,94pBf-Q-VasP2l606DwPvQ)
 
-A security scanner that catches vulnerabilities in real-time as AI writes code. Built as a [Claude Code hook](https://docs.anthropic.com/en/docs/claude-code/hooks), GTSS analyzes every file write for security issues across 16 programming languages using a four-layer analysis pipeline.
+A security scanner that catches vulnerabilities in real-time as AI writes code. Built as a [Claude Code hook](https://docs.anthropic.com/en/docs/claude-code/hooks), Batou analyzes every file write for security issues across 16 programming languages using a four-layer analysis pipeline.
 
 ## How It Works
 
-GTSS hooks into Claude Code's `Write`, `Edit`, and `NotebookEdit` operations:
+Batou hooks into Claude Code's `Write`, `Edit`, and `NotebookEdit` operations:
 
 - **PreToolUse**: Scans code before it's written. Blocks critical vulnerabilities (exit code 2) and provides fix guidance.
 - **PostToolUse**: Performs deep analysis after writes, giving Claude detailed hints to improve code security.
 
 ```
-Claude writes code → GTSS intercepts → 4-layer scan → Block critical vulns / Hint fixes to Claude
+Claude writes code → Batou intercepts → 4-layer scan → Block critical vulns / Hint fixes to Claude
 ```
 
 ## Four-Layer Analysis Pipeline
@@ -134,8 +134,8 @@ Persistent cross-function and cross-file taint tracking that survives across fil
 ### Quick Install
 
 ```bash
-git clone https://github.com/turenio/gtss.git
-cd gtss
+git clone https://github.com/turenlabs/batou.git
+cd batou
 ./install.sh
 ```
 
@@ -164,7 +164,7 @@ make setup PROJECT=/path/to/your/project
 
 ## Configuration
 
-GTSS hooks are configured in `.claude/settings.json`:
+Batou hooks are configured in `.claude/settings.json`:
 
 ```json
 {
@@ -175,9 +175,9 @@ GTSS hooks are configured in `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gtss-hook.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/batou-hook.sh",
             "timeout": 30,
-            "statusMessage": "GTSS: Scanning for vulnerabilities..."
+            "statusMessage": "Batou: Scanning for vulnerabilities..."
           }
         ]
       }
@@ -188,9 +188,9 @@ GTSS hooks are configured in `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gtss-hook.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/batou-hook.sh",
             "timeout": 30,
-            "statusMessage": "GTSS: Deep security scan..."
+            "statusMessage": "Batou: Deep security scan..."
           }
         ]
       }
@@ -209,7 +209,7 @@ make test
 make test-cover
 
 # Quick manual test
-echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"app.py","content":"import pickle\npickle.loads(user_data)"}}' | ./bin/gtss
+echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"app.py","content":"import pickle\npickle.loads(user_data)"}}' | ./bin/batou
 ```
 
 ### Test Suite
@@ -240,14 +240,14 @@ Test cases:         2,000+
 
 ## How It Improves AI Code
 
-GTSS is designed specifically for AI-generated code patterns. Research shows AI code assistants produce vulnerable code at high rates for certain CWEs:
+Batou is designed specifically for AI-generated code patterns. Research shows AI code assistants produce vulnerable code at high rates for certain CWEs:
 
 - **CWE-117** (Log Injection): 88% AI failure rate
 - **CWE-79/80** (XSS): 86% AI failure rate
 - **CWE-20** (Input Validation): #1 most common AI vulnerability
 - **CWE-89** (SQL Injection): Persistent across all AI models
 
-GTSS prioritizes rules based on these failure rates, catching the vulnerabilities AI is most likely to introduce.
+Batou prioritizes rules based on these failure rates, catching the vulnerabilities AI is most likely to introduce.
 
 ## License
 

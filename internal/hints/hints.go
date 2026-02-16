@@ -2,7 +2,7 @@
 //
 // Unlike traditional scanner output that just reports findings, hints are
 // designed as a real-time feedback loop: every time Claude writes code,
-// GTSS feeds back specific, contextual advice that helps Claude improve
+// Batou feeds back specific, contextual advice that helps Claude improve
 // the code immediately.
 //
 // Hints include:
@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/turenio/gtss/internal/graph"
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/graph"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // HintContext contains everything needed to generate hints for a scan.
@@ -97,7 +97,7 @@ func GenerateHints(ctx *HintContext) []Hint {
 func FormatForClaude(ctx *HintContext, hints []Hint) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("\n=== GTSS Security Copilot [%s] ===\n", ctx.FilePath))
+	b.WriteString(fmt.Sprintf("\n=== Batou Security Copilot [%s] ===\n", ctx.FilePath))
 	b.WriteString(fmt.Sprintf("Language: %s | Scan: %dms", ctx.Language, ctx.ScanTimeMs))
 	if ctx.CallGraph != nil {
 		stats := ctx.CallGraph.Stats()
@@ -111,7 +111,7 @@ func FormatForClaude(ctx *HintContext, hints []Hint) string {
 			b.WriteString(hints[0].Explanation)
 			b.WriteString("\n")
 		}
-		b.WriteString("=== End GTSS ===\n")
+		b.WriteString("=== End Batou ===\n")
 		return b.String()
 	}
 
@@ -160,7 +160,7 @@ func FormatForClaude(ctx *HintContext, hints []Hint) string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("=== End GTSS ===\n")
+	b.WriteString("=== End Batou ===\n")
 	return b.String()
 }
 

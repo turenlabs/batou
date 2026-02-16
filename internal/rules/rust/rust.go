@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ func truncate(s string, maxLen int) string {
 
 type UnsafeBlock struct{}
 
-func (r UnsafeBlock) ID() string                    { return "GTSS-RS-001" }
+func (r UnsafeBlock) ID() string                    { return "BATOU-RS-001" }
 func (r UnsafeBlock) Name() string                  { return "Unsafe Block Usage" }
 func (r UnsafeBlock) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r UnsafeBlock) Description() string {
@@ -202,7 +202,7 @@ func (r UnsafeBlock) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CommandInjection struct{}
 
-func (r CommandInjection) ID() string                    { return "GTSS-RS-002" }
+func (r CommandInjection) ID() string                    { return "BATOU-RS-002" }
 func (r CommandInjection) Name() string                  { return "Command Injection" }
 func (r CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r CommandInjection) Description() string {
@@ -292,7 +292,7 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SQLInjection struct{}
 
-func (r SQLInjection) ID() string                    { return "GTSS-RS-003" }
+func (r SQLInjection) ID() string                    { return "BATOU-RS-003" }
 func (r SQLInjection) Name() string                  { return "SQL Injection" }
 func (r SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r SQLInjection) Description() string {
@@ -396,7 +396,7 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PathTraversal struct{}
 
-func (r PathTraversal) ID() string                    { return "GTSS-RS-004" }
+func (r PathTraversal) ID() string                    { return "BATOU-RS-004" }
 func (r PathTraversal) Name() string                  { return "Path Traversal" }
 func (r PathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r PathTraversal) Description() string {
@@ -453,7 +453,7 @@ func (r PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureDeserialization struct{}
 
-func (r InsecureDeserialization) ID() string                    { return "GTSS-RS-005" }
+func (r InsecureDeserialization) ID() string                    { return "BATOU-RS-005" }
 func (r InsecureDeserialization) Name() string                  { return "Insecure Deserialization" }
 func (r InsecureDeserialization) DefaultSeverity() rules.Severity { return rules.High }
 func (r InsecureDeserialization) Description() string {
@@ -533,7 +533,7 @@ func (r InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureTLS struct{}
 
-func (r InsecureTLS) ID() string                    { return "GTSS-RS-006" }
+func (r InsecureTLS) ID() string                    { return "BATOU-RS-006" }
 func (r InsecureTLS) Name() string                  { return "Insecure TLS Configuration" }
 func (r InsecureTLS) DefaultSeverity() rules.Severity { return rules.High }
 func (r InsecureTLS) Description() string {
@@ -599,7 +599,7 @@ func (r InsecureTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PanicInHandler struct{}
 
-func (r PanicInHandler) ID() string                    { return "GTSS-RS-007" }
+func (r PanicInHandler) ID() string                    { return "BATOU-RS-007" }
 func (r PanicInHandler) Name() string                  { return "Panic in Web Handler" }
 func (r PanicInHandler) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r PanicInHandler) Description() string {
@@ -698,7 +698,7 @@ func (r PanicInHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureRandom struct{}
 
-func (r InsecureRandom) ID() string                    { return "GTSS-RS-008" }
+func (r InsecureRandom) ID() string                    { return "BATOU-RS-008" }
 func (r InsecureRandom) Name() string                  { return "Insecure Random for Security Context" }
 func (r InsecureRandom) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r InsecureRandom) Description() string {
@@ -755,7 +755,7 @@ func (r InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MemoryUnsafety struct{}
 
-func (r MemoryUnsafety) ID() string                    { return "GTSS-RS-009" }
+func (r MemoryUnsafety) ID() string                    { return "BATOU-RS-009" }
 func (r MemoryUnsafety) Name() string                  { return "Memory Unsafety Patterns" }
 func (r MemoryUnsafety) DefaultSeverity() rules.Severity { return rules.High }
 func (r MemoryUnsafety) Description() string {
@@ -857,7 +857,7 @@ func (r MemoryUnsafety) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CORSMisconfig struct{}
 
-func (r CORSMisconfig) ID() string                    { return "GTSS-RS-010" }
+func (r CORSMisconfig) ID() string                    { return "BATOU-RS-010" }
 func (r CORSMisconfig) Name() string                  { return "CORS Misconfiguration" }
 func (r CORSMisconfig) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r CORSMisconfig) Description() string {

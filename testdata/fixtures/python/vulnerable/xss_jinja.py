@@ -1,5 +1,5 @@
 # Vulnerable: XSS via Markup() and |safe on user input
-# Expected: GTSS-XSS-008 (ServerSideRenderingXSS), GTSS-XSS-004 (UnescapedTemplateOutput)
+# Expected: BATOU-XSS-008 (ServerSideRenderingXSS), BATOU-XSS-004 (UnescapedTemplateOutput)
 
 from flask import Flask, request, render_template_string
 from markupsafe import Markup

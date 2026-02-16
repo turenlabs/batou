@@ -1,8 +1,8 @@
 package languages
 
 import (
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // PythonCatalog provides taint-tracking definitions for the Python language.

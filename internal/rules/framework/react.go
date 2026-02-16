@@ -4,41 +4,41 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // React-specific security rule patterns
 //
-// Note: dangerouslySetInnerHTML is already covered by GTSS-XSS-002 and
-// javascript: href by GTSS-XSS-007. This file covers additional React-specific
+// Note: dangerouslySetInnerHTML is already covered by BATOU-XSS-002 and
+// javascript: href by BATOU-XSS-007. This file covers additional React-specific
 // patterns not handled by the general XSS rules.
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-REACT-001: React SSR renderToString with unsanitized data
+	// BATOU-FW-REACT-001: React SSR renderToString with unsanitized data
 	reReactRenderToString  = regexp.MustCompile(`\brenderToString\s*\(`)
 	reReactRenderToStatic  = regexp.MustCompile(`\brenderToStaticMarkup\s*\(`)
 	reReactSSRUserInput    = regexp.MustCompile(`(?:req\.(?:query|params|body|cookies)|request\.(?:query|params|body)|props\.\w*[Uu]ser|props\.\w*[Ii]nput|props\.\w*[Dd]ata)`)
 
-	// GTSS-FW-REACT-002: React ref-based innerHTML assignment
+	// BATOU-FW-REACT-002: React ref-based innerHTML assignment
 	reReactRefInnerHTML = regexp.MustCompile(`\.\s*current\s*\.\s*innerHTML\s*=`)
 
-	// GTSS-FW-REACT-003: React component prop spreading from user input
+	// BATOU-FW-REACT-003: React component prop spreading from user input
 	reReactSpreadProps = regexp.MustCompile(`<\w+\s+\{\s*\.\.\.(?:props|data|userInput|input|params|queryParams|req\.)`)
 
-	// GTSS-FW-REACT-004: Dynamic script/iframe creation in React
+	// BATOU-FW-REACT-004: Dynamic script/iframe creation in React
 	reReactCreateScript = regexp.MustCompile(`createElement\s*\(\s*["'](?:script|iframe)["']`)
 	reReactDangerousTag = regexp.MustCompile(`<(?:script|iframe)\s+.*(?:src|srcdoc)\s*=\s*\{`)
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-REACT-001: React SSR with unsanitized user data
+// BATOU-FW-REACT-001: React SSR with unsanitized user data
 // ---------------------------------------------------------------------------
 
 type ReactSSRUnsanitized struct{}
 
-func (r *ReactSSRUnsanitized) ID() string                      { return "GTSS-FW-REACT-001" }
+func (r *ReactSSRUnsanitized) ID() string                      { return "BATOU-FW-REACT-001" }
 func (r *ReactSSRUnsanitized) Name() string                    { return "ReactSSRUnsanitized" }
 func (r *ReactSSRUnsanitized) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ReactSSRUnsanitized) Description() string {
@@ -113,12 +113,12 @@ func hasSSRSanitizer(lines []string, idx int) bool {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-REACT-002: React ref innerHTML assignment
+// BATOU-FW-REACT-002: React ref innerHTML assignment
 // ---------------------------------------------------------------------------
 
 type ReactRefInnerHTML struct{}
 
-func (r *ReactRefInnerHTML) ID() string                      { return "GTSS-FW-REACT-002" }
+func (r *ReactRefInnerHTML) ID() string                      { return "BATOU-FW-REACT-002" }
 func (r *ReactRefInnerHTML) Name() string                    { return "ReactRefInnerHTML" }
 func (r *ReactRefInnerHTML) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ReactRefInnerHTML) Description() string {
@@ -161,12 +161,12 @@ func (r *ReactRefInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-REACT-003: Prop spreading from user input
+// BATOU-FW-REACT-003: Prop spreading from user input
 // ---------------------------------------------------------------------------
 
 type ReactPropSpreading struct{}
 
-func (r *ReactPropSpreading) ID() string                      { return "GTSS-FW-REACT-003" }
+func (r *ReactPropSpreading) ID() string                      { return "BATOU-FW-REACT-003" }
 func (r *ReactPropSpreading) Name() string                    { return "ReactPropSpreading" }
 func (r *ReactPropSpreading) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ReactPropSpreading) Description() string {
@@ -209,12 +209,12 @@ func (r *ReactPropSpreading) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-REACT-004: Dynamic script/iframe creation
+// BATOU-FW-REACT-004: Dynamic script/iframe creation
 // ---------------------------------------------------------------------------
 
 type ReactDynamicScriptIframe struct{}
 
-func (r *ReactDynamicScriptIframe) ID() string                      { return "GTSS-FW-REACT-004" }
+func (r *ReactDynamicScriptIframe) ID() string                      { return "BATOU-FW-REACT-004" }
 func (r *ReactDynamicScriptIframe) Name() string                    { return "ReactDynamicScriptIframe" }
 func (r *ReactDynamicScriptIframe) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ReactDynamicScriptIframe) Description() string {

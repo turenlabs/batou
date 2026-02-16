@@ -10,15 +10,15 @@ import (
 
 // GraphPath returns the path to the graph file for a project.
 func GraphPath(projectRoot string) string {
-	return filepath.Join(projectRoot, ".gtss", "callgraph.json")
+	return filepath.Join(projectRoot, ".batou", "callgraph.json")
 }
 
 // lockPath returns the path to the lockfile used for concurrent access protection.
 func lockPath(projectRoot string) string {
-	return filepath.Join(projectRoot, ".gtss", "callgraph.lock")
+	return filepath.Join(projectRoot, ".batou", "callgraph.lock")
 }
 
-// LoadGraph reads the call graph from disk (.gtss/callgraph.json in project root).
+// LoadGraph reads the call graph from disk (.batou/callgraph.json in project root).
 // If no graph exists or the session ID doesn't match, returns a new empty graph.
 func LoadGraph(projectRoot, sessionID string) (*CallGraph, error) {
 	graphFile := GraphPath(projectRoot)
@@ -51,14 +51,14 @@ func LoadGraph(projectRoot, sessionID string) (*CallGraph, error) {
 }
 
 // SaveGraph writes the call graph to disk using atomic write (temp file + rename)
-// to prevent corruption. Creates the .gtss/ directory if needed.
+// to prevent corruption. Creates the .batou/ directory if needed.
 func SaveGraph(cg *CallGraph) error {
 	graphFile := GraphPath(cg.ProjectRoot)
 	dir := filepath.Dir(graphFile)
 
-	// Ensure .gtss/ directory exists.
+	// Ensure .batou/ directory exists.
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("creating .gtss directory: %w", err)
+		return fmt.Errorf("creating .batou directory: %w", err)
 	}
 
 	// Acquire a simple lockfile for concurrent access protection.

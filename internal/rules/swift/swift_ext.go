@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
-// Compiled regex patterns for Swift extension rules (GTSS-SWIFT-011 .. GTSS-SWIFT-018)
+// Compiled regex patterns for Swift extension rules (BATOU-SWIFT-011 .. BATOU-SWIFT-018)
 // ---------------------------------------------------------------------------
 
 // SWIFT-011: URLSession with disabled SSL validation
@@ -83,12 +83,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SWIFT-011: Swift URLSession with disabled SSL validation
+// BATOU-SWIFT-011: Swift URLSession with disabled SSL validation
 // ---------------------------------------------------------------------------
 
 type SwiftURLSessionNoSSL struct{}
 
-func (r *SwiftURLSessionNoSSL) ID() string                      { return "GTSS-SWIFT-011" }
+func (r *SwiftURLSessionNoSSL) ID() string                      { return "BATOU-SWIFT-011" }
 func (r *SwiftURLSessionNoSSL) Name() string                    { return "SwiftURLSessionNoSSL" }
 func (r *SwiftURLSessionNoSSL) Description() string             { return "Detects Swift URLSession delegates that unconditionally accept server trust challenges, disabling SSL/TLS certificate validation." }
 func (r *SwiftURLSessionNoSSL) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -146,12 +146,12 @@ func (r *SwiftURLSessionNoSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SWIFT-012: Swift Keychain access without authentication
+// BATOU-SWIFT-012: Swift Keychain access without authentication
 // ---------------------------------------------------------------------------
 
 type SwiftKeychainNoAuth struct{}
 
-func (r *SwiftKeychainNoAuth) ID() string                      { return "GTSS-SWIFT-012" }
+func (r *SwiftKeychainNoAuth) ID() string                      { return "BATOU-SWIFT-012" }
 func (r *SwiftKeychainNoAuth) Name() string                    { return "SwiftKeychainNoAuth" }
 func (r *SwiftKeychainNoAuth) Description() string             { return "Detects Swift Keychain items stored with kSecAttrAccessibleAlways or without access control flags, making them readable without device authentication." }
 func (r *SwiftKeychainNoAuth) DefaultSeverity() rules.Severity { return rules.High }
@@ -196,12 +196,12 @@ func (r *SwiftKeychainNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SWIFT-013: Swift UserDefaults storing sensitive data
+// BATOU-SWIFT-013: Swift UserDefaults storing sensitive data
 // ---------------------------------------------------------------------------
 
 type SwiftUserDefaultsSensitive struct{}
 
-func (r *SwiftUserDefaultsSensitive) ID() string                      { return "GTSS-SWIFT-013" }
+func (r *SwiftUserDefaultsSensitive) ID() string                      { return "BATOU-SWIFT-013" }
 func (r *SwiftUserDefaultsSensitive) Name() string                    { return "SwiftUserDefaultsSensitive" }
 func (r *SwiftUserDefaultsSensitive) Description() string             { return "Detects Swift UserDefaults storing sensitive data (passwords, tokens, keys) which is stored unencrypted on the device." }
 func (r *SwiftUserDefaultsSensitive) DefaultSeverity() rules.Severity { return rules.High }
@@ -246,12 +246,12 @@ func (r *SwiftUserDefaultsSensitive) Scan(ctx *rules.ScanContext) []rules.Findin
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SWIFT-014: Swift WKWebView JavaScript enabled without content rules
+// BATOU-SWIFT-014: Swift WKWebView JavaScript enabled without content rules
 // ---------------------------------------------------------------------------
 
 type SwiftWKWebViewJS struct{}
 
-func (r *SwiftWKWebViewJS) ID() string                      { return "GTSS-SWIFT-014" }
+func (r *SwiftWKWebViewJS) ID() string                      { return "BATOU-SWIFT-014" }
 func (r *SwiftWKWebViewJS) Name() string                    { return "SwiftWKWebViewJS" }
 func (r *SwiftWKWebViewJS) Description() string             { return "Detects Swift WKWebView with JavaScript enabled but without content rule lists or navigation delegation for URL restriction." }
 func (r *SwiftWKWebViewJS) DefaultSeverity() rules.Severity { return rules.High }
@@ -301,12 +301,12 @@ func (r *SwiftWKWebViewJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SWIFT-015: Swift hardcoded encryption key/IV
+// BATOU-SWIFT-015: Swift hardcoded encryption key/IV
 // ---------------------------------------------------------------------------
 
 type SwiftHardcodedKey struct{}
 
-func (r *SwiftHardcodedKey) ID() string                      { return "GTSS-SWIFT-015" }
+func (r *SwiftHardcodedKey) ID() string                      { return "BATOU-SWIFT-015" }
 func (r *SwiftHardcodedKey) Name() string                    { return "SwiftHardcodedKey" }
 func (r *SwiftHardcodedKey) Description() string             { return "Detects Swift hardcoded encryption keys, IVs, or nonces as byte arrays or string literals." }
 func (r *SwiftHardcodedKey) DefaultSeverity() rules.Severity { return rules.High }
@@ -356,12 +356,12 @@ func (r *SwiftHardcodedKey) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SWIFT-016: Swift string interpolation in SQL/predicate
+// BATOU-SWIFT-016: Swift string interpolation in SQL/predicate
 // ---------------------------------------------------------------------------
 
 type SwiftSQLPredicateInterp struct{}
 
-func (r *SwiftSQLPredicateInterp) ID() string                      { return "GTSS-SWIFT-016" }
+func (r *SwiftSQLPredicateInterp) ID() string                      { return "BATOU-SWIFT-016" }
 func (r *SwiftSQLPredicateInterp) Name() string                    { return "SwiftSQLPredicateInterp" }
 func (r *SwiftSQLPredicateInterp) Description() string             { return "Detects Swift string interpolation in SQL queries or NSPredicate format strings, enabling injection attacks." }
 func (r *SwiftSQLPredicateInterp) DefaultSeverity() rules.Severity { return rules.High }
@@ -418,12 +418,12 @@ func (r *SwiftSQLPredicateInterp) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SWIFT-017: Swift insecure NSCoding deserialization
+// BATOU-SWIFT-017: Swift insecure NSCoding deserialization
 // ---------------------------------------------------------------------------
 
 type SwiftNSCodingDeser struct{}
 
-func (r *SwiftNSCodingDeser) ID() string                      { return "GTSS-SWIFT-017" }
+func (r *SwiftNSCodingDeser) ID() string                      { return "BATOU-SWIFT-017" }
 func (r *SwiftNSCodingDeser) Name() string                    { return "SwiftNSCodingDeser" }
 func (r *SwiftNSCodingDeser) Description() string             { return "Detects Swift NSKeyedUnarchiver.unarchiveObject (deprecated, insecure) without NSSecureCoding, enabling deserialization attacks." }
 func (r *SwiftNSCodingDeser) DefaultSeverity() rules.Severity { return rules.High }
@@ -476,12 +476,12 @@ func (r *SwiftNSCodingDeser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SWIFT-018: Swift App Transport Security disabled
+// BATOU-SWIFT-018: Swift App Transport Security disabled
 // ---------------------------------------------------------------------------
 
 type SwiftATSDisabled struct{}
 
-func (r *SwiftATSDisabled) ID() string                      { return "GTSS-SWIFT-018" }
+func (r *SwiftATSDisabled) ID() string                      { return "BATOU-SWIFT-018" }
 func (r *SwiftATSDisabled) Name() string                    { return "SwiftATSDisabled" }
 func (r *SwiftATSDisabled) Description() string             { return "Detects App Transport Security (ATS) disabled via NSAllowsArbitraryLoads in Info.plist, allowing plaintext HTTP connections." }
 func (r *SwiftATSDisabled) DefaultSeverity() rules.Severity { return rules.High }

@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
-// Compiled regex patterns for Perl extension rules (GTSS-PL-011 .. GTSS-PL-018)
+// Compiled regex patterns for Perl extension rules (BATOU-PL-011 .. BATOU-PL-018)
 // ---------------------------------------------------------------------------
 
 // PL-011: Two-argument open (command injection)
@@ -82,12 +82,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PL-011: Perl two-argument open (command injection)
+// BATOU-PL-011: Perl two-argument open (command injection)
 // ---------------------------------------------------------------------------
 
 type PerlTwoArgOpen struct{}
 
-func (r *PerlTwoArgOpen) ID() string                      { return "GTSS-PL-011" }
+func (r *PerlTwoArgOpen) ID() string                      { return "BATOU-PL-011" }
 func (r *PerlTwoArgOpen) Name() string                    { return "PerlTwoArgOpen" }
 func (r *PerlTwoArgOpen) Description() string             { return "Detects Perl two-argument open() which interprets special characters (|, >, <) in the filename, enabling command injection." }
 func (r *PerlTwoArgOpen) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -142,12 +142,12 @@ func (r *PerlTwoArgOpen) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PL-012: Perl backtick/qx with variable interpolation
+// BATOU-PL-012: Perl backtick/qx with variable interpolation
 // ---------------------------------------------------------------------------
 
 type PerlBacktickVar struct{}
 
-func (r *PerlBacktickVar) ID() string                      { return "GTSS-PL-012" }
+func (r *PerlBacktickVar) ID() string                      { return "BATOU-PL-012" }
 func (r *PerlBacktickVar) Name() string                    { return "PerlBacktickVar" }
 func (r *PerlBacktickVar) Description() string             { return "Detects Perl backtick or qx// with variable interpolation, enabling command injection." }
 func (r *PerlBacktickVar) DefaultSeverity() rules.Severity { return rules.High }
@@ -202,12 +202,12 @@ func (r *PerlBacktickVar) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PL-013: Perl DBI query without placeholders
+// BATOU-PL-013: Perl DBI query without placeholders
 // ---------------------------------------------------------------------------
 
 type PerlDBINoPlaceholder struct{}
 
-func (r *PerlDBINoPlaceholder) ID() string                      { return "GTSS-PL-013" }
+func (r *PerlDBINoPlaceholder) ID() string                      { return "BATOU-PL-013" }
 func (r *PerlDBINoPlaceholder) Name() string                    { return "PerlDBINoPlaceholder" }
 func (r *PerlDBINoPlaceholder) Description() string             { return "Detects Perl DBI queries with variable interpolation instead of placeholders, enabling SQL injection." }
 func (r *PerlDBINoPlaceholder) DefaultSeverity() rules.Severity { return rules.High }
@@ -267,12 +267,12 @@ func (r *PerlDBINoPlaceholder) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PL-014: Perl taint mode not enabled for CGI
+// BATOU-PL-014: Perl taint mode not enabled for CGI
 // ---------------------------------------------------------------------------
 
 type PerlTaintMode struct{}
 
-func (r *PerlTaintMode) ID() string                      { return "GTSS-PL-014" }
+func (r *PerlTaintMode) ID() string                      { return "BATOU-PL-014" }
 func (r *PerlTaintMode) Name() string                    { return "PerlTaintMode" }
 func (r *PerlTaintMode) Description() string             { return "Detects Perl CGI scripts without taint mode (-T), which leaves user input validation unchecked." }
 func (r *PerlTaintMode) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -320,12 +320,12 @@ func (r *PerlTaintMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PL-015: Perl eval with user input
+// BATOU-PL-015: Perl eval with user input
 // ---------------------------------------------------------------------------
 
 type PerlEvalUser struct{}
 
-func (r *PerlEvalUser) ID() string                      { return "GTSS-PL-015" }
+func (r *PerlEvalUser) ID() string                      { return "BATOU-PL-015" }
 func (r *PerlEvalUser) Name() string                    { return "PerlEvalUser" }
 func (r *PerlEvalUser) Description() string             { return "Detects Perl string eval with variable interpolation or user input, enabling arbitrary code execution." }
 func (r *PerlEvalUser) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -378,12 +378,12 @@ func (r *PerlEvalUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PL-016: Perl regex with user input (injection)
+// BATOU-PL-016: Perl regex with user input (injection)
 // ---------------------------------------------------------------------------
 
 type PerlRegexUser struct{}
 
-func (r *PerlRegexUser) ID() string                      { return "GTSS-PL-016" }
+func (r *PerlRegexUser) ID() string                      { return "BATOU-PL-016" }
 func (r *PerlRegexUser) Name() string                    { return "PerlRegexUser" }
 func (r *PerlRegexUser) Description() string             { return "Detects Perl regex with user-controlled variable interpolation, enabling ReDoS or regex injection." }
 func (r *PerlRegexUser) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -432,12 +432,12 @@ func (r *PerlRegexUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PL-017: Perl insecure temporary file
+// BATOU-PL-017: Perl insecure temporary file
 // ---------------------------------------------------------------------------
 
 type PerlInsecureTmp struct{}
 
-func (r *PerlInsecureTmp) ID() string                      { return "GTSS-PL-017" }
+func (r *PerlInsecureTmp) ID() string                      { return "BATOU-PL-017" }
 func (r *PerlInsecureTmp) Name() string                    { return "PerlInsecureTmp" }
 func (r *PerlInsecureTmp) Description() string             { return "Detects Perl insecure temporary file creation via tmpnam(), mktemp(), or predictable /tmp filenames." }
 func (r *PerlInsecureTmp) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -497,12 +497,12 @@ func (r *PerlInsecureTmp) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PL-018: Perl symlink attack via predictable filename
+// BATOU-PL-018: Perl symlink attack via predictable filename
 // ---------------------------------------------------------------------------
 
 type PerlSymlinkAttack struct{}
 
-func (r *PerlSymlinkAttack) ID() string                      { return "GTSS-PL-018" }
+func (r *PerlSymlinkAttack) ID() string                      { return "BATOU-PL-018" }
 func (r *PerlSymlinkAttack) Name() string                    { return "PerlSymlinkAttack" }
 func (r *PerlSymlinkAttack) Description() string             { return "Detects Perl file operations writing to predictable /tmp paths, enabling symlink race condition attacks." }
 func (r *PerlSymlinkAttack) DefaultSeverity() rules.Severity { return rules.Medium }

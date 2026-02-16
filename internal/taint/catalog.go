@@ -3,7 +3,7 @@ package taint
 import (
 	"sync"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // CatalogRegistry holds all registered language catalogs.

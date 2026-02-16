@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // LocatedSource represents a taint source found at a specific line in a scope.

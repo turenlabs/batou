@@ -1,5 +1,5 @@
 # Source: CWE-918 - Server-Side Request Forgery
-# Expected: GTSS-SSRF-001 (URL from User Input)
+# Expected: BATOU-SSRF-001 (URL from User Input)
 # OWASP: A10:2021 - Server-Side Request Forgery
 
 import requests

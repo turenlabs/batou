@@ -23,7 +23,7 @@ expected_vulnerabilities:
     pattern: "Search query reflected in HTML without encoding"
     cwe: CWE-79
     typical_severity: medium
-    gtss_rules: [GTSS-XSS-001, GTSS-XSS-002]
+    batou_rules: [BATOU-XSS-001, BATOU-XSS-002]
 gold_secure_pattern: |
   HTML-encode the reflected value:
   safe_query = html.escape(query)

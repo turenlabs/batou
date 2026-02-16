@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
-// Compiled regex patterns for Lua extension rules (GTSS-LUA-009 .. GTSS-LUA-014)
+// Compiled regex patterns for Lua extension rules (BATOU-LUA-009 .. BATOU-LUA-014)
 // ---------------------------------------------------------------------------
 
 // LUA-009: loadstring with user input (explicit user-input pattern)
@@ -62,12 +62,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LUA-009: Lua loadstring with user input
+// BATOU-LUA-009: Lua loadstring with user input
 // ---------------------------------------------------------------------------
 
 type LuaLoadstringUser struct{}
 
-func (r LuaLoadstringUser) ID() string                      { return "GTSS-LUA-009" }
+func (r LuaLoadstringUser) ID() string                      { return "BATOU-LUA-009" }
 func (r LuaLoadstringUser) Name() string                    { return "LuaLoadstringUser" }
 func (r LuaLoadstringUser) Description() string             { return "Detects Lua loadstring() with explicit user input sources (ngx.var, ngx.req, arg[], io.read), enabling arbitrary code execution." }
 func (r LuaLoadstringUser) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -112,12 +112,12 @@ func (r LuaLoadstringUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LUA-010: Lua os.execute with variable concatenation
+// BATOU-LUA-010: Lua os.execute with variable concatenation
 // ---------------------------------------------------------------------------
 
 type LuaOsExecVar struct{}
 
-func (r LuaOsExecVar) ID() string                      { return "GTSS-LUA-010" }
+func (r LuaOsExecVar) ID() string                      { return "BATOU-LUA-010" }
 func (r LuaOsExecVar) Name() string                    { return "LuaOsExecVar" }
 func (r LuaOsExecVar) Description() string             { return "Detects Lua os.execute() with variable concatenation or string.format, enabling command injection." }
 func (r LuaOsExecVar) DefaultSeverity() rules.Severity { return rules.High }
@@ -165,12 +165,12 @@ func (r LuaOsExecVar) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LUA-011: Lua io.popen with user input
+// BATOU-LUA-011: Lua io.popen with user input
 // ---------------------------------------------------------------------------
 
 type LuaIoPopenUser struct{}
 
-func (r LuaIoPopenUser) ID() string                      { return "GTSS-LUA-011" }
+func (r LuaIoPopenUser) ID() string                      { return "BATOU-LUA-011" }
 func (r LuaIoPopenUser) Name() string                    { return "LuaIoPopenUser" }
 func (r LuaIoPopenUser) Description() string             { return "Detects Lua io.popen() with user input or variable concatenation, enabling command injection via shell pipe." }
 func (r LuaIoPopenUser) DefaultSeverity() rules.Severity { return rules.High }
@@ -217,12 +217,12 @@ func (r LuaIoPopenUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LUA-012: Lua dofile/loadfile with user-controlled path
+// BATOU-LUA-012: Lua dofile/loadfile with user-controlled path
 // ---------------------------------------------------------------------------
 
 type LuaDofileLoadfileUser struct{}
 
-func (r LuaDofileLoadfileUser) ID() string                      { return "GTSS-LUA-012" }
+func (r LuaDofileLoadfileUser) ID() string                      { return "BATOU-LUA-012" }
 func (r LuaDofileLoadfileUser) Name() string                    { return "LuaDofileLoadfileUser" }
 func (r LuaDofileLoadfileUser) Description() string             { return "Detects Lua dofile()/loadfile() with user-controlled path, enabling arbitrary Lua file execution." }
 func (r LuaDofileLoadfileUser) DefaultSeverity() rules.Severity { return rules.High }
@@ -276,12 +276,12 @@ func (r LuaDofileLoadfileUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LUA-013: Lua SQL query string concat (common in game servers)
+// BATOU-LUA-013: Lua SQL query string concat (common in game servers)
 // ---------------------------------------------------------------------------
 
 type LuaSQLConcatGame struct{}
 
-func (r LuaSQLConcatGame) ID() string                      { return "GTSS-LUA-013" }
+func (r LuaSQLConcatGame) ID() string                      { return "BATOU-LUA-013" }
 func (r LuaSQLConcatGame) Name() string                    { return "LuaSQLConcatGame" }
 func (r LuaSQLConcatGame) Description() string             { return "Detects Lua SQL query string concatenation with player/user variables, common in game server Lua scripting." }
 func (r LuaSQLConcatGame) DefaultSeverity() rules.Severity { return rules.High }
@@ -328,12 +328,12 @@ func (r LuaSQLConcatGame) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LUA-014: Lua debug library enabled in production
+// BATOU-LUA-014: Lua debug library enabled in production
 // ---------------------------------------------------------------------------
 
 type LuaDebugProd struct{}
 
-func (r LuaDebugProd) ID() string                      { return "GTSS-LUA-014" }
+func (r LuaDebugProd) ID() string                      { return "BATOU-LUA-014" }
 func (r LuaDebugProd) Name() string                    { return "LuaDebugProd" }
 func (r LuaDebugProd) Description() string             { return "Detects Lua debug library require/usage in production-like code, which can be used for sandbox escape and information disclosure." }
 func (r LuaDebugProd) DefaultSeverity() rules.Severity { return rules.Medium }

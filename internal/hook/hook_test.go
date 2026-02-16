@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/turenio/gtss/internal/hook"
+	"github.com/turenlabs/batou/internal/hook"
 )
 
 // ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ func TestPreToolOutputJSON(t *testing.T) {
 			HookEventName:           "PreToolUse",
 			PermissionDecision:       "allow",
 			PermissionDecisionReason: "no issues found",
-			AdditionalContext:        "GTSS scan clean",
+			AdditionalContext:        "Batou scan clean",
 		},
 	}
 
@@ -263,8 +263,8 @@ func TestPreToolOutputJSON(t *testing.T) {
 	if hso["permissionDecision"] != "allow" {
 		t.Errorf("permissionDecision = %v, want %q", hso["permissionDecision"], "allow")
 	}
-	if hso["additionalContext"] != "GTSS scan clean" {
-		t.Errorf("additionalContext = %v, want %q", hso["additionalContext"], "GTSS scan clean")
+	if hso["additionalContext"] != "Batou scan clean" {
+		t.Errorf("additionalContext = %v, want %q", hso["additionalContext"], "Batou scan clean")
 	}
 }
 
@@ -449,7 +449,7 @@ func TestPreToolOutputBlockDecision(t *testing.T) {
 			HookEventName:           "PreToolUse",
 			PermissionDecision:       "block",
 			PermissionDecisionReason: "Critical SQL injection detected",
-			AdditionalContext:        "GTSS-INJ-001: SQL injection in db.Query",
+			AdditionalContext:        "BATOU-INJ-001: SQL injection in db.Query",
 		},
 	}
 

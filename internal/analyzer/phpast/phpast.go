@@ -3,8 +3,8 @@ package phpast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // PHPASTAnalyzer performs AST-based security analysis of PHP source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&PHPASTAnalyzer{})
 }
 
-func (p *PHPASTAnalyzer) ID() string                      { return "GTSS-PHPAST" }
+func (p *PHPASTAnalyzer) ID() string                      { return "BATOU-PHPAST" }
 func (p *PHPASTAnalyzer) Name() string                    { return "PHP AST Security Analyzer" }
 func (p *PHPASTAnalyzer) DefaultSeverity() rules.Severity { return rules.Critical }
 func (p *PHPASTAnalyzer) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
@@ -55,7 +55,7 @@ var dangerousFuncs = map[string]struct {
 	tags       []string
 }{
 	"eval": {
-		ruleID:     "GTSS-PHPAST-001",
+		ruleID:     "BATOU-PHPAST-001",
 		title:      "Code injection via eval()",
 		desc:       "eval() executes a string as PHP code. If the argument is user-controlled, an attacker can execute arbitrary code on the server.",
 		suggestion: "Avoid eval() entirely. Use a safe alternative appropriate for your use case.",
@@ -64,7 +64,7 @@ var dangerousFuncs = map[string]struct {
 		tags:       []string{"injection", "eval", "rce", "ast"},
 	},
 	"exec": {
-		ruleID:     "GTSS-PHPAST-002",
+		ruleID:     "BATOU-PHPAST-002",
 		title:      "Command injection via exec()",
 		desc:       "exec() executes a system command. If the argument is user-controlled, an attacker can execute arbitrary OS commands.",
 		suggestion: "Use escapeshellarg() and escapeshellcmd() on all user input, or avoid shell commands entirely.",
@@ -73,7 +73,7 @@ var dangerousFuncs = map[string]struct {
 		tags:       []string{"command-injection", "injection", "rce", "ast"},
 	},
 	"system": {
-		ruleID:     "GTSS-PHPAST-002",
+		ruleID:     "BATOU-PHPAST-002",
 		title:      "Command injection via system()",
 		desc:       "system() executes a command and displays output. If the argument is user-controlled, an attacker can execute arbitrary OS commands.",
 		suggestion: "Use escapeshellarg() and escapeshellcmd() on all user input, or avoid shell commands entirely.",
@@ -82,7 +82,7 @@ var dangerousFuncs = map[string]struct {
 		tags:       []string{"command-injection", "injection", "rce", "ast"},
 	},
 	"passthru": {
-		ruleID:     "GTSS-PHPAST-002",
+		ruleID:     "BATOU-PHPAST-002",
 		title:      "Command injection via passthru()",
 		desc:       "passthru() executes a command and passes raw output. If the argument is user-controlled, an attacker can execute arbitrary OS commands.",
 		suggestion: "Use escapeshellarg() and escapeshellcmd() on all user input, or avoid shell commands entirely.",
@@ -91,7 +91,7 @@ var dangerousFuncs = map[string]struct {
 		tags:       []string{"command-injection", "injection", "rce", "ast"},
 	},
 	"shell_exec": {
-		ruleID:     "GTSS-PHPAST-002",
+		ruleID:     "BATOU-PHPAST-002",
 		title:      "Command injection via shell_exec()",
 		desc:       "shell_exec() executes a command via the shell. If the argument is user-controlled, an attacker can execute arbitrary OS commands.",
 		suggestion: "Use escapeshellarg() and escapeshellcmd() on all user input, or avoid shell commands entirely.",
@@ -100,7 +100,7 @@ var dangerousFuncs = map[string]struct {
 		tags:       []string{"command-injection", "injection", "rce", "ast"},
 	},
 	"popen": {
-		ruleID:     "GTSS-PHPAST-002",
+		ruleID:     "BATOU-PHPAST-002",
 		title:      "Command injection via popen()",
 		desc:       "popen() opens a process with a shell command. If the argument is user-controlled, an attacker can execute arbitrary OS commands.",
 		suggestion: "Use escapeshellarg() and escapeshellcmd() on all user input, or avoid shell commands entirely.",
@@ -109,7 +109,7 @@ var dangerousFuncs = map[string]struct {
 		tags:       []string{"command-injection", "injection", "rce", "ast"},
 	},
 	"proc_open": {
-		ruleID:     "GTSS-PHPAST-002",
+		ruleID:     "BATOU-PHPAST-002",
 		title:      "Command injection via proc_open()",
 		desc:       "proc_open() opens a process with a shell command. If the argument is user-controlled, an attacker can execute arbitrary OS commands.",
 		suggestion: "Use escapeshellarg() and escapeshellcmd() on all user input, or avoid shell commands entirely.",
@@ -118,7 +118,7 @@ var dangerousFuncs = map[string]struct {
 		tags:       []string{"command-injection", "injection", "rce", "ast"},
 	},
 	"unserialize": {
-		ruleID:     "GTSS-PHPAST-004",
+		ruleID:     "BATOU-PHPAST-004",
 		title:      "Unsafe deserialization via unserialize()",
 		desc:       "unserialize() on untrusted data can trigger arbitrary object instantiation, leading to code execution via PHP magic methods (__wakeup, __destruct).",
 		suggestion: "Use json_decode() instead. If unserialize() is needed, use the allowed_classes option: unserialize($data, ['allowed_classes' => false]).",
@@ -203,7 +203,7 @@ func (c *phpChecker) checkInclude(n *ast.Node, keyword string) {
 			if inner != nil && !isPHPLiteral(inner) {
 				line := int(n.StartRow()) + 1
 				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "GTSS-PHPAST-003",
+					RuleID:        "BATOU-PHPAST-003",
 					Severity:      rules.Critical,
 					SeverityLabel: rules.Critical.String(),
 					Title:         "Local file inclusion via " + keyword + "()",
@@ -224,7 +224,7 @@ func (c *phpChecker) checkInclude(n *ast.Node, keyword string) {
 		if child.Type() == "variable_name" || child.Type() == "member_access_expression" {
 			line := int(n.StartRow()) + 1
 			c.findings = append(c.findings, rules.Finding{
-				RuleID:        "GTSS-PHPAST-003",
+				RuleID:        "BATOU-PHPAST-003",
 				Severity:      rules.Critical,
 				SeverityLabel: rules.Critical.String(),
 				Title:         "Local file inclusion via " + keyword + "()",
@@ -259,7 +259,7 @@ func (c *phpChecker) checkPregReplace(n *ast.Node) {
 	if strings.Contains(text, "/e") {
 		line := int(n.StartRow()) + 1
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-PHPAST-005",
+			RuleID:        "BATOU-PHPAST-005",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Code execution via preg_replace() with /e modifier",
@@ -296,7 +296,7 @@ func (c *phpChecker) checkSQLQueryFunc(n *ast.Node, funcName string) {
 	if queryArg.Type() == "binary_expression" && containsSQLKeyword(queryArg.Text()) {
 		line := int(n.StartRow()) + 1
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-PHPAST-006",
+			RuleID:        "BATOU-PHPAST-006",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "SQL injection via string concatenation in " + funcName + "()",
@@ -336,7 +336,7 @@ func (c *phpChecker) checkSQLAssignment(n *ast.Node) {
 			if hasVariable {
 				line := int(n.StartRow()) + 1
 				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "GTSS-PHPAST-006",
+					RuleID:        "BATOU-PHPAST-006",
 					Severity:      rules.Critical,
 					SeverityLabel: rules.Critical.String(),
 					Title:         "SQL injection via string concatenation",

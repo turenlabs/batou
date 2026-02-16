@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended crypto rules
 // ---------------------------------------------------------------------------
 
-// GTSS-CRY-019: ECB mode encryption (no diffusion)
+// BATOU-CRY-019: ECB mode encryption (no diffusion)
 var (
 	reECBModeGo     = regexp.MustCompile(`cipher\.NewCBCEncrypter|cipher\.NewCBCDecrypter`)
 	reECBModeJava   = regexp.MustCompile(`Cipher\.getInstance\s*\(\s*["']AES/ECB`)
@@ -21,27 +21,27 @@ var (
 	reECBModeGeneric = regexp.MustCompile(`(?i)\bECB\b.*(?i)(?:cipher|encrypt|aes|block|mode)`)
 )
 
-// GTSS-CRY-020: Static/hardcoded IV/nonce
+// BATOU-CRY-020: Static/hardcoded IV/nonce
 var (
 	reStaticIVAllZero  = regexp.MustCompile(`(?i)\b(?:iv|nonce|initialization.?vector)\s*[:=]\s*(?:\[\]byte\s*\{(?:\s*0\s*,?\s*){4,}|b?["']\\x00|bytes\s*\(\s*(?:16|12|8)\s*\)|new\s+byte\s*\[\s*(?:16|12|8)\s*\])`)
 	reStaticIVRepeat   = regexp.MustCompile(`(?i)\b(?:iv|nonce)\s*[:=]\s*(?:\[\]byte\s*\{\s*(?:0x[0-9a-fA-F]{2}\s*,\s*){3,}|b?["'][^"']{8,}["'])`)
 	reIVFromConst      = regexp.MustCompile(`(?i)\b(?:iv|nonce)\s*[:=]\s*(?:FIXED_|STATIC_|DEFAULT_|CONST_)`)
 )
 
-// GTSS-CRY-021: Weak key derivation
+// BATOU-CRY-021: Weak key derivation
 var (
 	reWeakKDF          = regexp.MustCompile(`(?i)\b(?:key|encryption_key|aes_key|cipher_key|secret_key)\s*[:=]\s*(?:hashlib\.|md5\.|sha1\.|sha256\.|MessageDigest|crypto\.createHash|md5\.Sum|sha256\.Sum)`)
 	reSimpleHashKey    = regexp.MustCompile(`(?i)(?:md5|sha1|sha256|sha512)\s*\(.*(?:password|passphrase|secret|key)\b`)
 	reProperKDFPresent = regexp.MustCompile(`(?i)(?:pbkdf2|scrypt|argon2|hkdf|PBKDF2WithHmacSHA|Rfc2898DeriveBytes|bcrypt|key_derivation)`)
 )
 
-// GTSS-CRY-022: Insecure random for cryptographic use
+// BATOU-CRY-022: Insecure random for cryptographic use
 var (
 	reCryptoCtxRandom  = regexp.MustCompile(`(?i)(?:key|iv|nonce|salt|token|secret|session)\s*[:=]\s*(?:rand\.|random\.|Math\.random|mt_rand|array_rand|Random\.)`)
 	reKeyGenMathRand   = regexp.MustCompile(`(?i)(?:generate|create|make|new).{0,20}(?:key|token|nonce|salt|iv|secret)\w*.*(?:rand\.|random\.|Math\.random|mt_rand)`)
 )
 
-// GTSS-CRY-023: RSA key size < 2048 bits
+// BATOU-CRY-023: RSA key size < 2048 bits
 var (
 	reRSASmallKeyPy   = regexp.MustCompile(`(?i)(?:RSA\.generate|rsa\.generate_private_key)\s*\(\s*(?:512|768|1024)\b`)
 	reRSASmallKeyRuby = regexp.MustCompile(`(?i)OpenSSL::PKey::RSA\.(?:new|generate)\s*\(\s*(?:512|768|1024)\b`)
@@ -49,14 +49,14 @@ var (
 	reRSASmallKeyJS   = regexp.MustCompile(`(?i)(?:modulusLength|key_size|keySize)\s*:\s*(?:512|768|1024)\b`)
 )
 
-// GTSS-CRY-024: Disabled certificate validation
+// BATOU-CRY-024: Disabled certificate validation
 var (
 	reCertValidationOff = regexp.MustCompile(`(?i)(?:VERIFY_NONE|verify\s*(?:=|:)\s*(?:false|False|0)|CERT_NONE|SSL_VERIFY_NONE|ServerCertificateValidationCallback\s*=\s*\(\s*[^)]*\)\s*=>\s*true|checkServerIdentity\s*:\s*\(\)\s*=>\s*(?:undefined|null|true)|ServicePointManager\.ServerCertificateValidationCallback\s*=\s*delegate\s*\{?\s*return\s+true)`)
 	reCurlInsecure     = regexp.MustCompile(`(?i)(?:CURLOPT_SSL_VERIFYPEER\s*(?:,|=>)\s*(?:false|0)|CURLOPT_SSL_VERIFYHOST\s*(?:,|=>)\s*(?:false|0))`)
 	reHttpClientNoCert = regexp.MustCompile(`(?i)(?:SSLContext\.(?:getInstance|getDefault)|TrustAllCerts|AcceptAllCerts|NullHostnameVerifier|AllowAllHostnameVerifier|ALLOW_ALL_HOSTNAME_VERIFIER)`)
 )
 
-// GTSS-CRY-025: Deprecated TLS version
+// BATOU-CRY-025: Deprecated TLS version
 var (
 	reTLSv10Explicit = regexp.MustCompile(`(?i)(?:TLSv1(?:\.0)?|SSLv3|TLS_1_0|PROTOCOL_TLSv1(?:_0)?)\b`)
 	reTLSv11Explicit = regexp.MustCompile(`(?i)(?:TLSv1\.1|TLS_1_1|PROTOCOL_TLSv1_1)\b`)
@@ -64,7 +64,7 @@ var (
 	reMinVersionOld  = regexp.MustCompile(`(?i)(?:MinVersion|min_version|minVersion|minimum_version)\s*[:=]\s*(?:tls\.VersionTLS10|tls\.VersionTLS11|['"]TLSv1(?:\.0|\.1)?['"]|0x0301|0x0302|ssl\.PROTOCOL_TLSv1|TLS_1_0|TLS_1_1)`)
 )
 
-// GTSS-CRY-026: Null cipher / no encryption
+// BATOU-CRY-026: Null cipher / no encryption
 var (
 	reNullCipher     = regexp.MustCompile(`(?i)(?:eNULL|aNULL|NULL)\b.*(?:cipher|ssl|tls)`)
 	reCipherNull     = regexp.MustCompile(`(?i)(?:cipher|ssl|tls).*(?:eNULL|aNULL|NULL)\b`)
@@ -88,12 +88,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CRY-019: ECB mode encryption (no diffusion)
+// BATOU-CRY-019: ECB mode encryption (no diffusion)
 // ---------------------------------------------------------------------------
 
 type ECBModeEncryption struct{}
 
-func (r *ECBModeEncryption) ID() string                     { return "GTSS-CRY-019" }
+func (r *ECBModeEncryption) ID() string                     { return "BATOU-CRY-019" }
 func (r *ECBModeEncryption) Name() string                   { return "ECBModeEncryption" }
 func (r *ECBModeEncryption) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ECBModeEncryption) Description() string {
@@ -144,12 +144,12 @@ func (r *ECBModeEncryption) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CRY-020: Static/hardcoded IV/nonce
+// BATOU-CRY-020: Static/hardcoded IV/nonce
 // ---------------------------------------------------------------------------
 
 type StaticIVNonce struct{}
 
-func (r *StaticIVNonce) ID() string                     { return "GTSS-CRY-020" }
+func (r *StaticIVNonce) ID() string                     { return "BATOU-CRY-020" }
 func (r *StaticIVNonce) Name() string                   { return "StaticIVNonce" }
 func (r *StaticIVNonce) DefaultSeverity() rules.Severity { return rules.High }
 func (r *StaticIVNonce) Description() string {
@@ -191,12 +191,12 @@ func (r *StaticIVNonce) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CRY-021: Weak key derivation
+// BATOU-CRY-021: Weak key derivation
 // ---------------------------------------------------------------------------
 
 type WeakKeyDerivation struct{}
 
-func (r *WeakKeyDerivation) ID() string                     { return "GTSS-CRY-021" }
+func (r *WeakKeyDerivation) ID() string                     { return "BATOU-CRY-021" }
 func (r *WeakKeyDerivation) Name() string                   { return "WeakKeyDerivation" }
 func (r *WeakKeyDerivation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WeakKeyDerivation) Description() string {
@@ -242,12 +242,12 @@ func (r *WeakKeyDerivation) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CRY-022: Insecure random for cryptographic use
+// BATOU-CRY-022: Insecure random for cryptographic use
 // ---------------------------------------------------------------------------
 
 type InsecureRandomCrypto struct{}
 
-func (r *InsecureRandomCrypto) ID() string                     { return "GTSS-CRY-022" }
+func (r *InsecureRandomCrypto) ID() string                     { return "BATOU-CRY-022" }
 func (r *InsecureRandomCrypto) Name() string                   { return "InsecureRandomCrypto" }
 func (r *InsecureRandomCrypto) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureRandomCrypto) Description() string {
@@ -289,12 +289,12 @@ func (r *InsecureRandomCrypto) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CRY-023: RSA key size < 2048 bits (broader)
+// BATOU-CRY-023: RSA key size < 2048 bits (broader)
 // ---------------------------------------------------------------------------
 
 type RSASmallKeyBroad struct{}
 
-func (r *RSASmallKeyBroad) ID() string                     { return "GTSS-CRY-023" }
+func (r *RSASmallKeyBroad) ID() string                     { return "BATOU-CRY-023" }
 func (r *RSASmallKeyBroad) Name() string                   { return "RSASmallKeyBroad" }
 func (r *RSASmallKeyBroad) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RSASmallKeyBroad) Description() string {
@@ -347,12 +347,12 @@ func (r *RSASmallKeyBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CRY-024: Disabled certificate validation
+// BATOU-CRY-024: Disabled certificate validation
 // ---------------------------------------------------------------------------
 
 type DisabledCertValidation struct{}
 
-func (r *DisabledCertValidation) ID() string                     { return "GTSS-CRY-024" }
+func (r *DisabledCertValidation) ID() string                     { return "BATOU-CRY-024" }
 func (r *DisabledCertValidation) Name() string                   { return "DisabledCertValidation" }
 func (r *DisabledCertValidation) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *DisabledCertValidation) Description() string {
@@ -394,12 +394,12 @@ func (r *DisabledCertValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CRY-025: Deprecated TLS version (TLS 1.0/1.1)
+// BATOU-CRY-025: Deprecated TLS version (TLS 1.0/1.1)
 // ---------------------------------------------------------------------------
 
 type DeprecatedTLSVersion struct{}
 
-func (r *DeprecatedTLSVersion) ID() string                     { return "GTSS-CRY-025" }
+func (r *DeprecatedTLSVersion) ID() string                     { return "BATOU-CRY-025" }
 func (r *DeprecatedTLSVersion) Name() string                   { return "DeprecatedTLSVersion" }
 func (r *DeprecatedTLSVersion) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DeprecatedTLSVersion) Description() string {
@@ -445,12 +445,12 @@ func (r *DeprecatedTLSVersion) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CRY-026: Null cipher / no encryption in TLS config
+// BATOU-CRY-026: Null cipher / no encryption in TLS config
 // ---------------------------------------------------------------------------
 
 type NullCipherTLS struct{}
 
-func (r *NullCipherTLS) ID() string                     { return "GTSS-CRY-026" }
+func (r *NullCipherTLS) ID() string                     { return "BATOU-CRY-026" }
 func (r *NullCipherTLS) Name() string                   { return "NullCipherTLS" }
 func (r *NullCipherTLS) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *NullCipherTLS) Description() string {

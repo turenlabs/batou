@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,28 +12,28 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-PHOENIX-001: raw/2 rendering unescaped user input
+	// BATOU-FW-PHOENIX-001: raw/2 rendering unescaped user input
 	rePhoenixRaw       = regexp.MustCompile(`\braw\s*\(`)
 	rePhoenixRawPipe   = regexp.MustCompile(`\|>\s*raw\b`)
 
-	// GTSS-FW-PHOENIX-002: Ecto raw SQL with string interpolation
+	// BATOU-FW-PHOENIX-002: Ecto raw SQL with string interpolation
 	rePhoenixEctoFragment = regexp.MustCompile(`fragment\s*\(\s*"[^"]*#\{`)
 	rePhoenixEctoRawSQL   = regexp.MustCompile(`Ecto\.Adapters\.SQL\.query[!]?\s*\(\s*\w+\s*,\s*"[^"]*#\{`)
 	rePhoenixRepoQuery    = regexp.MustCompile(`Repo\.query[!]?\s*\(\s*"[^"]*#\{`)
 
-	// GTSS-FW-PHOENIX-003: CSRF protection disabled
+	// BATOU-FW-PHOENIX-003: CSRF protection disabled
 	rePhoenixCSRFDisable   = regexp.MustCompile(`(?:protect_from_forgery|:put_csrf_token).*false`)
 	rePhoenixDeleteCSRF    = regexp.MustCompile(`delete_csrf_token\s*\(`)
 	rePhoenixPlugCSRF      = regexp.MustCompile(`plug\s+:protect_from_forgery`)
 
-	// GTSS-FW-PHOENIX-004: secret_key_base hardcoded
+	// BATOU-FW-PHOENIX-004: secret_key_base hardcoded
 	rePhoenixSecretKey     = regexp.MustCompile(`secret_key_base\s*:\s*"[A-Za-z0-9+/=]{20,}"`)
 	rePhoenixSecretKeyBase = regexp.MustCompile(`secret_key_base\s*[=:]\s*"[^"]{20,}"`)
 
-	// GTSS-FW-PHOENIX-005: LiveView handle_event without authorization
+	// BATOU-FW-PHOENIX-005: LiveView handle_event without authorization
 	rePhoenixHandleEvent = regexp.MustCompile(`def\s+handle_event\s*\(`)
 
-	// GTSS-FW-PHOENIX-006: Plug/router without auth pipeline
+	// BATOU-FW-PHOENIX-006: Plug/router without auth pipeline
 	rePhoenixPipeline    = regexp.MustCompile(`pipeline\s+:(?:api|browser)\s+do`)
 	rePhoenixPlugAuth    = regexp.MustCompile(`plug\s+:(?:require_auth|ensure_auth|authenticate|verify_user|check_auth|require_login)`)
 )
@@ -48,12 +48,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-PHOENIX-001: raw/2 rendering unescaped user input
+// BATOU-FW-PHOENIX-001: raw/2 rendering unescaped user input
 // ---------------------------------------------------------------------------
 
 type PhoenixRaw struct{}
 
-func (r *PhoenixRaw) ID() string                      { return "GTSS-FW-PHOENIX-001" }
+func (r *PhoenixRaw) ID() string                      { return "BATOU-FW-PHOENIX-001" }
 func (r *PhoenixRaw) Name() string                    { return "PhoenixRaw" }
 func (r *PhoenixRaw) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PhoenixRaw) Description() string {
@@ -112,12 +112,12 @@ func (r *PhoenixRaw) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-PHOENIX-002: Ecto raw SQL with string interpolation
+// BATOU-FW-PHOENIX-002: Ecto raw SQL with string interpolation
 // ---------------------------------------------------------------------------
 
 type PhoenixEctoSQLi struct{}
 
-func (r *PhoenixEctoSQLi) ID() string                      { return "GTSS-FW-PHOENIX-002" }
+func (r *PhoenixEctoSQLi) ID() string                      { return "BATOU-FW-PHOENIX-002" }
 func (r *PhoenixEctoSQLi) Name() string                    { return "PhoenixEctoSQLi" }
 func (r *PhoenixEctoSQLi) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PhoenixEctoSQLi) Description() string {
@@ -180,12 +180,12 @@ func (r *PhoenixEctoSQLi) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-PHOENIX-003: CSRF protection disabled
+// BATOU-FW-PHOENIX-003: CSRF protection disabled
 // ---------------------------------------------------------------------------
 
 type PhoenixCSRFDisabled struct{}
 
-func (r *PhoenixCSRFDisabled) ID() string                      { return "GTSS-FW-PHOENIX-003" }
+func (r *PhoenixCSRFDisabled) ID() string                      { return "BATOU-FW-PHOENIX-003" }
 func (r *PhoenixCSRFDisabled) Name() string                    { return "PhoenixCSRFDisabled" }
 func (r *PhoenixCSRFDisabled) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PhoenixCSRFDisabled) Description() string {
@@ -259,12 +259,12 @@ func (r *PhoenixCSRFDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-PHOENIX-004: secret_key_base hardcoded
+// BATOU-FW-PHOENIX-004: secret_key_base hardcoded
 // ---------------------------------------------------------------------------
 
 type PhoenixHardcodedSecret struct{}
 
-func (r *PhoenixHardcodedSecret) ID() string                      { return "GTSS-FW-PHOENIX-004" }
+func (r *PhoenixHardcodedSecret) ID() string                      { return "BATOU-FW-PHOENIX-004" }
 func (r *PhoenixHardcodedSecret) Name() string                    { return "PhoenixHardcodedSecret" }
 func (r *PhoenixHardcodedSecret) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PhoenixHardcodedSecret) Description() string {
@@ -325,12 +325,12 @@ func (r *PhoenixHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-PHOENIX-005: LiveView handle_event without authorization
+// BATOU-FW-PHOENIX-005: LiveView handle_event without authorization
 // ---------------------------------------------------------------------------
 
 type PhoenixLiveViewAuth struct{}
 
-func (r *PhoenixLiveViewAuth) ID() string                      { return "GTSS-FW-PHOENIX-005" }
+func (r *PhoenixLiveViewAuth) ID() string                      { return "BATOU-FW-PHOENIX-005" }
 func (r *PhoenixLiveViewAuth) Name() string                    { return "PhoenixLiveViewAuth" }
 func (r *PhoenixLiveViewAuth) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *PhoenixLiveViewAuth) Description() string {
@@ -386,12 +386,12 @@ func (r *PhoenixLiveViewAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-PHOENIX-006: Router without authentication pipeline
+// BATOU-FW-PHOENIX-006: Router without authentication pipeline
 // ---------------------------------------------------------------------------
 
 type PhoenixRouterNoAuth struct{}
 
-func (r *PhoenixRouterNoAuth) ID() string                      { return "GTSS-FW-PHOENIX-006" }
+func (r *PhoenixRouterNoAuth) ID() string                      { return "BATOU-FW-PHOENIX-006" }
 func (r *PhoenixRouterNoAuth) Name() string                    { return "PhoenixRouterNoAuth" }
 func (r *PhoenixRouterNoAuth) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *PhoenixRouterNoAuth) Description() string {

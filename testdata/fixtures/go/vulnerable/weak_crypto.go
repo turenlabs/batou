@@ -10,7 +10,7 @@ import (
 )
 
 // VULN: Weak cryptographic hash (MD5) and insecure random (math/rand) for token generation.
-// Should trigger GTSS-CRY-001 (Weak Hashing) and GTSS-CRY-002 / GTSS-CRY-011 (Insecure Random / Predictable Seed).
+// Should trigger BATOU-CRY-001 (Weak Hashing) and BATOU-CRY-002 / BATOU-CRY-011 (Insecure Random / Predictable Seed).
 
 func HandleResetToken(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")

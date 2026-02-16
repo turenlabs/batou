@@ -4,46 +4,46 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns -- Gin
 // ---------------------------------------------------------------------------
 
-// GTSS-FW-GIN-001: Trusted proxies not configured
+// BATOU-FW-GIN-001: Trusted proxies not configured
 var reGinEngine = regexp.MustCompile(`gin\.(?:Default|New)\s*\(`)
 var reGinSetTrustedProxies = regexp.MustCompile(`\.SetTrustedProxies\s*\(`)
 
-// GTSS-FW-GIN-002: CORS wildcard
+// BATOU-FW-GIN-002: CORS wildcard
 var reGinCORSWildcard = regexp.MustCompile(`AllowOrigins\s*:\s*\[\s*\]\s*string\s*\{\s*"\*"\s*\}`)
 var reGinCORSAllowAll = regexp.MustCompile(`AllowAllOrigins\s*:\s*true`)
 
-// GTSS-FW-GIN-003: ShouldBind without validation
+// BATOU-FW-GIN-003: ShouldBind without validation
 var reGinShouldBind = regexp.MustCompile(`\.(?:ShouldBind|ShouldBindJSON|ShouldBindQuery|ShouldBindUri|Bind|BindJSON)\s*\(`)
 var reGinBindingTag = regexp.MustCompile("`" + `[^` + "`" + `]*binding:"[^"]*required[^"]*"[^` + "`" + `]*` + "`")
 
-// GTSS-FW-GIN-004: HTML template with unescaped data
+// BATOU-FW-GIN-004: HTML template with unescaped data
 var reGinHTMLUnescaped = regexp.MustCompile(`template\.HTML\s*\(`)
 
-// GTSS-FW-GIN-005: Debug mode in production
+// BATOU-FW-GIN-005: Debug mode in production
 var reGinDebugMode = regexp.MustCompile(`gin\.SetMode\s*\(\s*gin\.DebugMode\s*\)`)
 
-// GTSS-FW-GIN-006: File serve with user-controlled path
+// BATOU-FW-GIN-006: File serve with user-controlled path
 var reGinFilePath = regexp.MustCompile(`c\.(?:File|FileAttachment|FileFromFS)\s*\(\s*(?:c\.(?:Param|Query|PostForm)|[a-zA-Z_]\w*\s*\+)`)
 
-// GTSS-FW-GIN-007: SQL injection via c.Query
+// BATOU-FW-GIN-007: SQL injection via c.Query
 var reGinSQLQuery = regexp.MustCompile(`(?:db\.(?:Raw|Exec|Query|QueryRow)|\.(?:Raw|Exec)\s*\()\s*\(\s*(?:"[^"]*"\s*\+\s*c\.(?:Query|Param|PostForm)|fmt\.Sprintf\s*\([^)]*c\.(?:Query|Param|PostForm))`)
 var reGinSQLConcat = regexp.MustCompile(`(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\b[^"]*"\s*\+\s*c\.(?:Query|Param|PostForm|DefaultQuery)\s*\(`)
 
-// GTSS-FW-GIN-008: Cookie without Secure/HttpOnly flags
+// BATOU-FW-GIN-008: Cookie without Secure/HttpOnly flags
 var reGinSetCookie = regexp.MustCompile(`c\.SetCookie\s*\(`)
 var reGinSetCookieInsecure = regexp.MustCompile(`c\.SetCookie\s*\([^)]*,\s*false\s*,\s*false\s*\)`)
 
-// GTSS-FW-GIN-009: BasicAuth with hardcoded credentials
+// BATOU-FW-GIN-009: BasicAuth with hardcoded credentials
 var reGinBasicAuth = regexp.MustCompile(`gin\.Accounts\s*\{[^}]*"[^"]+"\s*:\s*"[^"]+"`)
 
-// GTSS-FW-GIN-010: Middleware ordering
+// BATOU-FW-GIN-010: Middleware ordering
 var reGinUseAuth = regexp.MustCompile(`\.Use\s*\(\s*(?:\w*[Aa]uth\w*|[Mm]iddleware|[Gg]uard)`)
 var reGinRouteHandler = regexp.MustCompile(`\.\s*(?:GET|POST|PUT|DELETE|PATCH|Handle|Any)\s*\(`)
 
@@ -61,12 +61,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-GIN-001: Trusted proxies not configured
+// BATOU-FW-GIN-001: Trusted proxies not configured
 // ---------------------------------------------------------------------------
 
 type GinTrustedProxies struct{}
 
-func (r *GinTrustedProxies) ID() string                      { return "GTSS-FW-GIN-001" }
+func (r *GinTrustedProxies) ID() string                      { return "BATOU-FW-GIN-001" }
 func (r *GinTrustedProxies) Name() string                    { return "GinTrustedProxies" }
 func (r *GinTrustedProxies) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GinTrustedProxies) Description() string {
@@ -117,12 +117,12 @@ func (r *GinTrustedProxies) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-GIN-002: CORS with wildcard origin
+// BATOU-FW-GIN-002: CORS with wildcard origin
 // ---------------------------------------------------------------------------
 
 type GinCORSWildcard struct{}
 
-func (r *GinCORSWildcard) ID() string                      { return "GTSS-FW-GIN-002" }
+func (r *GinCORSWildcard) ID() string                      { return "BATOU-FW-GIN-002" }
 func (r *GinCORSWildcard) Name() string                    { return "GinCORSWildcard" }
 func (r *GinCORSWildcard) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GinCORSWildcard) Description() string {
@@ -172,12 +172,12 @@ func (r *GinCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-GIN-003: ShouldBind without validation tags
+// BATOU-FW-GIN-003: ShouldBind without validation tags
 // ---------------------------------------------------------------------------
 
 type GinBindNoValidation struct{}
 
-func (r *GinBindNoValidation) ID() string                      { return "GTSS-FW-GIN-003" }
+func (r *GinBindNoValidation) ID() string                      { return "BATOU-FW-GIN-003" }
 func (r *GinBindNoValidation) Name() string                    { return "GinBindNoValidation" }
 func (r *GinBindNoValidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GinBindNoValidation) Description() string {
@@ -227,12 +227,12 @@ func (r *GinBindNoValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-GIN-004: HTML template with unescaped data
+// BATOU-FW-GIN-004: HTML template with unescaped data
 // ---------------------------------------------------------------------------
 
 type GinHTMLUnescaped struct{}
 
-func (r *GinHTMLUnescaped) ID() string                      { return "GTSS-FW-GIN-004" }
+func (r *GinHTMLUnescaped) ID() string                      { return "BATOU-FW-GIN-004" }
 func (r *GinHTMLUnescaped) Name() string                    { return "GinHTMLUnescaped" }
 func (r *GinHTMLUnescaped) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GinHTMLUnescaped) Description() string {
@@ -276,12 +276,12 @@ func (r *GinHTMLUnescaped) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-GIN-005: Debug mode in production
+// BATOU-FW-GIN-005: Debug mode in production
 // ---------------------------------------------------------------------------
 
 type GinDebugMode struct{}
 
-func (r *GinDebugMode) ID() string                      { return "GTSS-FW-GIN-005" }
+func (r *GinDebugMode) ID() string                      { return "BATOU-FW-GIN-005" }
 func (r *GinDebugMode) Name() string                    { return "GinDebugMode" }
 func (r *GinDebugMode) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GinDebugMode) Description() string {
@@ -325,12 +325,12 @@ func (r *GinDebugMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-GIN-006: File serve with user-controlled path
+// BATOU-FW-GIN-006: File serve with user-controlled path
 // ---------------------------------------------------------------------------
 
 type GinFilePathTraversal struct{}
 
-func (r *GinFilePathTraversal) ID() string                      { return "GTSS-FW-GIN-006" }
+func (r *GinFilePathTraversal) ID() string                      { return "BATOU-FW-GIN-006" }
 func (r *GinFilePathTraversal) Name() string                    { return "GinFilePathTraversal" }
 func (r *GinFilePathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GinFilePathTraversal) Description() string {
@@ -374,12 +374,12 @@ func (r *GinFilePathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-GIN-007: SQL injection via c.Query in raw SQL
+// BATOU-FW-GIN-007: SQL injection via c.Query in raw SQL
 // ---------------------------------------------------------------------------
 
 type GinSQLInjection struct{}
 
-func (r *GinSQLInjection) ID() string                      { return "GTSS-FW-GIN-007" }
+func (r *GinSQLInjection) ID() string                      { return "BATOU-FW-GIN-007" }
 func (r *GinSQLInjection) Name() string                    { return "GinSQLInjection" }
 func (r *GinSQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GinSQLInjection) Description() string {
@@ -428,12 +428,12 @@ func (r *GinSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-GIN-008: Cookie without Secure/HttpOnly flags
+// BATOU-FW-GIN-008: Cookie without Secure/HttpOnly flags
 // ---------------------------------------------------------------------------
 
 type GinInsecureCookie struct{}
 
-func (r *GinInsecureCookie) ID() string                      { return "GTSS-FW-GIN-008" }
+func (r *GinInsecureCookie) ID() string                      { return "BATOU-FW-GIN-008" }
 func (r *GinInsecureCookie) Name() string                    { return "GinInsecureCookie" }
 func (r *GinInsecureCookie) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GinInsecureCookie) Description() string {
@@ -477,12 +477,12 @@ func (r *GinInsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-GIN-009: BasicAuth with hardcoded credentials
+// BATOU-FW-GIN-009: BasicAuth with hardcoded credentials
 // ---------------------------------------------------------------------------
 
 type GinHardcodedAuth struct{}
 
-func (r *GinHardcodedAuth) ID() string                      { return "GTSS-FW-GIN-009" }
+func (r *GinHardcodedAuth) ID() string                      { return "BATOU-FW-GIN-009" }
 func (r *GinHardcodedAuth) Name() string                    { return "GinHardcodedAuth" }
 func (r *GinHardcodedAuth) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GinHardcodedAuth) Description() string {
@@ -526,12 +526,12 @@ func (r *GinHardcodedAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-GIN-010: Middleware ordering (auth after handler)
+// BATOU-FW-GIN-010: Middleware ordering (auth after handler)
 // ---------------------------------------------------------------------------
 
 type GinMiddlewareOrder struct{}
 
-func (r *GinMiddlewareOrder) ID() string                      { return "GTSS-FW-GIN-010" }
+func (r *GinMiddlewareOrder) ID() string                      { return "BATOU-FW-GIN-010" }
 func (r *GinMiddlewareOrder) Name() string                    { return "GinMiddlewareOrder" }
 func (r *GinMiddlewareOrder) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GinMiddlewareOrder) Description() string {

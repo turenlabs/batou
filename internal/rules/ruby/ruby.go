@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -134,12 +134,12 @@ func hasNearbyPattern(lines []string, idx int, pat *regexp.Regexp) bool {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-001: ERB Output Without Escaping
+// BATOU-RB-001: ERB Output Without Escaping
 // ---------------------------------------------------------------------------
 
 type ERBUnescapedOutput struct{}
 
-func (r *ERBUnescapedOutput) ID() string                      { return "GTSS-RB-001" }
+func (r *ERBUnescapedOutput) ID() string                      { return "BATOU-RB-001" }
 func (r *ERBUnescapedOutput) Name() string                    { return "RubyERBUnescapedOutput" }
 func (r *ERBUnescapedOutput) Description() string             { return "Detects raw() and .html_safe on user input in Ruby/Rails, bypassing XSS auto-escaping." }
 func (r *ERBUnescapedOutput) DefaultSeverity() rules.Severity { return rules.High }
@@ -196,12 +196,12 @@ func (r *ERBUnescapedOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-002: Command Injection via system/exec/backtick
+// BATOU-RB-002: Command Injection via system/exec/backtick
 // ---------------------------------------------------------------------------
 
 type RubyCommandInjection struct{}
 
-func (r *RubyCommandInjection) ID() string                      { return "GTSS-RB-002" }
+func (r *RubyCommandInjection) ID() string                      { return "BATOU-RB-002" }
 func (r *RubyCommandInjection) Name() string                    { return "RubyCommandInjection" }
 func (r *RubyCommandInjection) Description() string             { return "Detects Ruby system/exec/backtick/spawn with user input, enabling command injection." }
 func (r *RubyCommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -258,12 +258,12 @@ func (r *RubyCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-003: YAML.load (Unsafe Deserialization)
+// BATOU-RB-003: YAML.load (Unsafe Deserialization)
 // ---------------------------------------------------------------------------
 
 type YAMLUnsafeLoad struct{}
 
-func (r *YAMLUnsafeLoad) ID() string                      { return "GTSS-RB-003" }
+func (r *YAMLUnsafeLoad) ID() string                      { return "BATOU-RB-003" }
 func (r *YAMLUnsafeLoad) Name() string                    { return "RubyYAMLUnsafeLoad" }
 func (r *YAMLUnsafeLoad) Description() string             { return "Detects Ruby YAML.load which deserializes arbitrary objects, enabling RCE." }
 func (r *YAMLUnsafeLoad) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -327,12 +327,12 @@ func (r *YAMLUnsafeLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-004: Sinatra Params in SQL/Shell
+// BATOU-RB-004: Sinatra Params in SQL/Shell
 // ---------------------------------------------------------------------------
 
 type SinatraParamsInjection struct{}
 
-func (r *SinatraParamsInjection) ID() string                      { return "GTSS-RB-004" }
+func (r *SinatraParamsInjection) ID() string                      { return "BATOU-RB-004" }
 func (r *SinatraParamsInjection) Name() string                    { return "RubySinatraParamsInjection" }
 func (r *SinatraParamsInjection) Description() string             { return "Detects Sinatra params interpolated directly into SQL or shell commands." }
 func (r *SinatraParamsInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -389,12 +389,12 @@ func (r *SinatraParamsInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-005: Kernel#open with Pipe
+// BATOU-RB-005: Kernel#open with Pipe
 // ---------------------------------------------------------------------------
 
 type KernelOpenPipe struct{}
 
-func (r *KernelOpenPipe) ID() string                      { return "GTSS-RB-005" }
+func (r *KernelOpenPipe) ID() string                      { return "BATOU-RB-005" }
 func (r *KernelOpenPipe) Name() string                    { return "RubyKernelOpenPipe" }
 func (r *KernelOpenPipe) Description() string             { return "Detects Ruby Kernel#open / URI.open with user input, which allows command injection via pipe prefix." }
 func (r *KernelOpenPipe) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -456,12 +456,12 @@ func (r *KernelOpenPipe) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-006: send/public_send with User-Controlled Method Name
+// BATOU-RB-006: send/public_send with User-Controlled Method Name
 // ---------------------------------------------------------------------------
 
 type SendMethodInjection struct{}
 
-func (r *SendMethodInjection) ID() string                      { return "GTSS-RB-006" }
+func (r *SendMethodInjection) ID() string                      { return "BATOU-RB-006" }
 func (r *SendMethodInjection) Name() string                    { return "RubySendMethodInjection" }
 func (r *SendMethodInjection) Description() string             { return "Detects Ruby send/public_send with user-controlled method name, enabling arbitrary method invocation." }
 func (r *SendMethodInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -514,12 +514,12 @@ func (r *SendMethodInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-007: Regex Injection (Regexp.new with user input)
+// BATOU-RB-007: Regex Injection (Regexp.new with user input)
 // ---------------------------------------------------------------------------
 
 type RegexpInjection struct{}
 
-func (r *RegexpInjection) ID() string                      { return "GTSS-RB-007" }
+func (r *RegexpInjection) ID() string                      { return "BATOU-RB-007" }
 func (r *RegexpInjection) Name() string                    { return "RubyRegexpInjection" }
 func (r *RegexpInjection) Description() string             { return "Detects Regexp.new/compile with user input, enabling ReDoS or regex injection." }
 func (r *RegexpInjection) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -573,12 +573,12 @@ func (r *RegexpInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-008: Insecure SSL (VERIFY_NONE)
+// BATOU-RB-008: Insecure SSL (VERIFY_NONE)
 // ---------------------------------------------------------------------------
 
 type InsecureSSL struct{}
 
-func (r *InsecureSSL) ID() string                      { return "GTSS-RB-008" }
+func (r *InsecureSSL) ID() string                      { return "BATOU-RB-008" }
 func (r *InsecureSSL) Name() string                    { return "RubyInsecureSSL" }
 func (r *InsecureSSL) Description() string             { return "Detects Ruby SSL verification disabled (VERIFY_NONE), enabling MITM attacks." }
 func (r *InsecureSSL) DefaultSeverity() rules.Severity { return rules.High }
@@ -632,12 +632,12 @@ func (r *InsecureSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-009: Marshal.load from Untrusted Source
+// BATOU-RB-009: Marshal.load from Untrusted Source
 // ---------------------------------------------------------------------------
 
 type MarshalUnsafeLoad struct{}
 
-func (r *MarshalUnsafeLoad) ID() string                      { return "GTSS-RB-009" }
+func (r *MarshalUnsafeLoad) ID() string                      { return "BATOU-RB-009" }
 func (r *MarshalUnsafeLoad) Name() string                    { return "RubyMarshalUnsafeLoad" }
 func (r *MarshalUnsafeLoad) Description() string             { return "Detects Ruby Marshal.load which deserializes arbitrary objects, enabling RCE." }
 func (r *MarshalUnsafeLoad) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -679,12 +679,12 @@ func (r *MarshalUnsafeLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-010: Mass Assignment (Legacy Patterns)
+// BATOU-RB-010: Mass Assignment (Legacy Patterns)
 // ---------------------------------------------------------------------------
 
 type MassAssignment struct{}
 
-func (r *MassAssignment) ID() string                      { return "GTSS-RB-010" }
+func (r *MassAssignment) ID() string                      { return "BATOU-RB-010" }
 func (r *MassAssignment) Name() string                    { return "RubyMassAssignment" }
 func (r *MassAssignment) Description() string             { return "Detects Ruby/Rails mass assignment vulnerabilities via update_attributes(params) or legacy attr_accessible/attr_protected." }
 func (r *MassAssignment) DefaultSeverity() rules.Severity { return rules.High }
@@ -749,12 +749,12 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-011: Open Redirect
+// BATOU-RB-011: Open Redirect
 // ---------------------------------------------------------------------------
 
 type OpenRedirect struct{}
 
-func (r *OpenRedirect) ID() string                      { return "GTSS-RB-011" }
+func (r *OpenRedirect) ID() string                      { return "BATOU-RB-011" }
 func (r *OpenRedirect) Name() string                    { return "RubyOpenRedirect" }
 func (r *OpenRedirect) Description() string             { return "Detects Rails redirect_to with user-controlled URLs, enabling open redirect attacks." }
 func (r *OpenRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -805,12 +805,12 @@ func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-012: Cookie Security
+// BATOU-RB-012: Cookie Security
 // ---------------------------------------------------------------------------
 
 type CookieSecurity struct{}
 
-func (r *CookieSecurity) ID() string                      { return "GTSS-RB-012" }
+func (r *CookieSecurity) ID() string                      { return "BATOU-RB-012" }
 func (r *CookieSecurity) Name() string                    { return "RubyCookieSecurity" }
 func (r *CookieSecurity) Description() string             { return "Detects Rails cookies set directly from user input without security flags." }
 func (r *CookieSecurity) DefaultSeverity() rules.Severity { return rules.Medium }

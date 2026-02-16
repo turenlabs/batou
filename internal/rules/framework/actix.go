@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,29 +12,29 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-ACTIX-001: CORS permissive configuration
+	// BATOU-FW-ACTIX-001: CORS permissive configuration
 	reActixCorsPermissiveOrigin  = regexp.MustCompile(`Cors::permissive\s*\(`)
 	reActixCorsAllowAnyOrigin    = regexp.MustCompile(`\.allow_any_origin\s*\(`)
 	reActixCorsAllowAnyMethod    = regexp.MustCompile(`\.allow_any_method\s*\(`)
 
-	// GTSS-FW-ACTIX-002: Serving static files with user-controlled path
+	// BATOU-FW-ACTIX-002: Serving static files with user-controlled path
 	reActixNamedFile     = regexp.MustCompile(`NamedFile::open\s*\(\s*(?:format!\s*\(|&format!\s*\(|path\.|req\.|info\.)`)
 	reActixFilesService  = regexp.MustCompile(`Files::new\s*\(\s*"[^"]*"\s*,\s*(?:&?\w+|format!\s*\()`)
 
-	// GTSS-FW-ACTIX-003: SQL injection via format! in query
+	// BATOU-FW-ACTIX-003: SQL injection via format! in query
 	reActixSQLFormat     = regexp.MustCompile(`(?:query|execute|query_as|query_scalar)\s*[!(]\s*(?:&\s*)?format!\s*\(`)
 	reActixSQLFormatStr  = regexp.MustCompile(`(?:query|execute)\s*\(\s*&format!\s*\(`)
 
-	// GTSS-FW-ACTIX-004: Session without secure cookie settings
+	// BATOU-FW-ACTIX-004: Session without secure cookie settings
 	reActixCookieSession   = regexp.MustCompile(`CookieSession::(?:signed|private)\s*\(`)
 	reActixSessionSecure   = regexp.MustCompile(`\.secure\s*\(\s*true\s*\)`)
 	reActixSessionHttpOnly = regexp.MustCompile(`\.http_only\s*\(\s*true\s*\)`)
 
-	// GTSS-FW-ACTIX-005: Missing authentication extractor
+	// BATOU-FW-ACTIX-005: Missing authentication extractor
 	reActixHandler        = regexp.MustCompile(`(?:\.route|\.resource|web::(?:get|post|put|delete|patch))\s*\(`)
 	reActixAuthExtractor  = regexp.MustCompile(`(?:Identity|Claims|Auth|Token|Session|User)\s*:`)
 
-	// GTSS-FW-ACTIX-006: Error response exposing internal details
+	// BATOU-FW-ACTIX-006: Error response exposing internal details
 	reActixErrorDisplay   = regexp.MustCompile(`HttpResponse::(?:InternalServerError|BadRequest)\s*\(\s*\)\s*\.(?:body|json)\s*\(\s*(?:format!\s*\(|err\.|e\.|error\.)`)
 	reActixErrorDbg       = regexp.MustCompile(`HttpResponse::.*\.body\s*\(\s*format!\s*\(\s*"[^"]*\{:?\?\}`)
 )
@@ -49,12 +49,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ACTIX-001: CORS permissive configuration
+// BATOU-FW-ACTIX-001: CORS permissive configuration
 // ---------------------------------------------------------------------------
 
 type ActixCorsPermissive struct{}
 
-func (r *ActixCorsPermissive) ID() string                      { return "GTSS-FW-ACTIX-001" }
+func (r *ActixCorsPermissive) ID() string                      { return "BATOU-FW-ACTIX-001" }
 func (r *ActixCorsPermissive) Name() string                    { return "ActixCorsPermissive" }
 func (r *ActixCorsPermissive) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ActixCorsPermissive) Description() string {
@@ -113,12 +113,12 @@ func (r *ActixCorsPermissive) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ACTIX-002: Static file serving with user-controlled path
+// BATOU-FW-ACTIX-002: Static file serving with user-controlled path
 // ---------------------------------------------------------------------------
 
 type ActixStaticPath struct{}
 
-func (r *ActixStaticPath) ID() string                      { return "GTSS-FW-ACTIX-002" }
+func (r *ActixStaticPath) ID() string                      { return "BATOU-FW-ACTIX-002" }
 func (r *ActixStaticPath) Name() string                    { return "ActixStaticPath" }
 func (r *ActixStaticPath) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ActixStaticPath) Description() string {
@@ -164,12 +164,12 @@ func (r *ActixStaticPath) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ACTIX-003: SQL injection via format! in query
+// BATOU-FW-ACTIX-003: SQL injection via format! in query
 // ---------------------------------------------------------------------------
 
 type ActixSQLFormat struct{}
 
-func (r *ActixSQLFormat) ID() string                      { return "GTSS-FW-ACTIX-003" }
+func (r *ActixSQLFormat) ID() string                      { return "BATOU-FW-ACTIX-003" }
 func (r *ActixSQLFormat) Name() string                    { return "ActixSQLFormat" }
 func (r *ActixSQLFormat) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ActixSQLFormat) Description() string {
@@ -222,12 +222,12 @@ func (r *ActixSQLFormat) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ACTIX-004: Session without secure cookie settings
+// BATOU-FW-ACTIX-004: Session without secure cookie settings
 // ---------------------------------------------------------------------------
 
 type ActixInsecureSession struct{}
 
-func (r *ActixInsecureSession) ID() string                      { return "GTSS-FW-ACTIX-004" }
+func (r *ActixInsecureSession) ID() string                      { return "BATOU-FW-ACTIX-004" }
 func (r *ActixInsecureSession) Name() string                    { return "ActixInsecureSession" }
 func (r *ActixInsecureSession) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ActixInsecureSession) Description() string {
@@ -295,12 +295,12 @@ func (r *ActixInsecureSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ACTIX-005: Missing authentication extractor
+// BATOU-FW-ACTIX-005: Missing authentication extractor
 // ---------------------------------------------------------------------------
 
 type ActixMissingAuth struct{}
 
-func (r *ActixMissingAuth) ID() string                      { return "GTSS-FW-ACTIX-005" }
+func (r *ActixMissingAuth) ID() string                      { return "BATOU-FW-ACTIX-005" }
 func (r *ActixMissingAuth) Name() string                    { return "ActixMissingAuth" }
 func (r *ActixMissingAuth) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ActixMissingAuth) Description() string {
@@ -367,12 +367,12 @@ func (r *ActixMissingAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ACTIX-006: Error response exposing internal details
+// BATOU-FW-ACTIX-006: Error response exposing internal details
 // ---------------------------------------------------------------------------
 
 type ActixErrorExposure struct{}
 
-func (r *ActixErrorExposure) ID() string                      { return "GTSS-FW-ACTIX-006" }
+func (r *ActixErrorExposure) ID() string                      { return "BATOU-FW-ACTIX-006" }
 func (r *ActixErrorExposure) Name() string                    { return "ActixErrorExposure" }
 func (r *ActixErrorExposure) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ActixErrorExposure) Description() string {

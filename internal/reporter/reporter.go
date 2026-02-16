@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
-// ScanResult holds the complete results of a GTSS scan.
+// ScanResult holds the complete results of a Batou scan.
 type ScanResult struct {
 	FilePath    string          `json:"file_path"`
 	Language    rules.Language  `json:"language"`
@@ -59,7 +59,7 @@ func FormatForClaude(result *ScanResult) string {
 	var b strings.Builder
 
 	counts := result.CountBySeverity()
-	b.WriteString(fmt.Sprintf("\n--- GTSS Security Scan [%s] ---\n", result.FilePath))
+	b.WriteString(fmt.Sprintf("\n--- Batou Security Scan [%s] ---\n", result.FilePath))
 	b.WriteString(fmt.Sprintf("Language: %s | Findings: %d | Rules checked: %d | Time: %dms\n",
 		result.Language, len(result.Findings), result.RulesRun, result.ScanTimeMs))
 
@@ -87,18 +87,18 @@ func FormatForClaude(result *ScanResult) string {
 		b.WriteString("\nWARNING: High-severity vulnerability detected. Please review and fix.\n")
 	}
 
-	b.WriteString("--- End GTSS Scan ---\n")
+	b.WriteString("--- End Batou Scan ---\n")
 
 	return b.String()
 }
 
 // FormatBlockMessage formats a message for blocking a write via stderr.
-// This is the most important message GTSS produces: it STOPS the write,
+// This is the most important message Batou produces: it STOPS the write,
 // so Claude needs clear guidance on how to rewrite the code.
 func FormatBlockMessage(result *ScanResult) string {
 	var b strings.Builder
 
-	b.WriteString("GTSS BLOCKED WRITE: Critical security vulnerability detected\n\n")
+	b.WriteString("Batou BLOCKED WRITE: Critical security vulnerability detected\n\n")
 
 	for _, f := range result.Findings {
 		if f.Severity >= rules.Critical {

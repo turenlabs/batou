@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/hints"
-	"github.com/turenio/gtss/internal/reporter"
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/hints"
+	"github.com/turenlabs/batou/internal/reporter"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // ---------------------------------------------------------------------------
@@ -308,14 +308,14 @@ func TestFormatForClaudeStructure(t *testing.T) {
 	output := hints.FormatForClaude(ctx, hintList)
 
 	// Verify structure.
-	if !strings.Contains(output, "=== GTSS Security Copilot") {
-		t.Error("expected GTSS Security Copilot header")
+	if !strings.Contains(output, "=== Batou Security Copilot") {
+		t.Error("expected Batou Security Copilot header")
 	}
 	if !strings.Contains(output, "Language: go") {
 		t.Error("expected language in header")
 	}
-	if !strings.Contains(output, "=== End GTSS ===") {
-		t.Error("expected End GTSS footer")
+	if !strings.Contains(output, "=== End Batou ===") {
+		t.Error("expected End Batou footer")
 	}
 	if !strings.Contains(output, "Hint 1") {
 		t.Error("expected at least Hint 1")
@@ -504,7 +504,7 @@ func TestBlockMessageIsActionable(t *testing.T) {
 		Language: rules.LangGo,
 		Findings: []rules.Finding{
 			{
-				RuleID:        "GTSS-INJ-001",
+				RuleID:        "BATOU-INJ-001",
 				Title:         "SQL Injection",
 				Severity:      rules.Critical,
 				FilePath:      "/app/handler.go",
@@ -526,7 +526,7 @@ func TestBlockMessageIsActionable(t *testing.T) {
 		want  string
 	}{
 		{"severity", "CRITICAL"},
-		{"rule ID", "GTSS-INJ-001"},
+		{"rule ID", "BATOU-INJ-001"},
 		{"location", "/app/handler.go:42"},
 		{"vulnerable code snippet", "db.Query"},
 		{"fix suggestion", "parameterized"},
@@ -613,7 +613,7 @@ func TestArchitecturalHintsOnRepeatedPatterns(t *testing.T) {
 	var findings []rules.Finding
 	for i := 0; i < 4; i++ {
 		findings = append(findings, rules.Finding{
-			RuleID:     "GTSS-INJ-001",
+			RuleID:     "BATOU-INJ-001",
 			Title:      "SQL Injection",
 			Severity:   rules.Critical,
 			LineNumber: i + 1,

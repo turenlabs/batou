@@ -1,6 +1,6 @@
 // PSB-A03-CMD-001: Deployment script runner
 // CWE: CWE-78
-// Expected: GTSS-INJ-005, GTSS-INJ-006
+// Expected: BATOU-INJ-005, BATOU-INJ-006
 package main
 
 import (

@@ -7,25 +7,25 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/testutil"
 
 	// Register all rule packages.
-	_ "github.com/turenio/gtss/internal/rules/auth"
-	_ "github.com/turenio/gtss/internal/rules/crypto"
-	_ "github.com/turenio/gtss/internal/rules/generic"
-	_ "github.com/turenio/gtss/internal/rules/injection"
-	_ "github.com/turenio/gtss/internal/rules/logging"
-	_ "github.com/turenio/gtss/internal/rules/memory"
-	_ "github.com/turenio/gtss/internal/rules/secrets"
-	_ "github.com/turenio/gtss/internal/rules/ssrf"
-	_ "github.com/turenio/gtss/internal/rules/traversal"
-	_ "github.com/turenio/gtss/internal/rules/validation"
-	_ "github.com/turenio/gtss/internal/rules/xss"
+	_ "github.com/turenlabs/batou/internal/rules/auth"
+	_ "github.com/turenlabs/batou/internal/rules/crypto"
+	_ "github.com/turenlabs/batou/internal/rules/generic"
+	_ "github.com/turenlabs/batou/internal/rules/injection"
+	_ "github.com/turenlabs/batou/internal/rules/logging"
+	_ "github.com/turenlabs/batou/internal/rules/memory"
+	_ "github.com/turenlabs/batou/internal/rules/secrets"
+	_ "github.com/turenlabs/batou/internal/rules/ssrf"
+	_ "github.com/turenlabs/batou/internal/rules/traversal"
+	_ "github.com/turenlabs/batou/internal/rules/validation"
+	_ "github.com/turenlabs/batou/internal/rules/xss"
 
 	// Taint catalogs.
-	_ "github.com/turenio/gtss/internal/taint"
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/taint"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 // langToFakePath maps bench language directory names to synthetic non-test
@@ -41,7 +41,7 @@ var langToFakePath = map[string]string{
 }
 
 // ruleCategory extracts the category prefix from a rule ID.
-// E.g., "GTSS-INJ-001" -> "INJ", "GTSS-TAINT-sql_query" -> "TAINT".
+// E.g., "BATOU-INJ-001" -> "INJ", "BATOU-TAINT-sql_query" -> "TAINT".
 func ruleCategory(ruleID string) string {
 	parts := strings.Split(ruleID, "-")
 	if len(parts) >= 2 {
@@ -64,7 +64,7 @@ type fpEntry struct {
 // above Low on code that is intentionally safe).
 //
 // This test logs false positives as informational data rather than test
-// failures. It serves as a measurement tool for GTSS's false-positive rate.
+// failures. It serves as a measurement tool for Batou's false-positive rate.
 func TestFalsePositiveBench(t *testing.T) {
 	fixtures := testutil.BenchSafeFixtures(t)
 	if len(fixtures) == 0 {

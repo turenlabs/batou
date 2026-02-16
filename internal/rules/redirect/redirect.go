@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-REDIR-001: Server redirect with user input
+// BATOU-REDIR-001: Server redirect with user input
 var (
 	// Go: http.Redirect with user input variable
 	reGoRedirectUserInput = regexp.MustCompile(`http\.Redirect\s*\([^,]+,[^,]+,\s*[a-zA-Z_]\w*`)
@@ -39,7 +39,7 @@ var (
 	reDjangoRedirect        = regexp.MustCompile(`HttpResponseRedirect\s*\(\s*request\.GET`)
 )
 
-// GTSS-REDIR-002: Bypassable URL allowlist
+// BATOU-REDIR-002: Bypassable URL allowlist
 var (
 	// url.includes("allowed.com") — can be bypassed with "allowed.com.evil.com"
 	reJSURLIncludes       = regexp.MustCompile(`(?:url|href|redirect|target|dest|location|link)\w*\.includes\s*\(\s*['"]`)
@@ -58,11 +58,11 @@ func init() {
 	rules.Register(&BypassableURLAllowlist{})
 }
 
-// --- GTSS-REDIR-001: Server Redirect With User Input ---
+// --- BATOU-REDIR-001: Server Redirect With User Input ---
 
 type ServerRedirectUserInput struct{}
 
-func (r *ServerRedirectUserInput) ID() string                     { return "GTSS-REDIR-001" }
+func (r *ServerRedirectUserInput) ID() string                     { return "BATOU-REDIR-001" }
 func (r *ServerRedirectUserInput) Name() string                   { return "ServerRedirectUserInput" }
 func (r *ServerRedirectUserInput) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ServerRedirectUserInput) Description() string {
@@ -191,11 +191,11 @@ func (r *ServerRedirectUserInput) scanJavaLine(line string, lines []string, idx 
 	return "", ""
 }
 
-// --- GTSS-REDIR-002: Bypassable URL Allowlist ---
+// --- BATOU-REDIR-002: Bypassable URL Allowlist ---
 
 type BypassableURLAllowlist struct{}
 
-func (r *BypassableURLAllowlist) ID() string                     { return "GTSS-REDIR-002" }
+func (r *BypassableURLAllowlist) ID() string                     { return "BATOU-REDIR-002" }
 func (r *BypassableURLAllowlist) Name() string                   { return "BypassableURLAllowlist" }
 func (r *BypassableURLAllowlist) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *BypassableURLAllowlist) Description() string {

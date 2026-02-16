@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-CORS-001: Wildcard origin with credentials
+// BATOU-CORS-001: Wildcard origin with credentials
 var (
 	// Generic: Access-Control-Allow-Origin: *
 	headerAllowOriginStar = regexp.MustCompile(`(?i)Access-Control-Allow-Origin['":\s]+\*`)
@@ -38,7 +38,7 @@ var (
 	goHeaderSetCreds      = regexp.MustCompile(`\.(?:Set|Add)\s*\(\s*["']Access-Control-Allow-Credentials["']\s*,\s*["']true["']`)
 )
 
-// GTSS-CORS-002: Reflected origin without validation
+// BATOU-CORS-002: Reflected origin without validation
 var (
 	// Express: res.header("Access-Control-Allow-Origin", req.headers.origin)
 	jsReflectedOrigin = regexp.MustCompile(`(?:\.header|\.set|\.setHeader)\s*\(\s*['"]Access-Control-Allow-Origin['"]\s*,\s*(?:req\.headers\.origin|req\.header\(['"]origin['"]\)|origin|requestOrigin)`)
@@ -55,11 +55,11 @@ func init() {
 	rules.Register(&CORSReflectedOrigin{})
 }
 
-// --- GTSS-CORS-001: Wildcard Origin with Credentials ---
+// --- BATOU-CORS-001: Wildcard Origin with Credentials ---
 
 type CORSWildcardCredentials struct{}
 
-func (r *CORSWildcardCredentials) ID() string                        { return "GTSS-CORS-001" }
+func (r *CORSWildcardCredentials) ID() string                        { return "BATOU-CORS-001" }
 func (r *CORSWildcardCredentials) Name() string                      { return "CORSWildcardCredentials" }
 func (r *CORSWildcardCredentials) DefaultSeverity() rules.Severity   { return rules.Medium }
 func (r *CORSWildcardCredentials) Languages() []rules.Language {
@@ -201,11 +201,11 @@ func (r *CORSWildcardCredentials) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-CORS-002: Reflected Origin ---
+// --- BATOU-CORS-002: Reflected Origin ---
 
 type CORSReflectedOrigin struct{}
 
-func (r *CORSReflectedOrigin) ID() string                        { return "GTSS-CORS-002" }
+func (r *CORSReflectedOrigin) ID() string                        { return "BATOU-CORS-002" }
 func (r *CORSReflectedOrigin) Name() string                      { return "CORSReflectedOrigin" }
 func (r *CORSReflectedOrigin) DefaultSeverity() rules.Severity   { return rules.High }
 func (r *CORSReflectedOrigin) Languages() []rules.Language {

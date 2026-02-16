@@ -1,8 +1,8 @@
 package tsflow
 
 import (
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // langConfig defines how to interpret tree-sitter AST nodes for a specific language.

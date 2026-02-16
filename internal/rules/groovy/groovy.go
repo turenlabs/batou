@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
@@ -110,7 +110,7 @@ func init() {
 
 type CommandInjection struct{}
 
-func (r *CommandInjection) ID() string                      { return "GTSS-GVY-001" }
+func (r *CommandInjection) ID() string                      { return "BATOU-GVY-001" }
 func (r *CommandInjection) Name() string                    { return "GroovyCommandInjection" }
 func (r *CommandInjection) Description() string             { return "Detects command injection via Groovy's String.execute(), Runtime.exec, or ProcessBuilder with user-controlled input." }
 func (r *CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -177,7 +177,7 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CodeInjection struct{}
 
-func (r *CodeInjection) ID() string                      { return "GTSS-GVY-002" }
+func (r *CodeInjection) ID() string                      { return "BATOU-GVY-002" }
 func (r *CodeInjection) Name() string                    { return "GroovyCodeInjection" }
 func (r *CodeInjection) Description() string             { return "Detects code injection via GroovyShell.evaluate, Eval.me, and GroovyScriptEngine with user-controlled input." }
 func (r *CodeInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -237,7 +237,7 @@ func (r *CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SQLInjection struct{}
 
-func (r *SQLInjection) ID() string                      { return "GTSS-GVY-003" }
+func (r *SQLInjection) ID() string                      { return "BATOU-GVY-003" }
 func (r *SQLInjection) Name() string                    { return "GroovySQLInjection" }
 func (r *SQLInjection) Description() string             { return "Detects SQL injection via GString interpolation or string concatenation in Groovy SQL methods." }
 func (r *SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -309,7 +309,7 @@ func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JenkinsPipelineInjection struct{}
 
-func (r *JenkinsPipelineInjection) ID() string                      { return "GTSS-GVY-004" }
+func (r *JenkinsPipelineInjection) ID() string                      { return "BATOU-GVY-004" }
 func (r *JenkinsPipelineInjection) Name() string                    { return "JenkinsPipelineInjection" }
 func (r *JenkinsPipelineInjection) Description() string             { return "Detects Jenkins pipeline script injection via GString interpolation in sh/bat steps or unsafe load." }
 func (r *JenkinsPipelineInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -372,7 +372,7 @@ func (r *JenkinsPipelineInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type GStringInjection struct{}
 
-func (r *GStringInjection) ID() string                      { return "GTSS-GVY-005" }
+func (r *GStringInjection) ID() string                      { return "BATOU-GVY-005" }
 func (r *GStringInjection) Name() string                    { return "GStringInjection" }
 func (r *GStringInjection) Description() string             { return "Detects GString interpolation used in security-sensitive contexts like SQL, shell commands, or LDAP queries." }
 func (r *GStringInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -437,7 +437,7 @@ func (r *GStringInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GrailsMassAssignment struct{}
 
-func (r *GrailsMassAssignment) ID() string                      { return "GTSS-GVY-006" }
+func (r *GrailsMassAssignment) ID() string                      { return "BATOU-GVY-006" }
 func (r *GrailsMassAssignment) Name() string                    { return "GrailsMassAssignment" }
 func (r *GrailsMassAssignment) Description() string             { return "Detects Grails mass assignment via direct params binding without allowed fields or command objects." }
 func (r *GrailsMassAssignment) DefaultSeverity() rules.Severity { return rules.High }
@@ -500,7 +500,7 @@ func (r *GrailsMassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XXEViaXmlSlurper struct{}
 
-func (r *XXEViaXmlSlurper) ID() string                      { return "GTSS-GVY-007" }
+func (r *XXEViaXmlSlurper) ID() string                      { return "BATOU-GVY-007" }
 func (r *XXEViaXmlSlurper) Name() string                    { return "XXEViaXmlSlurper" }
 func (r *XXEViaXmlSlurper) Description() string             { return "Detects XML parsing via XmlSlurper/XmlParser without disabling external entities (XXE)." }
 func (r *XXEViaXmlSlurper) DefaultSeverity() rules.Severity { return rules.High }
@@ -560,7 +560,7 @@ func (r *XXEViaXmlSlurper) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureDeserialization struct{}
 
-func (r *InsecureDeserialization) ID() string                      { return "GTSS-GVY-008" }
+func (r *InsecureDeserialization) ID() string                      { return "BATOU-GVY-008" }
 func (r *InsecureDeserialization) Name() string                    { return "GroovyInsecureDeserialization" }
 func (r *InsecureDeserialization) Description() string             { return "Detects insecure deserialization via ObjectInputStream, XStream, or SnakeYAML in Groovy context." }
 func (r *InsecureDeserialization) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -621,7 +621,7 @@ func (r *InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JenkinsCredentialsLeak struct{}
 
-func (r *JenkinsCredentialsLeak) ID() string                      { return "GTSS-GVY-009" }
+func (r *JenkinsCredentialsLeak) ID() string                      { return "BATOU-GVY-009" }
 func (r *JenkinsCredentialsLeak) Name() string                    { return "JenkinsCredentialsLeak" }
 func (r *JenkinsCredentialsLeak) Description() string             { return "Detects Jenkins credentials leaked via sh/echo steps or print statements in pipeline scripts." }
 func (r *JenkinsCredentialsLeak) DefaultSeverity() rules.Severity { return rules.High }
@@ -684,7 +684,7 @@ func (r *JenkinsCredentialsLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GrailsXSS struct{}
 
-func (r *GrailsXSS) ID() string                      { return "GTSS-GVY-010" }
+func (r *GrailsXSS) ID() string                      { return "BATOU-GVY-010" }
 func (r *GrailsXSS) Name() string                    { return "GrailsXSS" }
 func (r *GrailsXSS) Description() string             { return "Detects XSS via unescaped output in Grails GSP views using ${} without encodeAsHTML or raw()." }
 func (r *GrailsXSS) DefaultSeverity() rules.Severity { return rules.High }

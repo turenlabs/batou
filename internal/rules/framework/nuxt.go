@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,28 +12,28 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-NUXT-001: v-html directive with user data
+	// BATOU-FW-NUXT-001: v-html directive with user data
 	reNuxtVHtml = regexp.MustCompile(`v-html\s*=\s*["']`)
 
-	// GTSS-FW-NUXT-002: runtimeConfig exposing secrets
+	// BATOU-FW-NUXT-002: runtimeConfig exposing secrets
 	reNuxtPublicRuntime   = regexp.MustCompile(`(?:publicRuntimeConfig|public\s*:\s*\{)`)
 	reNuxtRuntimeSensitive = regexp.MustCompile(`(?i)(?:secret|key|token|password|credential|api_key|apiKey|private|database|db_)`)
 
-	// GTSS-FW-NUXT-003: Server API without authentication
+	// BATOU-FW-NUXT-003: Server API without authentication
 	reNuxtDefineHandler     = regexp.MustCompile(`defineEventHandler\s*\(`)
 	reNuxtDefineHandlerOld  = regexp.MustCompile(`export\s+default\s+defineEventHandler\s*\(`)
 
-	// GTSS-FW-NUXT-004: SSR injection via user-controlled meta/head
+	// BATOU-FW-NUXT-004: SSR injection via user-controlled meta/head
 	reNuxtUseHead       = regexp.MustCompile(`useHead\s*\(\s*\{`)
 	reNuxtUseSeoMeta    = regexp.MustCompile(`useSeoMeta\s*\(\s*\{`)
 	reNuxtHeadDynamic   = regexp.MustCompile(`(?:title|description|innerHTML|content)\s*:\s*(?:route\.|query\.|params\.|req\.|event\.|useRoute)`)
 
-	// GTSS-FW-NUXT-005: Proxy/redirect with user input
+	// BATOU-FW-NUXT-005: Proxy/redirect with user input
 	reNuxtSendRedirect  = regexp.MustCompile(`sendRedirect\s*\(\s*event\s*,\s*(?:query\.|getQuery|getRouterParam|event\.(?:context|node)\.)`)
 	reNuxtProxyRequest  = regexp.MustCompile(`proxyRequest\s*\(\s*event\s*,\s*(?:query\.|getQuery|getRouterParam|event\.)`)
 	reNuxtNavigateTo    = regexp.MustCompile(`navigateTo\s*\(\s*(?:route\.|useRoute|query\.|to\.|params\.)`)
 
-	// GTSS-FW-NUXT-006: Middleware bypass via direct API access
+	// BATOU-FW-NUXT-006: Middleware bypass via direct API access
 	reNuxtMiddlewareDef = regexp.MustCompile(`defineNuxtRouteMiddleware\s*\(`)
 )
 
@@ -47,12 +47,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NUXT-001: v-html directive with user data (XSS)
+// BATOU-FW-NUXT-001: v-html directive with user data (XSS)
 // ---------------------------------------------------------------------------
 
 type NuxtVHtml struct{}
 
-func (r *NuxtVHtml) ID() string                      { return "GTSS-FW-NUXT-001" }
+func (r *NuxtVHtml) ID() string                      { return "BATOU-FW-NUXT-001" }
 func (r *NuxtVHtml) Name() string                    { return "NuxtVHtml" }
 func (r *NuxtVHtml) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NuxtVHtml) Description() string {
@@ -98,12 +98,12 @@ func (r *NuxtVHtml) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NUXT-002: runtimeConfig exposing secrets to client
+// BATOU-FW-NUXT-002: runtimeConfig exposing secrets to client
 // ---------------------------------------------------------------------------
 
 type NuxtPublicRuntimeSecrets struct{}
 
-func (r *NuxtPublicRuntimeSecrets) ID() string                      { return "GTSS-FW-NUXT-002" }
+func (r *NuxtPublicRuntimeSecrets) ID() string                      { return "BATOU-FW-NUXT-002" }
 func (r *NuxtPublicRuntimeSecrets) Name() string                    { return "NuxtPublicRuntimeSecrets" }
 func (r *NuxtPublicRuntimeSecrets) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NuxtPublicRuntimeSecrets) Description() string {
@@ -171,12 +171,12 @@ func (r *NuxtPublicRuntimeSecrets) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NUXT-003: Nuxt server API without authentication
+// BATOU-FW-NUXT-003: Nuxt server API without authentication
 // ---------------------------------------------------------------------------
 
 type NuxtServerAPINoAuth struct{}
 
-func (r *NuxtServerAPINoAuth) ID() string                      { return "GTSS-FW-NUXT-003" }
+func (r *NuxtServerAPINoAuth) ID() string                      { return "BATOU-FW-NUXT-003" }
 func (r *NuxtServerAPINoAuth) Name() string                    { return "NuxtServerAPINoAuth" }
 func (r *NuxtServerAPINoAuth) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NuxtServerAPINoAuth) Description() string {
@@ -235,12 +235,12 @@ func (r *NuxtServerAPINoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NUXT-004: SSR injection via user-controlled meta/head
+// BATOU-FW-NUXT-004: SSR injection via user-controlled meta/head
 // ---------------------------------------------------------------------------
 
 type NuxtSSRInjection struct{}
 
-func (r *NuxtSSRInjection) ID() string                      { return "GTSS-FW-NUXT-004" }
+func (r *NuxtSSRInjection) ID() string                      { return "BATOU-FW-NUXT-004" }
 func (r *NuxtSSRInjection) Name() string                    { return "NuxtSSRInjection" }
 func (r *NuxtSSRInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NuxtSSRInjection) Description() string {
@@ -291,12 +291,12 @@ func (r *NuxtSSRInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NUXT-005: Proxy/redirect with user input
+// BATOU-FW-NUXT-005: Proxy/redirect with user input
 // ---------------------------------------------------------------------------
 
 type NuxtOpenRedirect struct{}
 
-func (r *NuxtOpenRedirect) ID() string                      { return "GTSS-FW-NUXT-005" }
+func (r *NuxtOpenRedirect) ID() string                      { return "BATOU-FW-NUXT-005" }
 func (r *NuxtOpenRedirect) Name() string                    { return "NuxtOpenRedirect" }
 func (r *NuxtOpenRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NuxtOpenRedirect) Description() string {
@@ -355,12 +355,12 @@ func (r *NuxtOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NUXT-006: Middleware bypass via direct API access
+// BATOU-FW-NUXT-006: Middleware bypass via direct API access
 // ---------------------------------------------------------------------------
 
 type NuxtMiddlewareBypass struct{}
 
-func (r *NuxtMiddlewareBypass) ID() string                      { return "GTSS-FW-NUXT-006" }
+func (r *NuxtMiddlewareBypass) ID() string                      { return "BATOU-FW-NUXT-006" }
 func (r *NuxtMiddlewareBypass) Name() string                    { return "NuxtMiddlewareBypass" }
 func (r *NuxtMiddlewareBypass) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NuxtMiddlewareBypass) Description() string {

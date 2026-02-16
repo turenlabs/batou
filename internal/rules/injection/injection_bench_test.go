@@ -4,14 +4,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 
 	// Register injection rules.
-	_ "github.com/turenio/gtss/internal/rules/injection"
+	_ "github.com/turenlabs/batou/internal/rules/injection"
 )
 
 // sqlParts holds SQL fragments assembled at runtime to avoid triggering
-// the GTSS security hook on this test file.
+// the Batou security hook on this test file.
 var sqlParts = []string{
 	"SEL", "ECT * FR", "OM users WH", "ERE name = '%s'",
 }
@@ -54,13 +54,13 @@ func BenchmarkSQLInjectionRule(b *testing.B) {
 	applicable := rules.ForLanguage(rules.LangGo)
 	var sqlRule rules.Rule
 	for _, r := range applicable {
-		if r.ID() == "GTSS-INJ-001" {
+		if r.ID() == "BATOU-INJ-001" {
 			sqlRule = r
 			break
 		}
 	}
 	if sqlRule == nil {
-		b.Fatal("GTSS-INJ-001 rule not found")
+		b.Fatal("BATOU-INJ-001 rule not found")
 	}
 
 	b.ReportAllocs()
@@ -82,13 +82,13 @@ func BenchmarkCommandInjectionRule(b *testing.B) {
 	applicable := rules.ForLanguage(rules.LangGo)
 	var cmdRule rules.Rule
 	for _, r := range applicable {
-		if r.ID() == "GTSS-INJ-002" {
+		if r.ID() == "BATOU-INJ-002" {
 			cmdRule = r
 			break
 		}
 	}
 	if cmdRule == nil {
-		b.Fatal("GTSS-INJ-002 rule not found")
+		b.Fatal("BATOU-INJ-002 rule not found")
 	}
 
 	b.ReportAllocs()

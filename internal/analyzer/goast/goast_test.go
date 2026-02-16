@@ -3,7 +3,7 @@ package goast
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanGo(code string) []rules.Finding {
@@ -36,7 +36,7 @@ func countByRule(findings []rules.Finding, ruleID string) int {
 }
 
 // =========================================================================
-// GTSS-AST-001: UnsafePackageUsage
+// BATOU-AST-001: UnsafePackageUsage
 // =========================================================================
 
 func TestAST001_UnsafeImport(t *testing.T) {
@@ -47,7 +47,7 @@ import "unsafe"
 func main() {}
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-001")
+	f := findByRule(findings, "BATOU-AST-001")
 	if f == nil {
 		t.Error("expected finding for unsafe import")
 	}
@@ -64,7 +64,7 @@ func cast(p *int) {
 }
 `
 	findings := scanGo(code)
-	count := countByRule(findings, "GTSS-AST-001")
+	count := countByRule(findings, "BATOU-AST-001")
 	if count < 2 {
 		t.Errorf("expected at least 2 AST-001 findings (import + usage), got %d", count)
 		for _, f := range findings {
@@ -84,7 +84,7 @@ func cast(p *int) {
 }
 `
 	findings := scanGo(code)
-	count := countByRule(findings, "GTSS-AST-001")
+	count := countByRule(findings, "BATOU-AST-001")
 	if count < 2 {
 		t.Errorf("expected at least 2 AST-001 findings for aliased unsafe, got %d", count)
 	}
@@ -100,14 +100,14 @@ func main() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-001")
+	f := findByRule(findings, "BATOU-AST-001")
 	if f != nil {
 		t.Error("should not flag code without unsafe import")
 	}
 }
 
 // =========================================================================
-// GTSS-AST-002: SQLStringConcat
+// BATOU-AST-002: SQLStringConcat
 // =========================================================================
 
 func TestAST002_QueryWithConcat(t *testing.T) {
@@ -120,7 +120,7 @@ func getUser(db *sql.DB, name string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-002")
+	f := findByRule(findings, "BATOU-AST-002")
 	if f == nil {
 		t.Error("expected finding for SQL string concatenation in db.Query")
 		for _, f := range findings {
@@ -142,7 +142,7 @@ func deleteUser(db *sql.DB, id string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-002")
+	f := findByRule(findings, "BATOU-AST-002")
 	if f == nil {
 		t.Error("expected finding for SQL fmt.Sprintf in db.Exec")
 		for _, f := range findings {
@@ -165,7 +165,7 @@ func getUser(db *sql.DB, ctx context.Context, name string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-002")
+	f := findByRule(findings, "BATOU-AST-002")
 	if f == nil {
 		t.Error("expected finding for SQL fmt.Sprintf in db.QueryContext")
 	}
@@ -181,7 +181,7 @@ func getUser(db *sql.DB, name string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-002")
+	f := findByRule(findings, "BATOU-AST-002")
 	if f != nil {
 		t.Error("should not flag parameterized query")
 	}
@@ -197,14 +197,14 @@ func getUsers(db *sql.DB) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-002")
+	f := findByRule(findings, "BATOU-AST-002")
 	if f != nil {
 		t.Error("should not flag literal-only string concatenation")
 	}
 }
 
 // =========================================================================
-// GTSS-AST-003: ExecCommandInjection
+// BATOU-AST-003: ExecCommandInjection
 // =========================================================================
 
 func TestAST003_ShellExec(t *testing.T) {
@@ -217,7 +217,7 @@ func run(cmd string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-003")
+	f := findByRule(findings, "BATOU-AST-003")
 	if f == nil {
 		t.Error("expected finding for exec.Command shell injection")
 	}
@@ -233,7 +233,7 @@ func run(cmd string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-003")
+	f := findByRule(findings, "BATOU-AST-003")
 	if f == nil {
 		t.Error("expected finding for exec.Command with /bin/bash")
 	}
@@ -249,7 +249,7 @@ func run(program string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-003")
+	f := findByRule(findings, "BATOU-AST-003")
 	if f == nil {
 		t.Error("expected finding for variable command name")
 	}
@@ -265,7 +265,7 @@ func run(arg string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-003")
+	f := findByRule(findings, "BATOU-AST-003")
 	if f == nil {
 		t.Error("expected finding for variable arguments to exec.Command")
 	}
@@ -281,14 +281,14 @@ func run() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-003")
+	f := findByRule(findings, "BATOU-AST-003")
 	if f != nil {
 		t.Error("should not flag exec.Command with all literal args")
 	}
 }
 
 // =========================================================================
-// GTSS-AST-004: UncheckedError
+// BATOU-AST-004: UncheckedError
 // =========================================================================
 
 func TestAST004_BlankError(t *testing.T) {
@@ -301,7 +301,7 @@ func handler() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-004")
+	f := findByRule(findings, "BATOU-AST-004")
 	if f == nil {
 		t.Error("expected finding for unchecked error from os.Open")
 	}
@@ -317,7 +317,7 @@ func main() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-004")
+	f := findByRule(findings, "BATOU-AST-004")
 	if f == nil {
 		t.Error("expected finding for discarded return from http.ListenAndServe")
 	}
@@ -338,14 +338,14 @@ func handler() error {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-004")
+	f := findByRule(findings, "BATOU-AST-004")
 	if f != nil {
 		t.Error("should not flag properly checked error")
 	}
 }
 
 // =========================================================================
-// GTSS-AST-005: DeprecatedCrypto
+// BATOU-AST-005: DeprecatedCrypto
 // =========================================================================
 
 func TestAST005_CryptoDES(t *testing.T) {
@@ -358,7 +358,7 @@ func encrypt() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-005")
+	f := findByRule(findings, "BATOU-AST-005")
 	if f == nil {
 		t.Error("expected finding for crypto/des import")
 	}
@@ -374,7 +374,7 @@ func encrypt() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-005")
+	f := findByRule(findings, "BATOU-AST-005")
 	if f == nil {
 		t.Error("expected finding for crypto/rc4 import")
 	}
@@ -390,7 +390,7 @@ func hash() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-005")
+	f := findByRule(findings, "BATOU-AST-005")
 	if f == nil {
 		t.Error("expected finding for crypto/md5 import")
 	}
@@ -406,7 +406,7 @@ func hash() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-005")
+	f := findByRule(findings, "BATOU-AST-005")
 	if f == nil {
 		t.Error("expected finding for crypto/sha1 import")
 	}
@@ -422,7 +422,7 @@ func token() int {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-005")
+	f := findByRule(findings, "BATOU-AST-005")
 	if f == nil {
 		t.Error("expected finding for math/rand without crypto/rand")
 	}
@@ -444,7 +444,7 @@ func token() {
 	findings := scanGo(code)
 	// Should not flag math/rand when crypto/rand is also imported
 	for _, f := range findings {
-		if f.RuleID == "GTSS-AST-005" && f.Title == "Non-cryptographic random number generator without crypto/rand" {
+		if f.RuleID == "BATOU-AST-005" && f.Title == "Non-cryptographic random number generator without crypto/rand" {
 			t.Error("should not flag math/rand when crypto/rand is also imported")
 		}
 	}
@@ -460,14 +460,14 @@ func encrypt() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-005")
+	f := findByRule(findings, "BATOU-AST-005")
 	if f != nil {
 		t.Error("should not flag crypto/aes")
 	}
 }
 
 // =========================================================================
-// GTSS-AST-006: HttpServerMisconfig
+// BATOU-AST-006: HttpServerMisconfig
 // =========================================================================
 
 func TestAST006_ListenAndServeNoTLS(t *testing.T) {
@@ -480,7 +480,7 @@ func main() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-006")
+	f := findByRule(findings, "BATOU-AST-006")
 	if f == nil {
 		t.Error("expected finding for http.ListenAndServe without TLS")
 	}
@@ -499,7 +499,7 @@ func main() {
 }
 `
 	findings := scanGo(code)
-	count := countByRule(findings, "GTSS-AST-006")
+	count := countByRule(findings, "BATOU-AST-006")
 	if count == 0 {
 		t.Error("expected finding for http.Server missing timeouts")
 		for _, f := range findings {
@@ -529,7 +529,7 @@ func main() {
 	findings := scanGo(code)
 	// Should not flag server with all timeouts set
 	for _, f := range findings {
-		if f.RuleID == "GTSS-AST-006" && f.Title == "HTTP server missing timeout configuration" {
+		if f.RuleID == "BATOU-AST-006" && f.Title == "HTTP server missing timeout configuration" {
 			t.Error("should not flag http.Server with all timeouts configured")
 		}
 	}
@@ -555,14 +555,14 @@ func main() {
 `
 	findings := scanGo(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-AST-006" && f.Title == "HTTP server missing timeout configuration" {
+		if f.RuleID == "BATOU-AST-006" && f.Title == "HTTP server missing timeout configuration" {
 			t.Error("should not flag server with ReadHeaderTimeout as alternative to ReadTimeout")
 		}
 	}
 }
 
 // =========================================================================
-// GTSS-AST-007: DeferInLoop
+// BATOU-AST-007: DeferInLoop
 // =========================================================================
 
 func TestAST007_DeferInForLoop(t *testing.T) {
@@ -578,7 +578,7 @@ func processFiles(paths []string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-007")
+	f := findByRule(findings, "BATOU-AST-007")
 	if f == nil {
 		t.Error("expected finding for defer inside for loop")
 	}
@@ -597,7 +597,7 @@ func processFiles(paths []string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-007")
+	f := findByRule(findings, "BATOU-AST-007")
 	if f == nil {
 		t.Error("expected finding for defer inside range loop")
 	}
@@ -618,7 +618,7 @@ func processFiles(paths []string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-007")
+	f := findByRule(findings, "BATOU-AST-007")
 	if f == nil {
 		t.Error("expected finding for defer inside if inside loop")
 	}
@@ -635,7 +635,7 @@ func handler() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-007")
+	f := findByRule(findings, "BATOU-AST-007")
 	if f != nil {
 		t.Error("should not flag defer outside of loop")
 	}
@@ -656,14 +656,14 @@ func processFiles(paths []string) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-007")
+	f := findByRule(findings, "BATOU-AST-007")
 	if f != nil {
 		t.Error("should not flag defer inside closure within loop")
 	}
 }
 
 // =========================================================================
-// GTSS-AST-008: GoroutineLeak
+// BATOU-AST-008: GoroutineLeak
 // =========================================================================
 
 func TestAST008_GoroutineNoContext(t *testing.T) {
@@ -676,7 +676,7 @@ func handler() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-008")
+	f := findByRule(findings, "BATOU-AST-008")
 	if f == nil {
 		t.Error("expected finding for goroutine without context")
 	}
@@ -690,7 +690,7 @@ func handler() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-008")
+	f := findByRule(findings, "BATOU-AST-008")
 	if f == nil {
 		t.Error("expected finding for go doWork() without context argument")
 	}
@@ -708,7 +708,7 @@ func handler(ctx context.Context) {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-008")
+	f := findByRule(findings, "BATOU-AST-008")
 	if f != nil {
 		t.Error("should not flag goroutine with context.Context parameter")
 	}
@@ -727,7 +727,7 @@ func handler() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-008")
+	f := findByRule(findings, "BATOU-AST-008")
 	if f != nil {
 		t.Error("should not flag goroutine that captures ctx variable")
 	}
@@ -744,7 +744,7 @@ func handler() {
 }
 `
 	findings := scanGo(code)
-	f := findByRule(findings, "GTSS-AST-008")
+	f := findByRule(findings, "BATOU-AST-008")
 	if f != nil {
 		t.Error("should not flag go doWork(ctx)")
 	}

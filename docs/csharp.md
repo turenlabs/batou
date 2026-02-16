@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for C# code, covering ASP.NET Core web applications, Entity Framework, Razor views, Blazor components, System.DirectoryServices (LDAP), and common .NET libraries. Analysis includes four layers: regex-based pattern rules (348 rules, including 10 C#-specific plus cross-language rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
+Batou provides comprehensive security scanning for C# code, covering ASP.NET Core web applications, Entity Framework, Razor views, Blazor components, System.DirectoryServices (LDAP), and common .NET libraries. Analysis includes four layers: regex-based pattern rules (348 rules, including 10 C#-specific plus cross-language rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
 
 C# taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through variable declarations, assignments, and invocation expressions by walking the parsed AST. The walker handles C#-specific patterns such as `equals_value_clause` initializers in variable declarations.
 
@@ -257,16 +257,16 @@ Rules in `internal/rules/csharp/csharp.go` that target C#-specific patterns.
 
 | Rule ID | Name | Severity | What It Detects |
 |---|---|---|---|
-| `GTSS-CS-001` | CSharpSQLInjection | Critical | SQL injection via `SqlCommand`, `CommandText`, `FromSqlRaw`, `ExecuteSqlRaw` with string concatenation or interpolation |
-| `GTSS-CS-003` | CSharpInsecureDeserialization | Critical | `BinaryFormatter`, `SoapFormatter`, `NetDataContractSerializer`, `LosFormatter`, `ObjectStateFormatter` deserialization; `JavaScriptSerializer` with `SimpleTypeResolver`; JSON.NET `TypeNameHandling.All/Auto/Objects/Arrays` |
-| `GTSS-CS-004` | CSharpCommandInjection | Critical | `Process.Start` with variable arguments, `ProcessStartInfo.FileName`/`Arguments` with dynamic values |
-| `GTSS-CS-005` | CSharpPathTraversal | High | `File.*`/`Directory.*` operations and `Path.Combine` with user-controlled paths in ASP.NET controllers |
-| `GTSS-CS-006` | CSharpLDAPInjection | High | `DirectorySearcher.Filter` with string concatenation or interpolation |
-| `GTSS-CS-008` | CSharpHardcodedConnectionString | High | Connection strings with embedded `Password=` or `Pwd=` in source code |
-| `GTSS-CS-009` | CSharpInsecureCookie | Medium | `CookieOptions` missing `Secure`, `HttpOnly`, or `SameSite` flags |
-| `GTSS-CS-010` | CSharpCORSMisconfiguration | Medium | `AllowAnyOrigin()` with `AllowCredentials()`, `WithOrigins("*")` wildcard |
-| `GTSS-CS-011` | CSharpBlazorJSInteropInjection | High | `JSRuntime.InvokeAsync` with `eval` or string interpolation in function name |
-| `GTSS-CS-012` | CSharpMassAssignment | High | `TryUpdateModelAsync<T>` without specifying included properties |
+| `BATOU-CS-001` | CSharpSQLInjection | Critical | SQL injection via `SqlCommand`, `CommandText`, `FromSqlRaw`, `ExecuteSqlRaw` with string concatenation or interpolation |
+| `BATOU-CS-003` | CSharpInsecureDeserialization | Critical | `BinaryFormatter`, `SoapFormatter`, `NetDataContractSerializer`, `LosFormatter`, `ObjectStateFormatter` deserialization; `JavaScriptSerializer` with `SimpleTypeResolver`; JSON.NET `TypeNameHandling.All/Auto/Objects/Arrays` |
+| `BATOU-CS-004` | CSharpCommandInjection | Critical | `Process.Start` with variable arguments, `ProcessStartInfo.FileName`/`Arguments` with dynamic values |
+| `BATOU-CS-005` | CSharpPathTraversal | High | `File.*`/`Directory.*` operations and `Path.Combine` with user-controlled paths in ASP.NET controllers |
+| `BATOU-CS-006` | CSharpLDAPInjection | High | `DirectorySearcher.Filter` with string concatenation or interpolation |
+| `BATOU-CS-008` | CSharpHardcodedConnectionString | High | Connection strings with embedded `Password=` or `Pwd=` in source code |
+| `BATOU-CS-009` | CSharpInsecureCookie | Medium | `CookieOptions` missing `Secure`, `HttpOnly`, or `SameSite` flags |
+| `BATOU-CS-010` | CSharpCORSMisconfiguration | Medium | `AllowAnyOrigin()` with `AllowCredentials()`, `WithOrigins("*")` wildcard |
+| `BATOU-CS-011` | CSharpBlazorJSInteropInjection | High | `JSRuntime.InvokeAsync` with `eval` or string interpolation in function name |
+| `BATOU-CS-012` | CSharpMassAssignment | High | `TryUpdateModelAsync<T>` without specifying included properties |
 
 ### Cross-Language Rules Covering C#
 
@@ -274,34 +274,34 @@ Rules from other categories that include `LangCSharp` in their language list.
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-INJ-001` | SQLInjection | General SQL injection via string concatenation |
-| `GTSS-INJ-002` | CommandInjection | General command injection patterns |
-| `GTSS-INJ-004` | LDAPInjection | General LDAP filter concatenation |
-| `GTSS-INJ-006` | XPathInjection | XPath queries with string concatenation |
-| `GTSS-XXE-004` | CSharpXXE | `XmlTextReader`, `XmlReader.Create` without `DtdProcessing.Prohibit` |
-| `GTSS-XSS-008` | ServerSideRenderingXSS | `Html.Raw()` in Razor views |
-| `GTSS-DESER-001` | ExtendedDeserialization | `BinaryFormatter`, `LosFormatter`, `SoapFormatter`, `NetDataContractSerializer`, `ObjectStateFormatter`, JSON.NET `TypeNameHandling` |
+| `BATOU-INJ-001` | SQLInjection | General SQL injection via string concatenation |
+| `BATOU-INJ-002` | CommandInjection | General command injection patterns |
+| `BATOU-INJ-004` | LDAPInjection | General LDAP filter concatenation |
+| `BATOU-INJ-006` | XPathInjection | XPath queries with string concatenation |
+| `BATOU-XXE-004` | CSharpXXE | `XmlTextReader`, `XmlReader.Create` without `DtdProcessing.Prohibit` |
+| `BATOU-XSS-008` | ServerSideRenderingXSS | `Html.Raw()` in Razor views |
+| `BATOU-DESER-001` | ExtendedDeserialization | `BinaryFormatter`, `LosFormatter`, `SoapFormatter`, `NetDataContractSerializer`, `ObjectStateFormatter`, JSON.NET `TypeNameHandling` |
 
 ### Additional LangAny Rules
 
 All rules with `LangAny` apply to C# files. Key categories include:
 
-- **Secrets**: `GTSS-SEC-001` through `GTSS-SEC-006` (hardcoded passwords, API keys, private keys, connection strings, JWT secrets)
-- **Traversal**: `GTSS-TRV-001`, `GTSS-TRV-003`, `GTSS-TRV-008` (path traversal, archive extraction, null byte)
-- **SSRF**: `GTSS-SSRF-001`, `GTSS-SSRF-002` (URL from user input, internal network access)
-- **Authentication**: `GTSS-AUTH-001`, `GTSS-AUTH-003`, `GTSS-AUTH-005`, `GTSS-AUTH-007` (hardcoded credentials, CORS wildcard, weak passwords, privilege escalation patterns)
-- **Generic**: `GTSS-GEN-001` through `GTSS-GEN-005`, `GTSS-GEN-012` (debug mode, deserialization, XXE, open redirect, log injection, insecure download patterns)
-- **Misconfiguration**: `GTSS-MISC-003` (missing security headers)
-- **Validation**: `GTSS-VAL-005` (file upload hardening)
+- **Secrets**: `BATOU-SEC-001` through `BATOU-SEC-006` (hardcoded passwords, API keys, private keys, connection strings, JWT secrets)
+- **Traversal**: `BATOU-TRV-001`, `BATOU-TRV-003`, `BATOU-TRV-008` (path traversal, archive extraction, null byte)
+- **SSRF**: `BATOU-SSRF-001`, `BATOU-SSRF-002` (URL from user input, internal network access)
+- **Authentication**: `BATOU-AUTH-001`, `BATOU-AUTH-003`, `BATOU-AUTH-005`, `BATOU-AUTH-007` (hardcoded credentials, CORS wildcard, weak passwords, privilege escalation patterns)
+- **Generic**: `BATOU-GEN-001` through `BATOU-GEN-005`, `BATOU-GEN-012` (debug mode, deserialization, XXE, open redirect, log injection, insecure download patterns)
+- **Misconfiguration**: `BATOU-MISC-003` (missing security headers)
+- **Validation**: `BATOU-VAL-005` (file upload hardening)
 
 ## Example Detections
 
 ### SQL Injection via Entity Framework FromSqlRaw
 
-GTSS flags `FromSqlRaw()` with string interpolation instead of the safe `FromSqlInterpolated()`:
+Batou flags `FromSqlRaw()` with string interpolation instead of the safe `FromSqlInterpolated()`:
 
 ```csharp
-// DETECTED: GTSS-CS-001 + taint flow csharp.fromquery -> csharp.ef.fromsqlraw
+// DETECTED: BATOU-CS-001 + taint flow csharp.fromquery -> csharp.ef.fromsqlraw
 [HttpGet("search")]
 public IActionResult Search([FromQuery] string email)
 {
@@ -313,10 +313,10 @@ public IActionResult Search([FromQuery] string email)
 
 ### Insecure Deserialization with BinaryFormatter
 
-GTSS detects use of `BinaryFormatter` which Microsoft recommends against for untrusted data:
+Batou detects use of `BinaryFormatter` which Microsoft recommends against for untrusted data:
 
 ```csharp
-// DETECTED: GTSS-CS-003
+// DETECTED: BATOU-CS-003
 [HttpPost("import")]
 public IActionResult Import()
 {
@@ -328,10 +328,10 @@ public IActionResult Import()
 
 ### Blazor JS Interop Injection
 
-GTSS catches `eval` calls through JSRuntime which can lead to XSS:
+Batou catches `eval` calls through JSRuntime which can lead to XSS:
 
 ```csharp
-// DETECTED: GTSS-CS-011
+// DETECTED: BATOU-CS-011
 public async Task ExecuteCode(string userCode)
 {
     await JSRuntime.InvokeAsync<string>("eval", userCode);
@@ -340,10 +340,10 @@ public async Task ExecuteCode(string userCode)
 
 ### CORS Misconfiguration
 
-GTSS detects `AllowAnyOrigin()` combined with `AllowCredentials()`:
+Batou detects `AllowAnyOrigin()` combined with `AllowCredentials()`:
 
 ```csharp
-// DETECTED: GTSS-CS-010
+// DETECTED: BATOU-CS-010
 services.AddCors(options =>
 {
     options.AddPolicy("MyPolicy", builder =>
@@ -359,7 +359,7 @@ services.AddCors(options =>
 
 ### Parameterized SQL with SqlParameter
 
-GTSS recognizes `SqlParameter` as a sanitizer that neutralizes SQL injection:
+Batou recognizes `SqlParameter` as a sanitizer that neutralizes SQL injection:
 
 ```csharp
 // SAFE: SqlParameter neutralizes SQL injection
@@ -370,7 +370,7 @@ cmd.ExecuteReader();
 
 ### Entity Framework FromSqlInterpolated
 
-GTSS recognizes `FromSqlInterpolated()` as safe (it auto-parameterizes):
+Batou recognizes `FromSqlInterpolated()` as safe (it auto-parameterizes):
 
 ```csharp
 // SAFE: FromSqlInterpolated handles parameterization automatically
@@ -381,7 +381,7 @@ var users = _context.Users
 
 ### Path Traversal Prevention with GetFileName
 
-GTSS recognizes `Path.GetFileName()` as a sanitizer for file path operations:
+Batou recognizes `Path.GetFileName()` as a sanitizer for file path operations:
 
 ```csharp
 // SAFE: Path.GetFileName strips directory components
@@ -392,7 +392,7 @@ var content = File.ReadAllText(path);
 
 ### Secure Cookie Configuration
 
-GTSS does not flag cookies with all security flags set:
+Batou does not flag cookies with all security flags set:
 
 ```csharp
 // SAFE: all security flags present

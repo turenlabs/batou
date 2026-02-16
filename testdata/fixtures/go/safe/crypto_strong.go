@@ -10,7 +10,7 @@ import (
 )
 
 // SAFE: Strong cryptographic hash (bcrypt) and secure random (crypto/rand).
-// Should NOT trigger GTSS-CRY-001 or GTSS-CRY-002.
+// Should NOT trigger BATOU-CRY-001 or BATOU-CRY-002.
 
 func HandleRegister(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")

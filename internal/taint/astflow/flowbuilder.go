@@ -1,6 +1,6 @@
 package astflow
 
-import "github.com/turenio/gtss/internal/taint"
+import "github.com/turenlabs/batou/internal/taint"
 
 // FlowBuilder accumulates taint flows detected during analysis.
 type FlowBuilder struct {

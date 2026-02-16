@@ -1,0 +1,897 @@
+{
+  "nodes": {
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/CommandSafe.cs:PingHost": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/CommandSafe.cs:PingHost",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/CommandSafe.cs",
+      "name": "PingHost",
+      "package": "",
+      "start_line": 14,
+      "end_line": 31,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/CommandSafe.cs:PingHost"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "23cc7e67fc429700",
+      "last_scan_at": "2026-02-13T11:30:11.409019-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/PathSafe.cs:ReadFile": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/PathSafe.cs:ReadFile",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/PathSafe.cs",
+      "name": "ReadFile",
+      "package": "",
+      "start_line": 15,
+      "end_line": 29,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/PathSafe.cs:ReadFile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "ecd683b13e9da422",
+      "last_scan_at": "2026-02-13T11:30:11.417321-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/PathSafe.cs:WriteFile": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/PathSafe.cs:WriteFile",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/PathSafe.cs",
+      "name": "WriteFile",
+      "package": "",
+      "start_line": 33,
+      "end_line": 38,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/PathSafe.cs:WriteFile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "31d222b8cbd3f9c1",
+      "last_scan_at": "2026-02-13T11:30:11.417365-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:DeleteUser": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:DeleteUser",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs",
+      "name": "DeleteUser",
+      "package": "",
+      "start_line": 45,
+      "end_line": 49,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:DeleteUser"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "de34ab111d33f0c4",
+      "last_scan_at": "2026-02-13T11:30:11.404537-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:FindUser": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:FindUser",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs",
+      "name": "FindUser",
+      "package": "",
+      "start_line": 35,
+      "end_line": 41,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:FindUser"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "ef8d8f66f977f9e3",
+      "last_scan_at": "2026-02-13T11:30:11.404515-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:SearchUsers": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:SearchUsers",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs",
+      "name": "SearchUsers",
+      "package": "",
+      "start_line": 23,
+      "end_line": 31,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:SearchUsers"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "6eab4308d1d6342e",
+      "last_scan_at": "2026-02-13T11:30:11.404477-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:UsersController": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:UsersController",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs",
+      "name": "UsersController",
+      "package": "",
+      "start_line": 15,
+      "end_line": 19,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/safe/SqliParameterized.cs:UsersController"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "168a91bb96365f76",
+      "last_scan_at": "2026-02-13T11:30:11.404458-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/CommandInjection.cs:PingHost": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/CommandInjection.cs:PingHost",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/CommandInjection.cs",
+      "name": "PingHost",
+      "package": "",
+      "start_line": 13,
+      "end_line": 17,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/CommandInjection.cs:PingHost"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "28b02b27357957de",
+      "last_scan_at": "2026-02-13T11:30:11.406783-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/CommandInjection.cs:RunCommand": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/CommandInjection.cs:RunCommand",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/CommandInjection.cs",
+      "name": "RunCommand",
+      "package": "",
+      "start_line": 21,
+      "end_line": 32,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/CommandInjection.cs:RunCommand"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "281038b12f3e549c",
+      "last_scan_at": "2026-02-13T11:30:11.406801-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs:DeleteFile": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs:DeleteFile",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs",
+      "name": "DeleteFile",
+      "package": "",
+      "start_line": 31,
+      "end_line": 35,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs:DeleteFile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "cafecee0da6cd3e8",
+      "last_scan_at": "2026-02-13T11:30:11.414761-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs:ReadFile": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs:ReadFile",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs",
+      "name": "ReadFile",
+      "package": "",
+      "start_line": 13,
+      "end_line": 18,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs:ReadFile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "9e9470267c618b23",
+      "last_scan_at": "2026-02-13T11:30:11.414714-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs:WriteFile": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs:WriteFile",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs",
+      "name": "WriteFile",
+      "package": "",
+      "start_line": 22,
+      "end_line": 27,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/PathTraversal.cs:WriteFile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "3fd219cb8b84d5a2",
+      "last_scan_at": "2026-02-13T11:30:11.414737-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:DeleteUser": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:DeleteUser",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs",
+      "name": "DeleteUser",
+      "package": "",
+      "start_line": 44,
+      "end_line": 49,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:DeleteUser"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "cba262fac19c295b",
+      "last_scan_at": "2026-02-13T11:30:11.402307-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:FindUser": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:FindUser",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs",
+      "name": "FindUser",
+      "package": "",
+      "start_line": 35,
+      "end_line": 40,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:FindUser"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "716787167e2d01a9",
+      "last_scan_at": "2026-02-13T11:30:11.402284-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:SearchUsers": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:SearchUsers",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs",
+      "name": "SearchUsers",
+      "package": "",
+      "start_line": 23,
+      "end_line": 31,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:SearchUsers"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "b6b3bfbb9b2144cf",
+      "last_scan_at": "2026-02-13T11:30:11.402068-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:UsersController": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:UsersController",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs",
+      "name": "UsersController",
+      "package": "",
+      "start_line": 15,
+      "end_line": 19,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/SqlInjection.cs:UsersController"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "168a91bb96365f76",
+      "last_scan_at": "2026-02-13T11:30:11.402049-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs:Greet": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs:Greet",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs",
+      "name": "Greet",
+      "package": "",
+      "start_line": 31,
+      "end_line": 34,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs:Greet"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "50a6a59dd22a017b",
+      "last_scan_at": "2026-02-13T11:30:11.411511-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs:Profile": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs:Profile",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs",
+      "name": "Profile",
+      "package": "",
+      "start_line": 22,
+      "end_line": 27,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs:Profile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "fcbb35abc09df235",
+      "last_scan_at": "2026-02-13T11:30:11.411488-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs:SearchAsync": {
+      "id": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs:SearchAsync",
+      "file_path": "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs",
+      "name": "SearchAsync",
+      "package": "",
+      "start_line": 13,
+      "end_line": 18,
+      "calls": [],
+      "called_by": [
+        "/Users/tbowyer/turen/Code/turen-blogs/gtss/testdata/fixtures/csharp/vulnerable/XssReflected.cs:SearchAsync"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "f4bfa37348441a7b",
+      "last_scan_at": "2026-02-13T11:30:11.411463-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/AccountController.cs:Login": {
+      "id": "/app/AccountController.cs:Login",
+      "file_path": "/app/AccountController.cs",
+      "name": "Login",
+      "package": "",
+      "start_line": 4,
+      "end_line": 8,
+      "calls": [
+        "/app/AccountController.cs:Login"
+      ],
+      "called_by": [
+        "/app/AccountController.cs:Login"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "0f4e4718fc9143bc",
+      "last_scan_at": "2026-02-16T15:25:32.864678-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/ApiClient.cs:ApiClient": {
+      "id": "/app/ApiClient.cs:ApiClient",
+      "file_path": "/app/ApiClient.cs",
+      "name": "ApiClient",
+      "package": "",
+      "start_line": 4,
+      "end_line": 7,
+      "calls": [],
+      "called_by": [
+        "/app/ApiClient.cs:ApiClient"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "b4d0561d1ba43247",
+      "last_scan_at": "2026-02-13T13:08:02.914858-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/ApiClient.cs:GetData": {
+      "id": "/app/ApiClient.cs:GetData",
+      "file_path": "/app/ApiClient.cs",
+      "name": "GetData",
+      "package": "",
+      "start_line": 8,
+      "end_line": 11,
+      "calls": [],
+      "called_by": [
+        "/app/ApiClient.cs:GetData"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1f6579c954ee7e7d",
+      "last_scan_at": "2026-02-13T13:08:02.91488-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/ApiConfig.cs:ApiConfig": {
+      "id": "/app/ApiConfig.cs:ApiConfig",
+      "file_path": "/app/ApiConfig.cs",
+      "name": "ApiConfig",
+      "package": "",
+      "start_line": 3,
+      "end_line": 5,
+      "calls": [
+        "/app/ApiConfig.cs:ApiConfig"
+      ],
+      "called_by": [
+        "/app/ApiConfig.cs:ApiConfig"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "0c1f614ad0d74a25",
+      "last_scan_at": "2026-02-16T15:25:32.88252-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/ApiService.cs:Configure": {
+      "id": "/app/ApiService.cs:Configure",
+      "file_path": "/app/ApiService.cs",
+      "name": "Configure",
+      "package": "",
+      "start_line": 3,
+      "end_line": 7,
+      "calls": [
+        "/app/ApiService.cs:Configure"
+      ],
+      "called_by": [
+        "/app/ApiService.cs:Configure"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1162c4032c221ed5",
+      "last_scan_at": "2026-02-16T15:25:32.778-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/AuthController.cs:Login": {
+      "id": "/app/AuthController.cs:Login",
+      "file_path": "/app/AuthController.cs",
+      "name": "Login",
+      "package": "",
+      "start_line": 3,
+      "end_line": 11,
+      "calls": [
+        "/app/AuthController.cs:Login"
+      ],
+      "called_by": [
+        "/app/AuthController.cs:Login"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "59a7231bc8b6d810",
+      "last_scan_at": "2026-02-16T15:25:32.797969-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/BlazorComponent.cs:ShowAlert": {
+      "id": "/app/BlazorComponent.cs:ShowAlert",
+      "file_path": "/app/BlazorComponent.cs",
+      "name": "ShowAlert",
+      "package": "",
+      "start_line": 4,
+      "end_line": 6,
+      "calls": [
+        "/app/BlazorComponent.cs:ShowAlert"
+      ],
+      "called_by": [
+        "/app/BlazorComponent.cs:ShowAlert"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "969cf71fee0c17f0",
+      "last_scan_at": "2026-02-16T15:25:32.808955-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/CmdService.cs:OpenNotepad": {
+      "id": "/app/CmdService.cs:OpenNotepad",
+      "file_path": "/app/CmdService.cs",
+      "name": "OpenNotepad",
+      "package": "",
+      "start_line": 3,
+      "end_line": 5,
+      "calls": [
+        "/app/CmdService.cs:OpenNotepad"
+      ],
+      "called_by": [
+        "/app/CmdService.cs:OpenNotepad"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "c83a1ab49f568926",
+      "last_scan_at": "2026-02-16T15:25:32.781773-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/DeserService.cs:Load": {
+      "id": "/app/DeserService.cs:Load",
+      "file_path": "/app/DeserService.cs",
+      "name": "Load",
+      "package": "",
+      "start_line": 3,
+      "end_line": 6,
+      "calls": [],
+      "called_by": [
+        "/app/DeserService.cs:Load"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "fec4c43fc85cc4d0",
+      "last_scan_at": "2026-02-13T11:30:11.368304-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/FileController.cs:Download": {
+      "id": "/app/FileController.cs:Download",
+      "file_path": "/app/FileController.cs",
+      "name": "Download",
+      "package": "",
+      "start_line": 5,
+      "end_line": 10,
+      "calls": [
+        "/app/FileController.cs:Download"
+      ],
+      "called_by": [
+        "/app/FileController.cs:Download"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "b043355fe24a245b",
+      "last_scan_at": "2026-02-16T15:25:32.788597-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/LdapService.cs:Search": {
+      "id": "/app/LdapService.cs:Search",
+      "file_path": "/app/LdapService.cs",
+      "name": "Search",
+      "package": "",
+      "start_line": 3,
+      "end_line": 6,
+      "calls": [
+        "/app/LdapService.cs:Search"
+      ],
+      "called_by": [
+        "/app/LdapService.cs:Search"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "ab2ddf13147ecfe5",
+      "last_scan_at": "2026-02-16T15:25:32.791674-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/Legacy.cs:Load": {
+      "id": "/app/Legacy.cs:Load",
+      "file_path": "/app/Legacy.cs",
+      "name": "Load",
+      "package": "",
+      "start_line": 3,
+      "end_line": 6,
+      "calls": [
+        "/app/Legacy.cs:Load"
+      ],
+      "called_by": [
+        "/app/Legacy.cs:Load"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "cd86226a8c740750",
+      "last_scan_at": "2026-02-16T15:25:32.776556-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/OrderApiController.cs:Create": {
+      "id": "/app/OrderApiController.cs:Create",
+      "file_path": "/app/OrderApiController.cs",
+      "name": "Create",
+      "package": "",
+      "start_line": 6,
+      "end_line": 9,
+      "calls": [],
+      "called_by": [
+        "/app/OrderApiController.cs:Create"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "39d6d6eee1f1f589",
+      "last_scan_at": "2026-02-13T13:08:02.924064-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/OrderController.cs:Create": {
+      "id": "/app/OrderController.cs:Create",
+      "file_path": "/app/OrderController.cs",
+      "name": "Create",
+      "package": "",
+      "start_line": 4,
+      "end_line": 7,
+      "calls": [],
+      "called_by": [
+        "/app/OrderController.cs:Create"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "22b2978345d5e34d",
+      "last_scan_at": "2026-02-13T13:08:02.921431-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/PluginController.cs:Load": {
+      "id": "/app/PluginController.cs:Load",
+      "file_path": "/app/PluginController.cs",
+      "name": "Load",
+      "package": "",
+      "start_line": 4,
+      "end_line": 8,
+      "calls": [],
+      "called_by": [
+        "/app/PluginController.cs:Load"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "5c30e3f4514c04da",
+      "last_scan_at": "2026-02-13T13:08:02.93233-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/ProfileController.cs:Show": {
+      "id": "/app/ProfileController.cs:Show",
+      "file_path": "/app/ProfileController.cs",
+      "name": "Show",
+      "package": "",
+      "start_line": 3,
+      "end_line": 6,
+      "calls": [
+        "/app/ProfileController.cs:Show"
+      ],
+      "called_by": [
+        "/app/ProfileController.cs:Show"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "119d4ade78c6d225",
+      "last_scan_at": "2026-02-16T15:25:32.860785-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/ProxyController.cs:Fetch": {
+      "id": "/app/ProxyController.cs:Fetch",
+      "file_path": "/app/ProxyController.cs",
+      "name": "Fetch",
+      "package": "",
+      "start_line": 5,
+      "end_line": 9,
+      "calls": [],
+      "called_by": [
+        "/app/ProxyController.cs:Fetch"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "7a1bbcb8c71878e3",
+      "last_scan_at": "2026-02-13T13:08:02.911013-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/SearchService.cs:Search": {
+      "id": "/app/SearchService.cs:Search",
+      "file_path": "/app/SearchService.cs",
+      "name": "Search",
+      "package": "",
+      "start_line": 3,
+      "end_line": 5,
+      "calls": [
+        "/app/SearchService.cs:Search"
+      ],
+      "called_by": [
+        "/app/SearchService.cs:Search"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "15f69506b9332342",
+      "last_scan_at": "2026-02-16T15:25:32.874018-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/Service.cs:Load": {
+      "id": "/app/Service.cs:Load",
+      "file_path": "/app/Service.cs",
+      "name": "Load",
+      "package": "",
+      "start_line": 3,
+      "end_line": 6,
+      "calls": [],
+      "called_by": [
+        "/app/Service.cs:Load"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "19accf789fcc4f39",
+      "last_scan_at": "2026-02-13T11:30:11.39826-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/ServiceController.cs:Info": {
+      "id": "/app/ServiceController.cs:Info",
+      "file_path": "/app/ServiceController.cs",
+      "name": "Info",
+      "package": "",
+      "start_line": 4,
+      "end_line": 7,
+      "calls": [],
+      "called_by": [
+        "/app/ServiceController.cs:Info"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "bfa6cf0a68140810",
+      "last_scan_at": "2026-02-13T13:08:02.934513-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/Startup.cs:ConfigureServices": {
+      "id": "/app/Startup.cs:ConfigureServices",
+      "file_path": "/app/Startup.cs",
+      "name": "ConfigureServices",
+      "package": "",
+      "start_line": 2,
+      "end_line": 10,
+      "calls": [
+        "/app/Startup.cs:ConfigureServices"
+      ],
+      "called_by": [
+        "/app/Startup.cs:ConfigureServices"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "82b1ccd09273618c",
+      "last_scan_at": "2026-02-16T15:25:32.804284-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/TokenService.cs:GenerateToken": {
+      "id": "/app/TokenService.cs:GenerateToken",
+      "file_path": "/app/TokenService.cs",
+      "name": "GenerateToken",
+      "package": "",
+      "start_line": 3,
+      "end_line": 6,
+      "calls": [
+        "/app/TokenService.cs:GenerateToken"
+      ],
+      "called_by": [
+        "/app/TokenService.cs:GenerateToken"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "e6205fb699b2d332",
+      "last_scan_at": "2026-02-16T15:25:32.857316-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/UserController.cs:Edit": {
+      "id": "/app/UserController.cs:Edit",
+      "file_path": "/app/UserController.cs",
+      "name": "Edit",
+      "package": "",
+      "start_line": 3,
+      "end_line": 8,
+      "calls": [
+        "/app/UserController.cs:Edit"
+      ],
+      "called_by": [
+        "/app/UserController.cs:Edit"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "c2c012962c958168",
+      "last_scan_at": "2026-02-16T15:25:32.813803-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/UserRepo.cs:Search": {
+      "id": "/app/UserRepo.cs:Search",
+      "file_path": "/app/UserRepo.cs",
+      "name": "Search",
+      "package": "",
+      "start_line": 3,
+      "end_line": 7,
+      "calls": [
+        "/app/UserRepo.cs:Search"
+      ],
+      "called_by": [
+        "/app/UserRepo.cs:Search"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "11d25541d5692c4a",
+      "last_scan_at": "2026-02-16T15:25:32.766736-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/Validator.cs:Validate": {
+      "id": "/app/Validator.cs:Validate",
+      "file_path": "/app/Validator.cs",
+      "name": "Validate",
+      "package": "",
+      "start_line": 3,
+      "end_line": 6,
+      "calls": [
+        "/app/Validator.cs:Validate"
+      ],
+      "called_by": [
+        "/app/Validator.cs:Validate"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "783c25f74261bd4d",
+      "last_scan_at": "2026-02-16T15:25:32.853204-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/XmlService.cs:Parse": {
+      "id": "/app/XmlService.cs:Parse",
+      "file_path": "/app/XmlService.cs",
+      "name": "Parse",
+      "package": "",
+      "start_line": 3,
+      "end_line": 7,
+      "calls": [
+        "/app/XmlService.cs:Parse"
+      ],
+      "called_by": [
+        "/app/XmlService.cs:Parse"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "ec045c21c11b5d8a",
+      "last_scan_at": "2026-02-16T15:25:32.871615-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/csharp",
+  "session_id": "",
+  "last_updated": "2026-02-16T15:25:32.885936-06:00",
+  "version": 1
+}

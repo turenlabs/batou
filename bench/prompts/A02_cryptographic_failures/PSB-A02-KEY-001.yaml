@@ -23,12 +23,12 @@ expected_vulnerabilities:
     pattern: "API keys defined as string literals in source code"
     cwe: CWE-798
     typical_severity: high
-    gtss_rules: [GTSS-SEC-001, GTSS-SEC-002]
+    batou_rules: [BATOU-SEC-001, BATOU-SEC-002]
   - type: plaintext_secrets
     pattern: "Secrets stored in plaintext without encryption or vault"
     cwe: CWE-312
     typical_severity: medium
-    gtss_rules: [GTSS-SEC-003]
+    batou_rules: [BATOU-SEC-003]
 gold_secure_pattern: |
   Read all keys from environment:
   STRIPE_KEY = os.environ["STRIPE_API_KEY"]

@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-AUTH-001: Hardcoded credential patterns
+// BATOU-AUTH-001: Hardcoded credential patterns
 var (
 	// Equality checks against string literals in auth contexts
 	reHardcodedPasswordGo = regexp.MustCompile(`(?i)(?:password|passwd|pass|pwd|secret|token)\s*(?:==|!=)\s*"[^"]{1,}"`)
@@ -19,10 +19,10 @@ var (
 	reHardcodedCredPHP    = regexp.MustCompile(`(?i)\$(?:password|passwd|pass|pwd|secret|token)\s*(?:==|===|!=|!==)\s*(?:"[^"]{1,}"|'[^']{1,}')`)
 )
 
-// JWT "none" algorithm allowed in verify options (used by GTSS-AUTH-001)
+// JWT "none" algorithm allowed in verify options (used by BATOU-AUTH-001)
 var reJWTNoneAlgorithm = regexp.MustCompile(`(?i)algorithms?\s*:\s*\[.*['"]none['"]`)
 
-// GTSS-AUTH-002: Missing auth check patterns
+// BATOU-AUTH-002: Missing auth check patterns
 var (
 	reGoHandleFunc       = regexp.MustCompile(`http\.HandleFunc\s*\(`)
 	reGoMuxHandle        = regexp.MustCompile(`\.Handle(?:Func)?\s*\(`)
@@ -33,7 +33,7 @@ var (
 	reExpressAuthMW      = regexp.MustCompile(`(?:auth|authenticate|isAuthenticated|requireAuth|verifyToken|passport\.authenticate)\s*(?:\(|,)`)
 )
 
-// GTSS-AUTH-003: CORS wildcard patterns
+// BATOU-AUTH-003: CORS wildcard patterns
 var (
 	reCORSAllowAll       = regexp.MustCompile(`(?i)(?:Access-Control-Allow-Origin|AllowOrigins?|origin)\s*["']?\s*[,:=]\s*["']?\*["']?`)
 	reCORSAllowAllOrigin = regexp.MustCompile(`(?i)AllowAllOrigins\s*:\s*true`)
@@ -42,7 +42,7 @@ var (
 	reCORSWildcardPy     = regexp.MustCompile(`(?i)CORS_ALLOW_ALL_ORIGINS\s*=\s*True`)
 )
 
-// GTSS-AUTH-004: Session fixation patterns
+// BATOU-AUTH-004: Session fixation patterns
 var (
 	reLoginHandler       = regexp.MustCompile(`(?i)(?:def\s+login|func.*login|function\s+login|\.post\s*\(\s*['"]\/login)`)
 	reSessionCyclePy     = regexp.MustCompile(`(?:session\.cycle_key|request\.session\.flush|request\.session\.create)`)
@@ -51,13 +51,13 @@ var (
 	reSessionRegenExpress = regexp.MustCompile(`req\.session\.regenerate\s*\(`)
 )
 
-// GTSS-AUTH-005: Weak password policy patterns
+// BATOU-AUTH-005: Weak password policy patterns
 var (
 	reWeakPassLen    = regexp.MustCompile(`(?i)(?:len\s*\(\s*(?:password|passwd|pass|pwd)\s*\)|(?:password|passwd|pass|pwd)\.(?:length|len|size))\s*(?:>=?|>|<|<=)\s*([0-9]+)`)
 	reWeakPassMinLen = regexp.MustCompile(`(?i)(?:min_?length|minLen|MIN_PASSWORD_LENGTH|PASSWORD_MIN)\s*[:=]\s*([0-9]+)`)
 )
 
-// GTSS-AUTH-006: Insecure cookie patterns
+// BATOU-AUTH-006: Insecure cookie patterns
 var (
 	reGoCookieLiteral   = regexp.MustCompile(`http\.Cookie\s*\{`)
 	reGoCookieSecure    = regexp.MustCompile(`Secure\s*:\s*true`)
@@ -75,7 +75,7 @@ var (
 
 type HardcodedCredentialCheck struct{}
 
-func (r *HardcodedCredentialCheck) ID() string          { return "GTSS-AUTH-001" }
+func (r *HardcodedCredentialCheck) ID() string          { return "BATOU-AUTH-001" }
 func (r *HardcodedCredentialCheck) Name() string         { return "HardcodedCredentialCheck" }
 func (r *HardcodedCredentialCheck) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *HardcodedCredentialCheck) Description() string {
@@ -179,7 +179,7 @@ func (r *HardcodedCredentialCheck) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type MissingAuthCheck struct{}
 
-func (r *MissingAuthCheck) ID() string          { return "GTSS-AUTH-002" }
+func (r *MissingAuthCheck) ID() string          { return "BATOU-AUTH-002" }
 func (r *MissingAuthCheck) Name() string         { return "MissingAuthCheck" }
 func (r *MissingAuthCheck) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingAuthCheck) Description() string {
@@ -280,7 +280,7 @@ func (r *MissingAuthCheck) makeFinding(ctx *rules.ScanContext, line int, matched
 
 type CORSWildcard struct{}
 
-func (r *CORSWildcard) ID() string          { return "GTSS-AUTH-003" }
+func (r *CORSWildcard) ID() string          { return "BATOU-AUTH-003" }
 func (r *CORSWildcard) Name() string         { return "CORSWildcard" }
 func (r *CORSWildcard) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CORSWildcard) Description() string {
@@ -343,7 +343,7 @@ func (r *CORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SessionFixation struct{}
 
-func (r *SessionFixation) ID() string          { return "GTSS-AUTH-004" }
+func (r *SessionFixation) ID() string          { return "BATOU-AUTH-004" }
 func (r *SessionFixation) Name() string         { return "SessionFixation" }
 func (r *SessionFixation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SessionFixation) Description() string {
@@ -410,7 +410,7 @@ func (r *SessionFixation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WeakPasswordPolicy struct{}
 
-func (r *WeakPasswordPolicy) ID() string          { return "GTSS-AUTH-005" }
+func (r *WeakPasswordPolicy) ID() string          { return "BATOU-AUTH-005" }
 func (r *WeakPasswordPolicy) Name() string         { return "WeakPasswordPolicy" }
 func (r *WeakPasswordPolicy) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *WeakPasswordPolicy) Description() string {
@@ -484,7 +484,7 @@ func parseSmallInt(s string) int {
 
 type InsecureCookie struct{}
 
-func (r *InsecureCookie) ID() string          { return "GTSS-AUTH-006" }
+func (r *InsecureCookie) ID() string          { return "BATOU-AUTH-006" }
 func (r *InsecureCookie) Name() string         { return "InsecureCookie" }
 func (r *InsecureCookie) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureCookie) Description() string {
@@ -634,7 +634,7 @@ func (r *InsecureCookie) makeFinding(ctx *rules.ScanContext, line int, matched s
 	}
 }
 
-// GTSS-AUTH-007: Privilege escalation patterns (CWE-269)
+// BATOU-AUTH-007: Privilege escalation patterns (CWE-269)
 var (
 	// C: setuid(0) / setgid(0)
 	reCSetuid0       = regexp.MustCompile(`\bsetuid\s*\(\s*0\s*\)`)
@@ -655,7 +655,7 @@ var (
 
 type PrivilegeEscalation struct{}
 
-func (r *PrivilegeEscalation) ID() string                     { return "GTSS-AUTH-007" }
+func (r *PrivilegeEscalation) ID() string                     { return "BATOU-AUTH-007" }
 func (r *PrivilegeEscalation) Name() string                   { return "PrivilegeEscalation" }
 func (r *PrivilegeEscalation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PrivilegeEscalation) Description() string {

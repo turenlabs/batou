@@ -1,5 +1,5 @@
 # Vulnerable: Hardcoded secrets in Python source code
-# Expected: GTSS-SEC-001 (HardcodedPassword), GTSS-SEC-005 (JWTSecret)
+# Expected: BATOU-SEC-001 (HardcodedPassword), BATOU-SEC-005 (JWTSecret)
 
 import jwt
 

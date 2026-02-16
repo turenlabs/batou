@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Ruby code, covering Rails, Sinatra, Grape, Hanami, and Rack applications. Analysis spans four layers: regex-based pattern matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). Ruby coverage includes 27 taint sources across 7 frameworks, 64 sinks spanning 14 vulnerability categories, and 26 sanitizer recognitions to reduce false positives.
+Batou provides comprehensive security scanning for Ruby code, covering Rails, Sinatra, Grape, Hanami, and Rack applications. Analysis spans four layers: regex-based pattern matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). Ruby coverage includes 27 taint sources across 7 frameworks, 64 sinks spanning 14 vulnerability categories, and 26 sanitizer recognitions to reduce false positives.
 
 Ruby taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through assignments, call expressions, and method calls by walking the parsed AST rather than relying on regex patterns.
 
@@ -233,136 +233,136 @@ The following Layer 1 regex rules apply to Ruby files. Rules with `LangAny` also
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-INJ-001 | SQL Injection | String interpolation in `.where()`, `.execute()`, raw SQL concatenation |
-| GTSS-INJ-002 | Command Injection | `system()`, backticks, `%x()` with interpolated variables |
-| GTSS-INJ-003 | Code Injection | `eval()`, `send()`, `public_send()` with dynamic input |
-| GTSS-INJ-004 | LDAP Injection | LDAP filter string concatenation |
-| GTSS-INJ-005 | Template Injection (SSTI) | `ERB.new()` with user-controlled templates |
-| GTSS-INJ-006 | XPath Injection | XPath query string concatenation |
-| GTSS-INJ-007 | NoSQL Injection | MongoDB `$where` with string concatenation, unsafe `$regex` |
-| GTSS-INJ-008 | GraphQL Injection | GraphQL query string concatenation |
+| BATOU-INJ-001 | SQL Injection | String interpolation in `.where()`, `.execute()`, raw SQL concatenation |
+| BATOU-INJ-002 | Command Injection | `system()`, backticks, `%x()` with interpolated variables |
+| BATOU-INJ-003 | Code Injection | `eval()`, `send()`, `public_send()` with dynamic input |
+| BATOU-INJ-004 | LDAP Injection | LDAP filter string concatenation |
+| BATOU-INJ-005 | Template Injection (SSTI) | `ERB.new()` with user-controlled templates |
+| BATOU-INJ-006 | XPath Injection | XPath query string concatenation |
+| BATOU-INJ-007 | NoSQL Injection | MongoDB `$where` with string concatenation, unsafe `$regex` |
+| BATOU-INJ-008 | GraphQL Injection | GraphQL query string concatenation |
 
 ### NoSQL Injection
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-NOSQL-001 | MongoDB $where Injection | `$where` with Ruby string interpolation (`"#{...}"`) or string concatenation enabling server-side JS execution |
-| GTSS-NOSQL-002 | MongoDB Operator Injection | Mongoid queries with unsanitized `params` (`.where(params[...])`, `.find_by(params[...])`) allowing operator injection |
-| GTSS-NOSQL-003 | MongoDB Raw Query Injection | `$regex` with user input, `mapReduce`/`group` with functions, `$lookup`/`$merge`/`$out` with user-controlled collection names, server-side `eval` |
+| BATOU-NOSQL-001 | MongoDB $where Injection | `$where` with Ruby string interpolation (`"#{...}"`) or string concatenation enabling server-side JS execution |
+| BATOU-NOSQL-002 | MongoDB Operator Injection | Mongoid queries with unsanitized `params` (`.where(params[...])`, `.find_by(params[...])`) allowing operator injection |
+| BATOU-NOSQL-003 | MongoDB Raw Query Injection | `$regex` with user input, `mapReduce`/`group` with functions, `$lookup`/`$merge`/`$out` with user-controlled collection names, server-side `eval` |
 
 ### Deserialization / Dynamic Execution
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-DESER-002 | Ruby Dangerous Dynamic Execution | `eval()` / `instance_eval` / `class_eval` / `module_eval` with dynamic arguments, `send()` / `public_send()` / `__send__()` with user input, `constantize` with user-controlled strings |
+| BATOU-DESER-002 | Ruby Dangerous Dynamic Execution | `eval()` / `instance_eval` / `class_eval` / `module_eval` with dynamic arguments, `send()` / `public_send()` / `__send__()` with user input, `constantize` with user-controlled strings |
 
 ### Mass Assignment
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-MASS-003 | Ruby/Rails Mass Assignment | `Model.new(params[:...])`, `.create(params[:...])`, `.update(params)` without strong parameters (`.permit`); detects missing `permit` calls |
+| BATOU-MASS-003 | Ruby/Rails Mass Assignment | `Model.new(params[:...])`, `.create(params[:...])`, `.update(params)` without strong parameters (`.permit`); detects missing `permit` calls |
 
 ### CORS
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-CORS-001 | CORS Wildcard with Credentials | `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` via generic header patterns |
+| BATOU-CORS-001 | CORS Wildcard with Credentials | `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` via generic header patterns |
 
 ### Misconfiguration
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-MISC-003 | Missing Security Headers | Missing security headers (CWE-1021, CWE-693) |
+| BATOU-MISC-003 | Missing Security Headers | Missing security headers (CWE-1021, CWE-693) |
 
 ### GraphQL
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-GQL-001 | GraphQL Introspection Enabled | `introspection: true` or equivalent configuration enabling full schema exposure in production |
+| BATOU-GQL-001 | GraphQL Introspection Enabled | `introspection: true` or equivalent configuration enabling full schema exposure in production |
 
 ### Redirect
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-REDIR-001 | Server Redirect with User Input | `redirect_to` with `params` allowing open redirect attacks for phishing |
+| BATOU-REDIR-001 | Server Redirect with User Input | `redirect_to` with `params` allowing open redirect attacks for phishing |
 
 ### XSS
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-XSS-004 | Unescaped Template Output | `raw()`, `.html_safe` bypassing auto-escaping |
-| GTSS-XSS-008 | Server-Side Rendering XSS | `render html:` with unescaped user input |
-| GTSS-XSS-011 | Reflected XSS | `params` directly rendered in response |
+| BATOU-XSS-004 | Unescaped Template Output | `raw()`, `.html_safe` bypassing auto-escaping |
+| BATOU-XSS-008 | Server-Side Rendering XSS | `render html:` with unescaped user input |
+| BATOU-XSS-011 | Reflected XSS | `params` directly rendered in response |
 
 ### Path Traversal
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-TRV-001 | Path Traversal | File operations with user-controlled paths (`send_file`, `File.read`, `File.join`) |
-| GTSS-TRV-002 | File Inclusion | Dynamic `require`, `load` with variable input |
+| BATOU-TRV-001 | Path Traversal | File operations with user-controlled paths (`send_file`, `File.read`, `File.join`) |
+| BATOU-TRV-002 | File Inclusion | Dynamic `require`, `load` with variable input |
 
 ### Cryptography
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-CRY-010 | Weak PRNG | `rand()` / `Random.new` / `Random.rand` / `srand()` in security-sensitive contexts |
-| GTSS-CRY-011 | Predictable Seed | `srand()` with fixed or time-based seeds |
-| GTSS-CRY-016 | Insecure Random (Broad) | `rand()` / `Random.new` / `Random.rand` in security contexts (tokens, sessions, OTPs, CSRF, API keys); complements CRY-010 |
-| GTSS-CRY-017 | Timing-Unsafe Comparison | `==` used to compare secrets, tokens, hashes, or signatures instead of `Rack::Utils.secure_compare` or `ActiveSupport::SecurityUtils.secure_compare` |
+| BATOU-CRY-010 | Weak PRNG | `rand()` / `Random.new` / `Random.rand` / `srand()` in security-sensitive contexts |
+| BATOU-CRY-011 | Predictable Seed | `srand()` with fixed or time-based seeds |
+| BATOU-CRY-016 | Insecure Random (Broad) | `rand()` / `Random.new` / `Random.rand` in security contexts (tokens, sessions, OTPs, CSRF, API keys); complements CRY-010 |
+| BATOU-CRY-017 | Timing-Unsafe Comparison | `==` used to compare secrets, tokens, hashes, or signatures instead of `Rack::Utils.secure_compare` or `ActiveSupport::SecurityUtils.secure_compare` |
 
 ### Secrets
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-SEC-001 | Hardcoded Password | Password/secret string literals in assignments |
-| GTSS-SEC-005 | JWT Secret | Hardcoded JWT signing keys |
+| BATOU-SEC-001 | Hardcoded Password | Password/secret string literals in assignments |
+| BATOU-SEC-005 | JWT Secret | Hardcoded JWT signing keys |
 
 ### Authentication
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-AUTH-001 | Hardcoded Credentials | Authentication checks against hardcoded values |
-| GTSS-AUTH-003 | CORS Wildcard | Overly permissive CORS configuration |
-| GTSS-AUTH-004 | Session Fixation | Login without `reset_session` |
-| GTSS-AUTH-005 | Weak Password Policy | Password length requirements below 8 characters |
-| GTSS-AUTH-007 | Privilege Escalation Patterns | Privilege escalation patterns (CWE-269) |
+| BATOU-AUTH-001 | Hardcoded Credentials | Authentication checks against hardcoded values |
+| BATOU-AUTH-003 | CORS Wildcard | Overly permissive CORS configuration |
+| BATOU-AUTH-004 | Session Fixation | Login without `reset_session` |
+| BATOU-AUTH-005 | Weak Password Policy | Password length requirements below 8 characters |
+| BATOU-AUTH-007 | Privilege Escalation Patterns | Privilege escalation patterns (CWE-269) |
 
 ### Generic
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-GEN-001 | Debug Mode Enabled | Production debug configuration |
-| GTSS-GEN-002 | Unsafe Deserialization | `Marshal.load`, `YAML.load` on untrusted data |
-| GTSS-GEN-004 | Open Redirect | `redirect_to` with user-controlled URL |
-| GTSS-GEN-006 | Race Condition (TOCTOU) | Check-then-use patterns without synchronization |
-| GTSS-GEN-007 | Mass Assignment | `update_attributes(params)` without strong parameters |
-| GTSS-GEN-008 | Code-as-String Eval | Dangerous calls inside `eval()` string arguments |
-| GTSS-GEN-009 | XML Parser Misconfig | XXE-enabling XML parser configuration |
-| GTSS-GEN-012 | Insecure Download Patterns | Insecure download patterns (CWE-494) |
+| BATOU-GEN-001 | Debug Mode Enabled | Production debug configuration |
+| BATOU-GEN-002 | Unsafe Deserialization | `Marshal.load`, `YAML.load` on untrusted data |
+| BATOU-GEN-004 | Open Redirect | `redirect_to` with user-controlled URL |
+| BATOU-GEN-006 | Race Condition (TOCTOU) | Check-then-use patterns without synchronization |
+| BATOU-GEN-007 | Mass Assignment | `update_attributes(params)` without strong parameters |
+| BATOU-GEN-008 | Code-as-String Eval | Dangerous calls inside `eval()` string arguments |
+| BATOU-GEN-009 | XML Parser Misconfig | XXE-enabling XML parser configuration |
+| BATOU-GEN-012 | Insecure Download Patterns | Insecure download patterns (CWE-494) |
 
 ### Logging
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-LOG-001 | Unsanitized Log Input | `params` passed directly to logger calls |
-| GTSS-LOG-002 | CRLF Log Injection | String interpolation of user input in log calls |
-| GTSS-LOG-003 | Sensitive Data in Logs | Logging passwords, tokens, API keys |
+| BATOU-LOG-001 | Unsanitized Log Input | `params` passed directly to logger calls |
+| BATOU-LOG-002 | CRLF Log Injection | String interpolation of user input in log calls |
+| BATOU-LOG-003 | Sensitive Data in Logs | Logging passwords, tokens, API keys |
 
 ### Validation
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-VAL-001 | Direct Parameter Usage | `params` used without any validation nearby |
-| GTSS-VAL-003 | Missing Length Validation | User input stored without size checks |
-| GTSS-VAL-004 | Missing Allowlist Validation | User input used as dynamic property keys |
-| GTSS-VAL-005 | File Upload Hardening | File upload without proper validation (CWE-434) |
+| BATOU-VAL-001 | Direct Parameter Usage | `params` used without any validation nearby |
+| BATOU-VAL-003 | Missing Length Validation | User input stored without size checks |
+| BATOU-VAL-004 | Missing Allowlist Validation | User input used as dynamic property keys |
+| BATOU-VAL-005 | File Upload Hardening | File upload without proper validation (CWE-434) |
 
 ### SSRF
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-SSRF-001 | URL From User Input | HTTP requests with user-derived URLs (applies to all languages) |
-| GTSS-SSRF-002 | Internal Network Access | Requests to private IPs or cloud metadata (applies to all languages) |
+| BATOU-SSRF-001 | URL From User Input | HTTP requests with user-derived URLs (applies to all languages) |
+| BATOU-SSRF-002 | Internal Network Access | Requests to private IPs or cloud metadata (applies to all languages) |
 
 ### Framework Rules
 
@@ -370,12 +370,12 @@ Rails-specific rules are defined in `internal/rules/framework/rails.go` and targ
 
 | Rule ID | Name | Severity | Description |
 |---------|------|----------|-------------|
-| GTSS-FW-RAILS-001 | Rails html_safe on Dynamic Content | High | `.html_safe` called on variables or interpolated strings (not plain string literals), bypassing Rails auto-escaping and enabling XSS (CWE-79) |
-| GTSS-FW-RAILS-002 | Rails render inline: SSTI | Critical | `render inline:` with dynamic content or string interpolation, enabling server-side template injection and RCE via ERB tag injection (CWE-1336) |
-| GTSS-FW-RAILS-003 | Rails constantize / safe_constantize | Critical/High | `.constantize` or `.safe_constantize` usage, especially with `params` or user input; converts strings to class constants enabling arbitrary class instantiation (CWE-470) |
-| GTSS-FW-RAILS-004 | Rails params.permit! | High | `params.permit!` bypasses strong parameter protection, permitting all parameters and enabling mass assignment of admin flags, foreign keys, etc. (CWE-915) |
-| GTSS-FW-RAILS-005 | Rails Misconfigurations | Medium | Insecure production settings: `consider_all_requests_local = true` (CWE-209), `force_ssl = false` (CWE-319), `protect_from_forgery with: :null_session` (CWE-352), `skip_before_action :verify_authenticity_token` (CWE-352) |
-| GTSS-FW-RAILS-006 | Rails ActiveRecord SQL Injection | Critical | `.where()` with params string interpolation (`"#{params[:name]}"`), `.where(params[:...])` hash injection, `.order()` with interpolation or raw params (CWE-89) |
+| BATOU-FW-RAILS-001 | Rails html_safe on Dynamic Content | High | `.html_safe` called on variables or interpolated strings (not plain string literals), bypassing Rails auto-escaping and enabling XSS (CWE-79) |
+| BATOU-FW-RAILS-002 | Rails render inline: SSTI | Critical | `render inline:` with dynamic content or string interpolation, enabling server-side template injection and RCE via ERB tag injection (CWE-1336) |
+| BATOU-FW-RAILS-003 | Rails constantize / safe_constantize | Critical/High | `.constantize` or `.safe_constantize` usage, especially with `params` or user input; converts strings to class constants enabling arbitrary class instantiation (CWE-470) |
+| BATOU-FW-RAILS-004 | Rails params.permit! | High | `params.permit!` bypasses strong parameter protection, permitting all parameters and enabling mass assignment of admin flags, foreign keys, etc. (CWE-915) |
+| BATOU-FW-RAILS-005 | Rails Misconfigurations | Medium | Insecure production settings: `consider_all_requests_local = true` (CWE-209), `force_ssl = false` (CWE-319), `protect_from_forgery with: :null_session` (CWE-352), `skip_before_action :verify_authenticity_token` (CWE-352) |
+| BATOU-FW-RAILS-006 | Rails ActiveRecord SQL Injection | Critical | `.where()` with params string interpolation (`"#{params[:name]}"`), `.where(params[:...])` hash injection, `.order()` with interpolation or raw params (CWE-89) |
 
 ## Example Detections
 
@@ -391,7 +391,7 @@ class UsersController < ApplicationController
 end
 ```
 
-**Triggers**: GTSS-INJ-001 (SQL Injection) -- string interpolation `#{name}` inside a `.where()` string argument allows an attacker to inject arbitrary SQL.
+**Triggers**: BATOU-INJ-001 (SQL Injection) -- string interpolation `#{name}` inside a `.where()` string argument allows an attacker to inject arbitrary SQL.
 
 ### Command Injection via system()
 
@@ -405,7 +405,7 @@ class FileController < ApplicationController
 end
 ```
 
-**Triggers**: GTSS-INJ-002 (Command Injection) -- user-controlled `filename` is interpolated into a shell command string passed to `system()`.
+**Triggers**: BATOU-INJ-002 (Command Injection) -- user-controlled `filename` is interpolated into a shell command string passed to `system()`.
 
 ### Unsafe Deserialization via Marshal.load
 
@@ -419,7 +419,7 @@ class SessionController < ApplicationController
 end
 ```
 
-**Triggers**: GTSS-GEN-002 (Unsafe Deserialization) and taint sink `ruby.marshal.load` (CWE-502) -- `Marshal.load` on user-controlled cookie data enables arbitrary code execution.
+**Triggers**: BATOU-GEN-002 (Unsafe Deserialization) and taint sink `ruby.marshal.load` (CWE-502) -- `Marshal.load` on user-controlled cookie data enables arbitrary code execution.
 
 ### Rails params.permit! Mass Assignment
 
@@ -432,7 +432,7 @@ class UsersController < ApplicationController
 end
 ```
 
-**Triggers**: GTSS-FW-RAILS-004 (Rails params.permit!) -- `params.permit!` permits all parameters, allowing an attacker to set `admin`, `role`, or any other model attribute.
+**Triggers**: BATOU-FW-RAILS-004 (Rails params.permit!) -- `params.permit!` permits all parameters, allowing an attacker to set `admin`, `role`, or any other model attribute.
 
 ### MongoDB $where with Ruby String Interpolation
 
@@ -446,7 +446,7 @@ class SearchController < ApplicationController
 end
 ```
 
-**Triggers**: GTSS-NOSQL-001 (MongoDB $where Injection) -- Ruby string interpolation `#{name}` inside a `$where` expression enables server-side JavaScript execution on the MongoDB server.
+**Triggers**: BATOU-NOSQL-001 (MongoDB $where Injection) -- Ruby string interpolation `#{name}` inside a `$where` expression enables server-side JavaScript execution on the MongoDB server.
 
 ### Rails constantize with User Input
 
@@ -459,7 +459,7 @@ class WidgetsController < ApplicationController
 end
 ```
 
-**Triggers**: GTSS-FW-RAILS-003 (Rails constantize) -- `params[:type].constantize` converts a user-controlled string into a Ruby class constant, enabling instantiation of arbitrary classes and potential RCE.
+**Triggers**: BATOU-FW-RAILS-003 (Rails constantize) -- `params[:type].constantize` converts a user-controlled string into a Ruby class constant, enabling instantiation of arbitrary classes and potential RCE.
 
 ### Dynamic eval with Variable Argument
 
@@ -473,7 +473,7 @@ class ReportController < ApplicationController
 end
 ```
 
-**Triggers**: GTSS-DESER-002 (Ruby Dangerous Dynamic Execution) -- `eval()` with a user-controlled argument executes arbitrary Ruby code, enabling remote code execution.
+**Triggers**: BATOU-DESER-002 (Ruby Dangerous Dynamic Execution) -- `eval()` with a user-controlled argument executes arbitrary Ruby code, enabling remote code execution.
 
 ### Rails render inline with Interpolation
 
@@ -486,7 +486,7 @@ class PagesController < ApplicationController
 end
 ```
 
-**Triggers**: GTSS-FW-RAILS-002 (Rails render inline: SSTI) -- `render inline:` with interpolated user input allows injection of ERB tags (`<%= system('...') %>`) for server-side template injection.
+**Triggers**: BATOU-FW-RAILS-002 (Rails render inline: SSTI) -- `render inline:` with interpolated user input allows injection of ERB tags (`<%= system('...') %>`) for server-side template injection.
 
 ## Safe Patterns
 
@@ -546,10 +546,10 @@ end
 
 ## Limitations
 
-- **ERB template analysis is line-based**: GTSS scans `.erb` files as Ruby but does not parse the ERB template structure. Complex multi-line ERB expressions or embedded HTML logic may not be fully analyzed.
-- **No Gemfile dependency awareness**: GTSS does not read `Gemfile` or `Gemfile.lock` to determine which frameworks are in use. It applies all Ruby framework patterns regardless of actual dependencies.
+- **ERB template analysis is line-based**: Batou scans `.erb` files as Ruby but does not parse the ERB template structure. Complex multi-line ERB expressions or embedded HTML logic may not be fully analyzed.
+- **No Gemfile dependency awareness**: Batou does not read `Gemfile` or `Gemfile.lock` to determine which frameworks are in use. It applies all Ruby framework patterns regardless of actual dependencies.
 - **Metaprogramming blind spots**: Ruby's `define_method`, `method_missing`, `class_eval`, and similar metaprogramming constructs are not tracked. Dynamically defined methods that introduce vulnerabilities will be missed.
-- **No SSRF-specific regex rules**: While SSRF is covered via taint sinks (`Net::HTTP.get`, `HTTParty.get`, `Faraday.get`, etc.) and the language-agnostic GTSS-SSRF-001/002 rules, there are no Ruby-specific SSRF regex rules. The DNS rebinding (GTSS-SSRF-003) and redirect following (GTSS-SSRF-004) rules do not currently cover Ruby.
+- **No SSRF-specific regex rules**: While SSRF is covered via taint sinks (`Net::HTTP.get`, `HTTParty.get`, `Faraday.get`, etc.) and the language-agnostic BATOU-SSRF-001/002 rules, there are no Ruby-specific SSRF regex rules. The DNS rebinding (BATOU-SSRF-003) and redirect following (BATOU-SSRF-004) rules do not currently cover Ruby.
 - **No memory safety rules**: The `memory` rule category does not apply to Ruby (as expected for a memory-managed language).
 - **Block/Proc taint propagation**: Taint is not tracked through Ruby blocks, procs, or lambdas. A tainted value passed into a `map`, `each`, or custom block may lose its taint tracking.
 - **Rails view helpers**: Custom view helpers that wrap escaping logic are not recognized as sanitizers unless they match a known pattern.

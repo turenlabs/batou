@@ -1,13 +1,13 @@
-# GTSS - Generation Time Security Scanning
+# Batou - Code guard for your AI agents
 
 ## Project Overview
 
-GTSS is a security scanner that runs as a Claude Code hook, analyzing code for vulnerabilities at write time. It intercepts `Write`, `Edit`, and `NotebookEdit` tool calls via PreToolUse (can block) and PostToolUse (provides hints) hooks.
+Batou is a security scanner that runs as a Claude Code hook, analyzing code for vulnerabilities at write time. It intercepts `Write`, `Edit`, and `NotebookEdit` tool calls via PreToolUse (can block) and PostToolUse (provides hints) hooks.
 
 ## Architecture
 
 ```
-cmd/gtss/main.go           Entry point - reads hook JSON from stdin, runs scanner, outputs hints
+cmd/batou/main.go          Entry point - reads hook JSON from stdin, runs scanner, outputs hints
 internal/scanner/           Core scan orchestrator (concurrent rule execution + preprocessing)
 internal/rules/             44 rule categories (862 regex-based rules)
 internal/ast/               Tree-sitter AST parsing (parser, query, filter, context)
@@ -60,7 +60,7 @@ Go, Python, JavaScript/TypeScript, Java, PHP, Ruby, C, C++, Kotlin, Swift, Rust,
 ## Building & Testing
 
 ```bash
-make build          # Build binary to bin/gtss (requires CGO_ENABLED=1)
+make build          # Build binary to bin/batou (requires CGO_ENABLED=1)
 make test           # Run all tests with race detector
 go test ./... -v    # Verbose test output
 go build ./...      # Compile check
@@ -84,13 +84,46 @@ Note: Tree-sitter requires CGo. The Makefile sets `CGO_ENABLED=1` automatically.
 - `testdata/fixtures/{lang}/safe/` - Safe code samples (should NOT trigger rules)
 - `internal/testutil/` - Test helpers (ScanContent, MustFindRule, LoadFixture, etc.)
 
+## Generating New Rules
+
+Use `tools/generate_rules.py` to generate regex rules and taint catalog entries from YAML definitions instead of writing Go code manually. Requires `pyyaml` (`pip install pyyaml`).
+
+```bash
+python tools/generate_rules.py rules.yaml              # generate + verify (runs gofmt + go build)
+python tools/generate_rules.py --dry-run rules.yaml    # preview generated Go code without writing
+python tools/generate_rules.py --no-verify rules.yaml  # generate without running go build
+```
+
+See `tools/example_rules.yaml` for the full YAML schema covering regex rules and taint entries (sources, sinks, sanitizers). The generator:
+
+- Auto-assigns rule IDs by scanning existing `BATOU-{PREFIX}-###` in the codebase
+- Validates regex patterns for Go RE2 compatibility (rejects lookahead/lookbehind)
+- Generates `_gen.go` files for existing categories, `{category}.go` for new ones
+- Inserts taint entries into existing catalog files or generates all 4 files for new languages
+- Updates `cmd/batou/main.go` blank imports for new rule categories
+- Runs `gofmt` and `go build ./...` to verify generated code compiles
+
+## Checking Rule Coverage & Duplicates
+
+Use `tools/check_rules.py` to audit rules for duplicates, ID gaps, coverage stats, and taint catalog health. No dependencies beyond Python stdlib.
+
+```bash
+python tools/check_rules.py              # full report (duplicates, gaps, coverage, taint)
+python tools/check_rules.py --duplicates # only show duplicate rule IDs (exits non-zero if found)
+python tools/check_rules.py --gaps       # only show missing ID numbers per prefix
+python tools/check_rules.py --coverage   # rule counts per prefix + CWE coverage
+python tools/check_rules.py --taint      # taint catalog entry counts per language
+```
+
+Run after adding new rules to verify no accidental ID collisions or numbering gaps.
+
 ## Common Patterns
 
 - Rules implement `rules.Rule` interface with `ID()`, `Scan()`, `Languages()`, `Severity()`
 - AST analyzers: create package in `internal/analyzer/{lang}ast/`, use `ast.TreeFromContext(sctx)` to get the parsed tree
 - Taint catalogs register via `init()` functions
-- New rules: create file in `internal/rules/{category}/`, add blank import in `cmd/gtss/main.go`
-- New language: create 4 files in `internal/taint/languages/` (catalog, sources, sinks, sanitizers), then add a `langConfig` in `internal/taint/tsflow/langconfig.go`
+- New rules: create file in `internal/rules/{category}/`, add blank import in `cmd/batou/main.go` (or use `tools/generate_rules.py`)
+- New language: create 4 files in `internal/taint/languages/` (catalog, sources, sinks, sanitizers), then add a `langConfig` in `internal/taint/tsflow/langconfig.go` (or use `tools/generate_rules.py` for the catalog files)
 - `ScanContext.Tree` is `interface{}` — rules call `ast.TreeFromContext(sctx)` to get typed `*ast.Tree` (tree-sitter)
 - `ScanContext.GoASTFile` is `interface{}` — caches `*astflow.GoParseResult` (`*token.FileSet` + `*ast.File`) for sharing between astflow and call graph builder
 

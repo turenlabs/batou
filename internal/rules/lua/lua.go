@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ func hasUserInputContext(content string) bool {
 
 type CommandInjection struct{}
 
-func (r CommandInjection) ID() string                      { return "GTSS-LUA-001" }
+func (r CommandInjection) ID() string                      { return "BATOU-LUA-001" }
 func (r CommandInjection) Name() string                    { return "Command Injection" }
 func (r CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r CommandInjection) Description() string {
@@ -187,7 +187,7 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CodeInjection struct{}
 
-func (r CodeInjection) ID() string                      { return "GTSS-LUA-002" }
+func (r CodeInjection) ID() string                      { return "BATOU-LUA-002" }
 func (r CodeInjection) Name() string                    { return "Code Injection" }
 func (r CodeInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r CodeInjection) Description() string {
@@ -302,7 +302,7 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SQLInjection struct{}
 
-func (r SQLInjection) ID() string                      { return "GTSS-LUA-003" }
+func (r SQLInjection) ID() string                      { return "BATOU-LUA-003" }
 func (r SQLInjection) Name() string                    { return "SQL Injection" }
 func (r SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r SQLInjection) Description() string {
@@ -382,7 +382,7 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PathTraversal struct{}
 
-func (r PathTraversal) ID() string                      { return "GTSS-LUA-004" }
+func (r PathTraversal) ID() string                      { return "BATOU-LUA-004" }
 func (r PathTraversal) Name() string                    { return "Path Traversal" }
 func (r PathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r PathTraversal) Description() string {
@@ -439,7 +439,7 @@ func (r PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XSSOutput struct{}
 
-func (r XSSOutput) ID() string                      { return "GTSS-LUA-005" }
+func (r XSSOutput) ID() string                      { return "BATOU-LUA-005" }
 func (r XSSOutput) Name() string                    { return "XSS via OpenResty Response" }
 func (r XSSOutput) DefaultSeverity() rules.Severity { return rules.High }
 func (r XSSOutput) Description() string {
@@ -507,7 +507,7 @@ func (r XSSOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureDeserialization struct{}
 
-func (r InsecureDeserialization) ID() string                      { return "GTSS-LUA-006" }
+func (r InsecureDeserialization) ID() string                      { return "BATOU-LUA-006" }
 func (r InsecureDeserialization) Name() string                    { return "Insecure Deserialization" }
 func (r InsecureDeserialization) DefaultSeverity() rules.Severity { return rules.High }
 func (r InsecureDeserialization) Description() string {
@@ -616,7 +616,7 @@ func (r InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OpenRedirect struct{}
 
-func (r OpenRedirect) ID() string                      { return "GTSS-LUA-007" }
+func (r OpenRedirect) ID() string                      { return "BATOU-LUA-007" }
 func (r OpenRedirect) Name() string                    { return "Open Redirect" }
 func (r OpenRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r OpenRedirect) Description() string {
@@ -671,7 +671,7 @@ func (r OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DebugLibrary struct{}
 
-func (r DebugLibrary) ID() string                      { return "GTSS-LUA-008" }
+func (r DebugLibrary) ID() string                      { return "BATOU-LUA-008" }
 func (r DebugLibrary) Name() string                    { return "Debug Library in Production" }
 func (r DebugLibrary) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r DebugLibrary) Description() string {

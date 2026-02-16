@@ -23,7 +23,7 @@ expected_vulnerabilities:
     pattern: "Native deserialization of untrusted user input"
     cwe: CWE-502
     typical_severity: critical
-    gtss_rules: [GTSS-INJ-010]
+    batou_rules: [BATOU-INJ-010]
 gold_secure_pattern: |
   Use a safe data format like JSON:
   preferences = json.loads(uploaded_data)

@@ -3,7 +3,7 @@ package tsflow
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
+	"github.com/turenlabs/batou/internal/ast"
 )
 
 // allowlistCheckResult holds the result of detecting an allowlist/membership

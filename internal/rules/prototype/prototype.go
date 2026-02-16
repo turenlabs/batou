@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-PROTO-001: Prototype pollution via merge/extend/deep copy
+// BATOU-PROTO-001: Prototype pollution via merge/extend/deep copy
 var (
 	// Lodash/underscore deep merge with user input
 	jsMergeUserInput = regexp.MustCompile(`(?:_\.merge|_\.defaultsDeep|_\.extend|lodash\.merge|deepmerge|deep[Mm]erge|deepExtend|deep[Ee]xtend)\s*\([^,]*,\s*(?:req\.body|req\.query|req\.params|request\.body|userInput|user[Ii]nput|input|body|payload)`)
@@ -21,7 +21,7 @@ var (
 	jsRecursiveMerge = regexp.MustCompile(`(?:merge|extend|assign|mixin)\s*\([^)]*(?:req\.body|req\.query|req\.params|request\.body)`)
 )
 
-// GTSS-PROTO-002: Direct __proto__ / constructor.prototype assignment
+// BATOU-PROTO-002: Direct __proto__ / constructor.prototype assignment
 var (
 	jsProtoAssign       = regexp.MustCompile(`\b\w+\s*\[\s*['"]__proto__['"]\s*\]`)
 	jsProtoDirectAccess = regexp.MustCompile(`\.__proto__\s*=`)
@@ -35,11 +35,11 @@ func init() {
 	rules.Register(&PrototypePollutionDirect{})
 }
 
-// --- GTSS-PROTO-001: Prototype Pollution via Merge/Extend ---
+// --- BATOU-PROTO-001: Prototype Pollution via Merge/Extend ---
 
 type PrototypePollutionMerge struct{}
 
-func (r *PrototypePollutionMerge) ID() string               { return "GTSS-PROTO-001" }
+func (r *PrototypePollutionMerge) ID() string               { return "BATOU-PROTO-001" }
 func (r *PrototypePollutionMerge) Name() string              { return "PrototypePollutionMerge" }
 func (r *PrototypePollutionMerge) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PrototypePollutionMerge) Languages() []rules.Language {
@@ -126,11 +126,11 @@ func (r *PrototypePollutionMerge) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-PROTO-002: Direct __proto__ Assignment ---
+// --- BATOU-PROTO-002: Direct __proto__ Assignment ---
 
 type PrototypePollutionDirect struct{}
 
-func (r *PrototypePollutionDirect) ID() string               { return "GTSS-PROTO-002" }
+func (r *PrototypePollutionDirect) ID() string               { return "BATOU-PROTO-002" }
 func (r *PrototypePollutionDirect) Name() string              { return "PrototypePollutionDirect" }
 func (r *PrototypePollutionDirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PrototypePollutionDirect) Languages() []rules.Language {

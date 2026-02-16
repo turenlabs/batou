@@ -3,11 +3,11 @@ package xxe
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-XXE-001: Java XML Parser without Secure Configuration
+// BATOU-XXE-001: Java XML Parser without Secure Configuration
 // ---------------------------------------------------------------------------
 
 func TestXXE001_DocumentBuilderFactory(t *testing.T) {
@@ -19,7 +19,7 @@ func TestXXE001_DocumentBuilderFactory(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/XmlHandler.java", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-001")
+	testutil.MustFindRule(t, result, "BATOU-XXE-001")
 }
 
 func TestXXE001_SAXParserFactory(t *testing.T) {
@@ -31,7 +31,7 @@ func TestXXE001_SAXParserFactory(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SaxHandler.java", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-001")
+	testutil.MustFindRule(t, result, "BATOU-XXE-001")
 }
 
 func TestXXE001_XMLInputFactory(t *testing.T) {
@@ -42,7 +42,7 @@ func TestXXE001_XMLInputFactory(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/StaxHandler.java", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-001")
+	testutil.MustFindRule(t, result, "BATOU-XXE-001")
 }
 
 func TestXXE001_TransformerFactory(t *testing.T) {
@@ -53,7 +53,7 @@ func TestXXE001_TransformerFactory(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/XslHandler.java", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-001")
+	testutil.MustFindRule(t, result, "BATOU-XXE-001")
 }
 
 func TestXXE001_Safe_DisallowDoctype(t *testing.T) {
@@ -66,7 +66,7 @@ func TestXXE001_Safe_DisallowDoctype(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SafeXmlHandler.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-XXE-001")
+	testutil.MustNotFindRule(t, result, "BATOU-XXE-001")
 }
 
 func TestXXE001_Safe_DisableExternalEntities(t *testing.T) {
@@ -79,7 +79,7 @@ func TestXXE001_Safe_DisableExternalEntities(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SafeStaxHandler.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-XXE-001")
+	testutil.MustNotFindRule(t, result, "BATOU-XXE-001")
 }
 
 func TestXXE001_Safe_SecureProcessing(t *testing.T) {
@@ -91,17 +91,17 @@ func TestXXE001_Safe_SecureProcessing(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SafeTransformer.java", content)
-	testutil.MustNotFindRule(t, result, "GTSS-XXE-001")
+	testutil.MustNotFindRule(t, result, "BATOU-XXE-001")
 }
 
 func TestXXE001_Fixture_Java(t *testing.T) {
 	content := testutil.LoadFixture(t, "java/vulnerable/XxeBasic.java")
 	result := testutil.ScanContent(t, "/app/XxeBasic.java", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-001")
+	testutil.MustFindRule(t, result, "BATOU-XXE-001")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XXE-002: JavaScript/Node XML Parser with Entity Expansion
+// BATOU-XXE-002: JavaScript/Node XML Parser with Entity Expansion
 // ---------------------------------------------------------------------------
 
 func TestXXE002_LibxmlNoent(t *testing.T) {
@@ -109,43 +109,43 @@ func TestXXE002_LibxmlNoent(t *testing.T) {
 const doc = libxmljs.parseXml(xmlData, { noent: true, nonet: false });
 const name = doc.get('//name').text();`
 	result := testutil.ScanContent(t, "/app/parser.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-002")
+	testutil.MustFindRule(t, result, "BATOU-XXE-002")
 }
 
 func TestXXE002_LibxmlNoentShort(t *testing.T) {
 	content := `const doc = libxml.parseXml(data, { noent: true });`
 	result := testutil.ScanContent(t, "/app/parser.js", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-002")
+	testutil.MustFindRule(t, result, "BATOU-XXE-002")
 }
 
 func TestXXE002_DOMParser(t *testing.T) {
 	content := `const parser = new DOMParser();
 const doc = parser.parseFromString(xmlInput, 'text/xml');`
 	result := testutil.ScanContent(t, "/app/parser.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-002")
+	testutil.MustFindRule(t, result, "BATOU-XXE-002")
 }
 
 func TestXXE002_FastXMLParserEntities(t *testing.T) {
 	content := `const parser = new XMLParser({ processEntities: true, allowBooleanAttributes: true });
 const result = parser.parse(xmlString);`
 	result := testutil.ScanContent(t, "/app/parser.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-002")
+	testutil.MustFindRule(t, result, "BATOU-XXE-002")
 }
 
 func TestXXE002_ParseFromStringReqBody(t *testing.T) {
 	content := `const doc = parser.parseFromString(req.body.xml, 'text/xml');`
 	result := testutil.ScanContent(t, "/app/handler.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-002")
+	testutil.MustFindRule(t, result, "BATOU-XXE-002")
 }
 
 func TestXXE002_Fixture_JS(t *testing.T) {
 	content := testutil.LoadFixture(t, "javascript/vulnerable/xml_xxe.ts")
 	result := testutil.ScanContent(t, "/app/xml_xxe.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-002")
+	testutil.MustFindRule(t, result, "BATOU-XXE-002")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XXE-003: Python XML Parser
+// BATOU-XXE-003: Python XML Parser
 // ---------------------------------------------------------------------------
 
 func TestXXE003_ElementTree(t *testing.T) {
@@ -153,14 +153,14 @@ func TestXXE003_ElementTree(t *testing.T) {
 tree = ET.parse(user_input_file)
 root = tree.getroot()`
 	result := testutil.ScanContent(t, "/app/parser.py", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-003")
+	testutil.MustFindRule(t, result, "BATOU-XXE-003")
 }
 
 func TestXXE003_Minidom(t *testing.T) {
 	content := `from xml.dom.minidom import parseString
 doc = minidom.parseString(xml_data)`
 	result := testutil.ScanContent(t, "/app/parser.py", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-003")
+	testutil.MustFindRule(t, result, "BATOU-XXE-003")
 }
 
 func TestXXE003_SAX(t *testing.T) {
@@ -168,7 +168,7 @@ func TestXXE003_SAX(t *testing.T) {
 parser = xml.sax.make_parser()
 parser.parse(input_file)`
 	result := testutil.ScanContent(t, "/app/parser.py", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-003")
+	testutil.MustFindRule(t, result, "BATOU-XXE-003")
 }
 
 func TestXXE003_Lxml(t *testing.T) {
@@ -176,7 +176,7 @@ func TestXXE003_Lxml(t *testing.T) {
 doc = etree.parse(xml_file)
 root = doc.getroot()`
 	result := testutil.ScanContent(t, "/app/parser.py", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-003")
+	testutil.MustFindRule(t, result, "BATOU-XXE-003")
 }
 
 func TestXXE003_Safe_DefusedXML(t *testing.T) {
@@ -184,7 +184,7 @@ func TestXXE003_Safe_DefusedXML(t *testing.T) {
 tree = ET.parse(user_input_file)
 root = tree.getroot()`
 	result := testutil.ScanContent(t, "/app/parser.py", content)
-	testutil.MustNotFindRule(t, result, "GTSS-XXE-003")
+	testutil.MustNotFindRule(t, result, "BATOU-XXE-003")
 }
 
 func TestXXE003_Safe_LxmlResolveEntitiesFalse(t *testing.T) {
@@ -193,11 +193,11 @@ parser = etree.XMLParser(resolve_entities=False)
 doc = etree.parse(xml_file, parser)
 root = doc.getroot()`
 	result := testutil.ScanContent(t, "/app/parser.py", content)
-	testutil.MustNotFindRule(t, result, "GTSS-XXE-003")
+	testutil.MustNotFindRule(t, result, "BATOU-XXE-003")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XXE-004: C#/.NET XML Parser
+// BATOU-XXE-004: C#/.NET XML Parser
 // ---------------------------------------------------------------------------
 
 func TestXXE004_XmlTextReader(t *testing.T) {
@@ -206,7 +206,7 @@ func TestXXE004_XmlTextReader(t *testing.T) {
     while (reader.Read()) { }
 }`
 	result := testutil.ScanContent(t, "/app/Parser.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-004")
+	testutil.MustFindRule(t, result, "BATOU-XXE-004")
 }
 
 func TestXXE004_XmlReaderCreate(t *testing.T) {
@@ -215,7 +215,7 @@ func TestXXE004_XmlReaderCreate(t *testing.T) {
     while (reader.Read()) { }
 }`
 	result := testutil.ScanContent(t, "/app/Parser.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-XXE-004")
+	testutil.MustFindRule(t, result, "BATOU-XXE-004")
 }
 
 func TestXXE004_Safe_DtdProhibit(t *testing.T) {
@@ -226,7 +226,7 @@ func TestXXE004_Safe_DtdProhibit(t *testing.T) {
     while (reader.Read()) { }
 }`
 	result := testutil.ScanContent(t, "/app/Parser.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-XXE-004")
+	testutil.MustNotFindRule(t, result, "BATOU-XXE-004")
 }
 
 func TestXXE004_Safe_XmlResolverNull(t *testing.T) {
@@ -237,5 +237,5 @@ func TestXXE004_Safe_XmlResolverNull(t *testing.T) {
     while (reader.Read()) { }
 }`
 	result := testutil.ScanContent(t, "/app/Parser.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-XXE-004")
+	testutil.MustNotFindRule(t, result, "BATOU-XXE-004")
 }

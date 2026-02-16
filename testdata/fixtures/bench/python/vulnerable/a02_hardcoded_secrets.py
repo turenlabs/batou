@@ -1,5 +1,5 @@
 # Source: CWE-798 - Hardcoded credentials in application code
-# Expected: GTSS-SEC-001 (Hardcoded Password), GTSS-SEC-002 (API Key), GTSS-SEC-004 (Connection String)
+# Expected: BATOU-SEC-001 (Hardcoded Password), BATOU-SEC-002 (API Key), BATOU-SEC-004 (Connection String)
 # OWASP: A02:2021 - Cryptographic Failures (Hardcoded Secrets)
 
 import boto3

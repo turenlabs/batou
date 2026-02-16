@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-FW-TAURI-001: Dangerous shell command allowlist
+// BATOU-FW-TAURI-001: Dangerous shell command allowlist
 var (
 	// Tauri v1: "shell": { "all": true } or shell.all = true
 	shellAllTrue = regexp.MustCompile(`"shell"\s*:\s*\{[^}]*"all"\s*:\s*true`)
@@ -28,7 +28,7 @@ var (
 	jsCommandCreate = regexp.MustCompile(`Command\s*\.\s*create\s*\(`)
 )
 
-// GTSS-FW-TAURI-002: Overly permissive filesystem scope
+// BATOU-FW-TAURI-002: Overly permissive filesystem scope
 var (
 	// fs scope with $HOME/**, $APPDATA/**, or ** wildcard
 	fsScopeHomeStar  = regexp.MustCompile(`"(?:fs|allow)"\s*:\s*\{[^}]*"scope"\s*:\s*\[[^\]]*"\$HOME/\*\*"`)
@@ -41,7 +41,7 @@ var (
 	fsScopeRoot      = regexp.MustCompile(`"scope"\s*:\s*\[[^\]]*"(?:/\*\*|[A-Z]:\\\\\*\*)"`)
 )
 
-// GTSS-FW-TAURI-003: IPC command injection
+// BATOU-FW-TAURI-003: IPC command injection
 var (
 	// Rust: #[tauri::command] fn without input validation (basic indicator)
 	tauriCommandAttr       = regexp.MustCompile(`#\[tauri::command\]`)
@@ -52,7 +52,7 @@ var (
 	jsInvokeUserInput      = regexp.MustCompile(`invoke\s*\(\s*(?:document\s*\.\s*getElementById|querySelector|event\s*\.\s*target|input\s*\.\s*value|userInput|user_input|cmdName|commandName)`)
 )
 
-// GTSS-FW-TAURI-004: Dangerous protocol handler
+// BATOU-FW-TAURI-004: Dangerous protocol handler
 var (
 	// Custom protocol without origin check
 	customProtocolRust     = regexp.MustCompile(`register_uri_scheme_protocol\s*\(`)
@@ -63,7 +63,7 @@ var (
 	dangerousScheme        = regexp.MustCompile(`"(?:open|scheme)"\s*:\s*(?:true|"(?:file|smb|nfs)://)`)
 )
 
-// GTSS-FW-TAURI-005: CSP bypass or missing CSP
+// BATOU-FW-TAURI-005: CSP bypass or missing CSP
 var (
 	// No CSP in security section: "security": {} with no "csp" key
 	securityNoCSP   = regexp.MustCompile(`"security"\s*:\s*\{[^}]*\}`)
@@ -74,7 +74,7 @@ var (
 	cspWildcard     = regexp.MustCompile(`"csp"\s*:\s*"[^"]*\*[^"]*"`)
 )
 
-// GTSS-FW-TAURI-006: window.__TAURI__ exposure
+// BATOU-FW-TAURI-006: window.__TAURI__ exposure
 var (
 	// Direct reference to window.__TAURI__
 	tauriWindowExpose  = regexp.MustCompile(`window\s*\.\s*__TAURI__`)
@@ -84,7 +84,7 @@ var (
 	tauriAPILeak       = regexp.MustCompile(`(?:postMessage|send|emit|broadcast)\s*\([^)]*__TAURI__`)
 )
 
-// GTSS-FW-TAURI-007: Dangerous Tauri v2 permissions
+// BATOU-FW-TAURI-007: Dangerous Tauri v2 permissions
 var (
 	// allow-execute in capability
 	permAllowExecute = regexp.MustCompile(`"shell:allow-execute"`)
@@ -98,7 +98,7 @@ var (
 	permAllWindows   = regexp.MustCompile(`"windows"\s*:\s*\[\s*"\*"\s*\]`)
 )
 
-// GTSS-FW-TAURI-008: Insecure updater config
+// BATOU-FW-TAURI-008: Insecure updater config
 var (
 	// Updater endpoint using HTTP (not HTTPS)
 	updaterHTTPEndpoint = regexp.MustCompile(`"(?:updater|endpoints?)"\s*:\s*(?:\[?\s*"http://[^"]+)`)
@@ -141,11 +141,11 @@ func isTauriProject(content, filePath string) bool {
 		strings.Contains(content, "invoke(") && strings.Contains(content, "tauri")
 }
 
-// --- GTSS-FW-TAURI-001: Dangerous Shell Command Allowlist ---
+// --- BATOU-FW-TAURI-001: Dangerous Shell Command Allowlist ---
 
 type TauriShellAllowlist struct{}
 
-func (r *TauriShellAllowlist) ID() string                      { return "GTSS-FW-TAURI-001" }
+func (r *TauriShellAllowlist) ID() string                      { return "BATOU-FW-TAURI-001" }
 func (r *TauriShellAllowlist) Name() string                    { return "TauriShellAllowlist" }
 func (r *TauriShellAllowlist) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *TauriShellAllowlist) Languages() []rules.Language {
@@ -226,11 +226,11 @@ func (r *TauriShellAllowlist) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-TAURI-002: Overly Permissive Filesystem Scope ---
+// --- BATOU-FW-TAURI-002: Overly Permissive Filesystem Scope ---
 
 type TauriFilesystemScope struct{}
 
-func (r *TauriFilesystemScope) ID() string                      { return "GTSS-FW-TAURI-002" }
+func (r *TauriFilesystemScope) ID() string                      { return "BATOU-FW-TAURI-002" }
 func (r *TauriFilesystemScope) Name() string                    { return "TauriFilesystemScope" }
 func (r *TauriFilesystemScope) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TauriFilesystemScope) Languages() []rules.Language {
@@ -291,11 +291,11 @@ func (r *TauriFilesystemScope) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-TAURI-003: IPC Command Injection ---
+// --- BATOU-FW-TAURI-003: IPC Command Injection ---
 
 type TauriIPCInjection struct{}
 
-func (r *TauriIPCInjection) ID() string                      { return "GTSS-FW-TAURI-003" }
+func (r *TauriIPCInjection) ID() string                      { return "BATOU-FW-TAURI-003" }
 func (r *TauriIPCInjection) Name() string                    { return "TauriIPCInjection" }
 func (r *TauriIPCInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TauriIPCInjection) Languages() []rules.Language {
@@ -405,11 +405,11 @@ func (r *TauriIPCInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-TAURI-004: Dangerous Protocol Handler ---
+// --- BATOU-FW-TAURI-004: Dangerous Protocol Handler ---
 
 type TauriProtocolHandler struct{}
 
-func (r *TauriProtocolHandler) ID() string                      { return "GTSS-FW-TAURI-004" }
+func (r *TauriProtocolHandler) ID() string                      { return "BATOU-FW-TAURI-004" }
 func (r *TauriProtocolHandler) Name() string                    { return "TauriProtocolHandler" }
 func (r *TauriProtocolHandler) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TauriProtocolHandler) Languages() []rules.Language {
@@ -498,11 +498,11 @@ func (r *TauriProtocolHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-TAURI-005: CSP Bypass or Missing CSP ---
+// --- BATOU-FW-TAURI-005: CSP Bypass or Missing CSP ---
 
 type TauriCSPMissing struct{}
 
-func (r *TauriCSPMissing) ID() string                      { return "GTSS-FW-TAURI-005" }
+func (r *TauriCSPMissing) ID() string                      { return "BATOU-FW-TAURI-005" }
 func (r *TauriCSPMissing) Name() string                    { return "TauriCSPMissing" }
 func (r *TauriCSPMissing) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *TauriCSPMissing) Languages() []rules.Language {
@@ -597,11 +597,11 @@ func (r *TauriCSPMissing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-TAURI-006: window.__TAURI__ Exposure ---
+// --- BATOU-FW-TAURI-006: window.__TAURI__ Exposure ---
 
 type TauriWindowExposure struct{}
 
-func (r *TauriWindowExposure) ID() string                      { return "GTSS-FW-TAURI-006" }
+func (r *TauriWindowExposure) ID() string                      { return "BATOU-FW-TAURI-006" }
 func (r *TauriWindowExposure) Name() string                    { return "TauriWindowExposure" }
 func (r *TauriWindowExposure) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TauriWindowExposure) Languages() []rules.Language {
@@ -677,11 +677,11 @@ func (r *TauriWindowExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-TAURI-007: Dangerous Tauri v2 Permissions ---
+// --- BATOU-FW-TAURI-007: Dangerous Tauri v2 Permissions ---
 
 type TauriDangerousPerms struct{}
 
-func (r *TauriDangerousPerms) ID() string                      { return "GTSS-FW-TAURI-007" }
+func (r *TauriDangerousPerms) ID() string                      { return "BATOU-FW-TAURI-007" }
 func (r *TauriDangerousPerms) Name() string                    { return "TauriDangerousPerms" }
 func (r *TauriDangerousPerms) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TauriDangerousPerms) Languages() []rules.Language {
@@ -768,11 +768,11 @@ func (r *TauriDangerousPerms) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-TAURI-008: Insecure Updater Configuration ---
+// --- BATOU-FW-TAURI-008: Insecure Updater Configuration ---
 
 type TauriInsecureUpdater struct{}
 
-func (r *TauriInsecureUpdater) ID() string                      { return "GTSS-FW-TAURI-008" }
+func (r *TauriInsecureUpdater) ID() string                      { return "BATOU-FW-TAURI-008" }
 func (r *TauriInsecureUpdater) Name() string                    { return "TauriInsecureUpdater" }
 func (r *TauriInsecureUpdater) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *TauriInsecureUpdater) Languages() []rules.Language {

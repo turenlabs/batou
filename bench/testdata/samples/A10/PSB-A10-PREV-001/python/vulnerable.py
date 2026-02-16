@@ -1,6 +1,6 @@
 # PSB-A10-PREV-001: URL preview/unfurl feature
 # CWE: CWE-918
-# Expected: GTSS-SSRF-001
+# Expected: BATOU-SSRF-001
 from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup

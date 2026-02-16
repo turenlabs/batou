@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// SQL Injection patterns (GTSS-INJ-001)
+// SQL Injection patterns (BATOU-INJ-001)
 var (
 	// Go: fmt.Sprintf with SQL keywords
 	reSQLSprintfGo = regexp.MustCompile(`(?i)fmt\.Sprintf\(\s*"[^"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"]*%[svdq]`)
@@ -39,7 +39,7 @@ var (
 	reSQLRubyWhere = regexp.MustCompile(`(?i)\.where\(\s*"[^"]*#\{`)
 )
 
-// Command Injection patterns (GTSS-INJ-002)
+// Command Injection patterns (BATOU-INJ-002)
 var (
 	// Python: os.system / os.popen with variable
 	reCmdOsSystem = regexp.MustCompile(`(?i)\bos\.(system|popen|popen2|popen3|popen4)\s*\((?:\s*f["']|[^)"']*\+|[^)"']*%|.*\.format\()`)
@@ -67,7 +67,7 @@ var (
 	reCmdRuby = regexp.MustCompile("(?i)(?:\\b(?:system|exec|%x)\\s*\\(\\s*[\"'][^\"']*#\\{|`[^`]*#\\{)")
 )
 
-// Code Injection patterns (GTSS-INJ-003)
+// Code Injection patterns (BATOU-INJ-003)
 var (
 	// eval() with variable argument (not a string literal)
 	reCodeEval = regexp.MustCompile(`(?i)\beval\s*\(\s*(?:[^"'\x60\s);][^);]*|f["']|["'][^"']*["']\s*[+%]|["'][^"']*["']\s*\.format)`)
@@ -84,7 +84,7 @@ var (
 	reCodeSafeJsonParse  = regexp.MustCompile(`(?i)\bJSON\.parse\b`)
 )
 
-// LDAP Injection patterns (GTSS-INJ-004)
+// LDAP Injection patterns (BATOU-INJ-004)
 var (
 	// LDAP filter with string concat
 	reLDAPConcat = regexp.MustCompile(`(?i)(?:["']\s*\(\s*(?:&|\|)\s*\(\s*\w+\s*=\s*["']\s*\+|["']\(\w+=["']\s*\+)`)
@@ -94,7 +94,7 @@ var (
 	reLDAPFilter = regexp.MustCompile(`(?i)(?:search_filter|ldap_filter|filter)\s*=\s*(?:f["'][^"']*\{|["'][^"']*["']\s*[+%]|["'][^"']*["']\s*\.format)`)
 )
 
-// Template Injection patterns (GTSS-INJ-005)
+// Template Injection patterns (BATOU-INJ-005)
 var (
 	// Python: render_template_string with variable
 	reTemplateRenderString = regexp.MustCompile(`(?i)\brender_template_string\s*\(\s*[^"'\s)]`)
@@ -115,7 +115,7 @@ var (
 	reTemplateJavaEngine = regexp.MustCompile(`(?i)(?:templateEngine|template|engine)\s*\.\s*(?:process|evaluate|merge)\s*\(\s*[^"'\s)]`)
 )
 
-// XPath Injection patterns (GTSS-INJ-006)
+// XPath Injection patterns (BATOU-INJ-006)
 var (
 	// XPath with string concat
 	reXPathConcat = regexp.MustCompile(`(?i)(?:xpath|selectNodes|selectSingleNode|evaluate|querySelector)\s*\(\s*(?:"[^"]*"|'[^']*')\s*\+`)
@@ -127,7 +127,7 @@ var (
 	reXPathGeneric = regexp.MustCompile(`(?i)["'][^"']*(?://|/)\w+\s*\[\s*@?\w+\s*=\s*["']\s*\+`)
 )
 
-// NoSQL Injection patterns (GTSS-INJ-007)
+// NoSQL Injection patterns (BATOU-INJ-007)
 var (
 	// MongoDB: $where with string
 	reNoSQLWhere = regexp.MustCompile(`(?i)['"]\$where['"]\s*:\s*(?:f?["'][^"']*\{|"[^"]*"\s*\+|'[^']*'\s*\+|[^"'\s][^,}]*)`)
@@ -164,7 +164,7 @@ var (
 			`(?:req\.(?:body|query|params)|[^"'\s{,}]+\.(?:body|query|params|input|data))`)
 )
 
-// GraphQL Injection patterns (GTSS-INJ-008)
+// GraphQL Injection patterns (BATOU-INJ-008)
 //
 // Note: patterns use (?:[^"'\\]|\\.)* instead of [^"']* to correctly
 // handle escaped quotes (e.g., \") inside string literals.
@@ -219,12 +219,12 @@ func truncate(s string, maxLen int) string {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-001: SQL Injection
+// BATOU-INJ-001: SQL Injection
 // ---------------------------------------------------------------------------
 
 type SQLInjection struct{}
 
-func (r SQLInjection) ID() string              { return "GTSS-INJ-001" }
+func (r SQLInjection) ID() string              { return "BATOU-INJ-001" }
 func (r SQLInjection) Name() string            { return "SQL Injection" }
 func (r SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r SQLInjection) Description() string {
@@ -296,12 +296,12 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-002: Command Injection
+// BATOU-INJ-002: Command Injection
 // ---------------------------------------------------------------------------
 
 type CommandInjection struct{}
 
-func (r CommandInjection) ID() string              { return "GTSS-INJ-002" }
+func (r CommandInjection) ID() string              { return "BATOU-INJ-002" }
 func (r CommandInjection) Name() string            { return "Command Injection" }
 func (r CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r CommandInjection) Description() string {
@@ -383,12 +383,12 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-003: Code Injection
+// BATOU-INJ-003: Code Injection
 // ---------------------------------------------------------------------------
 
 type CodeInjection struct{}
 
-func (r CodeInjection) ID() string              { return "GTSS-INJ-003" }
+func (r CodeInjection) ID() string              { return "BATOU-INJ-003" }
 func (r CodeInjection) Name() string            { return "Code Injection" }
 func (r CodeInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r CodeInjection) Description() string {
@@ -458,12 +458,12 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-004: LDAP Injection
+// BATOU-INJ-004: LDAP Injection
 // ---------------------------------------------------------------------------
 
 type LDAPInjection struct{}
 
-func (r LDAPInjection) ID() string              { return "GTSS-INJ-004" }
+func (r LDAPInjection) ID() string              { return "BATOU-INJ-004" }
 func (r LDAPInjection) Name() string            { return "LDAP Injection" }
 func (r LDAPInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r LDAPInjection) Description() string {
@@ -522,12 +522,12 @@ func (r LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-005: Template Injection (SSTI)
+// BATOU-INJ-005: Template Injection (SSTI)
 // ---------------------------------------------------------------------------
 
 type TemplateInjection struct{}
 
-func (r TemplateInjection) ID() string              { return "GTSS-INJ-005" }
+func (r TemplateInjection) ID() string              { return "BATOU-INJ-005" }
 func (r TemplateInjection) Name() string            { return "Server-Side Template Injection" }
 func (r TemplateInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r TemplateInjection) Description() string {
@@ -592,12 +592,12 @@ func (r TemplateInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-006: XPath Injection
+// BATOU-INJ-006: XPath Injection
 // ---------------------------------------------------------------------------
 
 type XPathInjection struct{}
 
-func (r XPathInjection) ID() string              { return "GTSS-INJ-006" }
+func (r XPathInjection) ID() string              { return "BATOU-INJ-006" }
 func (r XPathInjection) Name() string            { return "XPath Injection" }
 func (r XPathInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r XPathInjection) Description() string {
@@ -657,12 +657,12 @@ func (r XPathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-007: NoSQL Injection
+// BATOU-INJ-007: NoSQL Injection
 // ---------------------------------------------------------------------------
 
 type NoSQLInjection struct{}
 
-func (r NoSQLInjection) ID() string              { return "GTSS-INJ-007" }
+func (r NoSQLInjection) ID() string              { return "BATOU-INJ-007" }
 func (r NoSQLInjection) Name() string            { return "NoSQL Injection" }
 func (r NoSQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r NoSQLInjection) Description() string {
@@ -776,12 +776,12 @@ func hasNearbyReqInput(lines []string, idx int) bool {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-008: GraphQL Injection
+// BATOU-INJ-008: GraphQL Injection
 // ---------------------------------------------------------------------------
 
 type GraphQLInjection struct{}
 
-func (r GraphQLInjection) ID() string              { return "GTSS-INJ-008" }
+func (r GraphQLInjection) ID() string              { return "BATOU-INJ-008" }
 func (r GraphQLInjection) Name() string            { return "GraphQL Injection" }
 func (r GraphQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r GraphQLInjection) Description() string {
@@ -850,7 +850,7 @@ func (r GraphQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-009: HTTP Header Injection
+// BATOU-INJ-009: HTTP Header Injection
 // ---------------------------------------------------------------------------
 
 // HTTP Header Injection patterns
@@ -877,7 +877,7 @@ var (
 
 type HTTPHeaderInjection struct{}
 
-func (r HTTPHeaderInjection) ID() string              { return "GTSS-INJ-009" }
+func (r HTTPHeaderInjection) ID() string              { return "BATOU-INJ-009" }
 func (r HTTPHeaderInjection) Name() string            { return "HTTP Header Injection" }
 func (r HTTPHeaderInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r HTTPHeaderInjection) Description() string {

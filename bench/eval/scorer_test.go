@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // testdataDir returns the absolute path to the testdata directory
@@ -141,7 +141,7 @@ func TestAggregateModel(t *testing.T) {
 			SeverityScore:      10.0,
 			CWEMatched:         true,
 			OWASPMatched:       true,
-			RuleIDs:            []string{"GTSS-INJ-001"},
+			RuleIDs:            []string{"BATOU-INJ-001"},
 			FindingCount:       1,
 		},
 		{
@@ -153,7 +153,7 @@ func TestAggregateModel(t *testing.T) {
 			SeverityScore:      7.0,
 			CWEMatched:         true,
 			OWASPMatched:       false,
-			RuleIDs:            []string{"GTSS-INJ-002"},
+			RuleIDs:            []string{"BATOU-INJ-002"},
 			FindingCount:       1,
 		},
 		{
@@ -284,7 +284,7 @@ func TestFormatCSV(t *testing.T) {
 				SeverityScore:      14.0,
 				CWEMatched:         true,
 				OWASPMatched:       true,
-				RuleIDs:            []string{"GTSS-INJ-001", "GTSS-INJ-002"},
+				RuleIDs:            []string{"BATOU-INJ-001", "BATOU-INJ-002"},
 			},
 		},
 	}
@@ -300,7 +300,7 @@ func TestFormatCSV(t *testing.T) {
 		t.Error("CSV header should contain 'prompt_id'")
 	}
 
-	if !strings.Contains(lines[1], "GTSS-INJ-001;GTSS-INJ-002") {
+	if !strings.Contains(lines[1], "BATOU-INJ-001;BATOU-INJ-002") {
 		t.Errorf("CSV data should contain rule IDs, got: %s", lines[1])
 	}
 }

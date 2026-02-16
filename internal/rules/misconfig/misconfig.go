@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled regex patterns ---
 
-// GTSS-MISC-001: Debug mode enabled
+// BATOU-MISC-001: Debug mode enabled
 var (
 	// Python/Django: DEBUG = True
 	reDjangoDebug     = regexp.MustCompile(`\bDEBUG\s*=\s*True\b`)
@@ -28,7 +28,7 @@ var (
 	reGenericDebugTrue = regexp.MustCompile(`(?i)\bdebug[_\-]?mode\s*[:=]\s*(?:true|1|['"]true['"]|['"]1['"])`)
 )
 
-// GTSS-MISC-002: Verbose error disclosure
+// BATOU-MISC-002: Verbose error disclosure
 var (
 	// JS/Node: res.send(err.stack) or res.status(500).send(err.stack)
 	reJSErrStack       = regexp.MustCompile(`res\.(?:\w+\s*\([^)]*\)\s*\.)*\w+\s*\(\s*(?:err|error)\.stack\b`)
@@ -46,7 +46,7 @@ var (
 	reStackTraceResp   = regexp.MustCompile(`(?i)(?:response|res|resp)\.\w+\(.*(?:stack_?trace|stackTrace|full_?error)`)
 )
 
-// GTSS-MISC-003: Missing security headers (CWE-1021, CWE-693)
+// BATOU-MISC-003: Missing security headers (CWE-1021, CWE-693)
 var (
 	// Response handler patterns (where headers should be set)
 	reGoHTTPHandler      = regexp.MustCompile(`func\s+\w*\s*\(\s*\w+\s+http\.ResponseWriter`)
@@ -77,11 +77,11 @@ func init() {
 	rules.Register(&MissingSecurityHeaders{})
 }
 
-// --- GTSS-MISC-001: DebugMode ---
+// --- BATOU-MISC-001: DebugMode ---
 
 type DebugMode struct{}
 
-func (r *DebugMode) ID() string                    { return "GTSS-MISC-001" }
+func (r *DebugMode) ID() string                    { return "BATOU-MISC-001" }
 func (r *DebugMode) Name() string                  { return "DebugMode" }
 func (r *DebugMode) DefaultSeverity() rules.Severity { return rules.Medium }
 
@@ -193,11 +193,11 @@ func (r *DebugMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-MISC-002: ErrorDisclosure ---
+// --- BATOU-MISC-002: ErrorDisclosure ---
 
 type ErrorDisclosure struct{}
 
-func (r *ErrorDisclosure) ID() string                    { return "GTSS-MISC-002" }
+func (r *ErrorDisclosure) ID() string                    { return "BATOU-MISC-002" }
 func (r *ErrorDisclosure) Name() string                  { return "ErrorDisclosure" }
 func (r *ErrorDisclosure) DefaultSeverity() rules.Severity { return rules.Low }
 
@@ -303,11 +303,11 @@ func (r *ErrorDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-MISC-003: MissingSecurityHeaders ---
+// --- BATOU-MISC-003: MissingSecurityHeaders ---
 
 type MissingSecurityHeaders struct{}
 
-func (r *MissingSecurityHeaders) ID() string                    { return "GTSS-MISC-003" }
+func (r *MissingSecurityHeaders) ID() string                    { return "BATOU-MISC-003" }
 func (r *MissingSecurityHeaders) Name() string                  { return "MissingSecurityHeaders" }
 func (r *MissingSecurityHeaders) DefaultSeverity() rules.Severity { return rules.Medium }
 

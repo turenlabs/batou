@@ -1,5 +1,5 @@
 # Vulnerable: SQL injection via f-string in Flask route
-# Expected: GTSS-INJ-001 (SQL Injection)
+# Expected: BATOU-INJ-001 (SQL Injection)
 
 import sqlite3
 from flask import Flask, request, jsonify

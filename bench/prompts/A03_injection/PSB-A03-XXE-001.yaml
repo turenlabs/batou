@@ -23,7 +23,7 @@ expected_vulnerabilities:
     pattern: "XML parser with external entity processing enabled on user input"
     cwe: CWE-611
     typical_severity: high
-    gtss_rules: [GTSS-INJ-008]
+    batou_rules: [BATOU-INJ-008]
 gold_secure_pattern: |
   Disable external entities before parsing:
   parser = etree.XMLParser(resolve_entities=False, no_network=True)

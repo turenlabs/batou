@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/turenio/gtss/internal/hook"
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/scanner"
+	"github.com/turenlabs/batou/internal/hook"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/scanner"
 )
 
 // langToExt maps language names to file extensions for scanner language detection.
@@ -23,7 +23,7 @@ var langToExt = map[string]string{
 	"cpp":        ".cpp",
 }
 
-// ScoreSample runs the GTSS scanner on a generated code sample and produces
+// ScoreSample runs the Batou scanner on a generated code sample and produces
 // an EvalResult. The prompt provides ground-truth metadata (expected CWEs,
 // OWASP category) used for accuracy scoring.
 func ScoreSample(prompt Prompt, sample GeneratedSample) EvalResult {
@@ -320,7 +320,7 @@ func FakePathForLang(lang string) string {
 	return filepath.Base("/app/bench_target" + ext)
 }
 
-// ScanCode is a convenience function that runs the GTSS scanner on arbitrary
+// ScanCode is a convenience function that runs the Batou scanner on arbitrary
 // code with a given language, returning raw findings. Useful for testing.
 func ScanCode(code, lang string) []rules.Finding {
 	ext := langToExt[lang]

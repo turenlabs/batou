@@ -1,5 +1,5 @@
 # Vulnerable: Code injection via eval() with user input
-# Expected: GTSS-INJ-003 (Code Injection)
+# Expected: BATOU-INJ-003 (Code Injection)
 
 from flask import Flask, request, jsonify
 

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,34 +12,34 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-SSRF-005: DNS rebinding via hostname without IP validation
+	// BATOU-SSRF-005: DNS rebinding via hostname without IP validation
 	reExtDNSLookupThenUse = regexp.MustCompile(`(?i)(?:gethostbyname|getaddrinfo|dns\.resolve|dns\.lookup|net\.LookupHost|net\.LookupIP|InetAddress\.getByName)\s*\(`)
 
-	// GTSS-SSRF-006: URL parser confusion (different URL parsers in same file)
+	// BATOU-SSRF-006: URL parser confusion (different URL parsers in same file)
 	reExtURLParsePy     = regexp.MustCompile(`\b(?:urlparse|urlsplit|urllib\.parse\.urlparse)\s*\(`)
 	reExtURLParseJS     = regexp.MustCompile(`\bnew\s+URL\s*\(`)
 	reExtURLParseGo     = regexp.MustCompile(`\burl\.Parse\s*\(`)
 	reExtURLParseJava   = regexp.MustCompile(`\bnew\s+(?:java\.net\.)?URL\s*\(`)
 	reExtURLParseSecond = regexp.MustCompile(`(?i)(?:urllib|requests|http\.get|fetch|axios|\.openConnection|HttpClient)\s*[.(]`)
 
-	// GTSS-SSRF-007: Cloud metadata endpoint access
+	// BATOU-SSRF-007: Cloud metadata endpoint access
 	reExtCloudMetadata = regexp.MustCompile(`(?:169\.254\.169\.254|metadata\.google\.internal|metadata\.azure\.com|100\.100\.100\.200)`)
 
-	// GTSS-SSRF-008: SSRF via file:// protocol
+	// BATOU-SSRF-008: SSRF via file:// protocol
 	reExtFileProtocol = regexp.MustCompile(`(?i)file://`)
 	reExtFileProtocolInURL = regexp.MustCompile(`(?i)(?:url|uri|href|src|path|endpoint)\s*[:=]\s*["']?\s*file://`)
 
-	// GTSS-SSRF-009: SSRF via redirect following
+	// BATOU-SSRF-009: SSRF via redirect following
 	reExtRedirectFollow = regexp.MustCompile(`(?i)(?:follow_?redirects?\s*[:=]\s*(?:true|\d+)|max_?redirects?\s*[:=]\s*[1-9]|redirect\s*[:=]\s*['"]follow['"])`)
 
-	// GTSS-SSRF-010: Blind SSRF via webhook/callback URL
+	// BATOU-SSRF-010: Blind SSRF via webhook/callback URL
 	reExtWebhookURL = regexp.MustCompile(`(?i)(?:webhook[_-]?url|callback[_-]?url|notify[_-]?url|hook[_-]?url|postback[_-]?url)\s*[:=]\s*(?:req\.(?:body|query|params)|request\.(?:POST|GET|data|json|form)|params\[)`)
 
-	// GTSS-SSRF-011: SSRF via PDF/image generation library
+	// BATOU-SSRF-011: SSRF via PDF/image generation library
 	reExtPDFGen = regexp.MustCompile(`(?i)(?:wkhtmltopdf|puppeteer|phantom|html-pdf|pdfkit|imgkit|weasyprint|chrome\.(?:printToPDF|screenshot)|page\.(?:goto|pdf|screenshot)|gotenberg)`)
 	reExtPDFGenWithURL = regexp.MustCompile(`(?i)(?:wkhtmltopdf|puppeteer|phantom|html-pdf|pdfkit|imgkit|weasyprint|gotenberg).*(?:req\.|request\.|params|user_?input|url|uri)`)
 
-	// GTSS-SSRF-012: SSRF via SVG processing (external entity)
+	// BATOU-SSRF-012: SSRF via SVG processing (external entity)
 	reExtSVGProcess = regexp.MustCompile(`(?i)(?:svg|image).*(?:parse|render|convert|process|load)\s*\(`)
 	reExtSVGExternalRef = regexp.MustCompile(`(?i)(?:xlink:href|xmlns|href)\s*=\s*["']https?://`)
 	reExtSVGLibrary = regexp.MustCompile(`(?i)(?:librsvg|rsvg|cairosvg|inkscape|imagemagick|sharp|svg2png|svgexport)`)
@@ -61,12 +61,12 @@ func init() {
 }
 
 // ========================================================================
-// GTSS-SSRF-005: DNS Rebinding via Hostname without IP Validation
+// BATOU-SSRF-005: DNS Rebinding via Hostname without IP Validation
 // ========================================================================
 
 type DNSRebindingExt struct{}
 
-func (r *DNSRebindingExt) ID() string                     { return "GTSS-SSRF-005" }
+func (r *DNSRebindingExt) ID() string                     { return "BATOU-SSRF-005" }
 func (r *DNSRebindingExt) Name() string                   { return "DNSRebindingExt" }
 func (r *DNSRebindingExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DNSRebindingExt) Description() string {
@@ -139,12 +139,12 @@ func hasIPValidation(lines []string, idx int) bool {
 }
 
 // ========================================================================
-// GTSS-SSRF-006: URL Parser Confusion
+// BATOU-SSRF-006: URL Parser Confusion
 // ========================================================================
 
 type URLParserConfusion struct{}
 
-func (r *URLParserConfusion) ID() string                     { return "GTSS-SSRF-006" }
+func (r *URLParserConfusion) ID() string                     { return "BATOU-SSRF-006" }
 func (r *URLParserConfusion) Name() string                   { return "URLParserConfusion" }
 func (r *URLParserConfusion) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *URLParserConfusion) Description() string {
@@ -212,12 +212,12 @@ func (r *URLParserConfusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SSRF-007: Cloud Metadata Endpoint Access
+// BATOU-SSRF-007: Cloud Metadata Endpoint Access
 // ========================================================================
 
 type CloudMetadataAccess struct{}
 
-func (r *CloudMetadataAccess) ID() string                     { return "GTSS-SSRF-007" }
+func (r *CloudMetadataAccess) ID() string                     { return "BATOU-SSRF-007" }
 func (r *CloudMetadataAccess) Name() string                   { return "CloudMetadataAccess" }
 func (r *CloudMetadataAccess) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *CloudMetadataAccess) Description() string {
@@ -265,12 +265,12 @@ func (r *CloudMetadataAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SSRF-008: SSRF via file:// Protocol
+// BATOU-SSRF-008: SSRF via file:// Protocol
 // ========================================================================
 
 type FileProtocolSSRF struct{}
 
-func (r *FileProtocolSSRF) ID() string                     { return "GTSS-SSRF-008" }
+func (r *FileProtocolSSRF) ID() string                     { return "BATOU-SSRF-008" }
 func (r *FileProtocolSSRF) Name() string                   { return "FileProtocolSSRF" }
 func (r *FileProtocolSSRF) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FileProtocolSSRF) Description() string {
@@ -316,12 +316,12 @@ func (r *FileProtocolSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SSRF-009: SSRF via Redirect Following
+// BATOU-SSRF-009: SSRF via Redirect Following
 // ========================================================================
 
 type RedirectFollowingSSRF struct{}
 
-func (r *RedirectFollowingSSRF) ID() string                     { return "GTSS-SSRF-009" }
+func (r *RedirectFollowingSSRF) ID() string                     { return "BATOU-SSRF-009" }
 func (r *RedirectFollowingSSRF) Name() string                   { return "RedirectFollowingSSRF" }
 func (r *RedirectFollowingSSRF) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RedirectFollowingSSRF) Description() string {
@@ -370,12 +370,12 @@ func (r *RedirectFollowingSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SSRF-010: Blind SSRF via Webhook/Callback URL
+// BATOU-SSRF-010: Blind SSRF via Webhook/Callback URL
 // ========================================================================
 
 type BlindSSRFWebhook struct{}
 
-func (r *BlindSSRFWebhook) ID() string                     { return "GTSS-SSRF-010" }
+func (r *BlindSSRFWebhook) ID() string                     { return "BATOU-SSRF-010" }
 func (r *BlindSSRFWebhook) Name() string                   { return "BlindSSRFWebhook" }
 func (r *BlindSSRFWebhook) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *BlindSSRFWebhook) Description() string {
@@ -421,12 +421,12 @@ func (r *BlindSSRFWebhook) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SSRF-011: SSRF via PDF/Image Generation Library
+// BATOU-SSRF-011: SSRF via PDF/Image Generation Library
 // ========================================================================
 
 type PDFGenSSRF struct{}
 
-func (r *PDFGenSSRF) ID() string                     { return "GTSS-SSRF-011" }
+func (r *PDFGenSSRF) ID() string                     { return "BATOU-SSRF-011" }
 func (r *PDFGenSSRF) Name() string                   { return "PDFGenSSRF" }
 func (r *PDFGenSSRF) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PDFGenSSRF) Description() string {
@@ -478,12 +478,12 @@ func (r *PDFGenSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SSRF-012: SSRF via SVG Processing
+// BATOU-SSRF-012: SSRF via SVG Processing
 // ========================================================================
 
 type SVGProcessSSRF struct{}
 
-func (r *SVGProcessSSRF) ID() string                     { return "GTSS-SSRF-012" }
+func (r *SVGProcessSSRF) ID() string                     { return "BATOU-SSRF-012" }
 func (r *SVGProcessSSRF) Name() string                   { return "SVGProcessSSRF" }
 func (r *SVGProcessSSRF) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SVGProcessSSRF) Description() string {

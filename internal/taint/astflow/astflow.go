@@ -15,8 +15,8 @@ import (
 	"go/parser"
 	"go/token"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // GoParseResult holds a parsed Go file and its FileSet so that multiple

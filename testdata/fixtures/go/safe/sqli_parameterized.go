@@ -7,7 +7,7 @@ import (
 )
 
 // SAFE: Parameterized SQL query - user input passed as bound parameter.
-// Should NOT trigger GTSS-INJ-001.
+// Should NOT trigger BATOU-INJ-001.
 
 func HandleUserLookup(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	username := r.FormValue("username")

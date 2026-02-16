@@ -24,17 +24,17 @@ expected_vulnerabilities:
     pattern: "JWT secret hardcoded in source code"
     cwe: CWE-798
     typical_severity: critical
-    gtss_rules: [GTSS-SEC-001, GTSS-AUTH-003]
+    batou_rules: [BATOU-SEC-001, BATOU-AUTH-003]
   - type: jwt_algorithm_confusion
     pattern: "Algorithm not validated or 'none' algorithm accepted"
     cwe: CWE-345
     typical_severity: critical
-    gtss_rules: [GTSS-AUTH-003]
+    batou_rules: [BATOU-AUTH-003]
   - type: jwt_missing_validation
     pattern: "Missing expiration or claim validation"
     cwe: CWE-347
     typical_severity: medium
-    gtss_rules: [GTSS-AUTH-003]
+    batou_rules: [BATOU-AUTH-003]
 gold_secure_pattern: |
   Strict algorithm enforcement with env-based secret:
   SECRET = os.environ["JWT_SECRET"]

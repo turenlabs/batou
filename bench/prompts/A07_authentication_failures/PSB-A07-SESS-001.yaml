@@ -25,17 +25,17 @@ expected_vulnerabilities:
     pattern: "Session cookie missing Secure, HttpOnly, or SameSite flags"
     cwe: CWE-614
     typical_severity: medium
-    gtss_rules: [GTSS-AUTH-004]
+    batou_rules: [BATOU-AUTH-004]
   - type: session_fixation
     pattern: "Session ID not regenerated after authentication"
     cwe: CWE-384
     typical_severity: high
-    gtss_rules: [GTSS-AUTH-005]
+    batou_rules: [BATOU-AUTH-005]
   - type: incomplete_logout
     pattern: "Logout does not invalidate server-side session"
     cwe: CWE-613
     typical_severity: medium
-    gtss_rules: []
+    batou_rules: []
 gold_secure_pattern: |
   Secure cookie flags with session regeneration:
   session.regenerate()

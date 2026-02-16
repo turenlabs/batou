@@ -6,7 +6,7 @@ import (
 )
 
 // VULN: Log injection - unsanitized user input written directly to log.
-// Should trigger GTSS-LOG-001 (Unsanitized User Input in Log Calls).
+// Should trigger BATOU-LOG-001 (Unsanitized User Input in Log Calls).
 
 func HandleLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanLua(t *testing.T, code string) []rules.Finding {
@@ -29,7 +29,7 @@ os.execute("rm -rf " .. input)
 	findings := scanLua(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-LUA-AST-001" && strings.Contains(f.Title, "os.execute") {
+		if f.RuleID == "BATOU-LUA-AST-001" && strings.Contains(f.Title, "os.execute") {
 			found = true
 			if f.Severity != rules.Critical {
 				t.Errorf("expected Critical, got %s", f.Severity)
@@ -50,7 +50,7 @@ io.popen("ls " .. input)
 	findings := scanLua(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-LUA-AST-001" && strings.Contains(f.Title, "io.popen") {
+		if f.RuleID == "BATOU-LUA-AST-001" && strings.Contains(f.Title, "io.popen") {
 			found = true
 			break
 		}
@@ -66,7 +66,7 @@ os.execute("ls -la")
 `
 	findings := scanLua(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-LUA-AST-001" {
+		if f.RuleID == "BATOU-LUA-AST-001" {
 			t.Error("unexpected command injection finding for safe literal command")
 		}
 	}
@@ -80,7 +80,7 @@ loadstring("return " .. input)
 	findings := scanLua(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-LUA-AST-002" {
+		if f.RuleID == "BATOU-LUA-AST-002" {
 			found = true
 			if f.Severity != rules.Critical {
 				t.Errorf("expected Critical, got %s", f.Severity)
@@ -99,7 +99,7 @@ loadstring("return 42")
 `
 	findings := scanLua(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-LUA-AST-002" {
+		if f.RuleID == "BATOU-LUA-AST-002" {
 			t.Error("unexpected code injection finding for safe loadstring")
 		}
 	}
@@ -113,7 +113,7 @@ dofile(path)
 	findings := scanLua(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-LUA-AST-003" {
+		if f.RuleID == "BATOU-LUA-AST-003" {
 			found = true
 			break
 		}
@@ -129,7 +129,7 @@ dofile("config.lua")
 `
 	findings := scanLua(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-LUA-AST-003" {
+		if f.RuleID == "BATOU-LUA-AST-003" {
 			t.Error("unexpected path injection finding for safe dofile")
 		}
 	}
@@ -142,7 +142,7 @@ debug.getinfo(1)
 	findings := scanLua(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-LUA-AST-004" {
+		if f.RuleID == "BATOU-LUA-AST-004" {
 			found = true
 			if f.Severity != rules.High {
 				t.Errorf("expected High, got %s", f.Severity)
@@ -162,7 +162,7 @@ debug.sethook(handler, "c")
 	findings := scanLua(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-LUA-AST-004" && strings.Contains(f.Title, "sethook") {
+		if f.RuleID == "BATOU-LUA-AST-004" && strings.Contains(f.Title, "sethook") {
 			found = true
 			break
 		}
@@ -180,7 +180,7 @@ ngx.say("SELECT * FROM users WHERE id = " .. args.id)
 	findings := scanLua(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-LUA-AST-005" {
+		if f.RuleID == "BATOU-LUA-AST-005" {
 			found = true
 			break
 		}

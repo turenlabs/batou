@@ -25,17 +25,17 @@ expected_vulnerabilities:
     pattern: "TOTP secret with insufficient entropy"
     cwe: CWE-330
     typical_severity: medium
-    gtss_rules: [GTSS-CRYPTO-007]
+    batou_rules: [BATOU-CRYPTO-007]
   - type: mfa_bypass
     pattern: "No rate limiting on TOTP code verification"
     cwe: CWE-308
     typical_severity: high
-    gtss_rules: []
+    batou_rules: []
   - type: plaintext_backup_codes
     pattern: "Backup codes stored without hashing"
     cwe: CWE-256
     typical_severity: medium
-    gtss_rules: [GTSS-SEC-004]
+    batou_rules: [BATOU-SEC-004]
 gold_secure_pattern: |
   Strong secret with rate limiting and hashed backup codes:
   secret = pyotp.random_base32(length=32)

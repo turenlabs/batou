@@ -1,6 +1,6 @@
 # PSB-A08-DESER-001: User data deserialization
 # CWE: CWE-502
-# Expected: GTSS-INJ-010
+# Expected: BATOU-INJ-010
 from flask import Flask, request, jsonify
 import pickle
 import base64

@@ -1,7 +1,7 @@
-# GTSS QA Report
+# Batou QA Report
 
 **Date:** 2026-02-10
-**Module:** github.com/turen/gtss
+**Module:** github.com/turenlabs/batou
 **Go version:** 1.25.5
 **QA Lead:** qa-lead agent
 
@@ -12,7 +12,7 @@
 | Step | Result |
 |------|--------|
 | `go build ./...` | PASS - clean compilation, no errors |
-| Binary build (`go build -o /tmp/gtss-qa ./cmd/gtss/`) | PASS - 11 MB binary |
+| Binary build (`go build -o /tmp/batou-qa ./cmd/batou/`) | PASS - 11 MB binary |
 
 ---
 
@@ -149,7 +149,7 @@ go test ./... -race -count=1
 
 ## 6. Binary Spot Check
 
-Built binary: `/tmp/gtss-qa` (11 MB)
+Built binary: `/tmp/batou-qa` (11 MB)
 
 ### Test 1: Vulnerable JS SQL Injection (`sqli_string_concat.ts`)
 
@@ -199,7 +199,7 @@ Built binary: `/tmp/gtss-qa` (11 MB)
 
 ### Low Priority
 
-8. **Add test files for the 13 packages without tests** (cmd/gtss, cmd/qadebug, analyzer, graph, hook, ledger, reporter, rules, taint/goflow, taint/languages, testutil). Most are small or infrastructure packages, but hook and reporter would benefit from unit tests.
+8. **Add test files for the 13 packages without tests** (cmd/batou, cmd/qadebug, analyzer, graph, hook, ledger, reporter, rules, taint/goflow, taint/languages, testutil). Most are small or infrastructure packages, but hook and reporter would benefit from unit tests.
 
 ---
 

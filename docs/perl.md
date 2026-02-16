@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Perl code, covering CGI.pm, PSGI/Plack, Mojolicious, Dancer2, Catalyst, and DBI-based applications. Analysis spans all four layers: regex-based pattern matching (348 rules, Layer 1), tree-sitter AST structural analysis (Layer 2), taint source-to-sink tracking via the tree-sitter AST walker (Layer 3), and interprocedural call graph analysis (Layer 4). Perl coverage includes 25 taint sources across 6 frameworks, 27 sinks spanning 12 vulnerability categories, and 16 sanitizer recognitions to reduce false positives.
+Batou provides comprehensive security scanning for Perl code, covering CGI.pm, PSGI/Plack, Mojolicious, Dancer2, Catalyst, and DBI-based applications. Analysis spans all four layers: regex-based pattern matching (348 rules, Layer 1), tree-sitter AST structural analysis (Layer 2), taint source-to-sink tracking via the tree-sitter AST walker (Layer 3), and interprocedural call graph analysis (Layer 4). Perl coverage includes 25 taint sources across 6 frameworks, 27 sinks spanning 12 vulnerability categories, and 16 sanitizer recognitions to reduce false positives.
 
 Perl taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`), the same engine used by the other 14 supported languages. The tree-sitter-perl grammar (vendored from `github.com/tree-sitter-perl/tree-sitter-perl`, MIT license) provides structural AST parsing, enabling taint tracking through variable reassignment, complex expressions, and method call chains with higher precision than regex-based analysis.
 
@@ -175,16 +175,16 @@ The following Layer 1 regex rules are Perl-specific (defined in `internal/rules/
 
 | Rule ID | Name | Severity | Description |
 |---------|------|----------|-------------|
-| GTSS-PL-001 | PerlCommandInjection | Critical | `system()`, `exec()`, backticks, `qx()`, `open(\|...)` with variable interpolation |
-| GTSS-PL-002 | PerlSQLInjection | Critical | DBI `do()`, `prepare()`, `selectrow_*()`, `selectall_*()` with string interpolation or concatenation |
-| GTSS-PL-003 | PerlCodeInjection | Critical | String `eval()` with variable or interpolated string argument |
-| GTSS-PL-004 | PerlPathTraversal | High | Two-argument `open()` with variable, `open()` with user-controlled path |
-| GTSS-PL-005 | PerlRegexDoS | Medium | User input in regex without `quotemeta()` or `\Q\E` escaping |
-| GTSS-PL-006 | PerlCGIXSS | High | `print` with CGI parameters without HTML encoding |
-| GTSS-PL-007 | PerlInsecureFileOps | High | Two-argument `open()`, `chmod 0777`, world-writable permissions |
-| GTSS-PL-008 | PerlDeserialization | High/Critical | `Storable::thaw()`, `Storable::retrieve()`, `YAML::Load()` with untrusted input |
-| GTSS-PL-009 | PerlLDAPInjection | High | `Net::LDAP` search with interpolated or concatenated filter |
-| GTSS-PL-010 | PerlInsecureRandomness | Medium | `rand()` in security contexts, `srand(time)`, `srand()` with fixed seed |
+| BATOU-PL-001 | PerlCommandInjection | Critical | `system()`, `exec()`, backticks, `qx()`, `open(\|...)` with variable interpolation |
+| BATOU-PL-002 | PerlSQLInjection | Critical | DBI `do()`, `prepare()`, `selectrow_*()`, `selectall_*()` with string interpolation or concatenation |
+| BATOU-PL-003 | PerlCodeInjection | Critical | String `eval()` with variable or interpolated string argument |
+| BATOU-PL-004 | PerlPathTraversal | High | Two-argument `open()` with variable, `open()` with user-controlled path |
+| BATOU-PL-005 | PerlRegexDoS | Medium | User input in regex without `quotemeta()` or `\Q\E` escaping |
+| BATOU-PL-006 | PerlCGIXSS | High | `print` with CGI parameters without HTML encoding |
+| BATOU-PL-007 | PerlInsecureFileOps | High | Two-argument `open()`, `chmod 0777`, world-writable permissions |
+| BATOU-PL-008 | PerlDeserialization | High/Critical | `Storable::thaw()`, `Storable::retrieve()`, `YAML::Load()` with untrusted input |
+| BATOU-PL-009 | PerlLDAPInjection | High | `Net::LDAP` search with interpolated or concatenated filter |
+| BATOU-PL-010 | PerlInsecureRandomness | Medium | `rand()` in security contexts, `srand(time)`, `srand()` with fixed seed |
 
 ### Cross-Language Rules That Apply to Perl
 
@@ -192,18 +192,18 @@ Rules with `LangAny` also apply to Perl files:
 
 | Rule ID | Name | Description |
 |---------|------|-------------|
-| GTSS-SEC-001 | Hardcoded Password | Password/secret string literals in assignments |
-| GTSS-SEC-005 | JWT Secret | Hardcoded JWT signing keys |
-| GTSS-AUTH-001 | Hardcoded Credentials | Authentication checks against hardcoded values |
-| GTSS-GEN-001 | Debug Mode Enabled | Production debug configuration |
-| GTSS-GEN-002 | Unsafe Deserialization | Generic deserialization patterns |
-| GTSS-LOG-001 | Unsanitized Log Input | User input in log statements |
-| GTSS-SSRF-001 | URL From User Input | HTTP requests with user-derived URLs |
-| GTSS-SSRF-002 | Internal Network Access | Requests to private IPs or cloud metadata |
-| GTSS-AUTH-007 | Privilege Escalation | Privilege escalation patterns (CWE-269) |
-| GTSS-GEN-012 | Insecure Download | Insecure download patterns (CWE-494) |
-| GTSS-MISC-003 | Missing Security Headers | Missing security headers (CWE-1021, CWE-693) |
-| GTSS-VAL-005 | File Upload Hardening | File upload hardening (CWE-434) |
+| BATOU-SEC-001 | Hardcoded Password | Password/secret string literals in assignments |
+| BATOU-SEC-005 | JWT Secret | Hardcoded JWT signing keys |
+| BATOU-AUTH-001 | Hardcoded Credentials | Authentication checks against hardcoded values |
+| BATOU-GEN-001 | Debug Mode Enabled | Production debug configuration |
+| BATOU-GEN-002 | Unsafe Deserialization | Generic deserialization patterns |
+| BATOU-LOG-001 | Unsanitized Log Input | User input in log statements |
+| BATOU-SSRF-001 | URL From User Input | HTTP requests with user-derived URLs |
+| BATOU-SSRF-002 | Internal Network Access | Requests to private IPs or cloud metadata |
+| BATOU-AUTH-007 | Privilege Escalation | Privilege escalation patterns (CWE-269) |
+| BATOU-GEN-012 | Insecure Download | Insecure download patterns (CWE-494) |
+| BATOU-MISC-003 | Missing Security Headers | Missing security headers (CWE-1021, CWE-693) |
+| BATOU-VAL-005 | File Upload Hardening | File upload hardening (CWE-434) |
 
 ## Example Detections
 
@@ -215,7 +215,7 @@ my $name = $cgi->param('name');
 $dbh->do("DELETE FROM users WHERE name = '$name'");
 ```
 
-**Triggers**: GTSS-PL-002 (PerlSQLInjection) -- variable `$name` is interpolated into a double-quoted SQL string passed to `$dbh->do()`.
+**Triggers**: BATOU-PL-002 (PerlSQLInjection) -- variable `$name` is interpolated into a double-quoted SQL string passed to `$dbh->do()`.
 
 ### Command Injection via system()
 
@@ -224,7 +224,7 @@ my $file = $cgi->param('file');
 system("cat $file");
 ```
 
-**Triggers**: GTSS-PL-001 (PerlCommandInjection) -- user-controlled `$file` is interpolated into a shell command string. An attacker can inject `; rm -rf /` or similar.
+**Triggers**: BATOU-PL-001 (PerlCommandInjection) -- user-controlled `$file` is interpolated into a shell command string. An attacker can inject `; rm -rf /` or similar.
 
 ### Code Injection via eval()
 
@@ -233,7 +233,7 @@ my $expr = $cgi->param('expr');
 my $result = eval($expr);
 ```
 
-**Triggers**: GTSS-PL-003 (PerlCodeInjection) -- user-controlled `$expr` is passed directly to `eval()`, enabling arbitrary Perl code execution.
+**Triggers**: BATOU-PL-003 (PerlCodeInjection) -- user-controlled `$expr` is passed directly to `eval()`, enabling arbitrary Perl code execution.
 
 ### Unsafe Deserialization via Storable::thaw()
 
@@ -243,7 +243,7 @@ my $data = $cgi->param('data');
 my $obj = thaw($data);
 ```
 
-**Triggers**: GTSS-PL-008 (PerlDeserialization) -- `Storable::thaw()` deserializes arbitrary Perl data structures, including objects with DESTROY methods that execute code.
+**Triggers**: BATOU-PL-008 (PerlDeserialization) -- `Storable::thaw()` deserializes arbitrary Perl data structures, including objects with DESTROY methods that execute code.
 
 ### Two-Argument open() with User Input
 
@@ -252,7 +252,7 @@ my $file = $cgi->param('file');
 open(my $fh, $file);
 ```
 
-**Triggers**: GTSS-PL-004 (PerlPathTraversal) and GTSS-PL-007 (PerlInsecureFileOps) -- two-argument `open()` allows pipe injection if `$file` starts with `|` (e.g., `|rm -rf /`).
+**Triggers**: BATOU-PL-004 (PerlPathTraversal) and BATOU-PL-007 (PerlInsecureFileOps) -- two-argument `open()` allows pipe injection if `$file` starts with `|` (e.g., `|rm -rf /`).
 
 ### LDAP Injection via Net::LDAP
 
@@ -262,7 +262,7 @@ my $user = $cgi->param('username');
 my $result = $ldap->search(filter => "(uid=$user)");
 ```
 
-**Triggers**: GTSS-PL-009 (PerlLDAPInjection) -- user input `$user` is interpolated into the LDAP filter string, allowing filter manipulation.
+**Triggers**: BATOU-PL-009 (PerlLDAPInjection) -- user input `$user` is interpolated into the LDAP filter string, allowing filter manipulation.
 
 ## Safe Patterns
 
@@ -322,8 +322,8 @@ if ($text =~ /$pattern/) {
 
 ## Limitations
 
-- **No Perl taint mode awareness**: GTSS does not detect or respect Perl's built-in `-T` taint mode. Code running with taint mode may already have protections that GTSS is unaware of.
-- **No CPAN module awareness**: GTSS does not read `cpanfile` or `Makefile.PL` to determine which modules are installed. It applies all framework patterns regardless of actual dependencies.
+- **No Perl taint mode awareness**: Batou does not detect or respect Perl's built-in `-T` taint mode. Code running with taint mode may already have protections that Batou is unaware of.
+- **No CPAN module awareness**: Batou does not read `cpanfile` or `Makefile.PL` to determine which modules are installed. It applies all framework patterns regardless of actual dependencies.
 - **Metaprogramming blind spots**: Perl's `AUTOLOAD`, `can()`, symbol table manipulation, and `eval`-based method generation are not tracked. Dynamically defined subroutines that introduce vulnerabilities will be missed.
 - **Block/closure taint propagation**: Taint is not tracked through Perl closures, anonymous subroutines, or higher-order function calls (`map`, `grep`, `sort` blocks).
 - **No heredoc analysis**: Variables interpolated in heredoc strings (`<<EOF ... $var ... EOF`) are not currently tracked for injection patterns.

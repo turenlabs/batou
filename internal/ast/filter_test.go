@@ -3,7 +3,7 @@ package ast
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func TestIsInComment_Go(t *testing.T) {
@@ -144,14 +144,14 @@ func main() {
 
 	findings := []rules.Finding{
 		{
-			RuleID:      "GTSS-INJ-001",
+			RuleID:      "BATOU-INJ-001",
 			Title:       "SQL injection in comment",
 			LineNumber:  3, // the comment line
 			MatchedText: `db.Query("SELECT * FROM users WHERE id=" + id)`,
 			Severity:    rules.Critical,
 		},
 		{
-			RuleID:      "GTSS-INJ-001",
+			RuleID:      "BATOU-INJ-001",
 			Title:       "SQL injection in code",
 			LineNumber:  5, // the actual code line
 			MatchedText: `db.Query("SELECT * FROM users WHERE id=" + id)`,
@@ -202,7 +202,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	findings := []rules.Finding{
 		{
-			RuleID:      "GTSS-INJ-003",
+			RuleID:      "BATOU-INJ-003",
 			Title:       "Command injection",
 			LineNumber:  4,
 			MatchedText: `exec.Command("sh", "-c"`,
@@ -232,7 +232,7 @@ func TestFilterFindings_PreservesStringFindings(t *testing.T) {
 
 	findings := []rules.Finding{
 		{
-			RuleID:      "GTSS-INJ-001",
+			RuleID:      "BATOU-INJ-001",
 			Title:       "SQL injection",
 			LineNumber:  3,
 			MatchedText: `"SELECT * FROM users WHERE name = '" + user`,
@@ -296,7 +296,7 @@ func main() {}
 
 	findings := []rules.Finding{
 		{
-			RuleID:      "GTSS-INTERPROC-001",
+			RuleID:      "BATOU-INTERPROC-001",
 			Title:       "Cross-file finding on comment line",
 			LineNumber:  3, // coincides with comment in current file
 			MatchedText: "this comment",

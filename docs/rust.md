@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides security scanning for Rust code, covering the standard library (`std::process`, `std::fs`, `std::mem`, `std::ptr`), popular web frameworks (Actix-web, Axum, Rocket, Warp), database libraries (sqlx, diesel, rusqlite), HTTP clients (reqwest, hyper), serialization (serde, bincode, rmp), and cryptographic patterns. Rust support includes 10 Rust-specific regex rules, taint source-to-sink tracking with 22 sources, 40 sinks, and 15 sanitizers.
+Batou provides security scanning for Rust code, covering the standard library (`std::process`, `std::fs`, `std::mem`, `std::ptr`), popular web frameworks (Actix-web, Axum, Rocket, Warp), database libraries (sqlx, diesel, rusqlite), HTTP clients (reqwest, hyper), serialization (serde, bincode, rmp), and cryptographic patterns. Rust support includes 10 Rust-specific regex rules, taint source-to-sink tracking with 22 sources, 40 sinks, and 15 sanitizers.
 
 Rust taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `let_declaration` assignments (via `pattern` field), call expressions, and `field_expression` member accesses by walking the parsed AST. The walker handles Rust-specific patterns such as `::` scope resolution in method names (e.g., `Command::new`, `env::var`) and method chains like `env::var("CMD").unwrap()`.
 
@@ -162,28 +162,28 @@ The Rust taint catalog is defined in `internal/taint/languages/rust_*.go` and tr
 
 | Rule ID | Name | Severity | Description |
 |---------|------|----------|-------------|
-| GTSS-RS-001 | Unsafe Block Usage | Medium | Detects `unsafe { }` blocks with raw pointer dereferences, transmute, from_raw_parts |
-| GTSS-RS-002 | Command Injection | Critical | `Command::new` with `format!`/user input, shell invocation (`sh -c`, `bash -c`) |
-| GTSS-RS-003 | SQL Injection | Critical | `sqlx::query`/`diesel::sql_query`/`.execute` with `format!` or string concatenation |
-| GTSS-RS-004 | Path Traversal | High | `std::fs`/`tokio::fs` operations with user-controlled paths without canonicalize/starts_with |
-| GTSS-RS-005 | Insecure Deserialization | High | `bincode::deserialize`/`rmp_serde::from_slice`/`ciborium::from_reader` from untrusted input |
-| GTSS-RS-006 | Insecure TLS | High | `.danger_accept_invalid_certs(true)`, `.danger_accept_invalid_hostnames(true)` |
-| GTSS-RS-007 | Panic in Web Handler | Medium | `.unwrap()`/`.expect()` in Actix-web/Axum request handlers |
-| GTSS-RS-008 | Insecure Random | Medium | `thread_rng()`/`rand::random()` in security context (token, key, nonce) instead of `OsRng` |
-| GTSS-RS-009 | Memory Unsafety Patterns | High | `transmute`, `from_raw_parts`, `mem::forget`, `Box::from_raw`, raw pointer operations |
-| GTSS-RS-010 | CORS Misconfiguration | Medium | `CorsLayer::permissive()`, `Cors::permissive()`, any origin with credentials |
+| BATOU-RS-001 | Unsafe Block Usage | Medium | Detects `unsafe { }` blocks with raw pointer dereferences, transmute, from_raw_parts |
+| BATOU-RS-002 | Command Injection | Critical | `Command::new` with `format!`/user input, shell invocation (`sh -c`, `bash -c`) |
+| BATOU-RS-003 | SQL Injection | Critical | `sqlx::query`/`diesel::sql_query`/`.execute` with `format!` or string concatenation |
+| BATOU-RS-004 | Path Traversal | High | `std::fs`/`tokio::fs` operations with user-controlled paths without canonicalize/starts_with |
+| BATOU-RS-005 | Insecure Deserialization | High | `bincode::deserialize`/`rmp_serde::from_slice`/`ciborium::from_reader` from untrusted input |
+| BATOU-RS-006 | Insecure TLS | High | `.danger_accept_invalid_certs(true)`, `.danger_accept_invalid_hostnames(true)` |
+| BATOU-RS-007 | Panic in Web Handler | Medium | `.unwrap()`/`.expect()` in Actix-web/Axum request handlers |
+| BATOU-RS-008 | Insecure Random | Medium | `thread_rng()`/`rand::random()` in security context (token, key, nonce) instead of `OsRng` |
+| BATOU-RS-009 | Memory Unsafety Patterns | High | `transmute`, `from_raw_parts`, `mem::forget`, `Box::from_raw`, raw pointer operations |
+| BATOU-RS-010 | CORS Misconfiguration | Medium | `CorsLayer::permissive()`, `Cors::permissive()`, any origin with credentials |
 
 ### Cross-Language Rules Applicable to Rust
 
 Rules marked with `LangAny` or explicitly including `LangRust` in their `Languages()` method also apply to Rust files. These include:
 
-- **GTSS-SEC-001/002**: Hardcoded passwords and API keys
-- **GTSS-CRY-007**: Plaintext protocol (http:// URLs)
-- **GTSS-GQL-001/002**: GraphQL introspection and depth limiting (if using async-graphql or juniper)
-- **GTSS-AUTH-007**: Privilege escalation patterns (CWE-269) - HIGH
-- **GTSS-GEN-012**: Insecure download patterns (CWE-494) - HIGH
-- **GTSS-MISC-003**: Missing security headers (CWE-1021, CWE-693) - MEDIUM
-- **GTSS-VAL-005**: File upload hardening (CWE-434) - HIGH
+- **BATOU-SEC-001/002**: Hardcoded passwords and API keys
+- **BATOU-CRY-007**: Plaintext protocol (http:// URLs)
+- **BATOU-GQL-001/002**: GraphQL introspection and depth limiting (if using async-graphql or juniper)
+- **BATOU-AUTH-007**: Privilege escalation patterns (CWE-269) - HIGH
+- **BATOU-GEN-012**: Insecure download patterns (CWE-494) - HIGH
+- **BATOU-MISC-003**: Missing security headers (CWE-1021, CWE-693) - MEDIUM
+- **BATOU-VAL-005**: File upload hardening (CWE-434) - HIGH
 
 ### Tauri Framework Rules
 
@@ -191,17 +191,17 @@ Rules from `internal/rules/framework/tauri.go` that target `LangRust`. These app
 
 | Rule ID | Name | Severity | CWE | Description |
 |---------|------|----------|-----|-------------|
-| GTSS-FW-TAURI-001 | TauriShellAllowlist | Critical | CWE-78 | Detects `Command::new` with variable input in Tauri Rust code, and `tauri::api::shell::open` calls. Flags Rust backend code that spawns processes with frontend-controlled arguments. |
-| GTSS-FW-TAURI-003 | TauriIPCInjection | High | CWE-78 | Detects `#[tauri::command]` handler functions that pass unvalidated frontend input to `std::process::Command::new` or `tokio::process::Command::new`. Tracks brace depth to scope findings to the command handler body. |
-| GTSS-FW-TAURI-004 | TauriProtocolHandler | High | CWE-939 | Detects `register_uri_scheme_protocol` calls without origin validation (no `origin`/`Origin`/`referer`/`Referer` check within 20 lines), and dangerous URI scheme configurations (`file://`, `smb://`, `nfs://`). |
-| GTSS-FW-TAURI-008 | TauriInsecureUpdater | Critical | CWE-295 | Detects `dangerous_insecure_transport_protocol(true)` in Rust updater code, which disables TLS verification for the Tauri updater and enables man-in-the-middle attacks to serve malicious updates. |
+| BATOU-FW-TAURI-001 | TauriShellAllowlist | Critical | CWE-78 | Detects `Command::new` with variable input in Tauri Rust code, and `tauri::api::shell::open` calls. Flags Rust backend code that spawns processes with frontend-controlled arguments. |
+| BATOU-FW-TAURI-003 | TauriIPCInjection | High | CWE-78 | Detects `#[tauri::command]` handler functions that pass unvalidated frontend input to `std::process::Command::new` or `tokio::process::Command::new`. Tracks brace depth to scope findings to the command handler body. |
+| BATOU-FW-TAURI-004 | TauriProtocolHandler | High | CWE-939 | Detects `register_uri_scheme_protocol` calls without origin validation (no `origin`/`Origin`/`referer`/`Referer` check within 20 lines), and dangerous URI scheme configurations (`file://`, `smb://`, `nfs://`). |
+| BATOU-FW-TAURI-008 | TauriInsecureUpdater | Critical | CWE-295 | Detects `dangerous_insecure_transport_protocol(true)` in Rust updater code, which disables TLS verification for the Tauri updater and enables man-in-the-middle attacks to serve malicious updates. |
 
 ## Example Detections
 
 ### SQL Injection via format! Macro
 
 ```rust
-// DETECTED: GTSS-RS-003 (Critical) + taint flow rust.actix.path -> rust.sql.sqlx_query
+// DETECTED: BATOU-RS-003 (Critical) + taint flow rust.actix.path -> rust.sql.sqlx_query
 async fn get_user(path: web::Path<String>, pool: web::Data<PgPool>) -> HttpResponse {
     let username = path.into_inner();
     let row = sqlx::query(&format!("SELECT * FROM users WHERE username = '{}'", username))
@@ -212,12 +212,12 @@ async fn get_user(path: web::Path<String>, pool: web::Data<PgPool>) -> HttpRespo
 }
 ```
 
-GTSS flags the `format!` constructing a SQL query with user input (regex rule) and traces the taint from `web::Path` (source) through `username` into `sqlx::query` (sink).
+Batou flags the `format!` constructing a SQL query with user input (regex rule) and traces the taint from `web::Path` (source) through `username` into `sqlx::query` (sink).
 
 ### Command Injection via Shell Invocation
 
 ```rust
-// DETECTED: GTSS-RS-002 (Critical) + taint flow rust.actix.query -> rust.exec.command_new
+// DETECTED: BATOU-RS-002 (Critical) + taint flow rust.actix.query -> rust.exec.command_new
 async fn ping_host(query: web::Query<PingParams>) -> HttpResponse {
     let host = &query.host;
     let output = Command::new("sh")
@@ -229,12 +229,12 @@ async fn ping_host(query: web::Query<PingParams>) -> HttpResponse {
 }
 ```
 
-GTSS detects the `Command::new("sh")` shell invocation pattern and the `format!` in `.arg()` with user-controlled data.
+Batou detects the `Command::new("sh")` shell invocation pattern and the `format!` in `.arg()` with user-controlled data.
 
 ### Unsafe Transmute
 
 ```rust
-// DETECTED: GTSS-RS-001 (High) + GTSS-RS-009 (High)
+// DETECTED: BATOU-RS-001 (High) + BATOU-RS-009 (High)
 fn dangerous_cast(val: f64) -> u64 {
     unsafe {
         std::mem::transmute(val)
@@ -242,7 +242,7 @@ fn dangerous_cast(val: f64) -> u64 {
 }
 ```
 
-GTSS flags the `unsafe` block containing `transmute`, which bypasses type safety and can cause undefined behavior.
+Batou flags the `unsafe` block containing `transmute`, which bypasses type safety and can cause undefined behavior.
 
 ## Safe Patterns
 
@@ -257,7 +257,7 @@ async fn get_user(pool: &PgPool, name: &str) -> Result<User, sqlx::Error> {
 }
 ```
 
-The `sqlx::query!` macro checks the query at compile time and the `sqlx::query().bind()` pattern uses parameterized queries. GTSS recognizes both as sanitizers.
+The `sqlx::query!` macro checks the query at compile time and the `sqlx::query().bind()` pattern uses parameterized queries. Batou recognizes both as sanitizers.
 
 ### Path Traversal Prevention
 
@@ -274,7 +274,7 @@ async fn read_file(filename: &str) -> Result<String, std::io::Error> {
 }
 ```
 
-GTSS recognizes the combination of `canonicalize()` (path normalization) plus `starts_with()` (containment check) as a traversal guard and suppresses the finding.
+Batou recognizes the combination of `canonicalize()` (path normalization) plus `starts_with()` (containment check) as a traversal guard and suppresses the finding.
 
 ### Error Handling with ? Operator
 
@@ -288,24 +288,24 @@ async fn process(body: web::Json<Request>, pool: web::Data<PgPool>) -> Result<Ht
 }
 ```
 
-Using `?` instead of `.unwrap()` in web handlers prevents panics. GTSS only flags `.unwrap()` and `.expect()` inside handler functions.
+Using `?` instead of `.unwrap()` in web handlers prevents panics. Batou only flags `.unwrap()` and `.expect()` inside handler functions.
 
 ## Limitations
 
 The following are known gaps or areas with reduced accuracy in Rust coverage:
 
-- **Macro expansion**: GTSS scans Rust source code as text without macro expansion. Procedural macros, derive macros, and complex declarative macros may hide vulnerable patterns or produce false positives on safe macro invocations.
+- **Macro expansion**: Batou scans Rust source code as text without macro expansion. Procedural macros, derive macros, and complex declarative macros may hide vulnerable patterns or produce false positives on safe macro invocations.
 
 - **Trait method dispatch**: Taint tracking does not follow trait method dispatch. When tainted data is passed through a trait method and the concrete implementation varies, the taint may not propagate correctly.
 
-- **Lifetime and borrow checker**: GTSS does not model Rust's lifetime or borrow checker rules. Some patterns flagged as unsafe may actually be prevented by the compiler's safety guarantees.
+- **Lifetime and borrow checker**: Batou does not model Rust's lifetime or borrow checker rules. Some patterns flagged as unsafe may actually be prevented by the compiler's safety guarantees.
 
 - **Async/await boundaries**: Taint tracking across `.await` points and spawned tasks (`tokio::spawn`, `actix_rt::spawn`) has limited precision. Data flowing through channels or shared state across async boundaries may not be tracked.
 
 - **Conditional compilation**: Code behind `#[cfg(...)]` attributes is scanned regardless of target platform or feature flags. This may produce findings for code that is never compiled in the target configuration.
 
-- **Unsafe in FFI**: While `unsafe` blocks are detected, the safety of FFI boundaries (calling C code via `extern "C"`) requires understanding the C code's contracts, which GTSS cannot verify.
+- **Unsafe in FFI**: While `unsafe` blocks are detected, the safety of FFI boundaries (calling C code via `extern "C"`) requires understanding the C code's contracts, which Batou cannot verify.
 
-- **Custom derive safety**: Crates like `serde` use derive macros that are generally safe, but GTSS cannot verify that custom `Deserialize` implementations handle untrusted input correctly.
+- **Custom derive safety**: Crates like `serde` use derive macros that are generally safe, but Batou cannot verify that custom `Deserialize` implementations handle untrusted input correctly.
 
-- **Thread safety**: While Rust's type system prevents data races at compile time, GTSS does not verify that `unsafe` code maintains thread safety invariants (e.g., `Send`/`Sync` implementations).
+- **Thread safety**: While Rust's type system prevents data races at compile time, Batou does not verify that `unsafe` code maintains thread safety invariants (e.g., `Send`/`Sync` implementations).

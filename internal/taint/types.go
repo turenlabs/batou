@@ -1,4 +1,4 @@
-// Package taint implements Scope-Aware Taint Tracking (SATT) for GTSS.
+// Package taint implements Scope-Aware Taint Tracking (SATT) for Batou.
 //
 // Unlike regex-based scanning, taint analysis tracks how data flows from
 // untrusted sources (user input, network, files) through variable assignments
@@ -19,7 +19,7 @@
 // define sources, sinks, and sanitizers per language.
 package taint
 
-import "github.com/turenio/gtss/internal/rules"
+import "github.com/turenlabs/batou/internal/rules"
 
 // SourceCategory classifies where untrusted data enters the program.
 type SourceCategory string
@@ -136,7 +136,7 @@ type FlowStep struct {
 	VarName     string // Variable involved
 }
 
-// ToFinding converts a TaintFlow into a rules.Finding for GTSS reporting.
+// ToFinding converts a TaintFlow into a rules.Finding for Batou reporting.
 func (tf *TaintFlow) ToFinding() rules.Finding {
 	title := "Tainted data flows from " + string(tf.Source.Category) + " to " + string(tf.Sink.Category)
 
@@ -162,7 +162,7 @@ func (tf *TaintFlow) ToFinding() rules.Finding {
 	}
 
 	return rules.Finding{
-		RuleID:        "GTSS-TAINT-" + string(tf.Sink.Category),
+		RuleID:        "BATOU-TAINT-" + string(tf.Sink.Category),
 		Severity:      tf.Sink.Severity,
 		SeverityLabel: tf.Sink.Severity.String(),
 		Title:         title,

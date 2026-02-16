@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
-// Compiled regex patterns for C# extension rules (GTSS-CS-023 .. GTSS-CS-030)
+// Compiled regex patterns for C# extension rules (BATOU-CS-023 .. BATOU-CS-030)
 // ---------------------------------------------------------------------------
 
 // CS-023: SQL injection via string interpolation in EF Core
@@ -83,12 +83,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-023: C# SQL injection via string interpolation in EF Core
+// BATOU-CS-023: C# SQL injection via string interpolation in EF Core
 // ---------------------------------------------------------------------------
 
 type CSharpEFSqlInterp struct{}
 
-func (r *CSharpEFSqlInterp) ID() string                      { return "GTSS-CS-023" }
+func (r *CSharpEFSqlInterp) ID() string                      { return "BATOU-CS-023" }
 func (r *CSharpEFSqlInterp) Name() string                    { return "CSharpEFSqlInterp" }
 func (r *CSharpEFSqlInterp) Description() string             { return "Detects C# SQL injection via string interpolation ($\"\") or concatenation in EF Core FromSqlRaw/ExecuteSqlRaw." }
 func (r *CSharpEFSqlInterp) DefaultSeverity() rules.Severity { return rules.High }
@@ -145,12 +145,12 @@ func (r *CSharpEFSqlInterp) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-024: C# XML serialization without type restriction
+// BATOU-CS-024: C# XML serialization without type restriction
 // ---------------------------------------------------------------------------
 
 type CSharpXmlDeser struct{}
 
-func (r *CSharpXmlDeser) ID() string                      { return "GTSS-CS-024" }
+func (r *CSharpXmlDeser) ID() string                      { return "BATOU-CS-024" }
 func (r *CSharpXmlDeser) Name() string                    { return "CSharpXmlDeser" }
 func (r *CSharpXmlDeser) Description() string             { return "Detects C# BinaryFormatter and SoapFormatter deserialization which allow arbitrary type instantiation and code execution." }
 func (r *CSharpXmlDeser) DefaultSeverity() rules.Severity { return rules.High }
@@ -207,12 +207,12 @@ func (r *CSharpXmlDeser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-025: C# LDAP injection via DirectorySearcher
+// BATOU-CS-025: C# LDAP injection via DirectorySearcher
 // ---------------------------------------------------------------------------
 
 type CSharpLDAPInjection struct{}
 
-func (r *CSharpLDAPInjection) ID() string                      { return "GTSS-CS-025" }
+func (r *CSharpLDAPInjection) ID() string                      { return "BATOU-CS-025" }
 func (r *CSharpLDAPInjection) Name() string                    { return "CSharpLDAPInjection" }
 func (r *CSharpLDAPInjection) Description() string             { return "Detects C# LDAP injection via DirectorySearcher.Filter with string concatenation or interpolation." }
 func (r *CSharpLDAPInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -266,12 +266,12 @@ func (r *CSharpLDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-026: C# Server.MapPath with user input
+// BATOU-CS-026: C# Server.MapPath with user input
 // ---------------------------------------------------------------------------
 
 type CSharpServerMapPath struct{}
 
-func (r *CSharpServerMapPath) ID() string                      { return "GTSS-CS-026" }
+func (r *CSharpServerMapPath) ID() string                      { return "BATOU-CS-026" }
 func (r *CSharpServerMapPath) Name() string                    { return "CSharpServerMapPath" }
 func (r *CSharpServerMapPath) Description() string             { return "Detects C# Server.MapPath, Path.Combine, or ContentRootPath with user-controlled input, enabling path traversal." }
 func (r *CSharpServerMapPath) DefaultSeverity() rules.Severity { return rules.High }
@@ -325,12 +325,12 @@ func (r *CSharpServerMapPath) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-027: C# Response.Write with user input (XSS)
+// BATOU-CS-027: C# Response.Write with user input (XSS)
 // ---------------------------------------------------------------------------
 
 type CSharpResponseWriteXSS struct{}
 
-func (r *CSharpResponseWriteXSS) ID() string                      { return "GTSS-CS-027" }
+func (r *CSharpResponseWriteXSS) ID() string                      { return "BATOU-CS-027" }
 func (r *CSharpResponseWriteXSS) Name() string                    { return "CSharpResponseWriteXSS" }
 func (r *CSharpResponseWriteXSS) Description() string             { return "Detects C# Response.Write or Html.Raw with user input or model data, enabling cross-site scripting (XSS)." }
 func (r *CSharpResponseWriteXSS) DefaultSeverity() rules.Severity { return rules.High }
@@ -384,12 +384,12 @@ func (r *CSharpResponseWriteXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-028: C# Regex without timeout (ReDoS)
+// BATOU-CS-028: C# Regex without timeout (ReDoS)
 // ---------------------------------------------------------------------------
 
 type CSharpRegexNoTimeout struct{}
 
-func (r *CSharpRegexNoTimeout) ID() string                      { return "GTSS-CS-028" }
+func (r *CSharpRegexNoTimeout) ID() string                      { return "BATOU-CS-028" }
 func (r *CSharpRegexNoTimeout) Name() string                    { return "CSharpRegexNoTimeout" }
 func (r *CSharpRegexNoTimeout) Description() string             { return "Detects C# Regex usage without a timeout, which can lead to ReDoS (regular expression denial of service)." }
 func (r *CSharpRegexNoTimeout) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -442,12 +442,12 @@ func (r *CSharpRegexNoTimeout) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-029: C# TypeNameHandling.All in JSON deserialization
+// BATOU-CS-029: C# TypeNameHandling.All in JSON deserialization
 // ---------------------------------------------------------------------------
 
 type CSharpTypeNameHandling struct{}
 
-func (r *CSharpTypeNameHandling) ID() string                      { return "GTSS-CS-029" }
+func (r *CSharpTypeNameHandling) ID() string                      { return "BATOU-CS-029" }
 func (r *CSharpTypeNameHandling) Name() string                    { return "CSharpTypeNameHandling" }
 func (r *CSharpTypeNameHandling) Description() string             { return "Detects C# Newtonsoft.Json TypeNameHandling set to All/Auto/Objects/Arrays without a SerializationBinder, enabling deserialization attacks." }
 func (r *CSharpTypeNameHandling) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -497,12 +497,12 @@ func (r *CSharpTypeNameHandling) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-030: C# ViewBag/ViewData used in raw HTML
+// BATOU-CS-030: C# ViewBag/ViewData used in raw HTML
 // ---------------------------------------------------------------------------
 
 type CSharpViewBagRawHTML struct{}
 
-func (r *CSharpViewBagRawHTML) ID() string                      { return "GTSS-CS-030" }
+func (r *CSharpViewBagRawHTML) ID() string                      { return "BATOU-CS-030" }
 func (r *CSharpViewBagRawHTML) Name() string                    { return "CSharpViewBagRawHTML" }
 func (r *CSharpViewBagRawHTML) Description() string             { return "Detects C# ViewBag/ViewData rendered via Html.Raw or in HTML attribute contexts without encoding." }
 func (r *CSharpViewBagRawHTML) DefaultSeverity() rules.Severity { return rules.High }

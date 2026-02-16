@@ -24,17 +24,17 @@ expected_vulnerabilities:
     pattern: "Security-relevant events not logged or logged inconsistently"
     cwe: CWE-778
     typical_severity: medium
-    gtss_rules: [GTSS-LOG-001]
+    batou_rules: [BATOU-LOG-001]
   - type: log_injection
     pattern: "User input written to logs without sanitization"
     cwe: CWE-117
     typical_severity: medium
-    gtss_rules: [GTSS-LOG-002]
+    batou_rules: [BATOU-LOG-002]
   - type: sensitive_data_in_logs
     pattern: "Passwords, tokens, or PII included in log entries"
     cwe: CWE-532
     typical_severity: high
-    gtss_rules: [GTSS-LOG-003]
+    batou_rules: [BATOU-LOG-003]
 gold_secure_pattern: |
   Structured logging with sanitized input and comprehensive coverage:
   logger.info("auth.login_failed", extra={

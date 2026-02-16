@@ -1,8 +1,8 @@
-# PHP Language Support in GTSS
+# PHP Language Support in Batou
 
 ## Overview
 
-GTSS provides comprehensive security scanning for PHP code, covering native PHP functions, and framework-specific patterns for Laravel, Symfony/Twig, CodeIgniter, and WordPress. PHP analysis includes all four scanning layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4).
+Batou provides comprehensive security scanning for PHP code, covering native PHP functions, and framework-specific patterns for Laravel, Symfony/Twig, CodeIgniter, and WordPress. PHP analysis includes all four scanning layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4).
 
 PHP taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through assignments, variable declarations, function calls, and member call expressions by walking the parsed AST. This includes tracking PHP superglobals (`$_GET`, `$_POST`, `$_REQUEST`) as variable-name sources.
 
@@ -311,116 +311,116 @@ The following regex-based rules (Layer 1) include PHP in their language list:
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-INJ-001 | SQLInjection | SQL queries built with string concatenation or interpolation (`mysqli_query`, `PDO::query`, `$wpdb->query` with `$_GET`/`$_POST` variables) |
-| GTSS-INJ-002 | CommandInjection | Shell commands with unsanitized input (`system()`, `exec()`, `shell_exec()`, `passthru()`, `popen()`) |
-| GTSS-INJ-003 | CodeInjection | Dynamic code execution (`eval()`, `assert()`, `preg_replace` with `/e`) |
-| GTSS-INJ-004 | LDAPInjection | LDAP queries built with concatenation (`ldap_search` with variables) |
-| GTSS-INJ-005 | TemplateInjection | Server-side template injection in Twig/Blade |
-| GTSS-INJ-006 | XPathInjection | XPath queries built with string concatenation |
-| GTSS-INJ-007 | NoSQLInjection | NoSQL/MongoDB queries with unsafe patterns |
-| GTSS-INJ-008 | GraphQLInjection | GraphQL queries via string concatenation |
-| GTSS-INJ-009 | HTTPHeaderInjection | `header()` with user input variables (`$_GET`, `$_POST`, `$_REQUEST`, `$_SERVER`) enabling CRLF injection / response splitting |
+| BATOU-INJ-001 | SQLInjection | SQL queries built with string concatenation or interpolation (`mysqli_query`, `PDO::query`, `$wpdb->query` with `$_GET`/`$_POST` variables) |
+| BATOU-INJ-002 | CommandInjection | Shell commands with unsanitized input (`system()`, `exec()`, `shell_exec()`, `passthru()`, `popen()`) |
+| BATOU-INJ-003 | CodeInjection | Dynamic code execution (`eval()`, `assert()`, `preg_replace` with `/e`) |
+| BATOU-INJ-004 | LDAPInjection | LDAP queries built with concatenation (`ldap_search` with variables) |
+| BATOU-INJ-005 | TemplateInjection | Server-side template injection in Twig/Blade |
+| BATOU-INJ-006 | XPathInjection | XPath queries built with string concatenation |
+| BATOU-INJ-007 | NoSQLInjection | NoSQL/MongoDB queries with unsafe patterns |
+| BATOU-INJ-008 | GraphQLInjection | GraphQL queries via string concatenation |
+| BATOU-INJ-009 | HTTPHeaderInjection | `header()` with user input variables (`$_GET`, `$_POST`, `$_REQUEST`, `$_SERVER`) enabling CRLF injection / response splitting |
 
 ### XSS
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-XSS-004 | UnescapedTemplateOutput | Blade `{!! !!}`, Twig `\|raw` filter, Twig `autoescape false` |
-| GTSS-XSS-011 | ReflectedXSS | Direct echo/print of `$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE` |
+| BATOU-XSS-004 | UnescapedTemplateOutput | Blade `{!! !!}`, Twig `\|raw` filter, Twig `autoescape false` |
+| BATOU-XSS-011 | ReflectedXSS | Direct echo/print of `$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE` |
 
 ### Traversal
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-TRV-001 | PathTraversal | File operations with user input (applies to all languages including PHP) |
-| GTSS-TRV-002 | FileInclusion | `include`/`require`/`include_once`/`require_once` with user-controlled paths |
+| BATOU-TRV-001 | PathTraversal | File operations with user input (applies to all languages including PHP) |
+| BATOU-TRV-002 | FileInclusion | `include`/`require`/`include_once`/`require_once` with user-controlled paths |
 
 ### Cryptography
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-CRY-010 | WeakPRNG | `rand()`, `mt_rand()` used for security purposes |
-| GTSS-CRY-011 | PredictableSeed | `srand()` / `mt_srand()` with fixed or time-based seeds |
-| GTSS-CRY-015 | WeakPasswordHash | `md5($password)` / `sha1($password)` instead of `password_hash()` |
-| GTSS-CRY-016 | InsecureRandomBroad | `rand()` / `mt_rand()` in security-sensitive contexts (tokens, sessions, CSRF, keys) |
+| BATOU-CRY-010 | WeakPRNG | `rand()`, `mt_rand()` used for security purposes |
+| BATOU-CRY-011 | PredictableSeed | `srand()` / `mt_srand()` with fixed or time-based seeds |
+| BATOU-CRY-015 | WeakPasswordHash | `md5($password)` / `sha1($password)` instead of `password_hash()` |
+| BATOU-CRY-016 | InsecureRandomBroad | `rand()` / `mt_rand()` in security-sensitive contexts (tokens, sessions, CSRF, keys) |
 
 ### Secrets
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-SEC-001 | HardcodedPassword | `$password = "..."` and similar hardcoded credential assignments |
-| GTSS-SEC-005 | JWTSecret | Hardcoded JWT signing secrets |
+| BATOU-SEC-001 | HardcodedPassword | `$password = "..."` and similar hardcoded credential assignments |
+| BATOU-SEC-005 | JWTSecret | Hardcoded JWT signing secrets |
 
 ### Authentication
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-AUTH-001 | HardcodedCredentialCheck | `if ($password === "admin123")` and similar checks |
-| GTSS-AUTH-003 | CORSWildcard | `header('Access-Control-Allow-Origin: *')` |
-| GTSS-AUTH-004 | SessionFixation | Login handlers without `session_regenerate_id()` |
-| GTSS-AUTH-005 | WeakPasswordPolicy | Password validation with weak minimum length |
-| GTSS-AUTH-006 | InsecureCookie | `setcookie()` without Secure/HttpOnly/SameSite flags |
-| GTSS-AUTH-007 | PrivilegeEscalation | Privilege escalation patterns (CWE-269) |
+| BATOU-AUTH-001 | HardcodedCredentialCheck | `if ($password === "admin123")` and similar checks |
+| BATOU-AUTH-003 | CORSWildcard | `header('Access-Control-Allow-Origin: *')` |
+| BATOU-AUTH-004 | SessionFixation | Login handlers without `session_regenerate_id()` |
+| BATOU-AUTH-005 | WeakPasswordPolicy | Password validation with weak minimum length |
+| BATOU-AUTH-006 | InsecureCookie | `setcookie()` without Secure/HttpOnly/SameSite flags |
+| BATOU-AUTH-007 | PrivilegeEscalation | Privilege escalation patterns (CWE-269) |
 
 ### Generic
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-GEN-001 | DebugModeEnabled | `display_errors = On`, `error_reporting(E_ALL)` in production |
-| GTSS-GEN-002 | UnsafeDeserialization | `unserialize()` with untrusted data |
-| GTSS-GEN-003 | XXEVulnerability | XML parsing without disabling external entities |
-| GTSS-GEN-004 | OpenRedirect | `header('Location: ' . $userInput)` redirects |
-| GTSS-GEN-006 | RaceCondition | TOCTOU patterns (check-then-use without locking) |
-| GTSS-GEN-008 | CodeAsStringEval | Dangerous calls hidden inside `eval()` strings |
-| GTSS-GEN-009 | XMLParserMisconfig | Insecure XML parser configurations |
-| GTSS-GEN-012 | InsecureDownload | Insecure download patterns (CWE-494) |
+| BATOU-GEN-001 | DebugModeEnabled | `display_errors = On`, `error_reporting(E_ALL)` in production |
+| BATOU-GEN-002 | UnsafeDeserialization | `unserialize()` with untrusted data |
+| BATOU-GEN-003 | XXEVulnerability | XML parsing without disabling external entities |
+| BATOU-GEN-004 | OpenRedirect | `header('Location: ' . $userInput)` redirects |
+| BATOU-GEN-006 | RaceCondition | TOCTOU patterns (check-then-use without locking) |
+| BATOU-GEN-008 | CodeAsStringEval | Dangerous calls hidden inside `eval()` strings |
+| BATOU-GEN-009 | XMLParserMisconfig | Insecure XML parser configurations |
+| BATOU-GEN-012 | InsecureDownload | Insecure download patterns (CWE-494) |
 
 ### Logging
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-LOG-001 | UnsanitizedLogInput | User input written to logs without sanitization |
-| GTSS-LOG-002 | CRLFLogInjection | CRLF characters in log entries from user input |
-| GTSS-LOG-003 | SensitiveDataInLogs | Passwords, tokens, or keys logged in plaintext |
+| BATOU-LOG-001 | UnsanitizedLogInput | User input written to logs without sanitization |
+| BATOU-LOG-002 | CRLFLogInjection | CRLF characters in log entries from user input |
+| BATOU-LOG-003 | SensitiveDataInLogs | Passwords, tokens, or keys logged in plaintext |
 
 ### Validation
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-VAL-001 | DirectParamUsage | `$_GET`/`$_POST` used directly without validation |
-| GTSS-VAL-003 | MissingLengthValidation | User input stored without length checks |
-| GTSS-VAL-005 | FileUploadHardening | File upload without proper validation (CWE-434) |
+| BATOU-VAL-001 | DirectParamUsage | `$_GET`/`$_POST` used directly without validation |
+| BATOU-VAL-003 | MissingLengthValidation | User input stored without length checks |
+| BATOU-VAL-005 | FileUploadHardening | File upload without proper validation (CWE-434) |
 
 ### Deserialization
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-DESER-003 | PHPDangerousPatterns | `preg_replace` with `/e` modifier, `extract()` with superglobals (`$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE`), `assert()` with variable argument, `create_function()`, variable variable function calls (`$$var()`) |
+| BATOU-DESER-003 | PHPDangerousPatterns | `preg_replace` with `/e` modifier, `extract()` with superglobals (`$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE`), `assert()` with variable argument, `create_function()`, variable variable function calls (`$$var()`) |
 
 ### CORS
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-CORS-001 | CORSWildcardCredentials | `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` (wildcard origin with credentials misconfiguration) |
-| GTSS-CORS-002 | CORSReflectedOrigin | `header("Access-Control-Allow-Origin: " . $_SERVER["HTTP_ORIGIN"])` reflecting the request Origin without validation |
+| BATOU-CORS-001 | CORSWildcardCredentials | `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` (wildcard origin with credentials misconfiguration) |
+| BATOU-CORS-002 | CORSReflectedOrigin | `header("Access-Control-Allow-Origin: " . $_SERVER["HTTP_ORIGIN"])` reflecting the request Origin without validation |
 
 ### Misconfiguration
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-MISC-003 | MissingSecurityHeaders | Missing security headers (CWE-1021, CWE-693) |
+| BATOU-MISC-003 | MissingSecurityHeaders | Missing security headers (CWE-1021, CWE-693) |
 
 ### Redirect
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-REDIR-001 | ServerRedirectUserInput | `header("Location: " . $var)` with user input from `$_GET`/`$_POST`/`$_REQUEST` (open redirect) |
+| BATOU-REDIR-001 | ServerRedirectUserInput | `header("Location: " . $var)` with user input from `$_GET`/`$_POST`/`$_REQUEST` (open redirect) |
 
 ### SSRF
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-SSRF-001 | URLFromUserInput | HTTP requests with user-derived URLs (applies to all languages) |
+| BATOU-SSRF-001 | URLFromUserInput | HTTP requests with user-derived URLs (applies to all languages) |
 
 ### Framework Rules
 
@@ -428,19 +428,19 @@ The following regex-based rules (Layer 1) include PHP in their language list:
 
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-| GTSS-FW-LARAVEL-001 | LaravelDBRaw | `DB::raw()` with variable interpolation or concatenation, `DB::select`/`statement`/`insert`/`update`/`delete` with PHP variables in raw SQL |
-| GTSS-FW-LARAVEL-002 | LaravelBladeUnescaped | Blade `{!! $variable !!}` unescaped output bypassing HTML escaping (XSS) |
-| GTSS-FW-LARAVEL-003 | LaravelMassAssignment | `$request->all()` passed directly to Eloquent `::create`, `::update`, `::insert`, `->fill`, `->forceFill` (mass assignment) |
-| GTSS-FW-LARAVEL-004 | LaravelDebugMode | `APP_DEBUG=true` in `.env` or config files (information disclosure of stack traces, credentials, paths) |
-| GTSS-FW-LARAVEL-005 | LaravelAppKey | `APP_KEY=base64:...` committed in `.env` files or hardcoded in PHP config (session forgery, RCE via deserialization) |
-| GTSS-FW-LARAVEL-006 | LaravelUnserialize | `unserialize()` with user input (`$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE`, `$request`, `$input`) enabling object injection / RCE |
-| GTSS-FW-LARAVEL-007 | LaravelStorageTraversal | `Storage::get`/`read`/`download`/`url`/`path`/`exists`/`delete` with `$request->` input (path traversal) |
+| BATOU-FW-LARAVEL-001 | LaravelDBRaw | `DB::raw()` with variable interpolation or concatenation, `DB::select`/`statement`/`insert`/`update`/`delete` with PHP variables in raw SQL |
+| BATOU-FW-LARAVEL-002 | LaravelBladeUnescaped | Blade `{!! $variable !!}` unescaped output bypassing HTML escaping (XSS) |
+| BATOU-FW-LARAVEL-003 | LaravelMassAssignment | `$request->all()` passed directly to Eloquent `::create`, `::update`, `::insert`, `->fill`, `->forceFill` (mass assignment) |
+| BATOU-FW-LARAVEL-004 | LaravelDebugMode | `APP_DEBUG=true` in `.env` or config files (information disclosure of stack traces, credentials, paths) |
+| BATOU-FW-LARAVEL-005 | LaravelAppKey | `APP_KEY=base64:...` committed in `.env` files or hardcoded in PHP config (session forgery, RCE via deserialization) |
+| BATOU-FW-LARAVEL-006 | LaravelUnserialize | `unserialize()` with user input (`$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE`, `$request`, `$input`) enabling object injection / RCE |
+| BATOU-FW-LARAVEL-007 | LaravelStorageTraversal | `Storage::get`/`read`/`download`/`url`/`path`/`exists`/`delete` with `$request->` input (path traversal) |
 
 ## Example Detections
 
 ### 1. SQL Injection via String Interpolation
 
-This code triggers **GTSS-INJ-001** (Layer 1) and taint flow from `php.superglobal.get` to `php.mysqli.query` (Layer 2):
+This code triggers **BATOU-INJ-001** (Layer 1) and taint flow from `php.superglobal.get` to `php.mysqli.query` (Layer 2):
 
 ```php
 $id = $_GET['id'];
@@ -450,7 +450,7 @@ $result = mysqli_query($conn, $query);
 
 ### 2. Reflected XSS via Echo
 
-This code triggers **GTSS-XSS-011** (Layer 1) and taint flow from `php.superglobal.get` to `php.echo` (Layer 2):
+This code triggers **BATOU-XSS-011** (Layer 1) and taint flow from `php.superglobal.get` to `php.echo` (Layer 2):
 
 ```php
 $name = $_GET['name'];
@@ -459,7 +459,7 @@ echo "<h1>Hello, " . $name . "</h1>";
 
 ### 3. Command Injection via system()
 
-This code triggers **GTSS-INJ-002** (Layer 1) and taint flow from `php.superglobal.post` to `php.system` (Layer 2):
+This code triggers **BATOU-INJ-002** (Layer 1) and taint flow from `php.superglobal.post` to `php.system` (Layer 2):
 
 ```php
 $target = $_POST['ip'];
@@ -468,7 +468,7 @@ system("ping -c 4 " . $target);
 
 ### 4. HTTP Header Injection via header()
 
-This code triggers **GTSS-INJ-009** (Layer 1) and taint flow from `php.superglobal.get` to `php.header` (Layer 2):
+This code triggers **BATOU-INJ-009** (Layer 1) and taint flow from `php.superglobal.get` to `php.header` (Layer 2):
 
 ```php
 $lang = $_GET['lang'];
@@ -477,7 +477,7 @@ header("Content-Language: " . $lang);
 
 ### 5. PHP Dangerous Pattern -- extract() with Superglobals
 
-This code triggers **GTSS-DESER-003** (Layer 1):
+This code triggers **BATOU-DESER-003** (Layer 1):
 
 ```php
 extract($_POST);
@@ -486,7 +486,7 @@ extract($_POST);
 
 ### 6. CORS Reflected Origin
 
-This code triggers **GTSS-CORS-002** (Layer 1):
+This code triggers **BATOU-CORS-002** (Layer 1):
 
 ```php
 header("Access-Control-Allow-Origin: " . $_SERVER["HTTP_ORIGIN"]);
@@ -495,7 +495,7 @@ header("Access-Control-Allow-Credentials: true");
 
 ### 7. Open Redirect via header()
 
-This code triggers **GTSS-REDIR-001** (Layer 1) and taint flow from `php.superglobal.get` to `php.header.location` (Layer 2):
+This code triggers **BATOU-REDIR-001** (Layer 1) and taint flow from `php.superglobal.get` to `php.header.location` (Layer 2):
 
 ```php
 $url = $_GET['redirect'];
@@ -504,7 +504,7 @@ header("Location: " . $url);
 
 ### 8. Laravel DB::raw() SQL Injection
 
-This code triggers **GTSS-FW-LARAVEL-001** (Layer 1):
+This code triggers **BATOU-FW-LARAVEL-001** (Layer 1):
 
 ```php
 $sort = $request->input('sort');
@@ -513,7 +513,7 @@ $users = DB::select("SELECT * FROM users ORDER BY $sort");
 
 ### 9. Laravel Mass Assignment
 
-This code triggers **GTSS-FW-LARAVEL-003** (Layer 1):
+This code triggers **BATOU-FW-LARAVEL-003** (Layer 1):
 
 ```php
 $user = User::create($request->all());
@@ -521,7 +521,7 @@ $user = User::create($request->all());
 
 ### 10. Laravel Storage Path Traversal
 
-This code triggers **GTSS-FW-LARAVEL-007** (Layer 1):
+This code triggers **BATOU-FW-LARAVEL-007** (Layer 1):
 
 ```php
 $file = Storage::get($request->input('path'));

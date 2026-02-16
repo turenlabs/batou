@@ -1,5 +1,5 @@
 # Safe: Jinja2 autoescape enabled, proper template rendering
-# Expected: No findings for GTSS-XSS-004 or GTSS-XSS-008
+# Expected: No findings for BATOU-XSS-004 or BATOU-XSS-008
 
 from flask import Flask, request, render_template
 from markupsafe import escape

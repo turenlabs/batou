@@ -4,91 +4,91 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-JSTS-001: postMessage without origin check
+// BATOU-JSTS-001: postMessage without origin check
 var (
 	reMessageListener    = regexp.MustCompile(`addEventListener\s*\(\s*['"]message['"]`)
 	reOriginCheck        = regexp.MustCompile(`(?:\.origin\s*[!=]==?\s*['"]|\.origin\s*[!=]==?\s*\w|checkOrigin|validateOrigin|allowedOrigin|trustedOrigin)`)
 	reMessageData        = regexp.MustCompile(`(?:\.data\b|event\.data|e\.data|msg\.data)`)
 )
 
-// GTSS-JSTS-002: DOM clobbering risk
+// BATOU-JSTS-002: DOM clobbering risk
 var (
 	reDOMClobber = regexp.MustCompile(`(?:document\.getElementById|document\.getElementsByName|document\.querySelector)\s*\([^)]+\)\s*\.\s*(?:href|src|action|innerHTML|textContent|value)`)
 	reFormAssign = regexp.MustCompile(`(?:document\.forms|document\.anchors|document\.images)\s*\[`)
 )
 
-// GTSS-JSTS-003: Regex DoS (ReDoS)
+// BATOU-JSTS-003: Regex DoS (ReDoS)
 var (
 	reNewRegExpVar    = regexp.MustCompile(`new\s+RegExp\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|param|data|query|search|pattern|regex)`)
 	reNewRegExpConcat = regexp.MustCompile("new\\s+RegExp\\s*\\(\\s*(?:[^\"'`\\s)]+\\s*\\+|`[^`]*\\$\\{)")
 	reNewRegExpFmt    = regexp.MustCompile("new\\s+RegExp\\s*\\(\\s*`[^`]*\\$\\{")
 )
 
-// GTSS-JSTS-004: child_process.exec with template literal or concat (shell injection)
+// BATOU-JSTS-004: child_process.exec with template literal or concat (shell injection)
 var (
 	reExecTmplLit = regexp.MustCompile("(?:exec|execSync)\\s*\\(\\s*`[^`]*\\$\\{")
 	reExecConcat  = regexp.MustCompile(`(?:exec|execSync)\s*\(\s*(?:['"][^'"]*['"]\s*\+\s*\w|\w+\s*\+\s*['"])`)
 )
 
-// GTSS-JSTS-005: eval/Function with template literal
+// BATOU-JSTS-005: eval/Function with template literal
 var (
 	reEvalTmplLit     = regexp.MustCompile("\\beval\\s*\\(\\s*`[^`]*\\$\\{")
 	reFuncCtorTmplLit = regexp.MustCompile("\\bnew\\s+Function\\s*\\(\\s*`[^`]*\\$\\{")
 )
 
-// GTSS-JSTS-006: JWT verify without algorithm restriction
+// BATOU-JSTS-006: JWT verify without algorithm restriction
 var (
 	reJWTVerify       = regexp.MustCompile(`(?:jwt|jsonwebtoken)\s*\.\s*verify\s*\(`)
 	reJWTAlgorithms   = regexp.MustCompile(`algorithms\s*:`)
 	reJWTVerifyNoOpts = regexp.MustCompile(`(?:jwt|jsonwebtoken)\s*\.\s*verify\s*\(\s*[^,]+,\s*[^,]+\s*\)`)
 )
 
-// GTSS-JSTS-007: Insecure cookie (missing secure/httpOnly/sameSite)
+// BATOU-JSTS-007: Insecure cookie (missing secure/httpOnly/sameSite)
 var (
 	reCookieSet        = regexp.MustCompile(`res\.cookie\s*\(\s*['"][^'"]+['"]\s*,`)
 	reCookieSecure     = regexp.MustCompile(`secure\s*:\s*true`)
 	reCookieHttpOnly   = regexp.MustCompile(`httpOnly\s*:\s*true`)
 )
 
-// GTSS-JSTS-008: Next.js getServerSideProps data exposure
+// BATOU-JSTS-008: Next.js getServerSideProps data exposure
 var (
 	reGetSSP           = regexp.MustCompile(`(?:export\s+(?:async\s+)?function\s+getServerSideProps|export\s+const\s+getServerSideProps)`)
 	reSensitiveReturn  = regexp.MustCompile(`(?i)(?:password|secret|token|apiKey|api_key|privateKey|private_key|credential|ssn|creditCard|credit_card)\s*[,:=]`)
 )
 
-// GTSS-JSTS-009: React useEffect with unsanitized URL
+// BATOU-JSTS-009: React useEffect with unsanitized URL
 var (
 	reUseEffect        = regexp.MustCompile(`useEffect\s*\(`)
 	reLocationInEffect = regexp.MustCompile(`(?:window\.location|document\.location|location\.href|location\.search|location\.hash|location\.pathname)`)
 	reInnerHTMLInEffect = regexp.MustCompile(`\.innerHTML\s*=`)
 )
 
-// GTSS-JSTS-010: Node.js vm sandbox escape
+// BATOU-JSTS-010: Node.js vm sandbox escape
 var (
 	reVMModule     = regexp.MustCompile(`(?:require\s*\(\s*['"](?:vm|vm2)['"]\s*\)|from\s+['"](?:vm|vm2)['"])`)
 	reVMRunInCtx   = regexp.MustCompile(`\b(?:vm|VM)\s*\.\s*(?:runInNewContext|runInThisContext|createContext|Script|compileFunction)\s*\(`)
 	reVM2Create    = regexp.MustCompile(`\bnew\s+(?:VM|NodeVM|VMScript)\s*\(`)
 )
 
-// GTSS-JSTS-011: path.join doesn't prevent traversal
+// BATOU-JSTS-011: path.join doesn't prevent traversal
 var (
 	rePathJoinInput = regexp.MustCompile(`path\s*\.\s*(?:join|resolve)\s*\([^)]*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|param|filename|filepath|file_?name|file_?path)`)
 	rePathJoinNormalize = regexp.MustCompile(`path\s*\.\s*(?:join|resolve)\s*\([^)]*\.\.`)
 )
 
-// GTSS-JSTS-012: Handlebars SafeString XSS
+// BATOU-JSTS-012: Handlebars SafeString XSS
 var (
 	reHandlebarsSafeString = regexp.MustCompile(`(?:Handlebars\.SafeString|new\s+(?:hbs|Handlebars)\.SafeString)\s*\(`)
 )
 
-// GTSS-JSTS-013: Electron nodeIntegration enabled
+// BATOU-JSTS-013: Electron nodeIntegration enabled
 var (
 	reElectronNodeIntegration       = regexp.MustCompile(`nodeIntegration\s*:\s*true`)
 	reElectronContextIsolation      = regexp.MustCompile(`contextIsolation\s*:\s*false`)
@@ -97,7 +97,7 @@ var (
 	reElectronBrowserWindow         = regexp.MustCompile(`(?:new\s+BrowserWindow|BrowserWindow\s*\()`)
 )
 
-// GTSS-JSTS-014: Unvalidated redirect (res.redirect with user input)
+// BATOU-JSTS-014: Unvalidated redirect (res.redirect with user input)
 // NOTE: This complements the existing redirect/redirect.go rules by catching
 // additional patterns specific to JS/TS like location.href assignment
 var (
@@ -105,27 +105,27 @@ var (
 	reLocationReplace    = regexp.MustCompile(`(?:window\.)?location\s*\.\s*(?:replace|assign)\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|url|redirect[Uu]rl|returnUrl|return_url|next|target|dest)`)
 )
 
-// GTSS-JSTS-015: Server-side template injection (pug/ejs compile)
+// BATOU-JSTS-015: Server-side template injection (pug/ejs compile)
 var (
 	reEjsRenderVar   = regexp.MustCompile(`ejs\s*\.\s*(?:render|compile)\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|template|tmpl|body|content)`)
 	rePugCompileVar  = regexp.MustCompile(`pug\s*\.\s*(?:compile|render|renderFile)\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|template|tmpl|body|content)`)
 	reNunjucksRender = regexp.MustCompile(`nunjucks\s*\.\s*renderString\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|template|tmpl|body|content)`)
 )
 
-// GTSS-JSTS-016: Insecure WebSocket (ws without origin validation)
+// BATOU-JSTS-016: Insecure WebSocket (ws without origin validation)
 var (
 	reWSServer         = regexp.MustCompile(`new\s+(?:WebSocket\.Server|WebSocketServer|Server)\s*\(`)
 	reWSOriginCheck    = regexp.MustCompile(`(?:verifyClient|origin|handleProtocols)`)
 	reWSNoVerify       = regexp.MustCompile(`verifyClient\s*:\s*(?:false|null|undefined)`)
 )
 
-// GTSS-JSTS-017: crypto.createCipher (deprecated, use createCipheriv)
+// BATOU-JSTS-017: crypto.createCipher (deprecated, use createCipheriv)
 var (
 	reCreateCipher = regexp.MustCompile(`crypto\s*\.\s*createCipher\s*\(`)
 	reCreateCipherIv = regexp.MustCompile(`crypto\s*\.\s*createCipheriv\s*\(`)
 )
 
-// GTSS-JSTS-018: fs.chmod/chown with permissive modes
+// BATOU-JSTS-018: fs.chmod/chown with permissive modes
 var (
 	reFsChmod777    = regexp.MustCompile(`fs\s*\.\s*(?:chmod|chmodSync|fchmod|fchmodSync)\s*\([^,]+,\s*(?:0o?777|0o?766|0o?776|511|438)\b`)
 	reFsChmodWorld  = regexp.MustCompile(`fs\s*\.\s*(?:chmod|chmodSync|fchmod|fchmodSync)\s*\([^,]+,\s*0o?7[67][67]\b`)
@@ -175,12 +175,12 @@ func hasNearbyMatch(lines []string, idx int, pattern *regexp.Regexp, window int)
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-001: postMessage without origin check
+// BATOU-JSTS-001: postMessage without origin check
 // ---------------------------------------------------------------------------
 
 type PostMessageNoOrigin struct{}
 
-func (r *PostMessageNoOrigin) ID() string                     { return "GTSS-JSTS-001" }
+func (r *PostMessageNoOrigin) ID() string                     { return "BATOU-JSTS-001" }
 func (r *PostMessageNoOrigin) Name() string                   { return "PostMessageNoOrigin" }
 func (r *PostMessageNoOrigin) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PostMessageNoOrigin) Description() string {
@@ -238,12 +238,12 @@ func (r *PostMessageNoOrigin) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-002: DOM clobbering risk
+// BATOU-JSTS-002: DOM clobbering risk
 // ---------------------------------------------------------------------------
 
 type DOMClobberingRisk struct{}
 
-func (r *DOMClobberingRisk) ID() string                     { return "GTSS-JSTS-002" }
+func (r *DOMClobberingRisk) ID() string                     { return "BATOU-JSTS-002" }
 func (r *DOMClobberingRisk) Name() string                   { return "DOMClobberingRisk" }
 func (r *DOMClobberingRisk) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DOMClobberingRisk) Description() string {
@@ -295,12 +295,12 @@ func (r *DOMClobberingRisk) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-003: Regular Expression DoS (ReDoS)
+// BATOU-JSTS-003: Regular Expression DoS (ReDoS)
 // ---------------------------------------------------------------------------
 
 type RegexDoS struct{}
 
-func (r *RegexDoS) ID() string                     { return "GTSS-JSTS-003" }
+func (r *RegexDoS) ID() string                     { return "BATOU-JSTS-003" }
 func (r *RegexDoS) Name() string                   { return "RegexDoS" }
 func (r *RegexDoS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RegexDoS) Description() string {
@@ -366,12 +366,12 @@ func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-004: child_process.exec with shell injection
+// BATOU-JSTS-004: child_process.exec with shell injection
 // ---------------------------------------------------------------------------
 
 type ExecShellInjection struct{}
 
-func (r *ExecShellInjection) ID() string                     { return "GTSS-JSTS-004" }
+func (r *ExecShellInjection) ID() string                     { return "BATOU-JSTS-004" }
 func (r *ExecShellInjection) Name() string                   { return "ExecShellInjection" }
 func (r *ExecShellInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ExecShellInjection) Description() string {
@@ -423,12 +423,12 @@ func (r *ExecShellInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-005: eval/Function constructor with template literal
+// BATOU-JSTS-005: eval/Function constructor with template literal
 // ---------------------------------------------------------------------------
 
 type EvalTemplateLiteral struct{}
 
-func (r *EvalTemplateLiteral) ID() string                     { return "GTSS-JSTS-005" }
+func (r *EvalTemplateLiteral) ID() string                     { return "BATOU-JSTS-005" }
 func (r *EvalTemplateLiteral) Name() string                   { return "EvalTemplateLiteral" }
 func (r *EvalTemplateLiteral) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *EvalTemplateLiteral) Description() string {
@@ -484,12 +484,12 @@ func (r *EvalTemplateLiteral) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-006: JWT verify without algorithms option
+// BATOU-JSTS-006: JWT verify without algorithms option
 // ---------------------------------------------------------------------------
 
 type JWTVerifyNoAlgorithm struct{}
 
-func (r *JWTVerifyNoAlgorithm) ID() string                     { return "GTSS-JSTS-006" }
+func (r *JWTVerifyNoAlgorithm) ID() string                     { return "BATOU-JSTS-006" }
 func (r *JWTVerifyNoAlgorithm) Name() string                   { return "JWTVerifyNoAlgorithm" }
 func (r *JWTVerifyNoAlgorithm) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JWTVerifyNoAlgorithm) Description() string {
@@ -550,12 +550,12 @@ func (r *JWTVerifyNoAlgorithm) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-007: Insecure cookie settings (res.cookie without secure flags)
+// BATOU-JSTS-007: Insecure cookie settings (res.cookie without secure flags)
 // ---------------------------------------------------------------------------
 
 type InsecureCookie struct{}
 
-func (r *InsecureCookie) ID() string                     { return "GTSS-JSTS-007" }
+func (r *InsecureCookie) ID() string                     { return "BATOU-JSTS-007" }
 func (r *InsecureCookie) Name() string                   { return "InsecureCookie" }
 func (r *InsecureCookie) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureCookie) Description() string {
@@ -622,12 +622,12 @@ func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-008: Next.js getServerSideProps data exposure
+// BATOU-JSTS-008: Next.js getServerSideProps data exposure
 // ---------------------------------------------------------------------------
 
 type NextJSDataExposure struct{}
 
-func (r *NextJSDataExposure) ID() string                     { return "GTSS-JSTS-008" }
+func (r *NextJSDataExposure) ID() string                     { return "BATOU-JSTS-008" }
 func (r *NextJSDataExposure) Name() string                   { return "NextJSDataExposure" }
 func (r *NextJSDataExposure) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NextJSDataExposure) Description() string {
@@ -693,12 +693,12 @@ func (r *NextJSDataExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-009: React useEffect with unsanitized URL manipulation
+// BATOU-JSTS-009: React useEffect with unsanitized URL manipulation
 // ---------------------------------------------------------------------------
 
 type UseEffectURLManipulation struct{}
 
-func (r *UseEffectURLManipulation) ID() string                     { return "GTSS-JSTS-009" }
+func (r *UseEffectURLManipulation) ID() string                     { return "BATOU-JSTS-009" }
 func (r *UseEffectURLManipulation) Name() string                   { return "UseEffectURLManipulation" }
 func (r *UseEffectURLManipulation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UseEffectURLManipulation) Description() string {
@@ -760,12 +760,12 @@ func (r *UseEffectURLManipulation) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-010: Node.js vm/vm2 sandbox escape
+// BATOU-JSTS-010: Node.js vm/vm2 sandbox escape
 // ---------------------------------------------------------------------------
 
 type VMSandboxEscape struct{}
 
-func (r *VMSandboxEscape) ID() string                     { return "GTSS-JSTS-010" }
+func (r *VMSandboxEscape) ID() string                     { return "BATOU-JSTS-010" }
 func (r *VMSandboxEscape) Name() string                   { return "VMSandboxEscape" }
 func (r *VMSandboxEscape) DefaultSeverity() rules.Severity { return rules.High }
 func (r *VMSandboxEscape) Description() string {
@@ -825,12 +825,12 @@ func (r *VMSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-011: path.join doesn't prevent traversal
+// BATOU-JSTS-011: path.join doesn't prevent traversal
 // ---------------------------------------------------------------------------
 
 type PathJoinTraversal struct{}
 
-func (r *PathJoinTraversal) ID() string                     { return "GTSS-JSTS-011" }
+func (r *PathJoinTraversal) ID() string                     { return "BATOU-JSTS-011" }
 func (r *PathJoinTraversal) Name() string                   { return "PathJoinTraversal" }
 func (r *PathJoinTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PathJoinTraversal) Description() string {
@@ -905,12 +905,12 @@ func hasTraversalCheck(lines []string, idx int) bool {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-012: Handlebars SafeString XSS
+// BATOU-JSTS-012: Handlebars SafeString XSS
 // ---------------------------------------------------------------------------
 
 type HandlebarsSafeStringXSS struct{}
 
-func (r *HandlebarsSafeStringXSS) ID() string                     { return "GTSS-JSTS-012" }
+func (r *HandlebarsSafeStringXSS) ID() string                     { return "BATOU-JSTS-012" }
 func (r *HandlebarsSafeStringXSS) Name() string                   { return "HandlebarsSafeStringXSS" }
 func (r *HandlebarsSafeStringXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *HandlebarsSafeStringXSS) Description() string {
@@ -954,12 +954,12 @@ func (r *HandlebarsSafeStringXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-013: Electron nodeIntegration / contextIsolation misconfiguration
+// BATOU-JSTS-013: Electron nodeIntegration / contextIsolation misconfiguration
 // ---------------------------------------------------------------------------
 
 type ElectronInsecureConfig struct{}
 
-func (r *ElectronInsecureConfig) ID() string                     { return "GTSS-JSTS-013" }
+func (r *ElectronInsecureConfig) ID() string                     { return "BATOU-JSTS-013" }
 func (r *ElectronInsecureConfig) Name() string                   { return "ElectronInsecureConfig" }
 func (r *ElectronInsecureConfig) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ElectronInsecureConfig) Description() string {
@@ -1029,12 +1029,12 @@ func (r *ElectronInsecureConfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-014: Unvalidated redirect via location assignment
+// BATOU-JSTS-014: Unvalidated redirect via location assignment
 // ---------------------------------------------------------------------------
 
 type LocationRedirectUserInput struct{}
 
-func (r *LocationRedirectUserInput) ID() string                     { return "GTSS-JSTS-014" }
+func (r *LocationRedirectUserInput) ID() string                     { return "BATOU-JSTS-014" }
 func (r *LocationRedirectUserInput) Name() string                   { return "LocationRedirectUserInput" }
 func (r *LocationRedirectUserInput) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LocationRedirectUserInput) Description() string {
@@ -1086,12 +1086,12 @@ func (r *LocationRedirectUserInput) Scan(ctx *rules.ScanContext) []rules.Finding
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-015: Server-side template injection (EJS/Pug/Nunjucks)
+// BATOU-JSTS-015: Server-side template injection (EJS/Pug/Nunjucks)
 // ---------------------------------------------------------------------------
 
 type SSTITemplateEngine struct{}
 
-func (r *SSTITemplateEngine) ID() string                     { return "GTSS-JSTS-015" }
+func (r *SSTITemplateEngine) ID() string                     { return "BATOU-JSTS-015" }
 func (r *SSTITemplateEngine) Name() string                   { return "SSTITemplateEngine" }
 func (r *SSTITemplateEngine) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *SSTITemplateEngine) Description() string {
@@ -1150,12 +1150,12 @@ func (r *SSTITemplateEngine) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-016: Insecure WebSocket (no origin validation)
+// BATOU-JSTS-016: Insecure WebSocket (no origin validation)
 // ---------------------------------------------------------------------------
 
 type InsecureWebSocket struct{}
 
-func (r *InsecureWebSocket) ID() string                     { return "GTSS-JSTS-016" }
+func (r *InsecureWebSocket) ID() string                     { return "BATOU-JSTS-016" }
 func (r *InsecureWebSocket) Name() string                   { return "InsecureWebSocket" }
 func (r *InsecureWebSocket) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureWebSocket) Description() string {
@@ -1234,12 +1234,12 @@ func (r *InsecureWebSocket) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-017: crypto.createCipher (deprecated)
+// BATOU-JSTS-017: crypto.createCipher (deprecated)
 // ---------------------------------------------------------------------------
 
 type DeprecatedCreateCipher struct{}
 
-func (r *DeprecatedCreateCipher) ID() string                     { return "GTSS-JSTS-017" }
+func (r *DeprecatedCreateCipher) ID() string                     { return "BATOU-JSTS-017" }
 func (r *DeprecatedCreateCipher) Name() string                   { return "DeprecatedCreateCipher" }
 func (r *DeprecatedCreateCipher) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DeprecatedCreateCipher) Description() string {
@@ -1287,12 +1287,12 @@ func (r *DeprecatedCreateCipher) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JSTS-018: fs.chmod/chown with permissive modes
+// BATOU-JSTS-018: fs.chmod/chown with permissive modes
 // ---------------------------------------------------------------------------
 
 type FsPermissiveModes struct{}
 
-func (r *FsPermissiveModes) ID() string                     { return "GTSS-JSTS-018" }
+func (r *FsPermissiveModes) ID() string                     { return "BATOU-JSTS-018" }
 func (r *FsPermissiveModes) Name() string                   { return "FsPermissiveModes" }
 func (r *FsPermissiveModes) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FsPermissiveModes) Description() string {

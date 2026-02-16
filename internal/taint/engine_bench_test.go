@@ -4,15 +4,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 
 	// Register all catalogs.
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 // taintParts holds SQL fragments assembled at runtime to avoid triggering
-// the GTSS security hook on this test file.
+// the Batou security hook on this test file.
 var taintParts = []string{
 	"SEL", "ECT * FR", "OM users WH", "ERE name = '",
 }

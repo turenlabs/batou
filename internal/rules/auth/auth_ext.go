@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,45 +12,45 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-AUTH-008: Missing rate limiting on login
+	// BATOU-AUTH-008: Missing rate limiting on login
 	reExtLoginRoute = regexp.MustCompile(`(?i)(?:\.post|\.put|HandleFunc|handle)\s*\(\s*["']/(?:login|signin|sign-in|auth|authenticate|api/login|api/auth)["']`)
 	reExtRateLimit  = regexp.MustCompile(`(?i)(?:rate[_-]?limit|throttle|limiter|RateLimit|slowDown|express-rate-limit|express-brute|ratelimit|Throttle)`)
 
-	// GTSS-AUTH-009: Password comparison using ==
+	// BATOU-AUTH-009: Password comparison using ==
 	reExtPasswordEqGo   = regexp.MustCompile(`(?i)(?:password|passwd|pass|pwd)\s*==\s*(?:[a-zA-Z_]\w*|"[^"]+"|'[^']+')`)
 	reExtPasswordEqJS   = regexp.MustCompile(`(?i)(?:password|passwd|pass|pwd)\s*===?\s*(?:[a-zA-Z_]\w*|"[^"]+"|'[^']+')`)
 	reExtPasswordEqPy   = regexp.MustCompile(`(?i)(?:password|passwd|pass|pwd)\s*==\s*(?:[a-zA-Z_]\w*|"[^"]+"|'[^']+')`)
 	reExtSafeCompare    = regexp.MustCompile(`(?i)(?:bcrypt|argon2|scrypt|pbkdf2|hmac|constant_time|compare_digest|timing_safe|timingSafeEqual|subtle\.ConstantTimeCompare|crypto\.timingSafeEqual|secrets\.compare_digest)`)
 
-	// GTSS-AUTH-010: Hardcoded admin/default credentials
+	// BATOU-AUTH-010: Hardcoded admin/default credentials
 	reExtHardcodedAdmin = regexp.MustCompile(`(?i)(?:admin|administrator|root|superuser|default)\s*[:=]\s*["'](?:admin|password|123456|root|default|changeme|admin123|pass|passwd|test|secret)["']`)
 	reExtDefaultCreds   = regexp.MustCompile(`(?i)(?:default[_-]?(?:password|user|admin|cred)|admin[_-]?(?:password|pass|pwd))\s*[:=]\s*["'][^"']{1,}["']`)
 
-	// GTSS-AUTH-011: Missing CSRF protection
+	// BATOU-AUTH-011: Missing CSRF protection
 	reExtCSRFToken     = regexp.MustCompile(`(?i)(?:csrf|xsrf|_token|csrfmiddleware|anti[_-]?forgery|AntiForgeryToken|authenticity_token|__RequestVerificationToken)`)
 	reExtStateChanging = regexp.MustCompile(`(?i)(?:\.post|\.put|\.patch|\.delete)\s*\(\s*["']/`)
 
-	// GTSS-AUTH-012: Auth bypass via parameter manipulation
+	// BATOU-AUTH-012: Auth bypass via parameter manipulation
 	reExtAuthBypass = regexp.MustCompile(`(?i)(?:is[_-]?admin|isAdmin|is[_-]?authenticated|is_superuser|role|user_?role|admin)\s*[:=]\s*(?:req\.(?:body|query|params)|request\.(?:POST|GET|data|json|form)|params\[|\$_(?:GET|POST|REQUEST))`)
 
-	// GTSS-AUTH-013: Broken function-level access control
+	// BATOU-AUTH-013: Broken function-level access control
 	reExtAdminEndpoint       = regexp.MustCompile(`(?i)(?:\.(?:get|post|put|delete|patch|all))\s*\(\s*["']/(?:admin|internal|management|supervisor|moderator|api/admin)`)
 	reExtAccessControlCheck  = regexp.MustCompile(`(?i)(?:isAdmin|is_admin|requireAdmin|require_admin|authorize|@admin_required|@staff_member_required|@permission_required|hasRole|has_role|checkPermission)`)
 
-	// GTSS-AUTH-014: Insecure password reset
+	// BATOU-AUTH-014: Insecure password reset
 	reExtPasswordReset      = regexp.MustCompile(`(?i)(?:reset[_-]?(?:password|token|code)|forgot[_-]?password|password[_-]?reset)`)
 	reExtPredictableToken   = regexp.MustCompile(`(?i)(?:uuid\.uuid1|Math\.random|rand\(\)|time\.Now|Date\.now|random\.randint|srand|mt_rand|uniqid)\s*\(`)
 	reExtSecureToken        = regexp.MustCompile(`(?i)(?:crypto\.random|secrets\.token|uuid\.uuid4|uuid\.v4|RandomBytes|SecureRandom|crypto\.getRandomValues|os\.urandom|RandRead)`)
 
-	// GTSS-AUTH-015: Missing MFA check
+	// BATOU-AUTH-015: Missing MFA check
 	reExtMFACheck    = regexp.MustCompile(`(?i)(?:mfa|2fa|two[_-]?factor|totp|otp|multi[_-]?factor|second[_-]?factor)`)
 	reExtSensitiveOp = regexp.MustCompile(`(?i)(?:transfer|withdraw|payment|wire|change[_-]?password|change[_-]?email|delete[_-]?account|export[_-]?data)`)
 
-	// GTSS-AUTH-016: Username enumeration via different error messages
+	// BATOU-AUTH-016: Username enumeration via different error messages
 	reExtUserNotFound    = regexp.MustCompile(`(?i)["'](?:user\s+not\s+found|username\s+does\s+not\s+exist|no\s+(?:such\s+)?user|account\s+not\s+found|invalid\s+username|email\s+not\s+found|unknown\s+user|user\s+does\s+not\s+exist)["']`)
 	reExtWrongPassword   = regexp.MustCompile(`(?i)["'](?:wrong\s+password|incorrect\s+password|invalid\s+password|password\s+(?:is\s+)?incorrect|bad\s+password)["']`)
 
-	// GTSS-AUTH-017: Weak password policy
+	// BATOU-AUTH-017: Weak password policy
 	reExtWeakPolicyNoUpper = regexp.MustCompile(`(?i)(?:min_?length|minLen|minimum.?length|PASSWORD_MIN)\s*[:=]\s*([0-9]+)`)
 	reExtComplexityCheck   = regexp.MustCompile(`(?i)(?:uppercase|upper[_-]?case|[A-Z].*required|must.*[A-Z]|special.*char|complexity|zxcvbn|password.*strength|strongPassword)`)
 )
@@ -73,12 +73,12 @@ func init() {
 }
 
 // ========================================================================
-// GTSS-AUTH-008: Missing Rate Limiting on Login
+// BATOU-AUTH-008: Missing Rate Limiting on Login
 // ========================================================================
 
 type MissingRateLimit struct{}
 
-func (r *MissingRateLimit) ID() string                     { return "GTSS-AUTH-008" }
+func (r *MissingRateLimit) ID() string                     { return "BATOU-AUTH-008" }
 func (r *MissingRateLimit) Name() string                   { return "MissingRateLimit" }
 func (r *MissingRateLimit) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingRateLimit) Description() string {
@@ -127,12 +127,12 @@ func (r *MissingRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-AUTH-009: Password Comparison Using == (Timing Attack)
+// BATOU-AUTH-009: Password Comparison Using == (Timing Attack)
 // ========================================================================
 
 type TimingAttackComparison struct{}
 
-func (r *TimingAttackComparison) ID() string                     { return "GTSS-AUTH-009" }
+func (r *TimingAttackComparison) ID() string                     { return "BATOU-AUTH-009" }
 func (r *TimingAttackComparison) Name() string                   { return "TimingAttackComparison" }
 func (r *TimingAttackComparison) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TimingAttackComparison) Description() string {
@@ -189,12 +189,12 @@ func (r *TimingAttackComparison) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-AUTH-010: Hardcoded Admin/Default Credentials
+// BATOU-AUTH-010: Hardcoded Admin/Default Credentials
 // ========================================================================
 
 type HardcodedAdminCreds struct{}
 
-func (r *HardcodedAdminCreds) ID() string                     { return "GTSS-AUTH-010" }
+func (r *HardcodedAdminCreds) ID() string                     { return "BATOU-AUTH-010" }
 func (r *HardcodedAdminCreds) Name() string                   { return "HardcodedAdminCreds" }
 func (r *HardcodedAdminCreds) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *HardcodedAdminCreds) Description() string {
@@ -244,12 +244,12 @@ func (r *HardcodedAdminCreds) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-AUTH-011: Missing CSRF Protection
+// BATOU-AUTH-011: Missing CSRF Protection
 // ========================================================================
 
 type MissingCSRF struct{}
 
-func (r *MissingCSRF) ID() string                     { return "GTSS-AUTH-011" }
+func (r *MissingCSRF) ID() string                     { return "BATOU-AUTH-011" }
 func (r *MissingCSRF) Name() string                   { return "MissingCSRF" }
 func (r *MissingCSRF) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MissingCSRF) Description() string {
@@ -298,12 +298,12 @@ func (r *MissingCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-AUTH-012: Authentication Bypass via Parameter Manipulation
+// BATOU-AUTH-012: Authentication Bypass via Parameter Manipulation
 // ========================================================================
 
 type AuthBypassParam struct{}
 
-func (r *AuthBypassParam) ID() string                     { return "GTSS-AUTH-012" }
+func (r *AuthBypassParam) ID() string                     { return "BATOU-AUTH-012" }
 func (r *AuthBypassParam) Name() string                   { return "AuthBypassParam" }
 func (r *AuthBypassParam) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AuthBypassParam) Description() string {
@@ -348,12 +348,12 @@ func (r *AuthBypassParam) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-AUTH-013: Broken Function-Level Access Control
+// BATOU-AUTH-013: Broken Function-Level Access Control
 // ========================================================================
 
 type BrokenAccessControl struct{}
 
-func (r *BrokenAccessControl) ID() string                     { return "GTSS-AUTH-013" }
+func (r *BrokenAccessControl) ID() string                     { return "BATOU-AUTH-013" }
 func (r *BrokenAccessControl) Name() string                   { return "BrokenAccessControl" }
 func (r *BrokenAccessControl) DefaultSeverity() rules.Severity { return rules.High }
 func (r *BrokenAccessControl) Description() string {
@@ -402,12 +402,12 @@ func (r *BrokenAccessControl) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-AUTH-014: Insecure Password Reset (Predictable Token)
+// BATOU-AUTH-014: Insecure Password Reset (Predictable Token)
 // ========================================================================
 
 type InsecurePasswordReset struct{}
 
-func (r *InsecurePasswordReset) ID() string                     { return "GTSS-AUTH-014" }
+func (r *InsecurePasswordReset) ID() string                     { return "BATOU-AUTH-014" }
 func (r *InsecurePasswordReset) Name() string                   { return "InsecurePasswordReset" }
 func (r *InsecurePasswordReset) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecurePasswordReset) Description() string {
@@ -459,12 +459,12 @@ func (r *InsecurePasswordReset) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-AUTH-015: Missing MFA Check
+// BATOU-AUTH-015: Missing MFA Check
 // ========================================================================
 
 type MissingMFA struct{}
 
-func (r *MissingMFA) ID() string                     { return "GTSS-AUTH-015" }
+func (r *MissingMFA) ID() string                     { return "BATOU-AUTH-015" }
 func (r *MissingMFA) Name() string                   { return "MissingMFA" }
 func (r *MissingMFA) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingMFA) Description() string {
@@ -515,12 +515,12 @@ func (r *MissingMFA) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-AUTH-016: Username Enumeration via Different Error Messages
+// BATOU-AUTH-016: Username Enumeration via Different Error Messages
 // ========================================================================
 
 type UsernameEnumeration struct{}
 
-func (r *UsernameEnumeration) ID() string                     { return "GTSS-AUTH-016" }
+func (r *UsernameEnumeration) ID() string                     { return "BATOU-AUTH-016" }
 func (r *UsernameEnumeration) Name() string                   { return "UsernameEnumeration" }
 func (r *UsernameEnumeration) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UsernameEnumeration) Description() string {
@@ -571,12 +571,12 @@ func (r *UsernameEnumeration) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-AUTH-017: Weak Password Policy (No Complexity Requirement)
+// BATOU-AUTH-017: Weak Password Policy (No Complexity Requirement)
 // ========================================================================
 
 type WeakPasswordPolicyExt struct{}
 
-func (r *WeakPasswordPolicyExt) ID() string                     { return "GTSS-AUTH-017" }
+func (r *WeakPasswordPolicyExt) ID() string                     { return "BATOU-AUTH-017" }
 func (r *WeakPasswordPolicyExt) Name() string                   { return "WeakPasswordPolicyExt" }
 func (r *WeakPasswordPolicyExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *WeakPasswordPolicyExt) Description() string {

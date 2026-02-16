@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,46 +12,46 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-ASPNET-001: [AllowAnonymous] on sensitive endpoints
+	// BATOU-FW-ASPNET-001: [AllowAnonymous] on sensitive endpoints
 	reAspnetAllowAnonymous = regexp.MustCompile(`\[AllowAnonymous\]`)
 	// Sensitive endpoint indicators (admin, account, user, payment, etc.)
 	reAspnetSensitiveEndpoint = regexp.MustCompile(`(?i)(?:admin|account|user|payment|billing|password|credential|secret|token|auth|profile|settings|manage)`)
 
-	// GTSS-FW-ASPNET-002: Missing ValidateAntiForgeryToken on POST
+	// BATOU-FW-ASPNET-002: Missing ValidateAntiForgeryToken on POST
 	reAspnetHttpPost           = regexp.MustCompile(`\[Http(?:Post|Put|Delete|Patch)\]`)
 	reAspnetAntiForgery        = regexp.MustCompile(`\[ValidateAntiForgeryToken\]`)
 	reAspnetAutoAntiForgery    = regexp.MustCompile(`\[AutoValidateAntiforgeryToken\]`)
 	reAspnetIgnoreAntiForgery  = regexp.MustCompile(`\[IgnoreAntiforgeryToken\]`)
 
-	// GTSS-FW-ASPNET-003: Html.Raw with user input
+	// BATOU-FW-ASPNET-003: Html.Raw with user input
 	reAspnetHtmlRaw = regexp.MustCompile(`Html\.Raw\s*\(\s*(?:Model\.|ViewBag\.|ViewData\[|TempData\[|Request\.|[a-zA-Z_]\w*\s*[,)])`)
 
-	// GTSS-FW-ASPNET-004: Connection string with password in config
+	// BATOU-FW-ASPNET-004: Connection string with password in config
 	reAspnetConnStrPassword = regexp.MustCompile(`(?i)(?:connectionString|connection\s*string)\s*[=:]\s*["'][^"']*(?:Password|Pwd)\s*=\s*[^;'"]+`)
 
-	// GTSS-FW-ASPNET-005: Custom errors disabled
+	// BATOU-FW-ASPNET-005: Custom errors disabled
 	reAspnetCustomErrorsOff = regexp.MustCompile(`(?i)<customErrors\s+mode\s*=\s*["']Off["']`)
 	reAspnetDevExceptionPage = regexp.MustCompile(`\.UseDeveloperExceptionPage\s*\(`)
 
-	// GTSS-FW-ASPNET-006: ViewState MAC disabled
+	// BATOU-FW-ASPNET-006: ViewState MAC disabled
 	reAspnetViewStateMacOff = regexp.MustCompile(`(?i)(?:enableViewStateMac\s*=\s*["']?false|ViewStateEncryptionMode\s*=\s*["']?Never)`)
 
-	// GTSS-FW-ASPNET-007: Request validation disabled
+	// BATOU-FW-ASPNET-007: Request validation disabled
 	reAspnetReqValidationOff = regexp.MustCompile(`(?i)(?:validateRequest\s*=\s*["']?false|\[ValidateInput\s*\(\s*false\s*\)\])`)
 	reAspnetReqFilterOff     = regexp.MustCompile(`(?i)requestValidationMode\s*=\s*["']2\.0["']`)
 
-	// GTSS-FW-ASPNET-008: CORS allowing all origins
+	// BATOU-FW-ASPNET-008: CORS allowing all origins
 	reAspnetCorsAllowAny = regexp.MustCompile(`\.AllowAnyOrigin\s*\(`)
 	reAspnetCorsPolicyAll = regexp.MustCompile(`(?i)WithOrigins\s*\(\s*["']\*["']\s*\)`)
 	reAspnetCorsEnableAll = regexp.MustCompile(`EnableCors\s*\(\s*["']\*["']\s*\)`)
 
-	// GTSS-FW-ASPNET-009: Weak password settings in Identity
+	// BATOU-FW-ASPNET-009: Weak password settings in Identity
 	reAspnetWeakPwdLength    = regexp.MustCompile(`RequiredLength\s*=\s*([1-5])\b`)
 	reAspnetPwdDigitFalse    = regexp.MustCompile(`RequireDigit\s*=\s*false`)
 	reAspnetPwdUpperFalse    = regexp.MustCompile(`RequireUppercase\s*=\s*false`)
 	reAspnetPwdNonAlphaFalse = regexp.MustCompile(`RequireNonAlphanumeric\s*=\s*false`)
 
-	// GTSS-FW-ASPNET-010: Session cookie without SameSite
+	// BATOU-FW-ASPNET-010: Session cookie without SameSite
 	reAspnetCookieSameSiteNone = regexp.MustCompile(`(?i)SameSite\s*=\s*(?:SameSiteMode\s*\.\s*)?None`)
 	reAspnetCookieOptions      = regexp.MustCompile(`(?i)CookieOptions|CookieBuilder|CookiePolicyOptions`)
 )
@@ -70,12 +70,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ASPNET-001: AllowAnonymous on sensitive endpoint
+// BATOU-FW-ASPNET-001: AllowAnonymous on sensitive endpoint
 // ---------------------------------------------------------------------------
 
 type AspnetAllowAnonymous struct{}
 
-func (r *AspnetAllowAnonymous) ID() string                      { return "GTSS-FW-ASPNET-001" }
+func (r *AspnetAllowAnonymous) ID() string                      { return "BATOU-FW-ASPNET-001" }
 func (r *AspnetAllowAnonymous) Name() string                    { return "AspnetAllowAnonymous" }
 func (r *AspnetAllowAnonymous) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AspnetAllowAnonymous) Description() string {
@@ -134,12 +134,12 @@ func (r *AspnetAllowAnonymous) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ASPNET-002: Missing ValidateAntiForgeryToken on POST
+// BATOU-FW-ASPNET-002: Missing ValidateAntiForgeryToken on POST
 // ---------------------------------------------------------------------------
 
 type AspnetMissingAntiForgery struct{}
 
-func (r *AspnetMissingAntiForgery) ID() string                      { return "GTSS-FW-ASPNET-002" }
+func (r *AspnetMissingAntiForgery) ID() string                      { return "BATOU-FW-ASPNET-002" }
 func (r *AspnetMissingAntiForgery) Name() string                    { return "AspnetMissingAntiForgery" }
 func (r *AspnetMissingAntiForgery) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AspnetMissingAntiForgery) Description() string {
@@ -205,12 +205,12 @@ func (r *AspnetMissingAntiForgery) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ASPNET-003: Html.Raw with user input
+// BATOU-FW-ASPNET-003: Html.Raw with user input
 // ---------------------------------------------------------------------------
 
 type AspnetHtmlRaw struct{}
 
-func (r *AspnetHtmlRaw) ID() string                      { return "GTSS-FW-ASPNET-003" }
+func (r *AspnetHtmlRaw) ID() string                      { return "BATOU-FW-ASPNET-003" }
 func (r *AspnetHtmlRaw) Name() string                    { return "AspnetHtmlRaw" }
 func (r *AspnetHtmlRaw) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AspnetHtmlRaw) Description() string {
@@ -256,12 +256,12 @@ func (r *AspnetHtmlRaw) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ASPNET-004: Connection string with password in config
+// BATOU-FW-ASPNET-004: Connection string with password in config
 // ---------------------------------------------------------------------------
 
 type AspnetConnStringPassword struct{}
 
-func (r *AspnetConnStringPassword) ID() string                      { return "GTSS-FW-ASPNET-004" }
+func (r *AspnetConnStringPassword) ID() string                      { return "BATOU-FW-ASPNET-004" }
 func (r *AspnetConnStringPassword) Name() string                    { return "AspnetConnStringPassword" }
 func (r *AspnetConnStringPassword) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AspnetConnStringPassword) Description() string {
@@ -307,12 +307,12 @@ func (r *AspnetConnStringPassword) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ASPNET-005: Custom errors disabled
+// BATOU-FW-ASPNET-005: Custom errors disabled
 // ---------------------------------------------------------------------------
 
 type AspnetCustomErrorsOff struct{}
 
-func (r *AspnetCustomErrorsOff) ID() string                      { return "GTSS-FW-ASPNET-005" }
+func (r *AspnetCustomErrorsOff) ID() string                      { return "BATOU-FW-ASPNET-005" }
 func (r *AspnetCustomErrorsOff) Name() string                    { return "AspnetCustomErrorsOff" }
 func (r *AspnetCustomErrorsOff) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *AspnetCustomErrorsOff) Description() string {
@@ -391,12 +391,12 @@ func (r *AspnetCustomErrorsOff) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ASPNET-006: ViewState MAC validation disabled
+// BATOU-FW-ASPNET-006: ViewState MAC validation disabled
 // ---------------------------------------------------------------------------
 
 type AspnetViewStateMacOff struct{}
 
-func (r *AspnetViewStateMacOff) ID() string                      { return "GTSS-FW-ASPNET-006" }
+func (r *AspnetViewStateMacOff) ID() string                      { return "BATOU-FW-ASPNET-006" }
 func (r *AspnetViewStateMacOff) Name() string                    { return "AspnetViewStateMacOff" }
 func (r *AspnetViewStateMacOff) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *AspnetViewStateMacOff) Description() string {
@@ -442,12 +442,12 @@ func (r *AspnetViewStateMacOff) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ASPNET-007: Request validation disabled
+// BATOU-FW-ASPNET-007: Request validation disabled
 // ---------------------------------------------------------------------------
 
 type AspnetReqValidationOff struct{}
 
-func (r *AspnetReqValidationOff) ID() string                      { return "GTSS-FW-ASPNET-007" }
+func (r *AspnetReqValidationOff) ID() string                      { return "BATOU-FW-ASPNET-007" }
 func (r *AspnetReqValidationOff) Name() string                    { return "AspnetReqValidationOff" }
 func (r *AspnetReqValidationOff) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AspnetReqValidationOff) Description() string {
@@ -500,12 +500,12 @@ func (r *AspnetReqValidationOff) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ASPNET-008: CORS allowing all origins
+// BATOU-FW-ASPNET-008: CORS allowing all origins
 // ---------------------------------------------------------------------------
 
 type AspnetCorsAllowAll struct{}
 
-func (r *AspnetCorsAllowAll) ID() string                      { return "GTSS-FW-ASPNET-008" }
+func (r *AspnetCorsAllowAll) ID() string                      { return "BATOU-FW-ASPNET-008" }
 func (r *AspnetCorsAllowAll) Name() string                    { return "AspnetCorsAllowAll" }
 func (r *AspnetCorsAllowAll) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AspnetCorsAllowAll) Description() string {
@@ -560,12 +560,12 @@ func (r *AspnetCorsAllowAll) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ASPNET-009: Identity weak password settings
+// BATOU-FW-ASPNET-009: Identity weak password settings
 // ---------------------------------------------------------------------------
 
 type AspnetWeakPassword struct{}
 
-func (r *AspnetWeakPassword) ID() string                      { return "GTSS-FW-ASPNET-009" }
+func (r *AspnetWeakPassword) ID() string                      { return "BATOU-FW-ASPNET-009" }
 func (r *AspnetWeakPassword) Name() string                    { return "AspnetWeakPassword" }
 func (r *AspnetWeakPassword) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *AspnetWeakPassword) Description() string {
@@ -635,12 +635,12 @@ func (r *AspnetWeakPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-ASPNET-010: Session cookie without SameSite
+// BATOU-FW-ASPNET-010: Session cookie without SameSite
 // ---------------------------------------------------------------------------
 
 type AspnetCookieSameSite struct{}
 
-func (r *AspnetCookieSameSite) ID() string                      { return "GTSS-FW-ASPNET-010" }
+func (r *AspnetCookieSameSite) ID() string                      { return "BATOU-FW-ASPNET-010" }
 func (r *AspnetCookieSameSite) Name() string                    { return "AspnetCookieSameSite" }
 func (r *AspnetCookieSameSite) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *AspnetCookieSameSite) Description() string {

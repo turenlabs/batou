@@ -1,4 +1,4 @@
-module github.com/turenio/gtss
+module github.com/turenlabs/batou
 
 go 1.25.5
 

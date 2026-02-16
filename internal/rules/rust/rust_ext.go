@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
-// Compiled regex patterns for Rust extension rules (GTSS-RS-011 .. GTSS-RS-018)
+// Compiled regex patterns for Rust extension rules (BATOU-RS-011 .. BATOU-RS-018)
 // ---------------------------------------------------------------------------
 
 // RS-011: Unsafe block with raw pointer dereference
@@ -85,12 +85,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RS-011: Rust unsafe block with raw pointer dereference
+// BATOU-RS-011: Rust unsafe block with raw pointer dereference
 // ---------------------------------------------------------------------------
 
 type RustUnsafePtrDeref struct{}
 
-func (r RustUnsafePtrDeref) ID() string                      { return "GTSS-RS-011" }
+func (r RustUnsafePtrDeref) ID() string                      { return "BATOU-RS-011" }
 func (r RustUnsafePtrDeref) Name() string                    { return "RustUnsafePtrDeref" }
 func (r RustUnsafePtrDeref) Description() string             { return "Detects Rust unsafe blocks containing raw pointer dereferences or offset arithmetic, which bypass memory safety." }
 func (r RustUnsafePtrDeref) DefaultSeverity() rules.Severity { return rules.High }
@@ -150,12 +150,12 @@ func (r RustUnsafePtrDeref) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RS-012: Rust SQL injection via format! in query
+// BATOU-RS-012: Rust SQL injection via format! in query
 // ---------------------------------------------------------------------------
 
 type RustSQLFormat struct{}
 
-func (r RustSQLFormat) ID() string                      { return "GTSS-RS-012" }
+func (r RustSQLFormat) ID() string                      { return "BATOU-RS-012" }
 func (r RustSQLFormat) Name() string                    { return "RustSQLFormat" }
 func (r RustSQLFormat) Description() string             { return "Detects Rust SQL injection via format! macro building SQL query strings." }
 func (r RustSQLFormat) DefaultSeverity() rules.Severity { return rules.High }
@@ -206,12 +206,12 @@ func (r RustSQLFormat) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RS-013: Rust std::process::Command with user input
+// BATOU-RS-013: Rust std::process::Command with user input
 // ---------------------------------------------------------------------------
 
 type RustCommandUser struct{}
 
-func (r RustCommandUser) ID() string                      { return "GTSS-RS-013" }
+func (r RustCommandUser) ID() string                      { return "BATOU-RS-013" }
 func (r RustCommandUser) Name() string                    { return "RustCommandUser" }
 func (r RustCommandUser) Description() string             { return "Detects Rust std::process::Command with variable program names or format! in arguments, enabling command injection." }
 func (r RustCommandUser) DefaultSeverity() rules.Severity { return rules.High }
@@ -265,12 +265,12 @@ func (r RustCommandUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RS-014: Rust unwrap() in production code
+// BATOU-RS-014: Rust unwrap() in production code
 // ---------------------------------------------------------------------------
 
 type RustUnwrapProd struct{}
 
-func (r RustUnwrapProd) ID() string                      { return "GTSS-RS-014" }
+func (r RustUnwrapProd) ID() string                      { return "BATOU-RS-014" }
 func (r RustUnwrapProd) Name() string                    { return "RustUnwrapProd" }
 func (r RustUnwrapProd) Description() string             { return "Detects Rust unwrap()/expect() calls outside test code that can panic in production, causing denial of service." }
 func (r RustUnwrapProd) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -335,12 +335,12 @@ func (r RustUnwrapProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RS-015: Rust transmute between incompatible types
+// BATOU-RS-015: Rust transmute between incompatible types
 // ---------------------------------------------------------------------------
 
 type RustTransmuteIncompat struct{}
 
-func (r RustTransmuteIncompat) ID() string                      { return "GTSS-RS-015" }
+func (r RustTransmuteIncompat) ID() string                      { return "BATOU-RS-015" }
 func (r RustTransmuteIncompat) Name() string                    { return "RustTransmuteIncompat" }
 func (r RustTransmuteIncompat) Description() string             { return "Detects Rust transmute/transmute_copy calls which reinterpret memory between types, bypassing all type safety." }
 func (r RustTransmuteIncompat) DefaultSeverity() rules.Severity { return rules.High }
@@ -394,12 +394,12 @@ func (r RustTransmuteIncompat) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RS-016: Rust regex without size/time limit
+// BATOU-RS-016: Rust regex without size/time limit
 // ---------------------------------------------------------------------------
 
 type RustRegexNoLimit struct{}
 
-func (r RustRegexNoLimit) ID() string                      { return "GTSS-RS-016" }
+func (r RustRegexNoLimit) ID() string                      { return "BATOU-RS-016" }
 func (r RustRegexNoLimit) Name() string                    { return "RustRegexNoLimit" }
 func (r RustRegexNoLimit) Description() string             { return "Detects Rust Regex::new() with variable or format! patterns without size_limit, enabling ReDoS." }
 func (r RustRegexNoLimit) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -452,12 +452,12 @@ func (r RustRegexNoLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RS-017: Rust actix-web/warp/axum without TLS config
+// BATOU-RS-017: Rust actix-web/warp/axum without TLS config
 // ---------------------------------------------------------------------------
 
 type RustNoTLS struct{}
 
-func (r RustNoTLS) ID() string                      { return "GTSS-RS-017" }
+func (r RustNoTLS) ID() string                      { return "BATOU-RS-017" }
 func (r RustNoTLS) Name() string                    { return "RustNoTLS" }
 func (r RustNoTLS) Description() string             { return "Detects Rust web servers (actix-web, warp, axum) binding to addresses without TLS configuration." }
 func (r RustNoTLS) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -516,12 +516,12 @@ func (r RustNoTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RS-018: Rust FFI without proper bounds checking
+// BATOU-RS-018: Rust FFI without proper bounds checking
 // ---------------------------------------------------------------------------
 
 type RustFFIBounds struct{}
 
-func (r RustFFIBounds) ID() string                      { return "GTSS-RS-018" }
+func (r RustFFIBounds) ID() string                      { return "BATOU-RS-018" }
 func (r RustFFIBounds) Name() string                    { return "RustFFIBounds" }
 func (r RustFFIBounds) Description() string             { return "Detects Rust FFI (extern \"C\") functions with raw pointer parameters or unsafe C string/slice conversions without bounds checking." }
 func (r RustFFIBounds) DefaultSeverity() rules.Severity { return rules.High }

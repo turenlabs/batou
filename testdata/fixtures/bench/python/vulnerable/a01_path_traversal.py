@@ -1,5 +1,5 @@
 # Source: OWASP Juice Shop - File access with path traversal
-# Expected: GTSS-TRV-001 (Path Traversal via user input in file operations)
+# Expected: BATOU-TRV-001 (Path Traversal via user input in file operations)
 # OWASP: A01:2021 - Broken Access Control (Path Traversal)
 
 import os

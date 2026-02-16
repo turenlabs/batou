@@ -3,8 +3,8 @@ package gvyast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // GroovyASTAnalyzer performs AST-based security analysis of Groovy source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&GroovyASTAnalyzer{})
 }
 
-func (g *GroovyASTAnalyzer) ID() string                        { return "GTSS-GVY-AST" }
+func (g *GroovyASTAnalyzer) ID() string                        { return "BATOU-GVY-AST" }
 func (g *GroovyASTAnalyzer) Name() string                      { return "Groovy AST Security Analyzer" }
 func (g *GroovyASTAnalyzer) DefaultSeverity() rules.Severity   { return rules.High }
 func (g *GroovyASTAnalyzer) Languages() []rules.Language        { return []rules.Language{rules.LangGroovy} }
@@ -91,7 +91,7 @@ func (c *gvyChecker) checkStringExecute(n *ast.Node) {
 
 			if hasExecute && hasInterpolatedString {
 				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "GTSS-GVY-AST-001",
+					RuleID:        "BATOU-GVY-AST-001",
 					Severity:      rules.Critical,
 					SeverityLabel: rules.Critical.String(),
 					Title:         "Command injection via String.execute()",
@@ -111,7 +111,7 @@ func (c *gvyChecker) checkStringExecute(n *ast.Node) {
 				for _, dc := range child.NamedChildren() {
 					if dc.Type() == "identifier" && dc.Text() != "execute" {
 						c.findings = append(c.findings, rules.Finding{
-							RuleID:        "GTSS-GVY-AST-001",
+							RuleID:        "BATOU-GVY-AST-001",
 							Severity:      rules.High,
 							SeverityLabel: rules.High.String(),
 							Title:         "Command execution via .execute()",
@@ -149,7 +149,7 @@ func (c *gvyChecker) checkGroovyShellEvaluate(n *ast.Node) {
 	// Check if argument is a variable
 	if hasGroovyVariableArg(n) {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-GVY-AST-002",
+			RuleID:        "BATOU-GVY-AST-002",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Code injection via GroovyShell." + methodName + "()",
@@ -181,7 +181,7 @@ func (c *gvyChecker) checkRuntimeExec(n *ast.Node) {
 
 	if hasGroovyVariableArg(n) {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-GVY-AST-003",
+			RuleID:        "BATOU-GVY-AST-003",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Command injection via Runtime.exec",
@@ -240,7 +240,7 @@ func (c *gvyChecker) checkJenkinsPipeline(n *ast.Node) {
 			})
 			if hasInterpolation {
 				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "GTSS-GVY-AST-004",
+					RuleID:        "BATOU-GVY-AST-004",
 					Severity:      rules.Critical,
 					SeverityLabel: rules.Critical.String(),
 					Title:         "Jenkins pipeline " + funcName + " with interpolated string",
@@ -297,7 +297,7 @@ func (c *gvyChecker) checkGStringSQLInjection(n *ast.Node) {
 					}
 					if hasSql && hasInterp {
 						c.findings = append(c.findings, rules.Finding{
-							RuleID:        "GTSS-GVY-AST-005",
+							RuleID:        "BATOU-GVY-AST-005",
 							Severity:      rules.Critical,
 							SeverityLabel: rules.Critical.String(),
 							Title:         "SQL injection via GString interpolation",
@@ -369,7 +369,7 @@ func (c *gvyChecker) checkGStringSQLDeclaration(n *ast.Node) {
 			}
 			if hasSql && hasInterp {
 				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "GTSS-GVY-AST-005",
+					RuleID:        "BATOU-GVY-AST-005",
 					Severity:      rules.Critical,
 					SeverityLabel: rules.Critical.String(),
 					Title:         "SQL injection via GString interpolation in variable",

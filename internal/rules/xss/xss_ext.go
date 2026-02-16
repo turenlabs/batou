@@ -4,84 +4,84 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended XSS rules
 // ---------------------------------------------------------------------------
 
-// GTSS-XSS-016: DOM XSS via document.write with user input
+// BATOU-XSS-016: DOM XSS via document.write with user input
 var (
 	reDocWriteLocation   = regexp.MustCompile(`document\.(?:write|writeln)\s*\(.*(?:location\.|document\.URL|document\.referrer|document\.documentURI|window\.name)`)
 	reDocWriteUserInput  = regexp.MustCompile(`document\.(?:write|writeln)\s*\(.*(?:location\.(?:hash|search|href|pathname)|document\.cookie|window\.name|document\.referrer)`)
 )
 
-// GTSS-XSS-017: DOM XSS via location.hash/search
+// BATOU-XSS-017: DOM XSS via location.hash/search
 var (
 	reLocationHashUse    = regexp.MustCompile(`(?:location\.hash|location\.search|location\.href|document\.URL|document\.referrer)`)
 	reDOMSinkWithLoc     = regexp.MustCompile(`(?:innerHTML|outerHTML|insertAdjacentHTML|document\.write|\.html\s*\(|eval\s*\().*(?:location\.(?:hash|search|href)|document\.URL|document\.referrer)`)
 	reLocationToVar      = regexp.MustCompile(`(?:=\s*(?:location\.(?:hash|search|href)|document\.URL|document\.referrer|window\.location))`)
 )
 
-// GTSS-XSS-018: Angular bypassSecurityTrustHtml
+// BATOU-XSS-018: Angular bypassSecurityTrustHtml
 var (
 	reAngularBypass      = regexp.MustCompile(`bypassSecurityTrust(?:Html|Script|Style|Url|ResourceUrl)\s*\(`)
 	reAngularSanitizer   = regexp.MustCompile(`DomSanitizer`)
 )
 
-// GTSS-XSS-019: Vue v-html directive
+// BATOU-XSS-019: Vue v-html directive
 var (
 	reVueVHTML           = regexp.MustCompile(`v-html\s*=\s*["']`)
 	reVueSanitize        = regexp.MustCompile(`(?i)(?:sanitize|DOMPurify|xss|filterXSS)`)
 )
 
-// GTSS-XSS-020: jQuery .html() with user input
+// BATOU-XSS-020: jQuery .html() with user input
 var (
 	reJQueryHTMLUserInput = regexp.MustCompile(`\$\s*\([^)]*\)\s*\.html\s*\(\s*(?:(?:location|document|window)\.|.*\+|.*\$\{)`)
 	reJQueryHTMLVar       = regexp.MustCompile(`\.\s*html\s*\(\s*[a-zA-Z_]\w*\s*\)`)
 )
 
-// GTSS-XSS-021: React dangerouslySetInnerHTML with variable
+// BATOU-XSS-021: React dangerouslySetInnerHTML with variable
 var (
 	reReactDangerVar     = regexp.MustCompile(`dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html\s*:\s*(?:[a-zA-Z_]\w*(?:\.\w+)*|(?:props|state|data|user|input|param|query)\.)`)
 	reReactDangerConcat  = regexp.MustCompile(`dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html\s*:.*\+`)
 )
 
-// GTSS-XSS-022: Reflected XSS via response.write
+// BATOU-XSS-022: Reflected XSS via response.write
 var (
 	reRespWriteConcat    = regexp.MustCompile(`(?i)(?:response\.write|res\.write|res\.send|res\.end|out\.print|out\.println|writer\.write|writer\.println|w\.Write|fmt\.Fprint)\s*\(.*(?:\+\s*(?:req\.|request\.|params|query|body|args|GET|POST))`)
 	reRespWriteFmt       = regexp.MustCompile(`(?i)(?:response\.write|res\.write|res\.send|fmt\.Fprintf)\s*\(.*(?:f["']|%[sv]|\.format\().*(?:req\.|request\.|params|query|body|args|GET|POST)`)
 )
 
-// GTSS-XSS-023: Stored XSS via database value in HTML
+// BATOU-XSS-023: Stored XSS via database value in HTML
 var (
 	reDBValueInHTML      = regexp.MustCompile(`(?i)(?:innerHTML|outerHTML|document\.write|\.html\s*\(|dangerouslySetInnerHTML).*(?:\.(?:find|query|fetch|get|select|execute|findOne|findAll)\s*\(|db\.|database|cursor|result|row|record)`)
 	reDBHTMLConcat       = regexp.MustCompile(`(?i)(?:["']<[^"']*>\s*["']\s*\+|html\s*(?:\+?=)\s*["']<).*(?:row|record|result|data|item|entry|user|comment|post|message)\s*[\[.]`)
 )
 
-// GTSS-XSS-024: XSS via SVG/MathML
+// BATOU-XSS-024: XSS via SVG/MathML
 var (
 	reSVGUpload          = regexp.MustCompile(`(?i)(?:svg|mathml|image/svg).*(?:upload|file|input|content|src|source|user|data)`)
 	reSVGInline          = regexp.MustCompile(`(?i)<svg\b[^>]*>.*(?:onload|onerror|onclick|onmouseover|javascript:)`)
 	reSVGContentType     = regexp.MustCompile(`(?i)(?:Content-Type|contentType|content_type).*image/svg`)
 )
 
-// GTSS-XSS-025: XSS in error message reflection
+// BATOU-XSS-025: XSS in error message reflection
 var (
 	reErrorReflect       = regexp.MustCompile(`(?i)(?:error|err|exception|message|msg)\s*(?:\+?=|=).*(?:req\.|request\.|params|query|body|args|input|user|\$_GET|\$_POST|\$_REQUEST)`)
 	reErrorHTML          = regexp.MustCompile(`(?i)(?:res\.send|response\.write|out\.print|writer\.write|w\.Write|fmt\.Fprint|echo|print|render).*(?:error|err|exception|message|msg)\b`)
 	reErrorDisplay       = regexp.MustCompile(`(?i)(?:innerHTML|outerHTML|textContent|\.html\s*\(|\.text\s*\().*(?:error|err|exception|message|msg)\b`)
 )
 
-// GTSS-XSS-026: JavaScript URI scheme in href/src
+// BATOU-XSS-026: JavaScript URI scheme in href/src
 var (
 	reJSURIHref          = regexp.MustCompile(`(?i)(?:href|src|action|formaction|data|poster|background)\s*=\s*(?:["']\s*javascript\s*:|[{(]\s*["']\s*javascript\s*:)`)
 	reJSURIDynamic       = regexp.MustCompile(`(?i)(?:href|src|action)\s*=\s*\{?\s*(?:user|input|param|query|data|url|link|href|src)\w*\s*\}?`)
 	reJSURISanitize      = regexp.MustCompile(`(?i)(?:sanitizeUrl|DOMPurify|filterXSS|isValidUrl|isAbsoluteUrl|isSafeUrl|validateUrl)`)
 )
 
-// GTSS-XSS-027: Event handler injection
+// BATOU-XSS-027: Event handler injection
 var (
 	reEventHandler       = regexp.MustCompile(`(?i)(?:on(?:load|error|click|mouseover|mouseout|mouseenter|mouseleave|focus|blur|submit|change|input|keyup|keydown|keypress|abort|beforeunload|contextmenu|dblclick|drag|dragend|dragenter|dragleave|dragover|dragstart|drop))\s*=\s*(?:["'][^"']*(?:req\.|request\.|params|query|body|input|user)|["'][^"']*["']\s*\+)`)
 	reEventHandlerConcat = regexp.MustCompile(`(?i)(?:["']<[^"']*\s+on(?:load|error|click|mouseover|focus|blur|submit|change|input|keyup|keydown))\s*=\s*["']\s*\+\s*\w+`)
@@ -139,12 +139,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-016: DOM XSS via document.write with user input
+// BATOU-XSS-016: DOM XSS via document.write with user input
 // ---------------------------------------------------------------------------
 
 type DOMXSSDocWrite struct{}
 
-func (r *DOMXSSDocWrite) ID() string                     { return "GTSS-XSS-016" }
+func (r *DOMXSSDocWrite) ID() string                     { return "BATOU-XSS-016" }
 func (r *DOMXSSDocWrite) Name() string                   { return "DOMXSSDocWrite" }
 func (r *DOMXSSDocWrite) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DOMXSSDocWrite) Description() string {
@@ -173,12 +173,12 @@ func (r *DOMXSSDocWrite) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-017: DOM XSS via location.hash/search
+// BATOU-XSS-017: DOM XSS via location.hash/search
 // ---------------------------------------------------------------------------
 
 type DOMXSSLocationHash struct{}
 
-func (r *DOMXSSLocationHash) ID() string                     { return "GTSS-XSS-017" }
+func (r *DOMXSSLocationHash) ID() string                     { return "BATOU-XSS-017" }
 func (r *DOMXSSLocationHash) Name() string                   { return "DOMXSSLocationHash" }
 func (r *DOMXSSLocationHash) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DOMXSSLocationHash) Description() string {
@@ -207,12 +207,12 @@ func (r *DOMXSSLocationHash) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-018: Angular bypassSecurityTrustHtml
+// BATOU-XSS-018: Angular bypassSecurityTrustHtml
 // ---------------------------------------------------------------------------
 
 type AngularBypassSecurity struct{}
 
-func (r *AngularBypassSecurity) ID() string                     { return "GTSS-XSS-018" }
+func (r *AngularBypassSecurity) ID() string                     { return "BATOU-XSS-018" }
 func (r *AngularBypassSecurity) Name() string                   { return "AngularBypassSecurity" }
 func (r *AngularBypassSecurity) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AngularBypassSecurity) Description() string {
@@ -241,12 +241,12 @@ func (r *AngularBypassSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-019: Vue v-html directive
+// BATOU-XSS-019: Vue v-html directive
 // ---------------------------------------------------------------------------
 
 type VueVHTML struct{}
 
-func (r *VueVHTML) ID() string                     { return "GTSS-XSS-019" }
+func (r *VueVHTML) ID() string                     { return "BATOU-XSS-019" }
 func (r *VueVHTML) Name() string                   { return "VueVHTML" }
 func (r *VueVHTML) DefaultSeverity() rules.Severity { return rules.High }
 func (r *VueVHTML) Description() string {
@@ -278,12 +278,12 @@ func (r *VueVHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-020: jQuery .html() with user input
+// BATOU-XSS-020: jQuery .html() with user input
 // ---------------------------------------------------------------------------
 
 type JQueryHTMLXSS struct{}
 
-func (r *JQueryHTMLXSS) ID() string                     { return "GTSS-XSS-020" }
+func (r *JQueryHTMLXSS) ID() string                     { return "BATOU-XSS-020" }
 func (r *JQueryHTMLXSS) Name() string                   { return "JQueryHTMLXSS" }
 func (r *JQueryHTMLXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JQueryHTMLXSS) Description() string {
@@ -321,12 +321,12 @@ func (r *JQueryHTMLXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-021: React dangerouslySetInnerHTML with variable
+// BATOU-XSS-021: React dangerouslySetInnerHTML with variable
 // ---------------------------------------------------------------------------
 
 type ReactDangerousVar struct{}
 
-func (r *ReactDangerousVar) ID() string                     { return "GTSS-XSS-021" }
+func (r *ReactDangerousVar) ID() string                     { return "BATOU-XSS-021" }
 func (r *ReactDangerousVar) Name() string                   { return "ReactDangerousVar" }
 func (r *ReactDangerousVar) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ReactDangerousVar) Description() string {
@@ -355,12 +355,12 @@ func (r *ReactDangerousVar) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-022: Reflected XSS via response.write
+// BATOU-XSS-022: Reflected XSS via response.write
 // ---------------------------------------------------------------------------
 
 type ReflectedXSSRespWrite struct{}
 
-func (r *ReflectedXSSRespWrite) ID() string                     { return "GTSS-XSS-022" }
+func (r *ReflectedXSSRespWrite) ID() string                     { return "BATOU-XSS-022" }
 func (r *ReflectedXSSRespWrite) Name() string                   { return "ReflectedXSSRespWrite" }
 func (r *ReflectedXSSRespWrite) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ReflectedXSSRespWrite) Description() string {
@@ -392,12 +392,12 @@ func (r *ReflectedXSSRespWrite) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-023: Stored XSS via database value in HTML
+// BATOU-XSS-023: Stored XSS via database value in HTML
 // ---------------------------------------------------------------------------
 
 type StoredXSSDatabase struct{}
 
-func (r *StoredXSSDatabase) ID() string                     { return "GTSS-XSS-023" }
+func (r *StoredXSSDatabase) ID() string                     { return "BATOU-XSS-023" }
 func (r *StoredXSSDatabase) Name() string                   { return "StoredXSSDatabase" }
 func (r *StoredXSSDatabase) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *StoredXSSDatabase) Description() string {
@@ -429,12 +429,12 @@ func (r *StoredXSSDatabase) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-024: XSS via SVG/MathML injection
+// BATOU-XSS-024: XSS via SVG/MathML injection
 // ---------------------------------------------------------------------------
 
 type SVGMathMLXSS struct{}
 
-func (r *SVGMathMLXSS) ID() string                     { return "GTSS-XSS-024" }
+func (r *SVGMathMLXSS) ID() string                     { return "BATOU-XSS-024" }
 func (r *SVGMathMLXSS) Name() string                   { return "SVGMathMLXSS" }
 func (r *SVGMathMLXSS) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SVGMathMLXSS) Description() string {
@@ -468,12 +468,12 @@ func (r *SVGMathMLXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-025: XSS in error message reflection
+// BATOU-XSS-025: XSS in error message reflection
 // ---------------------------------------------------------------------------
 
 type ErrorMessageXSS struct{}
 
-func (r *ErrorMessageXSS) ID() string                     { return "GTSS-XSS-025" }
+func (r *ErrorMessageXSS) ID() string                     { return "BATOU-XSS-025" }
 func (r *ErrorMessageXSS) Name() string                   { return "ErrorMessageXSS" }
 func (r *ErrorMessageXSS) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ErrorMessageXSS) Description() string {
@@ -504,12 +504,12 @@ func (r *ErrorMessageXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-026: JavaScript URI scheme in href/src
+// BATOU-XSS-026: JavaScript URI scheme in href/src
 // ---------------------------------------------------------------------------
 
 type JavaScriptURIScheme struct{}
 
-func (r *JavaScriptURIScheme) ID() string                     { return "GTSS-XSS-026" }
+func (r *JavaScriptURIScheme) ID() string                     { return "BATOU-XSS-026" }
 func (r *JavaScriptURIScheme) Name() string                   { return "JavaScriptURIScheme" }
 func (r *JavaScriptURIScheme) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JavaScriptURIScheme) Description() string {
@@ -543,12 +543,12 @@ func (r *JavaScriptURIScheme) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-027: Event handler injection
+// BATOU-XSS-027: Event handler injection
 // ---------------------------------------------------------------------------
 
 type EventHandlerInjection struct{}
 
-func (r *EventHandlerInjection) ID() string                     { return "GTSS-XSS-027" }
+func (r *EventHandlerInjection) ID() string                     { return "BATOU-XSS-027" }
 func (r *EventHandlerInjection) Name() string                   { return "EventHandlerInjection" }
 func (r *EventHandlerInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *EventHandlerInjection) Description() string {

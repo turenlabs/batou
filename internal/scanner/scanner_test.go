@@ -4,25 +4,25 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/testutil"
 
 	// Register all rule packages to trigger init() registrations.
-	_ "github.com/turenio/gtss/internal/rules/injection"
-	_ "github.com/turenio/gtss/internal/rules/secrets"
-	_ "github.com/turenio/gtss/internal/rules/crypto"
-	_ "github.com/turenio/gtss/internal/rules/xss"
-	_ "github.com/turenio/gtss/internal/rules/traversal"
-	_ "github.com/turenio/gtss/internal/rules/ssrf"
-	_ "github.com/turenio/gtss/internal/rules/auth"
-	_ "github.com/turenio/gtss/internal/rules/generic"
-	_ "github.com/turenio/gtss/internal/rules/logging"
-	_ "github.com/turenio/gtss/internal/rules/validation"
-	_ "github.com/turenio/gtss/internal/rules/memory"
+	_ "github.com/turenlabs/batou/internal/rules/injection"
+	_ "github.com/turenlabs/batou/internal/rules/secrets"
+	_ "github.com/turenlabs/batou/internal/rules/crypto"
+	_ "github.com/turenlabs/batou/internal/rules/xss"
+	_ "github.com/turenlabs/batou/internal/rules/traversal"
+	_ "github.com/turenlabs/batou/internal/rules/ssrf"
+	_ "github.com/turenlabs/batou/internal/rules/auth"
+	_ "github.com/turenlabs/batou/internal/rules/generic"
+	_ "github.com/turenlabs/batou/internal/rules/logging"
+	_ "github.com/turenlabs/batou/internal/rules/validation"
+	_ "github.com/turenlabs/batou/internal/rules/memory"
 
 	// Taint analysis engine and language catalogs.
-	_ "github.com/turenio/gtss/internal/taint"
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/taint"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Panic recovery: verify GTSS-PANIC finding when a rule panics
+// Panic recovery: verify BATOU-PANIC finding when a rule panics
 // ---------------------------------------------------------------------------
 
 func TestPanicRecovery(t *testing.T) {
@@ -315,7 +315,7 @@ func TestVeryLongLineMinifiedJS(t *testing.T) {
 	}
 	// Should not produce a timeout finding
 	for _, f := range result.Findings {
-		if f.RuleID == "GTSS-TIMEOUT" {
+		if f.RuleID == "BATOU-TIMEOUT" {
 			t.Error("minified JS should not cause timeout")
 		}
 	}

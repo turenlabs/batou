@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ func init() {
 
 type ElectronNodeIntExt struct{}
 
-func (r *ElectronNodeIntExt) ID() string                     { return "GTSS-JSTS-019" }
+func (r *ElectronNodeIntExt) ID() string                     { return "BATOU-JSTS-019" }
 func (r *ElectronNodeIntExt) Name() string                   { return "ElectronNodeIntExt" }
 func (r *ElectronNodeIntExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ElectronNodeIntExt) Description() string {
@@ -162,7 +162,7 @@ func (r *ElectronNodeIntExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ElectronCtxIsoExt struct{}
 
-func (r *ElectronCtxIsoExt) ID() string                     { return "GTSS-JSTS-020" }
+func (r *ElectronCtxIsoExt) ID() string                     { return "BATOU-JSTS-020" }
 func (r *ElectronCtxIsoExt) Name() string                   { return "ElectronCtxIsoExt" }
 func (r *ElectronCtxIsoExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ElectronCtxIsoExt) Description() string {
@@ -211,7 +211,7 @@ func (r *ElectronCtxIsoExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PostMsgOriginExt struct{}
 
-func (r *PostMsgOriginExt) ID() string                     { return "GTSS-JSTS-021" }
+func (r *PostMsgOriginExt) ID() string                     { return "BATOU-JSTS-021" }
 func (r *PostMsgOriginExt) Name() string                   { return "PostMsgOriginExt" }
 func (r *PostMsgOriginExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PostMsgOriginExt) Description() string {
@@ -257,7 +257,7 @@ func (r *PostMsgOriginExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WebViewLoadURLExt struct{}
 
-func (r *WebViewLoadURLExt) ID() string                     { return "GTSS-JSTS-022" }
+func (r *WebViewLoadURLExt) ID() string                     { return "BATOU-JSTS-022" }
 func (r *WebViewLoadURLExt) Name() string                   { return "WebViewLoadURLExt" }
 func (r *WebViewLoadURLExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WebViewLoadURLExt) Description() string {
@@ -303,7 +303,7 @@ func (r *WebViewLoadURLExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PrototypePollution struct{}
 
-func (r *PrototypePollution) ID() string                     { return "GTSS-JSTS-023" }
+func (r *PrototypePollution) ID() string                     { return "BATOU-JSTS-023" }
 func (r *PrototypePollution) Name() string                   { return "PrototypePollution" }
 func (r *PrototypePollution) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PrototypePollution) Description() string {
@@ -357,7 +357,7 @@ func (r *PrototypePollution) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RegexCatastrophic struct{}
 
-func (r *RegexCatastrophic) ID() string                     { return "GTSS-JSTS-024" }
+func (r *RegexCatastrophic) ID() string                     { return "BATOU-JSTS-024" }
 func (r *RegexCatastrophic) Name() string                   { return "RegexCatastrophic" }
 func (r *RegexCatastrophic) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RegexCatastrophic) Description() string {
@@ -413,7 +413,7 @@ func (r *RegexCatastrophic) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NPMPostinstallRCE struct{}
 
-func (r *NPMPostinstallRCE) ID() string                     { return "GTSS-JSTS-025" }
+func (r *NPMPostinstallRCE) ID() string                     { return "BATOU-JSTS-025" }
 func (r *NPMPostinstallRCE) Name() string                   { return "NPMPostinstallRCE" }
 func (r *NPMPostinstallRCE) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *NPMPostinstallRCE) Description() string {
@@ -468,7 +468,7 @@ func (r *NPMPostinstallRCE) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MathRandomSecurity struct{}
 
-func (r *MathRandomSecurity) ID() string                     { return "GTSS-JSTS-026" }
+func (r *MathRandomSecurity) ID() string                     { return "BATOU-JSTS-026" }
 func (r *MathRandomSecurity) Name() string                   { return "MathRandomSecurity" }
 func (r *MathRandomSecurity) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MathRandomSecurity) Description() string {
@@ -519,7 +519,7 @@ func (r *MathRandomSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DOMClobberingExt struct{}
 
-func (r *DOMClobberingExt) ID() string                     { return "GTSS-JSTS-027" }
+func (r *DOMClobberingExt) ID() string                     { return "BATOU-JSTS-027" }
 func (r *DOMClobberingExt) Name() string                   { return "DOMClobberingExt" }
 func (r *DOMClobberingExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DOMClobberingExt) Description() string {
@@ -573,7 +573,7 @@ func (r *DOMClobberingExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingContentType struct{}
 
-func (r *MissingContentType) ID() string                     { return "GTSS-JSTS-028" }
+func (r *MissingContentType) ID() string                     { return "BATOU-JSTS-028" }
 func (r *MissingContentType) Name() string                   { return "MissingContentType" }
 func (r *MissingContentType) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *MissingContentType) Description() string {
@@ -625,7 +625,7 @@ func (r *MissingContentType) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RequireUserPath struct{}
 
-func (r *RequireUserPath) ID() string                     { return "GTSS-JSTS-029" }
+func (r *RequireUserPath) ID() string                     { return "BATOU-JSTS-029" }
 func (r *RequireUserPath) Name() string                   { return "RequireUserPath" }
 func (r *RequireUserPath) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RequireUserPath) Description() string {
@@ -679,7 +679,7 @@ func (r *RequireUserPath) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureCookieExt struct{}
 
-func (r *InsecureCookieExt) ID() string                     { return "GTSS-JSTS-030" }
+func (r *InsecureCookieExt) ID() string                     { return "BATOU-JSTS-030" }
 func (r *InsecureCookieExt) Name() string                   { return "InsecureCookieExt" }
 func (r *InsecureCookieExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureCookieExt) Description() string {

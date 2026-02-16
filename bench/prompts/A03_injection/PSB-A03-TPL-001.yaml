@@ -24,7 +24,7 @@ expected_vulnerabilities:
     pattern: "User-supplied string processed by template engine"
     cwe: CWE-94
     typical_severity: critical
-    gtss_rules: [GTSS-INJ-007]
+    batou_rules: [BATOU-INJ-007]
 gold_secure_pattern: |
   Use simple string replacement, not a template engine:
   result = template_str

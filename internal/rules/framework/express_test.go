@@ -3,10 +3,10 @@ package framework
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
-// --- GTSS-FW-EXPRESS-001: Missing Helmet ---
+// --- BATOU-FW-EXPRESS-001: Missing Helmet ---
 
 func TestExpress001_MissingHelmet(t *testing.T) {
 	content := `const express = require('express');
@@ -18,7 +18,7 @@ app.get('/api/users', (req, res) => {
 
 app.listen(3000);`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-001")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-001")
 }
 
 func TestExpress001_MissingHelmet_ESModule(t *testing.T) {
@@ -29,7 +29,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });`
 	result := testutil.ScanContent(t, "/app/server.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-001")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-001")
 }
 
 func TestExpress001_WithHelmet_Safe(t *testing.T) {
@@ -43,7 +43,7 @@ app.get('/api/users', (req, res) => {
   res.json({ users: [] });
 });`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-001")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-001")
 }
 
 func TestExpress001_WithHelmet_ESModule_Safe(t *testing.T) {
@@ -54,7 +54,7 @@ const app = express();
 app.use(helmet());
 app.listen(3000);`
 	result := testutil.ScanContent(t, "/app/server.ts", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-001")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-001")
 }
 
 func TestExpress001_NonExpressApp_Safe(t *testing.T) {
@@ -63,10 +63,10 @@ const server = http.createServer((req, res) => {
   res.end('hello');
 });`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-001")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-001")
 }
 
-// --- GTSS-FW-EXPRESS-002: Insecure Session Configuration ---
+// --- BATOU-FW-EXPRESS-002: Insecure Session Configuration ---
 
 func TestExpress002_SecureFalse(t *testing.T) {
 	content := `const session = require('express-session');
@@ -78,7 +78,7 @@ app.use(session({
   }
 }));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-002")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-002")
 }
 
 func TestExpress002_HttpOnlyFalse(t *testing.T) {
@@ -89,7 +89,7 @@ func TestExpress002_HttpOnlyFalse(t *testing.T) {
   }
 }));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-002")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-002")
 }
 
 func TestExpress002_SameSiteNone(t *testing.T) {
@@ -100,7 +100,7 @@ func TestExpress002_SameSiteNone(t *testing.T) {
   }
 }));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-002")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-002")
 }
 
 func TestExpress002_SecureConfig_Safe(t *testing.T) {
@@ -114,17 +114,17 @@ func TestExpress002_SecureConfig_Safe(t *testing.T) {
   }
 }));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-002")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-002")
 }
 
-// --- GTSS-FW-EXPRESS-003: Stack Trace Leak ---
+// --- BATOU-FW-EXPRESS-003: Stack Trace Leak ---
 
 func TestExpress003_StackTraceLeak_ErrStack(t *testing.T) {
 	content := `app.use((err, req, res, next) => {
   res.status(500).send(err.stack);
 });`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-003")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-003")
 }
 
 func TestExpress003_StackTraceLeak_ErrMessage(t *testing.T) {
@@ -132,7 +132,7 @@ func TestExpress003_StackTraceLeak_ErrMessage(t *testing.T) {
   res.status(500).json(err.message);
 });`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-003")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-003")
 }
 
 func TestExpress003_StackTraceLeak_ErrObject(t *testing.T) {
@@ -140,7 +140,7 @@ func TestExpress003_StackTraceLeak_ErrObject(t *testing.T) {
   res.status(500).json({ error: err.stack });
 });`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-003")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-003")
 }
 
 func TestExpress003_WithEnvCheck_Safe(t *testing.T) {
@@ -153,7 +153,7 @@ func TestExpress003_WithEnvCheck_Safe(t *testing.T) {
   }
 });`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-003")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-003")
 }
 
 func TestExpress003_GenericError_Safe(t *testing.T) {
@@ -162,10 +162,10 @@ func TestExpress003_GenericError_Safe(t *testing.T) {
   res.status(500).json({ error: 'Internal server error' });
 });`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-003")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-003")
 }
 
-// --- GTSS-FW-EXPRESS-004: Dynamic Require ---
+// --- BATOU-FW-EXPRESS-004: Dynamic Require ---
 
 func TestExpress004_RequireWithReqParams(t *testing.T) {
 	content := `app.get('/plugin/:name', (req, res) => {
@@ -173,7 +173,7 @@ func TestExpress004_RequireWithReqParams(t *testing.T) {
   plugin.run();
 });`
 	result := testutil.ScanContent(t, "/app/loader.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-004")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-004")
 }
 
 func TestExpress004_RequireWithReqQuery(t *testing.T) {
@@ -182,7 +182,7 @@ func TestExpress004_RequireWithReqQuery(t *testing.T) {
   res.json(mod.data);
 });`
 	result := testutil.ScanContent(t, "/app/loader.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-004")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-004")
 }
 
 func TestExpress004_RequireWithConcatenation(t *testing.T) {
@@ -191,7 +191,7 @@ func TestExpress004_RequireWithConcatenation(t *testing.T) {
   res.json(theme);
 });`
 	result := testutil.ScanContent(t, "/app/loader.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-004")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-004")
 }
 
 func TestExpress004_DynamicImportWithUserInput(t *testing.T) {
@@ -200,7 +200,7 @@ func TestExpress004_DynamicImportWithUserInput(t *testing.T) {
   res.json(plugin.default());
 });`
 	result := testutil.ScanContent(t, "/app/loader.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-004")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-004")
 }
 
 func TestExpress004_StaticRequire_Safe(t *testing.T) {
@@ -211,7 +211,7 @@ const cors = require('cors');
 app.use(helmet());
 app.use(cors());`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-004")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-004")
 }
 
 func TestExpress004_RequireVariableWithUserInput(t *testing.T) {
@@ -224,63 +224,63 @@ func TestExpress004_RequireVariableWithUserInput(t *testing.T) {
   res.json(loadProcessor());
 });`
 	result := testutil.ScanContent(t, "/app/loader.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-004")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-004")
 }
 
-// --- GTSS-FW-EXPRESS-005: Sensitive Static Directory ---
+// --- BATOU-FW-EXPRESS-005: Sensitive Static Directory ---
 
 func TestExpress005_StaticRoot(t *testing.T) {
 	content := `const express = require('express');
 const app = express();
 app.use(express.static('/'));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-005")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-005")
 }
 
 func TestExpress005_StaticDot(t *testing.T) {
 	content := `app.use(express.static('.'));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-005")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-005")
 }
 
 func TestExpress005_StaticGitDir(t *testing.T) {
 	content := `app.use(express.static('.git'));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-005")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-005")
 }
 
 func TestExpress005_StaticNodeModules(t *testing.T) {
 	content := `app.use(express.static('node_modules'));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-005")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-005")
 }
 
 func TestExpress005_StaticEnvDir(t *testing.T) {
 	content := `app.use(express.static('.env'));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-005")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-005")
 }
 
 func TestExpress005_StaticPublic_Safe(t *testing.T) {
 	content := `app.use(express.static('public'));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-005")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-005")
 }
 
 func TestExpress005_StaticDist_Safe(t *testing.T) {
 	content := `app.use(express.static('dist'));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-005")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-005")
 }
 
-// --- GTSS-FW-EXPRESS-006: Trust Proxy Misconfiguration ---
+// --- BATOU-FW-EXPRESS-006: Trust Proxy Misconfiguration ---
 
 func TestExpress006_TrustProxyTrue(t *testing.T) {
 	content := `const express = require('express');
 const app = express();
 app.set('trust proxy', true);`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-006")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-006")
 }
 
 func TestExpress006_TrustProxyNumber_Safe(t *testing.T) {
@@ -288,16 +288,16 @@ func TestExpress006_TrustProxyNumber_Safe(t *testing.T) {
 const app = express();
 app.set('trust proxy', 1);`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-006")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-006")
 }
 
 func TestExpress006_TrustProxySubnet_Safe(t *testing.T) {
 	content := `app.set('trust proxy', '10.0.0.0/8');`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-006")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-006")
 }
 
-// --- GTSS-FW-EXPRESS-007: Missing Session Expiration ---
+// --- BATOU-FW-EXPRESS-007: Missing Session Expiration ---
 
 func TestExpress007_SessionNoExpiry(t *testing.T) {
 	content := `app.use(session({
@@ -308,7 +308,7 @@ func TestExpress007_SessionNoExpiry(t *testing.T) {
   }
 }));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-007")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-007")
 }
 
 func TestExpress007_SessionWithMaxAge_Safe(t *testing.T) {
@@ -321,7 +321,7 @@ func TestExpress007_SessionWithMaxAge_Safe(t *testing.T) {
   }
 }));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-007")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-007")
 }
 
 func TestExpress007_SessionWithExpires_Safe(t *testing.T) {
@@ -333,17 +333,17 @@ func TestExpress007_SessionWithExpires_Safe(t *testing.T) {
   }
 }));`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-007")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-007")
 }
 
-// --- GTSS-FW-EXPRESS-008: Process.env Leak ---
+// --- BATOU-FW-EXPRESS-008: Process.env Leak ---
 
 func TestExpress008_ProcessEnvInResponse(t *testing.T) {
 	content := `app.get('/debug', (req, res) => {
   res.json(process.env);
 });`
 	result := testutil.ScanContent(t, "/app/debug.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-008")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-008")
 }
 
 func TestExpress008_ProcessEnvInSend(t *testing.T) {
@@ -351,7 +351,7 @@ func TestExpress008_ProcessEnvInSend(t *testing.T) {
   res.send(process.env);
 });`
 	result := testutil.ScanContent(t, "/app/debug.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-008")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-008")
 }
 
 func TestExpress008_SpecificEnvVar_Safe(t *testing.T) {
@@ -362,7 +362,7 @@ func TestExpress008_SpecificEnvVar_Safe(t *testing.T) {
 	// Specific env vars are a different pattern - this tests the regex doesn't over-match
 	// The regex should only match process.env without a specific property access in res.json()
 	// This is an acceptable pattern (though debatable)
-	testutil.MustNotFindRule(t, result, "GTSS-FW-EXPRESS-008")
+	testutil.MustNotFindRule(t, result, "BATOU-FW-EXPRESS-008")
 }
 
 func TestExpress008_ProcessEnvSpreadInResponse(t *testing.T) {
@@ -370,5 +370,5 @@ func TestExpress008_ProcessEnvSpreadInResponse(t *testing.T) {
   res.json({ ...process.env, timestamp: Date.now() });
 });`
 	result := testutil.ScanContent(t, "/app/debug.js", content)
-	testutil.MustFindRule(t, result, "GTSS-FW-EXPRESS-008")
+	testutil.MustFindRule(t, result, "BATOU-FW-EXPRESS-008")
 }

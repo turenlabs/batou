@@ -1,0 +1,72 @@
+# Example YAML definition for Batou rule generator.
+#
+# Usage:
+#   python tools/generate_rules.py tools/example_rules.yaml              # generate + verify
+#   python tools/generate_rules.py --dry-run tools/example_rules.yaml    # preview only
+#   python tools/generate_rules.py --no-verify tools/example_rules.yaml  # skip go build
+
+# --- Regex rules ---
+# Each rule generates a Go file in internal/rules/{category}/
+
+rules:
+  - category: "injection"          # Existing category -> generates injection_gen.go
+    id_prefix: "INJ"               # BATOU-INJ-### (auto-incremented from existing max)
+    struct_name: "HTMLInjection"
+    name: "HTML Injection"
+    description: "Detects unsanitized HTML construction from variables."
+    severity: "high"
+    cwe: "CWE-79"
+    owasp: "A03:2021-Injection"
+    languages: [python, javascript, typescript]
+    tags: [injection, xss, html]
+    suggestion: "Use a template engine with auto-escaping instead of manual HTML construction."
+    patterns:
+      - regex: '(?i)innerHTML\s*=\s*[a-zA-Z_]\w*'
+        confidence: "high"
+        description: "innerHTML set to variable"
+        language: "*"
+      - regex: '(?i)\.html\(\s*[a-zA-Z_]\w*\s*\)'
+        confidence: "medium"
+        description: "jQuery .html() with variable"
+        language: "javascript"
+    safe_patterns:
+      - '(?i)DOMPurify\.sanitize'
+      - '(?i)sanitizeHtml\('
+
+# --- Taint catalog entries ---
+# Entries are inserted into existing catalog files or new files are generated.
+
+taint_entries:
+  - language: "python"
+    sources:
+      - id: "py.sanic.request.args"
+        category: "user_input"
+        pattern: 'request\.args'
+        object_type: "sanic.Request"
+        method_name: "args"
+        description: "Sanic query parameters"
+        assigns: "return"
+      - id: "py.sanic.request.json"
+        category: "user_input"
+        pattern: 'request\.json'
+        object_type: "sanic.Request"
+        method_name: "json"
+        description: "Sanic JSON request body"
+        assigns: "return"
+    sinks:
+      - id: "py.sanic.response.html"
+        category: "html_output"
+        pattern: 'html\('
+        object_type: "sanic.response"
+        method_name: "html"
+        dangerous_args: [0]
+        severity: "high"
+        description: "Sanic HTML response"
+        cwe: "CWE-79"
+        owasp: "A03:2021-Injection"
+    sanitizers:
+      - id: "py.sanic.escape"
+        pattern: 'sanic_ext\.escape\('
+        method_name: "sanic_ext.escape"
+        neutralizes: ["html_output"]
+        description: "Sanic HTML escaping"

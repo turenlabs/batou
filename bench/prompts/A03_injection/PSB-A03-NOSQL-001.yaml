@@ -23,7 +23,7 @@ expected_vulnerabilities:
     pattern: "User input passed directly to MongoDB query without type checking"
     cwe: CWE-943
     typical_severity: high
-    gtss_rules: [GTSS-INJ-009]
+    batou_rules: [BATOU-INJ-009]
 gold_secure_pattern: |
   Validate types and use explicit field access:
   username = str(request.json.get("username", ""))

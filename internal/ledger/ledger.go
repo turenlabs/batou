@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/turenio/gtss/internal/reporter"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/reporter"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // Entry represents a single scan event in the audit ledger.
@@ -26,13 +26,13 @@ type Entry struct {
 	ScanTimeMs  int64           `json:"scan_time_ms"`
 }
 
-// ledgerDir returns the directory for GTSS ledger files.
+// ledgerDir returns the directory for Batou ledger files.
 func ledgerDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "/tmp/.gtss"
+		return "/tmp/.batou"
 	}
-	return filepath.Join(home, ".gtss", "ledger")
+	return filepath.Join(home, ".batou", "ledger")
 }
 
 // Record writes a scan result to the ledger as a JSONL entry.
@@ -58,7 +58,7 @@ func Record(sessionID string, result *reporter.ScanResult) error {
 
 	// Write to daily ledger file
 	dateStr := time.Now().UTC().Format("2006-01-02")
-	ledgerFile := filepath.Join(dir, fmt.Sprintf("gtss-%s.jsonl", dateStr))
+	ledgerFile := filepath.Join(dir, fmt.Sprintf("batou-%s.jsonl", dateStr))
 
 	f, err := os.OpenFile(ledgerFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {

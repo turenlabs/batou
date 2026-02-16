@@ -3,7 +3,7 @@ package rust
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // --- RS-001: Unsafe Block Usage ---
@@ -16,7 +16,7 @@ func TestRS001_UnsafeBlock(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/handler.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-001")
+	testutil.MustFindRule(t, result, "BATOU-RS-001")
 }
 
 func TestRS001_UnsafeTransmute(t *testing.T) {
@@ -26,7 +26,7 @@ func TestRS001_UnsafeTransmute(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/convert.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-001")
+	testutil.MustFindRule(t, result, "BATOU-RS-001")
 }
 
 func TestRS001_Safe_NoUnsafe(t *testing.T) {
@@ -36,7 +36,7 @@ func TestRS001_Safe_NoUnsafe(t *testing.T) {
     println!("{}", y);
 }`
 	result := testutil.ScanContent(t, "/app/safe.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-001")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-001")
 }
 
 // --- RS-002: Command Injection ---
@@ -47,7 +47,7 @@ fn run(input: &str) {
     Command::new("sh").arg("-c").arg(input).output().unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/exec.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-002")
+	testutil.MustFindRule(t, result, "BATOU-RS-002")
 }
 
 func TestRS002_CommandNewFormat(t *testing.T) {
@@ -56,7 +56,7 @@ fn run(program: &str) {
     Command::new(format!("/usr/bin/{}", program)).output().unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/exec.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-002")
+	testutil.MustFindRule(t, result, "BATOU-RS-002")
 }
 
 func TestRS002_CommandArgFormat(t *testing.T) {
@@ -65,7 +65,7 @@ fn run(host: &str) {
     Command::new("ping").arg(format!("-c 3 {}", host)).output().unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/exec.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-002")
+	testutil.MustFindRule(t, result, "BATOU-RS-002")
 }
 
 func TestRS002_Safe_StaticCommand(t *testing.T) {
@@ -74,7 +74,7 @@ fn run() {
     Command::new("ls").arg("-la").arg("/tmp").output().unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/exec.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-002")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-002")
 }
 
 // --- RS-003: SQL Injection ---
@@ -86,7 +86,7 @@ func TestRS003_SQLFormat(t *testing.T) {
         .fetch_one(pool).await.unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/db.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-003")
+	testutil.MustFindRule(t, result, "BATOU-RS-003")
 }
 
 func TestRS003_DieselSQLFormat(t *testing.T) {
@@ -95,7 +95,7 @@ func TestRS003_DieselSQLFormat(t *testing.T) {
         .load::<User>(conn).unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/db.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-003")
+	testutil.MustFindRule(t, result, "BATOU-RS-003")
 }
 
 func TestRS003_SQLVarFromFormat(t *testing.T) {
@@ -104,7 +104,7 @@ func TestRS003_SQLVarFromFormat(t *testing.T) {
     sqlx::query(&query).fetch_one(pool).await.unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/db.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-003")
+	testutil.MustFindRule(t, result, "BATOU-RS-003")
 }
 
 func TestRS003_Safe_Parameterized(t *testing.T) {
@@ -114,7 +114,7 @@ func TestRS003_Safe_Parameterized(t *testing.T) {
         .fetch_one(pool).await.unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/db.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-003")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-003")
 }
 
 func TestRS003_Safe_QueryMacro(t *testing.T) {
@@ -123,7 +123,7 @@ func TestRS003_Safe_QueryMacro(t *testing.T) {
         .fetch_one(pool).await.unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/db.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-003")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-003")
 }
 
 // --- RS-004: Path Traversal ---
@@ -133,7 +133,7 @@ func TestRS004_FsReadVariable(t *testing.T) {
     std::fs::read_to_string(filename).unwrap()
 }`
 	result := testutil.ScanContent(t, "/app/files.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-004")
+	testutil.MustFindRule(t, result, "BATOU-RS-004")
 }
 
 func TestRS004_Safe_WithCanonicalize(t *testing.T) {
@@ -146,7 +146,7 @@ func TestRS004_Safe_WithCanonicalize(t *testing.T) {
     std::fs::read_to_string(canonical).unwrap()
 }`
 	result := testutil.ScanContent(t, "/app/files.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-004")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-004")
 }
 
 // --- RS-005: Insecure Deserialization ---
@@ -156,7 +156,7 @@ func TestRS005_BincodeDe(t *testing.T) {
     let msg: Message = bincode::deserialize(data).unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/proto.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-005")
+	testutil.MustFindRule(t, result, "BATOU-RS-005")
 }
 
 func TestRS005_RmpDe(t *testing.T) {
@@ -164,7 +164,7 @@ func TestRS005_RmpDe(t *testing.T) {
     let msg: Message = rmp_serde::from_slice(data).unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/proto.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-005")
+	testutil.MustFindRule(t, result, "BATOU-RS-005")
 }
 
 func TestRS005_Safe_JsonNoWebContext(t *testing.T) {
@@ -173,7 +173,7 @@ func TestRS005_Safe_JsonNoWebContext(t *testing.T) {
     let config: Config = serde_json::from_str(&data).unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/config.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-005")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-005")
 }
 
 // --- RS-006: Insecure TLS ---
@@ -183,7 +183,7 @@ func TestRS006_DangerAcceptInvalidCerts(t *testing.T) {
     .danger_accept_invalid_certs(true)
     .build().unwrap();`
 	result := testutil.ScanContent(t, "/app/http.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-006")
+	testutil.MustFindRule(t, result, "BATOU-RS-006")
 }
 
 func TestRS006_DangerAcceptInvalidHostnames(t *testing.T) {
@@ -191,14 +191,14 @@ func TestRS006_DangerAcceptInvalidHostnames(t *testing.T) {
     .danger_accept_invalid_hostnames(true)
     .build().unwrap();`
 	result := testutil.ScanContent(t, "/app/http.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-006")
+	testutil.MustFindRule(t, result, "BATOU-RS-006")
 }
 
 func TestRS006_Safe_DefaultTLS(t *testing.T) {
 	content := `let client = reqwest::Client::builder()
     .build().unwrap();`
 	result := testutil.ScanContent(t, "/app/http.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-006")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-006")
 }
 
 // --- RS-007: Panic in Web Handler ---
@@ -211,7 +211,7 @@ func TestRS007_UnwrapInActixHandler(t *testing.T) {
     HttpResponse::Ok().json(user)
 }`
 	result := testutil.ScanContent(t, "/app/handler.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-007")
+	testutil.MustFindRule(t, result, "BATOU-RS-007")
 }
 
 func TestRS007_ExpectInHandler(t *testing.T) {
@@ -221,7 +221,7 @@ func TestRS007_ExpectInHandler(t *testing.T) {
     HttpResponse::Ok().json(result)
 }`
 	result := testutil.ScanContent(t, "/app/handler.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-007")
+	testutil.MustFindRule(t, result, "BATOU-RS-007")
 }
 
 func TestRS007_Safe_QuestionMark(t *testing.T) {
@@ -229,7 +229,7 @@ func TestRS007_Safe_QuestionMark(t *testing.T) {
     let x = some_operation().unwrap();
 }`
 	result := testutil.ScanContent(t, "/app/util.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-007")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-007")
 }
 
 // --- RS-008: Insecure Random ---
@@ -242,7 +242,7 @@ fn generate_token() -> String {
     hex::encode(token)
 }`
 	result := testutil.ScanContent(t, "/app/auth.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-008")
+	testutil.MustFindRule(t, result, "BATOU-RS-008")
 }
 
 func TestRS008_Safe_OsRng(t *testing.T) {
@@ -253,7 +253,7 @@ fn generate_token() -> String {
     hex::encode(token)
 }`
 	result := testutil.ScanContent(t, "/app/auth.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-008")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-008")
 }
 
 func TestRS008_Safe_NonSecurityContext(t *testing.T) {
@@ -263,7 +263,7 @@ fn shuffle_items(items: &mut Vec<i32>) {
     items.shuffle(&mut rng);
 }`
 	result := testutil.ScanContent(t, "/app/game.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-008")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-008")
 }
 
 // --- RS-009: Memory Unsafety Patterns ---
@@ -273,7 +273,7 @@ func TestRS009_Transmute(t *testing.T) {
     unsafe { std::mem::transmute(val) }
 }`
 	result := testutil.ScanContent(t, "/app/convert.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-009")
+	testutil.MustFindRule(t, result, "BATOU-RS-009")
 }
 
 func TestRS009_FromRawParts(t *testing.T) {
@@ -281,7 +281,7 @@ func TestRS009_FromRawParts(t *testing.T) {
     unsafe { std::slice::from_raw_parts(ptr, len) }
 }`
 	result := testutil.ScanContent(t, "/app/ffi.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-009")
+	testutil.MustFindRule(t, result, "BATOU-RS-009")
 }
 
 func TestRS009_MemForget(t *testing.T) {
@@ -289,7 +289,7 @@ func TestRS009_MemForget(t *testing.T) {
     std::mem::forget(resource);
 }`
 	result := testutil.ScanContent(t, "/app/resource.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-009")
+	testutil.MustFindRule(t, result, "BATOU-RS-009")
 }
 
 func TestRS009_BoxFromRaw(t *testing.T) {
@@ -297,7 +297,7 @@ func TestRS009_BoxFromRaw(t *testing.T) {
     let widget = unsafe { Box::from_raw(ptr) };
 }`
 	result := testutil.ScanContent(t, "/app/ffi.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-009")
+	testutil.MustFindRule(t, result, "BATOU-RS-009")
 }
 
 func TestRS009_Safe_NoUnsafePatterns(t *testing.T) {
@@ -307,7 +307,7 @@ func TestRS009_Safe_NoUnsafePatterns(t *testing.T) {
     println!("{:?}", s);
 }`
 	result := testutil.ScanContent(t, "/app/safe.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-009")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-009")
 }
 
 // --- RS-010: CORS Misconfiguration ---
@@ -316,14 +316,14 @@ func TestRS010_CorsPermissive(t *testing.T) {
 	content := `use tower_http::cors::CorsLayer;
 let cors = CorsLayer::permissive();`
 	result := testutil.ScanContent(t, "/app/server.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-010")
+	testutil.MustFindRule(t, result, "BATOU-RS-010")
 }
 
 func TestRS010_ActixCorsPermissive(t *testing.T) {
 	content := `use actix_cors::Cors;
 let cors = Cors::permissive();`
 	result := testutil.ScanContent(t, "/app/server.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-010")
+	testutil.MustFindRule(t, result, "BATOU-RS-010")
 }
 
 func TestRS010_AnyOriginWithCredentials(t *testing.T) {
@@ -332,7 +332,7 @@ let cors = Cors::default()
     .allow_any_origin()
     .allow_credentials(true);`
 	result := testutil.ScanContent(t, "/app/server.rs", content)
-	testutil.MustFindRule(t, result, "GTSS-RS-010")
+	testutil.MustFindRule(t, result, "BATOU-RS-010")
 }
 
 func TestRS010_Safe_SpecificOrigin(t *testing.T) {
@@ -340,7 +340,7 @@ func TestRS010_Safe_SpecificOrigin(t *testing.T) {
 let cors = CorsLayer::new()
     .allow_origin(["https://example.com".parse().unwrap()]);`
 	result := testutil.ScanContent(t, "/app/server.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-010")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-010")
 }
 
 // --- Fixture Tests ---
@@ -360,6 +360,6 @@ func TestFixture_Safe(t *testing.T) {
 	}
 	content := testutil.LoadFixture(t, "rust/safe/web_handler.rs")
 	result := testutil.ScanContent(t, "/app/handler.rs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RS-002")
-	testutil.MustNotFindRule(t, result, "GTSS-RS-003")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-002")
+	testutil.MustNotFindRule(t, result, "BATOU-RS-003")
 }

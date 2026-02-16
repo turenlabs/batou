@@ -3,7 +3,7 @@ package ast
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func TestParse_Go(t *testing.T) {

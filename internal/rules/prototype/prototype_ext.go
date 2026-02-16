@@ -4,44 +4,44 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended prototype pollution rules
 // ---------------------------------------------------------------------------
 
-// GTSS-PROTO-003: Object.assign with user-controlled source
+// BATOU-PROTO-003: Object.assign with user-controlled source
 var (
 	reObjAssignUserCtrl = regexp.MustCompile(`Object\.assign\s*\(\s*\w+\s*,\s*(?:req\.body|req\.query|req\.params|request\.body|JSON\.parse|body|payload|input|data)\b`)
 )
 
-// GTSS-PROTO-004: Lodash merge/defaultsDeep with untrusted input
+// BATOU-PROTO-004: Lodash merge/defaultsDeep with untrusted input
 var (
 	reLodashMergeInput = regexp.MustCompile(`(?:_\.merge|_\.defaultsDeep|_\.assign|_\.assignIn|_\.extend|lodash\.merge|lodash\.defaultsDeep|require\s*\(\s*['"]lodash['"]\s*\)\s*\.(?:merge|defaultsDeep))\s*\([^,]*,\s*(?:req\.|request\.|body|payload|input|data|JSON\.parse)`)
 )
 
-// GTSS-PROTO-005: JSON.parse of user input assigned to object
+// BATOU-PROTO-005: JSON.parse of user input assigned to object
 var (
 	reJSONParseAssign = regexp.MustCompile(`(?:Object\.assign|\.\.\.JSON\.parse|merge|extend|assign)\s*(?:\(\s*\w+\s*,\s*)?JSON\.parse\s*\(\s*(?:req\.body|req\.query|request\.body|body|payload|input|data|decodeURIComponent)`)
 	reJSONParseSpread = regexp.MustCompile(`\{\s*\.\.\.JSON\.parse\s*\(\s*(?:req\.|request\.|body|payload|input|data|decodeURIComponent)`)
 )
 
-// GTSS-PROTO-006: Recursive merge/extend without proto check
+// BATOU-PROTO-006: Recursive merge/extend without proto check
 var (
 	reRecursiveMerge  = regexp.MustCompile(`(?i)function\s+(?:deep[Mm]erge|merge[Dd]eep|recursive[Mm]erge|extend[Dd]eep|deep[Ee]xtend|deep[Cc]opy|deepAssign)\s*\(`)
 	reRecursiveMergeArrow = regexp.MustCompile(`(?i)(?:deep[Mm]erge|merge[Dd]eep|recursive[Mm]erge|extend[Dd]eep|deep[Ee]xtend)\s*=\s*(?:\([^)]*\)|[a-zA-Z_]\w*)\s*=>`)
 	reProtoGuard      = regexp.MustCompile(`(?i)(?:__proto__|constructor|prototype)\b`)
 )
 
-// GTSS-PROTO-007: __proto__ or constructor.prototype in user input
+// BATOU-PROTO-007: __proto__ or constructor.prototype in user input
 var (
 	reProtoInInput   = regexp.MustCompile(`(?:__proto__|constructor\.prototype)\s*(?:[:=]|['"]\s*[:=])`)
 	reProtoInJSON    = regexp.MustCompile(`['"](?:__proto__|constructor)['"]`)
 	reProtoPayload   = regexp.MustCompile(`\{\s*['"]__proto__['"]`)
 )
 
-// GTSS-PROTO-008: Prototype pollution via query parameter parsing
+// BATOU-PROTO-008: Prototype pollution via query parameter parsing
 var (
 	reQueryParserCustom   = regexp.MustCompile(`(?i)(?:qs\.parse|querystring\.parse|url\.parse|URLSearchParams)\s*\(`)
 	reQueryToObj          = regexp.MustCompile(`(?i)(?:qs\.parse|querystring\.parse)\s*\(\s*(?:req\.url|req\.query|request\.url|location\.search|window\.location)`)
@@ -49,12 +49,12 @@ var (
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-PROTO-003: Object.assign with User-Controlled Source
+// BATOU-PROTO-003: Object.assign with User-Controlled Source
 // ---------------------------------------------------------------------------
 
 type ProtoObjAssignUser struct{}
 
-func (r *ProtoObjAssignUser) ID() string                     { return "GTSS-PROTO-003" }
+func (r *ProtoObjAssignUser) ID() string                     { return "BATOU-PROTO-003" }
 func (r *ProtoObjAssignUser) Name() string                   { return "ProtoObjAssignUser" }
 func (r *ProtoObjAssignUser) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ProtoObjAssignUser) Languages() []rules.Language {
@@ -98,12 +98,12 @@ func (r *ProtoObjAssignUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PROTO-004: Lodash merge/defaultsDeep with Untrusted Input
+// BATOU-PROTO-004: Lodash merge/defaultsDeep with Untrusted Input
 // ---------------------------------------------------------------------------
 
 type ProtoLodashMerge struct{}
 
-func (r *ProtoLodashMerge) ID() string                     { return "GTSS-PROTO-004" }
+func (r *ProtoLodashMerge) ID() string                     { return "BATOU-PROTO-004" }
 func (r *ProtoLodashMerge) Name() string                   { return "ProtoLodashMerge" }
 func (r *ProtoLodashMerge) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ProtoLodashMerge) Languages() []rules.Language {
@@ -147,12 +147,12 @@ func (r *ProtoLodashMerge) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PROTO-005: JSON.parse of User Input Assigned to Object
+// BATOU-PROTO-005: JSON.parse of User Input Assigned to Object
 // ---------------------------------------------------------------------------
 
 type ProtoJSONParseAssign struct{}
 
-func (r *ProtoJSONParseAssign) ID() string                     { return "GTSS-PROTO-005" }
+func (r *ProtoJSONParseAssign) ID() string                     { return "BATOU-PROTO-005" }
 func (r *ProtoJSONParseAssign) Name() string                   { return "ProtoJSONParseAssign" }
 func (r *ProtoJSONParseAssign) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ProtoJSONParseAssign) Languages() []rules.Language {
@@ -202,12 +202,12 @@ func (r *ProtoJSONParseAssign) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PROTO-006: Recursive Merge/Extend Without Proto Check
+// BATOU-PROTO-006: Recursive Merge/Extend Without Proto Check
 // ---------------------------------------------------------------------------
 
 type ProtoRecursiveMerge struct{}
 
-func (r *ProtoRecursiveMerge) ID() string                     { return "GTSS-PROTO-006" }
+func (r *ProtoRecursiveMerge) ID() string                     { return "BATOU-PROTO-006" }
 func (r *ProtoRecursiveMerge) Name() string                   { return "ProtoRecursiveMerge" }
 func (r *ProtoRecursiveMerge) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ProtoRecursiveMerge) Languages() []rules.Language {
@@ -268,12 +268,12 @@ func (r *ProtoRecursiveMerge) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PROTO-007: __proto__ or constructor.prototype in User Input
+// BATOU-PROTO-007: __proto__ or constructor.prototype in User Input
 // ---------------------------------------------------------------------------
 
 type ProtoInUserInput struct{}
 
-func (r *ProtoInUserInput) ID() string                     { return "GTSS-PROTO-007" }
+func (r *ProtoInUserInput) ID() string                     { return "BATOU-PROTO-007" }
 func (r *ProtoInUserInput) Name() string                   { return "ProtoInUserInput" }
 func (r *ProtoInUserInput) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ProtoInUserInput) Languages() []rules.Language {
@@ -324,12 +324,12 @@ func (r *ProtoInUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-PROTO-008: Prototype Pollution via Query Parameter Parsing
+// BATOU-PROTO-008: Prototype Pollution via Query Parameter Parsing
 // ---------------------------------------------------------------------------
 
 type ProtoQueryParamParsing struct{}
 
-func (r *ProtoQueryParamParsing) ID() string                     { return "GTSS-PROTO-008" }
+func (r *ProtoQueryParamParsing) ID() string                     { return "BATOU-PROTO-008" }
 func (r *ProtoQueryParamParsing) Name() string                   { return "ProtoQueryParamParsing" }
 func (r *ProtoQueryParamParsing) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ProtoQueryParamParsing) Languages() []rules.Language {

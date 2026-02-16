@@ -3,8 +3,8 @@ package jsast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // JSASTAnalyzer performs AST-based security analysis of JavaScript/TypeScript source.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&JSASTAnalyzer{})
 }
 
-func (j *JSASTAnalyzer) ID() string                      { return "GTSS-JSAST" }
+func (j *JSASTAnalyzer) ID() string                      { return "BATOU-JSAST" }
 func (j *JSASTAnalyzer) Name() string                    { return "JavaScript AST Security Analyzer" }
 func (j *JSASTAnalyzer) DefaultSeverity() rules.Severity { return rules.Critical }
 func (j *JSASTAnalyzer) Languages() []rules.Language {
@@ -99,7 +99,7 @@ func (c *jsChecker) checkEval(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-JSAST-001",
+		RuleID:        "BATOU-JSAST-001",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Code injection via eval()",
@@ -131,7 +131,7 @@ func (c *jsChecker) checkAssignment(n *ast.Node) {
 			if !isJSLiteral(right) {
 				line := int(n.StartRow()) + 1
 				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "GTSS-JSAST-002",
+					RuleID:        "BATOU-JSAST-002",
 					Severity:      rules.High,
 					SeverityLabel: rules.High.String(),
 					Title:         "XSS via " + propName + " assignment",
@@ -163,7 +163,7 @@ func (c *jsChecker) checkDocumentWrite(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-JSAST-003",
+		RuleID:        "BATOU-JSAST-003",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "XSS via document.write()",
@@ -192,7 +192,7 @@ func (c *jsChecker) checkChildProcess(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-JSAST-004",
+		RuleID:        "BATOU-JSAST-004",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Command injection via child_process",
@@ -225,7 +225,7 @@ func (c *jsChecker) checkNewExpression(n *ast.Node) {
 			if !isJSLiteral(arg) {
 				line := int(n.StartRow()) + 1
 				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "GTSS-JSAST-005",
+					RuleID:        "BATOU-JSAST-005",
 					Severity:      rules.Critical,
 					SeverityLabel: rules.Critical.String(),
 					Title:         "Code injection via new Function()",
@@ -283,7 +283,7 @@ func (c *jsChecker) checkSQLTemplateString(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-JSAST-006",
+		RuleID:        "BATOU-JSAST-006",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "SQL injection via template literal interpolation",
@@ -322,7 +322,7 @@ func (c *jsChecker) checkSQLBinaryExpression(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-JSAST-006",
+		RuleID:        "BATOU-JSAST-006",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "SQL injection via string concatenation",

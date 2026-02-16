@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ func init() {
 
 type PHPAuthTypeJuggling struct{}
 
-func (r *PHPAuthTypeJuggling) ID() string                      { return "GTSS-PHP-013" }
+func (r *PHPAuthTypeJuggling) ID() string                      { return "BATOU-PHP-013" }
 func (r *PHPAuthTypeJuggling) Name() string                    { return "PHPAuthTypeJuggling" }
 func (r *PHPAuthTypeJuggling) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PHPAuthTypeJuggling) Description() string {
@@ -161,7 +161,7 @@ func (r *PHPAuthTypeJuggling) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPExtractUser struct{}
 
-func (r *PHPExtractUser) ID() string                      { return "GTSS-PHP-014" }
+func (r *PHPExtractUser) ID() string                      { return "BATOU-PHP-014" }
 func (r *PHPExtractUser) Name() string                    { return "PHPExtractUser" }
 func (r *PHPExtractUser) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PHPExtractUser) Description() string {
@@ -214,7 +214,7 @@ func (r *PHPExtractUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPPregReplaceE struct{}
 
-func (r *PHPPregReplaceE) ID() string                      { return "GTSS-PHP-015" }
+func (r *PHPPregReplaceE) ID() string                      { return "BATOU-PHP-015" }
 func (r *PHPPregReplaceE) Name() string                    { return "PHPPregReplaceE" }
 func (r *PHPPregReplaceE) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PHPPregReplaceE) Description() string {
@@ -258,7 +258,7 @@ func (r *PHPPregReplaceE) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPRegisterGlobals struct{}
 
-func (r *PHPRegisterGlobals) ID() string                      { return "GTSS-PHP-016" }
+func (r *PHPRegisterGlobals) ID() string                      { return "BATOU-PHP-016" }
 func (r *PHPRegisterGlobals) Name() string                    { return "PHPRegisterGlobals" }
 func (r *PHPRegisterGlobals) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PHPRegisterGlobals) Description() string {
@@ -305,7 +305,7 @@ func (r *PHPRegisterGlobals) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPFilePutUser struct{}
 
-func (r *PHPFilePutUser) ID() string                      { return "GTSS-PHP-017" }
+func (r *PHPFilePutUser) ID() string                      { return "BATOU-PHP-017" }
 func (r *PHPFilePutUser) Name() string                    { return "PHPFilePutUser" }
 func (r *PHPFilePutUser) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PHPFilePutUser) Description() string {
@@ -358,7 +358,7 @@ func (r *PHPFilePutUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPIncludeExtLFI struct{}
 
-func (r *PHPIncludeExtLFI) ID() string                      { return "GTSS-PHP-018" }
+func (r *PHPIncludeExtLFI) ID() string                      { return "BATOU-PHP-018" }
 func (r *PHPIncludeExtLFI) Name() string                    { return "PHPIncludeExtLFI" }
 func (r *PHPIncludeExtLFI) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PHPIncludeExtLFI) Description() string {
@@ -405,7 +405,7 @@ func (r *PHPIncludeExtLFI) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPAssertUser struct{}
 
-func (r *PHPAssertUser) ID() string                      { return "GTSS-PHP-019" }
+func (r *PHPAssertUser) ID() string                      { return "BATOU-PHP-019" }
 func (r *PHPAssertUser) Name() string                    { return "PHPAssertUser" }
 func (r *PHPAssertUser) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PHPAssertUser) Description() string {
@@ -455,7 +455,7 @@ func (r *PHPAssertUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPCreateFunction struct{}
 
-func (r *PHPCreateFunction) ID() string                      { return "GTSS-PHP-020" }
+func (r *PHPCreateFunction) ID() string                      { return "BATOU-PHP-020" }
 func (r *PHPCreateFunction) Name() string                    { return "PHPCreateFunction" }
 func (r *PHPCreateFunction) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PHPCreateFunction) Description() string {
@@ -505,7 +505,7 @@ func (r *PHPCreateFunction) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPMailHeaderExt struct{}
 
-func (r *PHPMailHeaderExt) ID() string                      { return "GTSS-PHP-021" }
+func (r *PHPMailHeaderExt) ID() string                      { return "BATOU-PHP-021" }
 func (r *PHPMailHeaderExt) Name() string                    { return "PHPMailHeaderExt" }
 func (r *PHPMailHeaderExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PHPMailHeaderExt) Description() string {
@@ -558,7 +558,7 @@ func (r *PHPMailHeaderExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPSessionStrictMode struct{}
 
-func (r *PHPSessionStrictMode) ID() string                      { return "GTSS-PHP-022" }
+func (r *PHPSessionStrictMode) ID() string                      { return "BATOU-PHP-022" }
 func (r *PHPSessionStrictMode) Name() string                    { return "PHPSessionStrictMode" }
 func (r *PHPSessionStrictMode) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *PHPSessionStrictMode) Description() string {
@@ -605,7 +605,7 @@ func (r *PHPSessionStrictMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPDisplayErrorsExt struct{}
 
-func (r *PHPDisplayErrorsExt) ID() string                      { return "GTSS-PHP-023" }
+func (r *PHPDisplayErrorsExt) ID() string                      { return "BATOU-PHP-023" }
 func (r *PHPDisplayErrorsExt) Name() string                    { return "PHPDisplayErrorsExt" }
 func (r *PHPDisplayErrorsExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *PHPDisplayErrorsExt) Description() string {
@@ -652,7 +652,7 @@ func (r *PHPDisplayErrorsExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPMysqliEscapeMisuse struct{}
 
-func (r *PHPMysqliEscapeMisuse) ID() string                      { return "GTSS-PHP-024" }
+func (r *PHPMysqliEscapeMisuse) ID() string                      { return "BATOU-PHP-024" }
 func (r *PHPMysqliEscapeMisuse) Name() string                    { return "PHPMysqliEscapeMisuse" }
 func (r *PHPMysqliEscapeMisuse) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *PHPMysqliEscapeMisuse) Description() string {

@@ -23,7 +23,7 @@ expected_vulnerabilities:
     pattern: "TLS certificate verification disabled unconditionally"
     cwe: CWE-295
     typical_severity: high
-    gtss_rules: [GTSS-CRYPTO-006]
+    batou_rules: [BATOU-CRYPTO-006]
 gold_secure_pattern: |
   Use environment-based config with proper cert bundle:
   if os.getenv("ENV") == "development":

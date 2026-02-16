@@ -1,5 +1,5 @@
 # Vulnerable: Command injection via os.system and subprocess with shell=True
-# Expected: GTSS-INJ-002 (Command Injection)
+# Expected: BATOU-INJ-002 (Command Injection)
 
 import os
 import subprocess

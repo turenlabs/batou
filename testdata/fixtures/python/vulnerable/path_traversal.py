@@ -1,5 +1,5 @@
 # Vulnerable: Path traversal via open() with user-controlled path
-# Expected: GTSS-TRV-001 (Path Traversal)
+# Expected: BATOU-TRV-001 (Path Traversal)
 
 import os
 from flask import Flask, request, send_file

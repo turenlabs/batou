@@ -8,7 +8,7 @@ import (
 )
 
 // VULN: Hardcoded credentials in source code.
-// Should trigger GTSS-SEC-001 (Hardcoded Password) and GTSS-SEC-004 (Connection String).
+// Should trigger BATOU-SEC-001 (Hardcoded Password) and BATOU-SEC-004 (Connection String).
 
 var apiKey = "sk_live_4eC39HqLyjWDarjtT1zdp7dc"
 

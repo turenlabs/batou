@@ -3,7 +3,7 @@ package taint
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func TestDetectScopes(t *testing.T) {

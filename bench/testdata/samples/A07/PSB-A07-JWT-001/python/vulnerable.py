@@ -1,6 +1,6 @@
 # PSB-A07-JWT-001: JWT authentication middleware
 # CWE: CWE-345, CWE-347
-# Expected: GTSS-SEC-001, GTSS-AUTH-003
+# Expected: BATOU-SEC-001, BATOU-AUTH-003
 from flask import Flask, request, jsonify, g
 import jwt
 from functools import wraps

@@ -4,52 +4,52 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended logging rules
 // ---------------------------------------------------------------------------
 
-// GTSS-LOG-004: Logging passwords/secrets/tokens in plaintext
+// BATOU-LOG-004: Logging passwords/secrets/tokens in plaintext
 var (
 	reLogPasswordVar = regexp.MustCompile(`(?i)(?:log|logger|logging|console|winston|pino|bunyan|Rails\.logger|slog|zap|error_log|syslog|System\.out|System\.err|LOG|print|puts|fmt\.Print)\b[^;{}\n]*\b(?:password|passwd|pwd|secret_key|api_key|apikey|api_secret|auth_token|access_token|refresh_token|private_key|secret|client_secret|session_token|bearer_token)\b`)
 )
 
-// GTSS-LOG-005: Logging PII
+// BATOU-LOG-005: Logging PII
 var (
 	reLogPII = regexp.MustCompile(`(?i)(?:log|logger|logging|console|winston|pino|bunyan|Rails\.logger|slog|zap|error_log|syslog|System\.out|System\.err|LOG|print|puts|fmt\.Print)\b[^;{}\n]*\b(?:email_address|email_addr|user_email|ssn|social_security|credit_card|card_number|card_num|phone_number|phone_num|date_of_birth|dob|national_id|passport_number|driver_license)\b`)
 )
 
-// GTSS-LOG-006: Log injection via user input
+// BATOU-LOG-006: Log injection via user input
 var (
 	reLogNewlineConcat = regexp.MustCompile(`(?i)(?:log|logger|logging|console|winston|pino|bunyan|Rails\.logger|slog|zap|LOG)\.\w+\s*\([^)]*(?:\+|,|\$\{|%s|%v|%d|\{[^}]*\}).*(?:user|input|name|param|query|header|cookie|referer|agent)\w*`)
 	reNewlineStrip     = regexp.MustCompile(`(?i)(?:\.replace\s*\(\s*[/'"]\s*[\[\\].*[rn]|\.replaceAll\s*\(\s*["']\\[rn]|strings\.Replace.*\\n|\.gsub.*\\n|strip|sanitize_log)`)
 )
 
-// GTSS-LOG-007: Logging full stack traces to client
+// BATOU-LOG-007: Logging full stack traces to client
 var (
 	reStackToClient = regexp.MustCompile(`(?i)(?:res\.(?:send|json|status|write)|response\.(?:write|send|body)|render|HttpResponse|JsonResponse|jsonify)\s*\([^)]*(?:stack_?trace|\.stack|traceback|stackTrace|getStackTrace|backtrace|format_exc)`)
 )
 
-// GTSS-LOG-008: Debug logging enabled in production
+// BATOU-LOG-008: Debug logging enabled in production
 var (
 	reDebugLogLevel = regexp.MustCompile(`(?i)(?:log_?level|logging\.level|LOG_LEVEL|log\.level|logger\.level|setLevel|basicConfig)\s*(?:[:=]\s*|\(\s*)(?:['"]?(?:DEBUG|TRACE|ALL|VERBOSE)['"]?)`)
 	reProdContext   = regexp.MustCompile(`(?i)(?:production|prod\.|\.prod|deploy|release)`)
 )
 
-// GTSS-LOG-009: Logging HTTP request bodies
+// BATOU-LOG-009: Logging HTTP request bodies
 var (
 	reLogRequestBody = regexp.MustCompile(`(?i)(?:log|logger|logging|console|winston|pino|bunyan|Rails\.logger|slog|zap|LOG|System\.out)\.\w+\s*\([^)]*(?:req(?:uest)?\.body|request\.data|request\.POST|request\.content|r\.Body|getInputStream|getReader|request\.get_data)`)
 )
 
-// GTSS-LOG-010: Excessive logging
+// BATOU-LOG-010: Excessive logging
 var (
 	reLogEveryRequest = regexp.MustCompile(`(?i)(?:log|logger|logging|console|winston|LOG)\.\w+\s*\([^)]*(?:every|all)\s+(?:request|req)`)
 	reLogFullObject   = regexp.MustCompile(`(?i)(?:log|logger|logging|console|winston|LOG)\.\w+\s*\(\s*(?:JSON\.stringify\s*\(\s*(?:req|request)|util\.inspect\s*\(\s*(?:req|request)|%\+v.*(?:req|request)|repr\s*\(\s*request)`)
 )
 
-// GTSS-LOG-011: Missing audit logging for security events
+// BATOU-LOG-011: Missing audit logging for security events
 var (
 	reSecurityEvent    = regexp.MustCompile(`(?i)(?:login|sign_?in|authenticate|authorize|change_?password|reset_?password|delete_?(?:account|user)|grant_?(?:role|permission)|revoke|escalat|admin_?access|mfa|two_?factor)`)
 	reAuditLog         = regexp.MustCompile(`(?i)(?:audit|security)[\._]?(?:log|event|record|trail)`)
@@ -57,12 +57,12 @@ var (
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-004: Logging Passwords/Secrets/Tokens in Plaintext
+// BATOU-LOG-004: Logging Passwords/Secrets/Tokens in Plaintext
 // ---------------------------------------------------------------------------
 
 type LoggingSecrets struct{}
 
-func (r *LoggingSecrets) ID() string                     { return "GTSS-LOG-004" }
+func (r *LoggingSecrets) ID() string                     { return "BATOU-LOG-004" }
 func (r *LoggingSecrets) Name() string                   { return "LoggingSecrets" }
 func (r *LoggingSecrets) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LoggingSecrets) Description() string {
@@ -107,12 +107,12 @@ func (r *LoggingSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-005: Logging PII
+// BATOU-LOG-005: Logging PII
 // ---------------------------------------------------------------------------
 
 type LoggingPII struct{}
 
-func (r *LoggingPII) ID() string                     { return "GTSS-LOG-005" }
+func (r *LoggingPII) ID() string                     { return "BATOU-LOG-005" }
 func (r *LoggingPII) Name() string                   { return "LoggingPII" }
 func (r *LoggingPII) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LoggingPII) Description() string {
@@ -157,12 +157,12 @@ func (r *LoggingPII) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-006: Log Injection via User Input
+// BATOU-LOG-006: Log Injection via User Input
 // ---------------------------------------------------------------------------
 
 type LogInjectionUserInput struct{}
 
-func (r *LogInjectionUserInput) ID() string                     { return "GTSS-LOG-006" }
+func (r *LogInjectionUserInput) ID() string                     { return "BATOU-LOG-006" }
 func (r *LogInjectionUserInput) Name() string                   { return "LogInjectionUserInput" }
 func (r *LogInjectionUserInput) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LogInjectionUserInput) Description() string {
@@ -210,12 +210,12 @@ func (r *LogInjectionUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-007: Logging Full Stack Traces to Client
+// BATOU-LOG-007: Logging Full Stack Traces to Client
 // ---------------------------------------------------------------------------
 
 type StackTraceToClient struct{}
 
-func (r *StackTraceToClient) ID() string                     { return "GTSS-LOG-007" }
+func (r *StackTraceToClient) ID() string                     { return "BATOU-LOG-007" }
 func (r *StackTraceToClient) Name() string                   { return "StackTraceToClient" }
 func (r *StackTraceToClient) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *StackTraceToClient) Description() string {
@@ -260,12 +260,12 @@ func (r *StackTraceToClient) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-008: Debug Logging Enabled in Production Config
+// BATOU-LOG-008: Debug Logging Enabled in Production Config
 // ---------------------------------------------------------------------------
 
 type DebugLoggingInProd struct{}
 
-func (r *DebugLoggingInProd) ID() string                     { return "GTSS-LOG-008" }
+func (r *DebugLoggingInProd) ID() string                     { return "BATOU-LOG-008" }
 func (r *DebugLoggingInProd) Name() string                   { return "DebugLoggingInProd" }
 func (r *DebugLoggingInProd) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DebugLoggingInProd) Description() string {
@@ -315,12 +315,12 @@ func (r *DebugLoggingInProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-009: Logging HTTP Request Bodies
+// BATOU-LOG-009: Logging HTTP Request Bodies
 // ---------------------------------------------------------------------------
 
 type LoggingRequestBodies struct{}
 
-func (r *LoggingRequestBodies) ID() string                     { return "GTSS-LOG-009" }
+func (r *LoggingRequestBodies) ID() string                     { return "BATOU-LOG-009" }
 func (r *LoggingRequestBodies) Name() string                   { return "LoggingRequestBodies" }
 func (r *LoggingRequestBodies) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LoggingRequestBodies) Description() string {
@@ -365,12 +365,12 @@ func (r *LoggingRequestBodies) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-010: Excessive Logging Causing Information Disclosure
+// BATOU-LOG-010: Excessive Logging Causing Information Disclosure
 // ---------------------------------------------------------------------------
 
 type ExcessiveLogging struct{}
 
-func (r *ExcessiveLogging) ID() string                     { return "GTSS-LOG-010" }
+func (r *ExcessiveLogging) ID() string                     { return "BATOU-LOG-010" }
 func (r *ExcessiveLogging) Name() string                   { return "ExcessiveLogging" }
 func (r *ExcessiveLogging) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *ExcessiveLogging) Description() string {
@@ -420,12 +420,12 @@ func (r *ExcessiveLogging) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-011: Missing Audit Logging for Security Events
+// BATOU-LOG-011: Missing Audit Logging for Security Events
 // ---------------------------------------------------------------------------
 
 type MissingAuditLogging struct{}
 
-func (r *MissingAuditLogging) ID() string                     { return "GTSS-LOG-011" }
+func (r *MissingAuditLogging) ID() string                     { return "BATOU-LOG-011" }
 func (r *MissingAuditLogging) Name() string                   { return "MissingAuditLogging" }
 func (r *MissingAuditLogging) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingAuditLogging) Description() string {

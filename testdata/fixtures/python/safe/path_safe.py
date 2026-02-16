@@ -1,5 +1,5 @@
 # Safe: Path traversal prevention with realpath + startswith check
-# Expected: No findings for GTSS-TRV-001
+# Expected: No findings for BATOU-TRV-001
 
 import os
 from flask import Flask, request, send_file, abort

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
@@ -157,7 +157,7 @@ func init() {
 
 type SubprocessShellInjection struct{}
 
-func (r *SubprocessShellInjection) ID() string                      { return "GTSS-PY-001" }
+func (r *SubprocessShellInjection) ID() string                      { return "BATOU-PY-001" }
 func (r *SubprocessShellInjection) Name() string                    { return "SubprocessShellInjection" }
 func (r *SubprocessShellInjection) Description() string             { return "Detects subprocess calls with shell=True and user-controlled input, or string formatting in shell commands." }
 func (r *SubprocessShellInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -220,7 +220,7 @@ func (r *SubprocessShellInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type PathTraversal struct{}
 
-func (r *PathTraversal) ID() string                      { return "GTSS-PY-002" }
+func (r *PathTraversal) ID() string                      { return "BATOU-PY-002" }
 func (r *PathTraversal) Name() string                    { return "PathTraversal" }
 func (r *PathTraversal) Description() string             { return "Detects os.path.join with user-controlled input that may allow directory traversal." }
 func (r *PathTraversal) DefaultSeverity() rules.Severity { return rules.High }
@@ -274,7 +274,7 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type Jinja2AutoescapeDisabled struct{}
 
-func (r *Jinja2AutoescapeDisabled) ID() string                      { return "GTSS-PY-003" }
+func (r *Jinja2AutoescapeDisabled) ID() string                      { return "BATOU-PY-003" }
 func (r *Jinja2AutoescapeDisabled) Name() string                    { return "Jinja2AutoescapeDisabled" }
 func (r *Jinja2AutoescapeDisabled) Description() string             { return "Detects Jinja2 Environment created with autoescape disabled, enabling XSS." }
 func (r *Jinja2AutoescapeDisabled) DefaultSeverity() rules.Severity { return rules.High }
@@ -342,7 +342,7 @@ func (r *Jinja2AutoescapeDisabled) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type UnsafeYAMLLoad struct{}
 
-func (r *UnsafeYAMLLoad) ID() string                      { return "GTSS-PY-004" }
+func (r *UnsafeYAMLLoad) ID() string                      { return "BATOU-PY-004" }
 func (r *UnsafeYAMLLoad) Name() string                    { return "UnsafeYAMLLoad" }
 func (r *UnsafeYAMLLoad) Description() string             { return "Detects yaml.load() without SafeLoader, enabling arbitrary code execution." }
 func (r *UnsafeYAMLLoad) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -397,7 +397,7 @@ func (r *UnsafeYAMLLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TempfileMktemp struct{}
 
-func (r *TempfileMktemp) ID() string                      { return "GTSS-PY-005" }
+func (r *TempfileMktemp) ID() string                      { return "BATOU-PY-005" }
 func (r *TempfileMktemp) Name() string                    { return "TempfileMktemp" }
 func (r *TempfileMktemp) Description() string             { return "Detects use of deprecated tempfile.mktemp() which has a TOCTOU race condition." }
 func (r *TempfileMktemp) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -440,7 +440,7 @@ func (r *TempfileMktemp) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AssertSecurity struct{}
 
-func (r *AssertSecurity) ID() string                      { return "GTSS-PY-006" }
+func (r *AssertSecurity) ID() string                      { return "BATOU-PY-006" }
 func (r *AssertSecurity) Name() string                    { return "AssertSecurity" }
 func (r *AssertSecurity) Description() string             { return "Detects use of Python assert statements for security checks, which are removed with -O flag." }
 func (r *AssertSecurity) DefaultSeverity() rules.Severity { return rules.High }
@@ -490,7 +490,7 @@ func (r *AssertSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeDeserialization struct{}
 
-func (r *UnsafeDeserialization) ID() string                      { return "GTSS-PY-007" }
+func (r *UnsafeDeserialization) ID() string                      { return "BATOU-PY-007" }
 func (r *UnsafeDeserialization) Name() string                    { return "UnsafeDeserialization" }
 func (r *UnsafeDeserialization) Description() string             { return "Detects pickle/dill/cloudpickle/shelve/marshal deserialization with user-controlled data." }
 func (r *UnsafeDeserialization) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -558,7 +558,7 @@ func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TimingAttack struct{}
 
-func (r *TimingAttack) ID() string                      { return "GTSS-PY-008" }
+func (r *TimingAttack) ID() string                      { return "BATOU-PY-008" }
 func (r *TimingAttack) Name() string                    { return "TimingAttack" }
 func (r *TimingAttack) Description() string             { return "Detects direct comparison of secrets/tokens instead of constant-time comparison." }
 func (r *TimingAttack) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -607,7 +607,7 @@ func (r *TimingAttack) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DjangoRawSQL struct{}
 
-func (r *DjangoRawSQL) ID() string                      { return "GTSS-PY-009" }
+func (r *DjangoRawSQL) ID() string                      { return "BATOU-PY-009" }
 func (r *DjangoRawSQL) Name() string                    { return "DjangoRawSQL" }
 func (r *DjangoRawSQL) Description() string             { return "Detects Django .raw(), .extra(), RawSQL() with string interpolation enabling SQL injection." }
 func (r *DjangoRawSQL) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -667,7 +667,7 @@ func (r *DjangoRawSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FlaskHardcodedSecret struct{}
 
-func (r *FlaskHardcodedSecret) ID() string                      { return "GTSS-PY-010" }
+func (r *FlaskHardcodedSecret) ID() string                      { return "BATOU-PY-010" }
 func (r *FlaskHardcodedSecret) Name() string                    { return "FlaskHardcodedSecret" }
 func (r *FlaskHardcodedSecret) Description() string             { return "Detects Flask/Django SECRET_KEY hardcoded as a string literal instead of loaded from environment." }
 func (r *FlaskHardcodedSecret) DefaultSeverity() rules.Severity { return rules.High }
@@ -720,7 +720,7 @@ func (r *FlaskHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TLSVerificationDisabled struct{}
 
-func (r *TLSVerificationDisabled) ID() string                      { return "GTSS-PY-011" }
+func (r *TLSVerificationDisabled) ID() string                      { return "BATOU-PY-011" }
 func (r *TLSVerificationDisabled) Name() string                    { return "TLSVerificationDisabled" }
 func (r *TLSVerificationDisabled) Description() string             { return "Detects disabled TLS certificate verification in requests, httpx, aiohttp, and urllib3." }
 func (r *TLSVerificationDisabled) DefaultSeverity() rules.Severity { return rules.High }
@@ -786,7 +786,7 @@ func (r *TLSVerificationDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ReDoS struct{}
 
-func (r *ReDoS) ID() string                      { return "GTSS-PY-012" }
+func (r *ReDoS) ID() string                      { return "BATOU-PY-012" }
 func (r *ReDoS) Name() string                    { return "ReDoS" }
 func (r *ReDoS) Description() string             { return "Detects re.compile/match/search with user-controlled patterns enabling Regular Expression Denial of Service." }
 func (r *ReDoS) DefaultSeverity() rules.Severity { return rules.High }
@@ -839,7 +839,7 @@ func (r *ReDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeArchiveExtraction struct{}
 
-func (r *UnsafeArchiveExtraction) ID() string                      { return "GTSS-PY-013" }
+func (r *UnsafeArchiveExtraction) ID() string                      { return "BATOU-PY-013" }
 func (r *UnsafeArchiveExtraction) Name() string                    { return "UnsafeArchiveExtraction" }
 func (r *UnsafeArchiveExtraction) Description() string             { return "Detects tarfile/zipfile extractall() without path validation (CVE-2007-4559)." }
 func (r *UnsafeArchiveExtraction) DefaultSeverity() rules.Severity { return rules.High }
@@ -893,7 +893,7 @@ func (r *UnsafeArchiveExtraction) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LoggingInjection struct{}
 
-func (r *LoggingInjection) ID() string                      { return "GTSS-PY-014" }
+func (r *LoggingInjection) ID() string                      { return "BATOU-PY-014" }
 func (r *LoggingInjection) Name() string                    { return "LoggingInjection" }
 func (r *LoggingInjection) Description() string             { return "Detects f-string/.format()/% formatting in logging calls instead of lazy % formatting." }
 func (r *LoggingInjection) DefaultSeverity() rules.Severity { return rules.Low }
@@ -950,7 +950,7 @@ func (r *LoggingInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JWTNoVerification struct{}
 
-func (r *JWTNoVerification) ID() string                      { return "GTSS-PY-015" }
+func (r *JWTNoVerification) ID() string                      { return "BATOU-PY-015" }
 func (r *JWTNoVerification) Name() string                    { return "JWTNoVerification" }
 func (r *JWTNoVerification) Description() string             { return "Detects PyJWT jwt.decode() with signature verification disabled or algorithm=none." }
 func (r *JWTNoVerification) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -1004,7 +1004,7 @@ func (r *JWTNoVerification) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DebuggerInProduction struct{}
 
-func (r *DebuggerInProduction) ID() string                      { return "GTSS-PY-016" }
+func (r *DebuggerInProduction) ID() string                      { return "BATOU-PY-016" }
 func (r *DebuggerInProduction) Name() string                    { return "DebuggerInProduction" }
 func (r *DebuggerInProduction) Description() string             { return "Detects Werkzeug debugger, Flask debug mode, and debug toolbar enabled in application code." }
 func (r *DebuggerInProduction) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -1065,7 +1065,7 @@ func (r *DebuggerInProduction) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FastAPIMissingValidation struct{}
 
-func (r *FastAPIMissingValidation) ID() string                      { return "GTSS-PY-017" }
+func (r *FastAPIMissingValidation) ID() string                      { return "BATOU-PY-017" }
 func (r *FastAPIMissingValidation) Name() string                    { return "FastAPIMissingValidation" }
 func (r *FastAPIMissingValidation) Description() string             { return "Detects FastAPI endpoints accepting raw user input without Pydantic validation or Query/Path constraints." }
 func (r *FastAPIMissingValidation) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -1125,7 +1125,7 @@ func (r *FastAPIMissingValidation) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type AsyncioShellInjection struct{}
 
-func (r *AsyncioShellInjection) ID() string                      { return "GTSS-PY-018" }
+func (r *AsyncioShellInjection) ID() string                      { return "BATOU-PY-018" }
 func (r *AsyncioShellInjection) Name() string                    { return "AsyncioShellInjection" }
 func (r *AsyncioShellInjection) Description() string             { return "Detects asyncio.create_subprocess_shell with potentially user-controlled commands." }
 func (r *AsyncioShellInjection) DefaultSeverity() rules.Severity { return rules.Critical }

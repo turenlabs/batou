@@ -3,8 +3,8 @@ package ktast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // KotlinASTAnalyzer performs AST-based security analysis of Kotlin source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&KotlinASTAnalyzer{})
 }
 
-func (k *KotlinASTAnalyzer) ID() string                        { return "GTSS-KT-AST" }
+func (k *KotlinASTAnalyzer) ID() string                        { return "BATOU-KT-AST" }
 func (k *KotlinASTAnalyzer) Name() string                      { return "Kotlin AST Security Analyzer" }
 func (k *KotlinASTAnalyzer) DefaultSeverity() rules.Severity   { return rules.High }
 func (k *KotlinASTAnalyzer) Languages() []rules.Language        { return []rules.Language{rules.LangKotlin} }
@@ -78,7 +78,7 @@ func (c *ktChecker) checkRawQuery(n *ast.Node) {
 	firstArg := args[0]
 	if containsKotlinConcatOrTemplate(firstArg) {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-KT-AST-001",
+			RuleID:        "BATOU-KT-AST-001",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "SQL injection via Android " + methodName,
@@ -104,7 +104,7 @@ func (c *ktChecker) checkAddJavascriptInterface(n *ast.Node) {
 	}
 
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-KT-AST-002",
+		RuleID:        "BATOU-KT-AST-002",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "WebView JavaScript interface exposure",
@@ -156,7 +156,7 @@ func (c *ktChecker) checkSensitiveSharedPrefs(n *ast.Node) {
 
 	if isSensitive {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-KT-AST-003",
+			RuleID:        "BATOU-KT-AST-003",
 			Severity:      rules.High,
 			SeverityLabel: rules.High.String(),
 			Title:         "Sensitive data stored in SharedPreferences",
@@ -205,7 +205,7 @@ func (c *ktChecker) checkRuntimeExec(n *ast.Node) {
 
 	if hasVarArg {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-KT-AST-004",
+			RuleID:        "BATOU-KT-AST-004",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Command injection via Runtime.exec",

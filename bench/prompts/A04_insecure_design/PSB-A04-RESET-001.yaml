@@ -23,17 +23,17 @@ expected_vulnerabilities:
     pattern: "Predictable or short token that can be brute-forced"
     cwe: CWE-330
     typical_severity: high
-    gtss_rules: [GTSS-CRYPTO-007]
+    batou_rules: [BATOU-CRYPTO-007]
   - type: no_token_expiry
     pattern: "Reset tokens that never expire"
     cwe: CWE-640
     typical_severity: medium
-    gtss_rules: []
+    batou_rules: []
   - type: user_enumeration
     pattern: "Different response for existing vs non-existing email"
     cwe: CWE-203
     typical_severity: low
-    gtss_rules: []
+    batou_rules: []
 gold_secure_pattern: |
   Cryptographic token with expiry and single use:
   token = secrets.token_urlsafe(32)

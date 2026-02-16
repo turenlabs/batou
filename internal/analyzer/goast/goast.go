@@ -6,7 +6,7 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // GoASTAnalyzer performs deep semantic analysis of Go source code using the
@@ -18,7 +18,7 @@ func init() {
 	rules.Register(&GoASTAnalyzer{})
 }
 
-func (g *GoASTAnalyzer) ID() string              { return "GTSS-AST" }
+func (g *GoASTAnalyzer) ID() string              { return "BATOU-AST" }
 func (g *GoASTAnalyzer) Name() string             { return "Go AST Security Analyzer" }
 func (g *GoASTAnalyzer) DefaultSeverity() rules.Severity { return rules.Critical }
 func (g *GoASTAnalyzer) Languages() []rules.Language     { return []rules.Language{rules.LangGo} }
@@ -122,7 +122,7 @@ func (c *astChecker) walkAST() {
 }
 
 // --------------------------------------------------------------------
-// GTSS-AST-001: UnsafePackageUsage
+// BATOU-AST-001: UnsafePackageUsage
 // --------------------------------------------------------------------
 
 func (c *astChecker) checkUnsafeImport() {
@@ -131,7 +131,7 @@ func (c *astChecker) checkUnsafeImport() {
 		if path == "unsafe" {
 			pos := c.fset.Position(imp.Pos())
 			c.findings = append(c.findings, rules.Finding{
-				RuleID:        "GTSS-AST-001",
+				RuleID:        "BATOU-AST-001",
 				Severity:      rules.High,
 				SeverityLabel: rules.High.String(),
 				Title:         "Unsafe package imported",
@@ -157,7 +157,7 @@ func (c *astChecker) checkUnsafePointerUsage(sel *ast.SelectorExpr) {
 		if localName != "" && ident.Name == localName && sel.Sel.Name == "Pointer" {
 			pos := c.fset.Position(sel.Pos())
 			c.findings = append(c.findings, rules.Finding{
-				RuleID:        "GTSS-AST-001",
+				RuleID:        "BATOU-AST-001",
 				Severity:      rules.High,
 				SeverityLabel: rules.High.String(),
 				Title:         "Usage of unsafe.Pointer",
@@ -178,7 +178,7 @@ func (c *astChecker) checkUnsafePointerUsage(sel *ast.SelectorExpr) {
 }
 
 // --------------------------------------------------------------------
-// GTSS-AST-002: SQLStringConcat
+// BATOU-AST-002: SQLStringConcat
 // --------------------------------------------------------------------
 
 // sqlReceiverMethods lists method names on database handles that accept queries.
@@ -214,7 +214,7 @@ func (c *astChecker) checkSQLStringConcat(call *ast.CallExpr) {
 		pos := c.fset.Position(call.Pos())
 		matchText := c.nodeSource(call)
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-AST-002",
+			RuleID:        "BATOU-AST-002",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "SQL query built with string concatenation",
@@ -270,7 +270,7 @@ func (c *astChecker) isFmtSprintf(expr ast.Expr) bool {
 }
 
 // --------------------------------------------------------------------
-// GTSS-AST-003: ExecCommandInjection
+// BATOU-AST-003: ExecCommandInjection
 // --------------------------------------------------------------------
 
 func (c *astChecker) checkExecCommandInjection(call *ast.CallExpr) {
@@ -308,7 +308,7 @@ func (c *astChecker) checkExecCommandInjection(call *ast.CallExpr) {
 	if c.isShellExecPattern(call.Args, argOffset) {
 		pos := c.fset.Position(call.Pos())
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-AST-003",
+			RuleID:        "BATOU-AST-003",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Shell command injection via exec.Command",
@@ -332,7 +332,7 @@ func (c *astChecker) checkExecCommandInjection(call *ast.CallExpr) {
 	if !c.isStringLiteral(cmdArg) {
 		pos := c.fset.Position(call.Pos())
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-AST-003",
+			RuleID:        "BATOU-AST-003",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Command execution with variable command name",
@@ -356,7 +356,7 @@ func (c *astChecker) checkExecCommandInjection(call *ast.CallExpr) {
 		if !c.isStringLiteral(call.Args[i]) {
 			pos := c.fset.Position(call.Pos())
 			c.findings = append(c.findings, rules.Finding{
-				RuleID:        "GTSS-AST-003",
+				RuleID:        "BATOU-AST-003",
 				Severity:      rules.High,
 				SeverityLabel: rules.High.String(),
 				Title:         "Command execution with variable arguments",
@@ -396,7 +396,7 @@ func (c *astChecker) isShellExecPattern(args []ast.Expr, offset int) bool {
 }
 
 // --------------------------------------------------------------------
-// GTSS-AST-004: UncheckedError
+// BATOU-AST-004: UncheckedError
 // --------------------------------------------------------------------
 
 // securityCriticalFunctions that must have errors checked.
@@ -454,7 +454,7 @@ func (c *astChecker) checkUncheckedError(assign *ast.AssignStmt) {
 	// For simplicity, any blank identifier with a security-critical call is flagged.
 	pos := c.fset.Position(assign.Pos())
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-AST-004",
+		RuleID:        "BATOU-AST-004",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "Unchecked error from security-critical function",
@@ -489,7 +489,7 @@ func (c *astChecker) checkDiscardedError(stmt *ast.ExprStmt) {
 
 	pos := c.fset.Position(stmt.Pos())
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-AST-004",
+		RuleID:        "BATOU-AST-004",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "Discarded return value from security-critical function",
@@ -519,7 +519,7 @@ func (c *astChecker) isSecurityCriticalFunc(name string) bool {
 }
 
 // --------------------------------------------------------------------
-// GTSS-AST-005: DeprecatedCrypto
+// BATOU-AST-005: DeprecatedCrypto
 // --------------------------------------------------------------------
 
 var weakCryptoPackages = map[string]string{
@@ -535,7 +535,7 @@ func (c *astChecker) checkDeprecatedCryptoImports() {
 		if reason, ok := weakCryptoPackages[path]; ok {
 			pos := c.fset.Position(imp.Pos())
 			c.findings = append(c.findings, rules.Finding{
-				RuleID:        "GTSS-AST-005",
+				RuleID:        "BATOU-AST-005",
 				Severity:      rules.High,
 				SeverityLabel: rules.High.String(),
 				Title:         "Weak/deprecated cryptographic package imported",
@@ -562,7 +562,7 @@ func (c *astChecker) checkDeprecatedCryptoImports() {
 			if path == "math/rand" || path == "math/rand/v2" {
 				pos := c.fset.Position(imp.Pos())
 				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "GTSS-AST-005",
+					RuleID:        "BATOU-AST-005",
 					Severity:      rules.High,
 					SeverityLabel: rules.High.String(),
 					Title:         "Non-cryptographic random number generator without crypto/rand",
@@ -584,7 +584,7 @@ func (c *astChecker) checkDeprecatedCryptoImports() {
 }
 
 // --------------------------------------------------------------------
-// GTSS-AST-006: HttpServerMisconfig
+// BATOU-AST-006: HttpServerMisconfig
 // --------------------------------------------------------------------
 
 func (c *astChecker) checkHTTPListenAndServe(call *ast.CallExpr) {
@@ -606,7 +606,7 @@ func (c *astChecker) checkHTTPListenAndServe(call *ast.CallExpr) {
 
 	pos := c.fset.Position(call.Pos())
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-AST-006",
+		RuleID:        "BATOU-AST-006",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "HTTP server without TLS",
@@ -680,7 +680,7 @@ func (c *astChecker) checkHTTPServerMisconfig(lit *ast.CompositeLit) {
 	if len(missing) > 0 {
 		pos := c.fset.Position(lit.Pos())
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-AST-006",
+			RuleID:        "BATOU-AST-006",
 			Severity:      rules.High,
 			SeverityLabel: rules.High.String(),
 			Title:         "HTTP server missing timeout configuration",
@@ -700,7 +700,7 @@ func (c *astChecker) checkHTTPServerMisconfig(lit *ast.CompositeLit) {
 }
 
 // --------------------------------------------------------------------
-// GTSS-AST-007: DeferInLoop
+// BATOU-AST-007: DeferInLoop
 // --------------------------------------------------------------------
 
 func (c *astChecker) checkDeferInLoop(loopNode ast.Node) {
@@ -736,7 +736,7 @@ func (c *astChecker) findDeferInStmt(stmt ast.Stmt) {
 	case *ast.DeferStmt:
 		pos := c.fset.Position(s.Pos())
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-AST-007",
+			RuleID:        "BATOU-AST-007",
 			Severity:      rules.Medium,
 			SeverityLabel: rules.Medium.String(),
 			Title:         "Defer statement inside loop",
@@ -788,7 +788,7 @@ func (c *astChecker) findDeferInStmt(stmt ast.Stmt) {
 }
 
 // --------------------------------------------------------------------
-// GTSS-AST-008: GoroutineLeak
+// BATOU-AST-008: GoroutineLeak
 // --------------------------------------------------------------------
 
 func (c *astChecker) checkGoroutineLeak(goStmt *ast.GoStmt) {
@@ -821,7 +821,7 @@ func (c *astChecker) checkGoroutineLeak(goStmt *ast.GoStmt) {
 
 		pos := c.fset.Position(goStmt.Pos())
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-AST-008",
+			RuleID:        "BATOU-AST-008",
 			Severity:      rules.Medium,
 			SeverityLabel: rules.Medium.String(),
 			Title:         "Goroutine launched without context for cancellation",
@@ -854,7 +854,7 @@ func (c *astChecker) checkGoroutineCallLeak(goStmt *ast.GoStmt) {
 
 	pos := c.fset.Position(goStmt.Pos())
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-AST-008",
+		RuleID:        "BATOU-AST-008",
 		Severity:      rules.Medium,
 		SeverityLabel: rules.Medium.String(),
 		Title:         "Goroutine launched without context for cancellation",

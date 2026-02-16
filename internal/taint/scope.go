@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // DetectScopes analyzes source code and returns a list of Scope structs

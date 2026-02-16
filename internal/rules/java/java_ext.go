@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ func init() {
 
 type SpringSpELUserInput struct{}
 
-func (r *SpringSpELUserInput) ID() string                      { return "GTSS-JAVA-019" }
+func (r *SpringSpELUserInput) ID() string                      { return "BATOU-JAVA-019" }
 func (r *SpringSpELUserInput) Name() string                    { return "SpringSpELUserInput" }
 func (r *SpringSpELUserInput) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *SpringSpELUserInput) Description() string {
@@ -172,7 +172,7 @@ func (r *SpringSpELUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JNDILog4Shell struct{}
 
-func (r *JNDILog4Shell) ID() string                      { return "GTSS-JAVA-020" }
+func (r *JNDILog4Shell) ID() string                      { return "BATOU-JAVA-020" }
 func (r *JNDILog4Shell) Name() string                    { return "JNDILog4Shell" }
 func (r *JNDILog4Shell) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JNDILog4Shell) Description() string {
@@ -225,7 +225,7 @@ func (r *JNDILog4Shell) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaUnsafeReflection struct{}
 
-func (r *JavaUnsafeReflection) ID() string                      { return "GTSS-JAVA-021" }
+func (r *JavaUnsafeReflection) ID() string                      { return "BATOU-JAVA-021" }
 func (r *JavaUnsafeReflection) Name() string                    { return "JavaUnsafeReflection" }
 func (r *JavaUnsafeReflection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JavaUnsafeReflection) Description() string {
@@ -275,7 +275,7 @@ func (r *JavaUnsafeReflection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RMIWithoutSSL struct{}
 
-func (r *RMIWithoutSSL) ID() string                      { return "GTSS-JAVA-022" }
+func (r *RMIWithoutSSL) ID() string                      { return "BATOU-JAVA-022" }
 func (r *RMIWithoutSSL) Name() string                    { return "RMIWithoutSSL" }
 func (r *RMIWithoutSSL) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RMIWithoutSSL) Description() string {
@@ -331,7 +331,7 @@ func (r *RMIWithoutSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type StrutsOGNLInjection struct{}
 
-func (r *StrutsOGNLInjection) ID() string                      { return "GTSS-JAVA-023" }
+func (r *StrutsOGNLInjection) ID() string                      { return "BATOU-JAVA-023" }
 func (r *StrutsOGNLInjection) Name() string                    { return "StrutsOGNLInjection" }
 func (r *StrutsOGNLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *StrutsOGNLInjection) Description() string {
@@ -383,7 +383,7 @@ func (r *StrutsOGNLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JDBCWithoutSSL struct{}
 
-func (r *JDBCWithoutSSL) ID() string                      { return "GTSS-JAVA-024" }
+func (r *JDBCWithoutSSL) ID() string                      { return "BATOU-JAVA-024" }
 func (r *JDBCWithoutSSL) Name() string                    { return "JDBCWithoutSSL" }
 func (r *JDBCWithoutSSL) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *JDBCWithoutSSL) Description() string {
@@ -426,7 +426,7 @@ func (r *JDBCWithoutSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaTrustAllCerts struct{}
 
-func (r *JavaTrustAllCerts) ID() string                      { return "GTSS-JAVA-025" }
+func (r *JavaTrustAllCerts) ID() string                      { return "BATOU-JAVA-025" }
 func (r *JavaTrustAllCerts) Name() string                    { return "JavaTrustAllCerts" }
 func (r *JavaTrustAllCerts) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JavaTrustAllCerts) Description() string {
@@ -484,7 +484,7 @@ func (r *JavaTrustAllCerts) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaHVDisabled struct{}
 
-func (r *JavaHVDisabled) ID() string                      { return "GTSS-JAVA-026" }
+func (r *JavaHVDisabled) ID() string                      { return "BATOU-JAVA-026" }
 func (r *JavaHVDisabled) Name() string                    { return "JavaHVDisabled" }
 func (r *JavaHVDisabled) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JavaHVDisabled) Description() string {
@@ -540,7 +540,7 @@ func (r *JavaHVDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SpringMassBinding struct{}
 
-func (r *SpringMassBinding) ID() string                      { return "GTSS-JAVA-027" }
+func (r *SpringMassBinding) ID() string                      { return "BATOU-JAVA-027" }
 func (r *SpringMassBinding) Name() string                    { return "SpringMassBinding" }
 func (r *SpringMassBinding) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SpringMassBinding) Description() string {
@@ -591,7 +591,7 @@ func (r *SpringMassBinding) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaTempFilePredictable struct{}
 
-func (r *JavaTempFilePredictable) ID() string                      { return "GTSS-JAVA-028" }
+func (r *JavaTempFilePredictable) ID() string                      { return "BATOU-JAVA-028" }
 func (r *JavaTempFilePredictable) Name() string                    { return "JavaTempFilePredictable" }
 func (r *JavaTempFilePredictable) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *JavaTempFilePredictable) Description() string {
@@ -638,7 +638,7 @@ func (r *JavaTempFilePredictable) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaSecureRandomSeed struct{}
 
-func (r *JavaSecureRandomSeed) ID() string                      { return "GTSS-JAVA-029" }
+func (r *JavaSecureRandomSeed) ID() string                      { return "BATOU-JAVA-029" }
 func (r *JavaSecureRandomSeed) Name() string                    { return "JavaSecureRandomSeed" }
 func (r *JavaSecureRandomSeed) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JavaSecureRandomSeed) Description() string {
@@ -682,7 +682,7 @@ func (r *JavaSecureRandomSeed) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaXXETransformer struct{}
 
-func (r *JavaXXETransformer) ID() string                      { return "GTSS-JAVA-030" }
+func (r *JavaXXETransformer) ID() string                      { return "BATOU-JAVA-030" }
 func (r *JavaXXETransformer) Name() string                    { return "JavaXXETransformer" }
 func (r *JavaXXETransformer) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JavaXXETransformer) Description() string {

@@ -5,8 +5,8 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // walkFunc performs intraprocedural taint analysis on a single function body.

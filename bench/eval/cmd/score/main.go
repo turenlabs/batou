@@ -1,6 +1,6 @@
 // Command score is the ProductSecBench CLI evaluation tool.
 //
-// It loads a prompt corpus and model-generated code samples, runs the GTSS
+// It loads a prompt corpus and model-generated code samples, runs the Batou
 // scanner on each sample, and produces an evaluation report.
 //
 // Usage:
@@ -20,26 +20,26 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/turenio/gtss/bench/eval"
+	"github.com/turenlabs/batou/bench/eval"
 
 	// Import rule packages to trigger init() registrations.
-	_ "github.com/turenio/gtss/internal/rules/auth"
-	_ "github.com/turenio/gtss/internal/rules/crypto"
-	_ "github.com/turenio/gtss/internal/rules/generic"
-	_ "github.com/turenio/gtss/internal/rules/injection"
-	_ "github.com/turenio/gtss/internal/rules/logging"
-	_ "github.com/turenio/gtss/internal/rules/memory"
-	_ "github.com/turenio/gtss/internal/rules/secrets"
-	_ "github.com/turenio/gtss/internal/rules/ssrf"
-	_ "github.com/turenio/gtss/internal/rules/traversal"
-	_ "github.com/turenio/gtss/internal/rules/validation"
-	_ "github.com/turenio/gtss/internal/rules/xss"
+	_ "github.com/turenlabs/batou/internal/rules/auth"
+	_ "github.com/turenlabs/batou/internal/rules/crypto"
+	_ "github.com/turenlabs/batou/internal/rules/generic"
+	_ "github.com/turenlabs/batou/internal/rules/injection"
+	_ "github.com/turenlabs/batou/internal/rules/logging"
+	_ "github.com/turenlabs/batou/internal/rules/memory"
+	_ "github.com/turenlabs/batou/internal/rules/secrets"
+	_ "github.com/turenlabs/batou/internal/rules/ssrf"
+	_ "github.com/turenlabs/batou/internal/rules/traversal"
+	_ "github.com/turenlabs/batou/internal/rules/validation"
+	_ "github.com/turenlabs/batou/internal/rules/xss"
 
 	// Taint analysis engine and language catalogs.
-	_ "github.com/turenio/gtss/internal/analyzer/goast"
-	_ "github.com/turenio/gtss/internal/taint"
-	_ "github.com/turenio/gtss/internal/taint/goflow"
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/analyzer/goast"
+	_ "github.com/turenlabs/batou/internal/taint"
+	_ "github.com/turenlabs/batou/internal/taint/goflow"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 func main() {

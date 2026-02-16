@@ -3,8 +3,8 @@ package rustast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // RustASTAnalyzer performs AST-based security analysis of Rust source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&RustASTAnalyzer{})
 }
 
-func (r *RustASTAnalyzer) ID() string                        { return "GTSS-RUST-AST" }
+func (r *RustASTAnalyzer) ID() string                        { return "BATOU-RUST-AST" }
 func (r *RustASTAnalyzer) Name() string                      { return "Rust AST Security Analyzer" }
 func (r *RustASTAnalyzer) DefaultSeverity() rules.Severity   { return rules.High }
 func (r *RustASTAnalyzer) Languages() []rules.Language        { return []rules.Language{rules.LangRust} }
@@ -89,7 +89,7 @@ func (c *rustChecker) checkUnsafeBlock(n *ast.Node) {
 
 	if hasTransmute {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-RUST-AST-001",
+			RuleID:        "BATOU-RUST-AST-001",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "std::mem::transmute in unsafe block",
@@ -108,7 +108,7 @@ func (c *rustChecker) checkUnsafeBlock(n *ast.Node) {
 
 	if hasRawPtrDeref {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-RUST-AST-001",
+			RuleID:        "BATOU-RUST-AST-001",
 			Severity:      rules.High,
 			SeverityLabel: rules.High.String(),
 			Title:         "Raw pointer dereference in unsafe block",
@@ -153,7 +153,7 @@ func (c *rustChecker) checkFormatSQLInjection(n *ast.Node) {
 					text := strings.ToUpper(inner.Text())
 					if containsSQLKeyword(text) && strings.Contains(inner.Text(), "{}") {
 						c.findings = append(c.findings, rules.Finding{
-							RuleID:        "GTSS-RUST-AST-002",
+							RuleID:        "BATOU-RUST-AST-002",
 							Severity:      rules.Critical,
 							SeverityLabel: rules.Critical.String(),
 							Title:         "SQL injection via format!() macro",
@@ -231,7 +231,7 @@ func (c *rustChecker) checkCommandInjection(n *ast.Node) {
 
 	if isShell && hasVarArg {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-RUST-AST-003",
+			RuleID:        "BATOU-RUST-AST-003",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Shell command injection via Command::new",
@@ -248,7 +248,7 @@ func (c *rustChecker) checkCommandInjection(n *ast.Node) {
 		})
 	} else if hasVarArg {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-RUST-AST-003",
+			RuleID:        "BATOU-RUST-AST-003",
 			Severity:      rules.High,
 			SeverityLabel: rules.High.String(),
 			Title:         "Command execution with variable arguments",
@@ -315,7 +315,7 @@ func (c *rustChecker) checkUnsafeUnwrap(n *ast.Node) {
 	}
 
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-RUST-AST-004",
+		RuleID:        "BATOU-RUST-AST-004",
 		Severity:      rules.Medium,
 		SeverityLabel: rules.Medium.String(),
 		Title:         "Unsafe .unwrap() on fallible operation",

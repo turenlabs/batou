@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
@@ -191,7 +191,7 @@ func isInHTTPHandler(content string) bool {
 
 type GORMSQLInjection struct{}
 
-func (r *GORMSQLInjection) ID() string                      { return "GTSS-GO-001" }
+func (r *GORMSQLInjection) ID() string                      { return "BATOU-GO-001" }
 func (r *GORMSQLInjection) Name() string                    { return "GORMSQLInjection" }
 func (r *GORMSQLInjection) Description() string             { return "Detects GORM Raw/Exec/Where with fmt.Sprintf or string concatenation, enabling SQL injection via ORM bypass." }
 func (r *GORMSQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -245,7 +245,7 @@ func (r *GORMSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TemplateHTMLBypass struct{}
 
-func (r *TemplateHTMLBypass) ID() string                      { return "GTSS-GO-002" }
+func (r *TemplateHTMLBypass) ID() string                      { return "BATOU-GO-002" }
 func (r *TemplateHTMLBypass) Name() string                    { return "TemplateHTMLBypass" }
 func (r *TemplateHTMLBypass) Description() string             { return "Detects template.HTML() and similar type conversions that bypass html/template's auto-escaping." }
 func (r *TemplateHTMLBypass) DefaultSeverity() rules.Severity { return rules.High }
@@ -309,7 +309,7 @@ func (r *TemplateHTMLBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ListenAndServeNoTLS struct{}
 
-func (r *ListenAndServeNoTLS) ID() string                      { return "GTSS-GO-003" }
+func (r *ListenAndServeNoTLS) ID() string                      { return "BATOU-GO-003" }
 func (r *ListenAndServeNoTLS) Name() string                    { return "ListenAndServeNoTLS" }
 func (r *ListenAndServeNoTLS) Description() string             { return "Detects net/http.ListenAndServe (plaintext HTTP) without a corresponding TLS configuration." }
 func (r *ListenAndServeNoTLS) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -359,7 +359,7 @@ func (r *ListenAndServeNoTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type BindWithoutValidation struct{}
 
-func (r *BindWithoutValidation) ID() string                      { return "GTSS-GO-004" }
+func (r *BindWithoutValidation) ID() string                      { return "BATOU-GO-004" }
 func (r *BindWithoutValidation) Name() string                    { return "BindWithoutValidation" }
 func (r *BindWithoutValidation) Description() string             { return "Detects Gin/Echo request binding without input validation, which may allow unexpected or malicious data." }
 func (r *BindWithoutValidation) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -405,7 +405,7 @@ func (r *BindWithoutValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FilepathTraversal struct{}
 
-func (r *FilepathTraversal) ID() string                      { return "GTSS-GO-005" }
+func (r *FilepathTraversal) ID() string                      { return "BATOU-GO-005" }
 func (r *FilepathTraversal) Name() string                    { return "FilepathTraversal" }
 func (r *FilepathTraversal) Description() string             { return "Detects filepath.Join/Clean with user input but without a HasPrefix check, which allows path traversal even after cleaning." }
 func (r *FilepathTraversal) DefaultSeverity() rules.Severity { return rules.High }
@@ -451,7 +451,7 @@ func (r *FilepathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MathRandCrypto struct{}
 
-func (r *MathRandCrypto) ID() string                      { return "GTSS-GO-006" }
+func (r *MathRandCrypto) ID() string                      { return "BATOU-GO-006" }
 func (r *MathRandCrypto) Name() string                    { return "MathRandCrypto" }
 func (r *MathRandCrypto) Description() string             { return "Detects math/rand usage in security-sensitive contexts where crypto/rand should be used." }
 func (r *MathRandCrypto) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -499,7 +499,7 @@ func (r *MathRandCrypto) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GoroutineLeak struct{}
 
-func (r *GoroutineLeak) ID() string                      { return "GTSS-GO-007" }
+func (r *GoroutineLeak) ID() string                      { return "BATOU-GO-007" }
 func (r *GoroutineLeak) Name() string                    { return "GoroutineLeak" }
 func (r *GoroutineLeak) Description() string             { return "Detects goroutines launched in HTTP handlers without context cancellation, which can leak goroutines." }
 func (r *GoroutineLeak) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -560,7 +560,7 @@ func (r *GoroutineLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RaceConditionHandler struct{}
 
-func (r *RaceConditionHandler) ID() string                      { return "GTSS-GO-008" }
+func (r *RaceConditionHandler) ID() string                      { return "BATOU-GO-008" }
 func (r *RaceConditionHandler) Name() string                    { return "RaceConditionHandler" }
 func (r *RaceConditionHandler) Description() string             { return "Detects shared mutable state accessed in HTTP handlers without synchronization (mutex, sync.Map, atomic)." }
 func (r *RaceConditionHandler) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -611,7 +611,7 @@ func (r *RaceConditionHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnvalidatedRedirect struct{}
 
-func (r *UnvalidatedRedirect) ID() string                      { return "GTSS-GO-009" }
+func (r *UnvalidatedRedirect) ID() string                      { return "BATOU-GO-009" }
 func (r *UnvalidatedRedirect) Name() string                    { return "UnvalidatedRedirect" }
 func (r *UnvalidatedRedirect) Description() string             { return "Detects HTTP redirects using user-controlled URL parameters in Go web frameworks (net/http, Gin, Echo)." }
 func (r *UnvalidatedRedirect) DefaultSeverity() rules.Severity { return rules.High }
@@ -665,7 +665,7 @@ func (r *UnvalidatedRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingCSRF struct{}
 
-func (r *MissingCSRF) ID() string                      { return "GTSS-GO-010" }
+func (r *MissingCSRF) ID() string                      { return "BATOU-GO-010" }
 func (r *MissingCSRF) Name() string                    { return "MissingCSRF" }
 func (r *MissingCSRF) Description() string             { return "Detects POST/PUT/DELETE form handlers without CSRF protection middleware." }
 func (r *MissingCSRF) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -715,7 +715,7 @@ func (r *MissingCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HardcodedJWTSecret struct{}
 
-func (r *HardcodedJWTSecret) ID() string                      { return "GTSS-GO-011" }
+func (r *HardcodedJWTSecret) ID() string                      { return "BATOU-GO-011" }
 func (r *HardcodedJWTSecret) Name() string                    { return "HardcodedJWTSecret" }
 func (r *HardcodedJWTSecret) Description() string             { return "Detects hardcoded JWT signing keys in Go code." }
 func (r *HardcodedJWTSecret) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -780,7 +780,7 @@ func (r *HardcodedJWTSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PermissiveFileMode struct{}
 
-func (r *PermissiveFileMode) ID() string                      { return "GTSS-GO-012" }
+func (r *PermissiveFileMode) ID() string                      { return "BATOU-GO-012" }
 func (r *PermissiveFileMode) Name() string                    { return "PermissiveFileMode" }
 func (r *PermissiveFileMode) Description() string             { return "Detects os.MkdirAll, os.Mkdir, os.WriteFile, and os.OpenFile with world-writable permissions (0777)." }
 func (r *PermissiveFileMode) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -835,7 +835,7 @@ func (r *PermissiveFileMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TrustedProxyMisconfig struct{}
 
-func (r *TrustedProxyMisconfig) ID() string                      { return "GTSS-GO-013" }
+func (r *TrustedProxyMisconfig) ID() string                      { return "BATOU-GO-013" }
 func (r *TrustedProxyMisconfig) Name() string                    { return "TrustedProxyMisconfig" }
 func (r *TrustedProxyMisconfig) Description() string             { return "Detects Gin/Echo trusted proxy misconfiguration that allows IP spoofing via X-Forwarded-For headers." }
 func (r *TrustedProxyMisconfig) DefaultSeverity() rules.Severity { return rules.High }
@@ -888,7 +888,7 @@ func (r *TrustedProxyMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeHTTPResponse struct{}
 
-func (r *UnsafeHTTPResponse) ID() string                      { return "GTSS-GO-014" }
+func (r *UnsafeHTTPResponse) ID() string                      { return "BATOU-GO-014" }
 func (r *UnsafeHTTPResponse) Name() string                    { return "UnsafeHTTPResponse" }
 func (r *UnsafeHTTPResponse) Description() string             { return "Detects writing user-controlled input directly to HTTP response without sanitization, enabling reflected XSS." }
 func (r *UnsafeHTTPResponse) DefaultSeverity() rules.Severity { return rules.High }

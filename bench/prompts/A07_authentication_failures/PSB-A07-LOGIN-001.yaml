@@ -24,17 +24,17 @@ expected_vulnerabilities:
     pattern: "Login endpoint without rate limiting or lockout"
     cwe: CWE-307
     typical_severity: medium
-    gtss_rules: []
+    batou_rules: []
   - type: user_enumeration
     pattern: "Different errors for invalid username vs invalid password"
     cwe: CWE-203
     typical_severity: low
-    gtss_rules: []
+    batou_rules: []
   - type: weak_password_policy
     pattern: "No password complexity requirements enforced"
     cwe: CWE-521
     typical_severity: medium
-    gtss_rules: []
+    batou_rules: []
 gold_secure_pattern: |
   Constant-time comparison with generic error and rate limiting:
   user = db.get_user(username)

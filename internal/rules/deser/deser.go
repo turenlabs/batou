@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-DESER-001: Extended deserialization patterns (beyond GEN-002)
+// BATOU-DESER-001: Extended deserialization patterns (beyond GEN-002)
 var (
 	// Python: shelve.open() with variable — stores pickled objects
 	reShelveOpen = regexp.MustCompile(`\bshelve\.open\s*\(`)
@@ -33,7 +33,7 @@ var (
 	reJsonNetTypeName = regexp.MustCompile(`(?i)TypeNameHandling\s*[=:]\s*(?:TypeNameHandling\.)?(?:All|Auto|Objects|Arrays)`)
 )
 
-// GTSS-DESER-002: Ruby dangerous dynamic execution
+// BATOU-DESER-002: Ruby dangerous dynamic execution
 var (
 	// Ruby: Kernel.eval / eval() with variable (not string literal)
 	reRubyEval = regexp.MustCompile(`\b(?:Kernel\.)?eval\s*\(\s*[^"'\s)]`)
@@ -48,7 +48,7 @@ var (
 	// Ruby: system / exec with variable interpolation already covered by INJ-002
 )
 
-// GTSS-DESER-003: PHP dangerous patterns (beyond INJ-003 and TRV-002)
+// BATOU-DESER-003: PHP dangerous patterns (beyond INJ-003 and TRV-002)
 var (
 	// PHP: preg_replace with /e modifier — code execution
 	rePHPPregE = regexp.MustCompile(`\bpreg_replace\s*\(\s*['"][^'"]*\/e['"imsxuADSUXJ]*['"]`)
@@ -62,7 +62,7 @@ var (
 	rePHPVarFunc = regexp.MustCompile(`\$\$\w+\s*\(`)
 )
 
-// GTSS-DESER-004: JS/TS additional dangerous patterns
+// BATOU-DESER-004: JS/TS additional dangerous patterns
 var (
 	// JS/TS: setTimeout / setInterval with string + user input nearby
 	reJSTimerString   = regexp.MustCompile(`\b(?:setTimeout|setInterval)\s*\(\s*[a-zA-Z_]\w*`)
@@ -71,12 +71,12 @@ var (
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-DESER-001: Extended Unsafe Deserialization
+// BATOU-DESER-001: Extended Unsafe Deserialization
 // ---------------------------------------------------------------------------
 
 type ExtendedDeserialization struct{}
 
-func (r *ExtendedDeserialization) ID() string                     { return "GTSS-DESER-001" }
+func (r *ExtendedDeserialization) ID() string                     { return "BATOU-DESER-001" }
 func (r *ExtendedDeserialization) Name() string                   { return "ExtendedDeserialization" }
 func (r *ExtendedDeserialization) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ExtendedDeserialization) Description() string {
@@ -166,12 +166,12 @@ func (r *ExtendedDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-DESER-002: Ruby Dangerous Dynamic Execution
+// BATOU-DESER-002: Ruby Dangerous Dynamic Execution
 // ---------------------------------------------------------------------------
 
 type RubyDynamicExecution struct{}
 
-func (r *RubyDynamicExecution) ID() string                     { return "GTSS-DESER-002" }
+func (r *RubyDynamicExecution) ID() string                     { return "BATOU-DESER-002" }
 func (r *RubyDynamicExecution) Name() string                   { return "RubyDynamicExecution" }
 func (r *RubyDynamicExecution) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RubyDynamicExecution) Description() string {
@@ -245,12 +245,12 @@ func (r *RubyDynamicExecution) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-DESER-003: PHP Dangerous Patterns
+// BATOU-DESER-003: PHP Dangerous Patterns
 // ---------------------------------------------------------------------------
 
 type PHPDangerousPatterns struct{}
 
-func (r *PHPDangerousPatterns) ID() string                     { return "GTSS-DESER-003" }
+func (r *PHPDangerousPatterns) ID() string                     { return "BATOU-DESER-003" }
 func (r *PHPDangerousPatterns) Name() string                   { return "PHPDangerousPatterns" }
 func (r *PHPDangerousPatterns) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PHPDangerousPatterns) Description() string {
@@ -317,12 +317,12 @@ func (r *PHPDangerousPatterns) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-DESER-004: JS/TS setTimeout/setInterval with String (enhanced)
+// BATOU-DESER-004: JS/TS setTimeout/setInterval with String (enhanced)
 // ---------------------------------------------------------------------------
 
 type JSTimerStringExec struct{}
 
-func (r *JSTimerStringExec) ID() string                     { return "GTSS-DESER-004" }
+func (r *JSTimerStringExec) ID() string                     { return "BATOU-DESER-004" }
 func (r *JSTimerStringExec) Name() string                   { return "JSTimerStringExec" }
 func (r *JSTimerStringExec) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JSTimerStringExec) Description() string {

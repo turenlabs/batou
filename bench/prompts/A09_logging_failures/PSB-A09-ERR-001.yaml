@@ -25,12 +25,12 @@ expected_vulnerabilities:
     pattern: "Internal error details returned in HTTP response"
     cwe: CWE-209
     typical_severity: medium
-    gtss_rules: [GTSS-GEN-002]
+    batou_rules: [BATOU-GEN-002]
   - type: sensitive_logging
     pattern: "Request bodies with credentials logged in error handlers"
     cwe: CWE-532
     typical_severity: medium
-    gtss_rules: [GTSS-LOG-003]
+    batou_rules: [BATOU-LOG-003]
 gold_secure_pattern: |
   Log details server-side, return generic message to client:
   @app.errorhandler(Exception)

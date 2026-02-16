@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // Compiled regex patterns for XSS detection.
 var (
-	// GTSS-XSS-001: innerHTML/outerHTML assignment with dynamic content
+	// BATOU-XSS-001: innerHTML/outerHTML assignment with dynamic content
 	reInnerHTMLAssign = regexp.MustCompile(`\.\s*(innerHTML|outerHTML)\s*=\s*(.+)`)
 	reStaticString    = regexp.MustCompile(`^\s*["'` + "`" + `][^"'` + "`" + `]*["'` + "`" + `]\s*;?\s*$`)
 	// insertAdjacentHTML — functionally equivalent to innerHTML
@@ -19,14 +19,14 @@ var (
 	// createContextualFragment — parses HTML from string
 	reContextualFragment = regexp.MustCompile(`\.createContextualFragment\s*\(`)
 
-	// GTSS-XSS-002: React dangerouslySetInnerHTML
+	// BATOU-XSS-002: React dangerouslySetInnerHTML
 	reDangerouslySet = regexp.MustCompile(`dangerouslySetInnerHTML\s*=\s*\{\s*\{`)
 
-	// GTSS-XSS-003: document.write / document.writeln
+	// BATOU-XSS-003: document.write / document.writeln
 	reDocWrite      = regexp.MustCompile(`document\s*\.\s*(write|writeln)\s*\((.+)\)`)
 	reDocWriteStatic = regexp.MustCompile(`document\s*\.\s*(write|writeln)\s*\(\s*["'` + "`" + `]`)
 
-	// GTSS-XSS-004: Unescaped template output
+	// BATOU-XSS-004: Unescaped template output
 	reGoTemplateHTML   = regexp.MustCompile(`template\.HTML\s*\(`)
 	reJinjaSafe        = regexp.MustCompile(`\|\s*safe\b`)
 	reJinjaAutoescOff  = regexp.MustCompile(`\{%[-\s]*autoescape\s+(false|off)\s*[-\s]*%\}`)
@@ -36,24 +36,24 @@ var (
 	rePHPEcho          = regexp.MustCompile(`<\?(?:php)?\s+echo\s+\$`)
 	rePHPEchoSafe      = regexp.MustCompile(`htmlspecialchars\s*\(|htmlentities\s*\(|strip_tags\s*\(`)
 
-	// GTSS-XSS-005: Risky DOM manipulation
+	// BATOU-XSS-005: Risky DOM manipulation
 	reEvalCall         = regexp.MustCompile(`\beval\s*\(`)
 	reLocationAssign   = regexp.MustCompile(`(?:location\.href|location\.assign|location\.replace)\s*=\s*(.+)`)
 	reWindowOpen       = regexp.MustCompile(`window\.open\s*\(`)
 	reSetAttrDangerous = regexp.MustCompile(`setAttribute\s*\(\s*["'](href|src|action|on\w+)["']\s*,`)
 
-	// GTSS-XSS-006: Response header injection
+	// BATOU-XSS-006: Response header injection
 	reNodeSetHeader  = regexp.MustCompile(`(?:res|response)\.setHeader\s*\(\s*["'][\w-]+["']\s*,\s*(.+)\)`)
 	reGoHeaderSet    = regexp.MustCompile(`\.Header\(\)\s*\.Set\s*\(\s*["'][\w-]+["']\s*,\s*(.+)\)`)
 	reHeaderFromReq  = regexp.MustCompile(`\.Header\(\)\s*\.Set\s*\(.+(?:req\.|request\.|r\.|params|query|body)`)
 	reNodeHeaderReq  = regexp.MustCompile(`\.setHeader\s*\(.+(?:req\.|request\.|params|query|body)`)
 
-	// GTSS-XSS-007: URL scheme injection (javascript: protocol)
+	// BATOU-XSS-007: URL scheme injection (javascript: protocol)
 	reJSProtocolHref = regexp.MustCompile(`(?:href|src|action)\s*=\s*["']javascript:`)
 	reHrefDynamic    = regexp.MustCompile(`(?:href|src|action)\s*=\s*\{[^}]*\}`)
 	reJSProtocolVar  = regexp.MustCompile(`["']javascript:["']\s*\+`)
 
-	// GTSS-XSS-008: Server-side rendering without escaping (cross-language)
+	// BATOU-XSS-008: Server-side rendering without escaping (cross-language)
 	rePyMarkup       = regexp.MustCompile(`\bMarkup\s*\(`)
 	rePyMarkupFmt    = regexp.MustCompile(`\bMarkup\.format\s*\(`)
 	rePyMarkSafe     = regexp.MustCompile(`\bmark_safe\s*\(`)
@@ -63,22 +63,22 @@ var (
 	reRubyHTMLSafe   = regexp.MustCompile(`\.html_safe\b`)
 	reCSharpHtmlRaw  = regexp.MustCompile(`@?Html\.Raw\s*\(`)
 
-	// GTSS-XSS-009: Missing Content-Type on HTML response
+	// BATOU-XSS-009: Missing Content-Type on HTML response
 	reGoWriteHTML      = regexp.MustCompile(`w\.Write\s*\(\s*\[\]byte\s*\(\s*["']<`)
 	reGoFprintfHTMLTag = regexp.MustCompile(`fmt\.Fprint(?:f|ln)?\s*\(\s*w\s*,\s*["']<(?:html|head|body|div|span|p|h[1-6]|script|table|form|a\s)`)
 
-	// GTSS-XSS-010: JSON response with user data and wrong content type
+	// BATOU-XSS-010: JSON response with user data and wrong content type
 	reNodeResSend     = regexp.MustCompile(`res\.(?:send|end|write)\s*\(`)
 	reNodeResJSON     = regexp.MustCompile(`res\.json\s*\(`)
 	reNodeContentJSON = regexp.MustCompile(`(?:Content-Type|content-type).*application/json`)
 
-	// GTSS-XSS-013: Python f-string HTML building without escaping
+	// BATOU-XSS-013: Python f-string HTML building without escaping
 	rePyFStringHTML = regexp.MustCompile(`(?:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*f["'].*<.*\{`)
 	rePyFormatHTML  = regexp.MustCompile(`(?:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*["'].*<.*["']\s*\.format\s*\(`)
 	rePyPctHTML     = regexp.MustCompile(`(?:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*["'].*<.*%s`)
 	rePyEscape      = regexp.MustCompile(`(?:escape|html\.escape|markupsafe\.escape|cgi\.escape|bleach\.clean)\s*\(`)
 
-	// GTSS-XSS-011: Reflected XSS patterns
+	// BATOU-XSS-011: Reflected XSS patterns
 	rePyReflected      = regexp.MustCompile(`(?:return|response)\s*.*(?:request\.args\.get|request\.form\.get|request\.values\.get|request\.args\[)`)
 	rePyFStringReq     = regexp.MustCompile(`f["'].*\{request\.(?:args|form|values)`)
 	rePHPEchoGet       = regexp.MustCompile(`echo\s+\$_(?:GET|POST|REQUEST)\s*\[`)
@@ -97,7 +97,7 @@ var (
 	// PHP superglobal usage nearby (indicates user input)
 	rePHPSuperglobal   = regexp.MustCompile(`\$_(?:GET|POST|REQUEST|COOKIE)\s*\[`)
 
-	// GTSS-XSS-014: Java HTML string concatenation with user input
+	// BATOU-XSS-014: Java HTML string concatenation with user input
 	// StringBuilder/StringBuffer.append with HTML tags and variables
 	reJavaStringBuilderHTML = regexp.MustCompile(`(?:StringBuilder|StringBuffer)\s*(?:\(\s*\))?[^;]*\.append\s*\(\s*["']<[^"']*["']\s*\+`)
 	reJavaStringBuilderAppendConcat = regexp.MustCompile(`\.append\s*\(\s*["']<[^"']*["']\s*\+`)
@@ -112,7 +112,7 @@ var (
 	// @RequestParam or @RequestBody annotation nearby (indicates user input)
 	reJavaRequestParam = regexp.MustCompile(`@(?:RequestParam|RequestBody|PathVariable|RequestHeader|CookieValue)`)
 
-	// GTSS-XSS-015: Java response writer XSS (HttpServletResponse, Spring @ResponseBody, String.format)
+	// BATOU-XSS-015: Java response writer XSS (HttpServletResponse, Spring @ResponseBody, String.format)
 	// response.getWriter().print/println/write with HTML and concatenation
 	reJavaResponseWriterHTML = regexp.MustCompile(`(?:response\.getWriter\(\)|response\.getOutputStream\(\))\s*\.\s*(?:print(?:ln)?|write)\s*\(\s*["']<.+?["']\s*\+`)
 	// String.format with HTML template containing %s (potential user data injection)
@@ -167,11 +167,11 @@ func isJSOrTS(lang rules.Language) bool {
 	return lang == rules.LangJavaScript || lang == rules.LangTypeScript
 }
 
-// ---------- GTSS-XSS-001: InnerHTMLUsage ----------
+// ---------- BATOU-XSS-001: InnerHTMLUsage ----------
 
 type InnerHTMLUsage struct{}
 
-func (r *InnerHTMLUsage) ID() string                   { return "GTSS-XSS-001" }
+func (r *InnerHTMLUsage) ID() string                   { return "BATOU-XSS-001" }
 func (r *InnerHTMLUsage) Name() string                 { return "InnerHTMLUsage" }
 func (r *InnerHTMLUsage) Description() string          { return "Detects innerHTML/outerHTML assignments with dynamic content that may lead to XSS" }
 func (r *InnerHTMLUsage) DefaultSeverity() rules.Severity { return rules.High }
@@ -239,11 +239,11 @@ func (r *InnerHTMLUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-002: DangerouslySetInnerHTML ----------
+// ---------- BATOU-XSS-002: DangerouslySetInnerHTML ----------
 
 type DangerouslySetInnerHTML struct{}
 
-func (r *DangerouslySetInnerHTML) ID() string                   { return "GTSS-XSS-002" }
+func (r *DangerouslySetInnerHTML) ID() string                   { return "BATOU-XSS-002" }
 func (r *DangerouslySetInnerHTML) Name() string                 { return "DangerouslySetInnerHTML" }
 func (r *DangerouslySetInnerHTML) Description() string          { return "Detects React dangerouslySetInnerHTML usage that may lead to XSS" }
 func (r *DangerouslySetInnerHTML) DefaultSeverity() rules.Severity { return rules.High }
@@ -272,11 +272,11 @@ func (r *DangerouslySetInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-003: DocumentWrite ----------
+// ---------- BATOU-XSS-003: DocumentWrite ----------
 
 type DocumentWrite struct{}
 
-func (r *DocumentWrite) ID() string                   { return "GTSS-XSS-003" }
+func (r *DocumentWrite) ID() string                   { return "BATOU-XSS-003" }
 func (r *DocumentWrite) Name() string                 { return "DocumentWrite" }
 func (r *DocumentWrite) Description() string          { return "Detects document.write/writeln calls with dynamic content" }
 func (r *DocumentWrite) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -309,11 +309,11 @@ func (r *DocumentWrite) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-004: UnescapedTemplateOutput ----------
+// ---------- BATOU-XSS-004: UnescapedTemplateOutput ----------
 
 type UnescapedTemplateOutput struct{}
 
-func (r *UnescapedTemplateOutput) ID() string                   { return "GTSS-XSS-004" }
+func (r *UnescapedTemplateOutput) ID() string                   { return "BATOU-XSS-004" }
 func (r *UnescapedTemplateOutput) Name() string                 { return "UnescapedTemplateOutput" }
 func (r *UnescapedTemplateOutput) Description() string          { return "Detects template engines outputting unescaped content" }
 func (r *UnescapedTemplateOutput) DefaultSeverity() rules.Severity { return rules.High }
@@ -388,11 +388,11 @@ func (r *UnescapedTemplateOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-005: DOMManipulation ----------
+// ---------- BATOU-XSS-005: DOMManipulation ----------
 
 type DOMManipulation struct{}
 
-func (r *DOMManipulation) ID() string                   { return "GTSS-XSS-005" }
+func (r *DOMManipulation) ID() string                   { return "BATOU-XSS-005" }
 func (r *DOMManipulation) Name() string                 { return "DOMManipulation" }
 func (r *DOMManipulation) Description() string          { return "Detects risky DOM APIs that can lead to XSS when used with user-controlled data" }
 func (r *DOMManipulation) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -477,11 +477,11 @@ func (r *DOMManipulation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-006: ResponseHeaderInjection ----------
+// ---------- BATOU-XSS-006: ResponseHeaderInjection ----------
 
 type ResponseHeaderInjection struct{}
 
-func (r *ResponseHeaderInjection) ID() string                   { return "GTSS-XSS-006" }
+func (r *ResponseHeaderInjection) ID() string                   { return "BATOU-XSS-006" }
 func (r *ResponseHeaderInjection) Name() string                 { return "ResponseHeaderInjection" }
 func (r *ResponseHeaderInjection) Description() string          { return "Detects HTTP response headers set with unsanitized input" }
 func (r *ResponseHeaderInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -539,11 +539,11 @@ func (r *ResponseHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-007: URLSchemeInjection ----------
+// ---------- BATOU-XSS-007: URLSchemeInjection ----------
 
 type URLSchemeInjection struct{}
 
-func (r *URLSchemeInjection) ID() string                   { return "GTSS-XSS-007" }
+func (r *URLSchemeInjection) ID() string                   { return "BATOU-XSS-007" }
 func (r *URLSchemeInjection) Name() string                 { return "URLSchemeInjection" }
 func (r *URLSchemeInjection) Description() string          { return "Detects javascript: protocol in URLs and dynamic href/src without protocol validation" }
 func (r *URLSchemeInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -606,11 +606,11 @@ func (r *URLSchemeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-008: ServerSideRenderingXSS ----------
+// ---------- BATOU-XSS-008: ServerSideRenderingXSS ----------
 
 type ServerSideRenderingXSS struct{}
 
-func (r *ServerSideRenderingXSS) ID() string                   { return "GTSS-XSS-008" }
+func (r *ServerSideRenderingXSS) ID() string                   { return "BATOU-XSS-008" }
 func (r *ServerSideRenderingXSS) Name() string                 { return "ServerSideRenderingXSS" }
 func (r *ServerSideRenderingXSS) Description() string          { return "Detects server-side rendering without escaping across Python, Java, Go, Ruby, and C#" }
 func (r *ServerSideRenderingXSS) DefaultSeverity() rules.Severity { return rules.High }
@@ -695,11 +695,11 @@ func (r *ServerSideRenderingXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-009: MissingContentType ----------
+// ---------- BATOU-XSS-009: MissingContentType ----------
 
 type MissingContentType struct{}
 
-func (r *MissingContentType) ID() string                   { return "GTSS-XSS-009" }
+func (r *MissingContentType) ID() string                   { return "BATOU-XSS-009" }
 func (r *MissingContentType) Name() string                 { return "MissingContentType" }
 func (r *MissingContentType) Description() string          { return "Detects HTML-like content written to HTTP responses without Content-Type header" }
 func (r *MissingContentType) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -742,11 +742,11 @@ func (r *MissingContentType) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-010: JSONContentTypeXSS ----------
+// ---------- BATOU-XSS-010: JSONContentTypeXSS ----------
 
 type JSONContentTypeXSS struct{}
 
-func (r *JSONContentTypeXSS) ID() string                   { return "GTSS-XSS-010" }
+func (r *JSONContentTypeXSS) ID() string                   { return "BATOU-XSS-010" }
 func (r *JSONContentTypeXSS) Name() string                 { return "JSONContentTypeXSS" }
 func (r *JSONContentTypeXSS) Description() string          { return "Detects JSON responses with user data sent without proper application/json Content-Type" }
 func (r *JSONContentTypeXSS) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -789,11 +789,11 @@ func (r *JSONContentTypeXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-011: ReflectedXSS ----------
+// ---------- BATOU-XSS-011: ReflectedXSS ----------
 
 type ReflectedXSS struct{}
 
-func (r *ReflectedXSS) ID() string                   { return "GTSS-XSS-011" }
+func (r *ReflectedXSS) ID() string                   { return "BATOU-XSS-011" }
 func (r *ReflectedXSS) Name() string                 { return "ReflectedXSS" }
 func (r *ReflectedXSS) Description() string          { return "Detects direct reflection of request parameters in HTTP response body" }
 func (r *ReflectedXSS) DefaultSeverity() rules.Severity { return rules.High }
@@ -879,12 +879,12 @@ func (r *ReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XSS-013: Python f-string HTML Building
+// BATOU-XSS-013: Python f-string HTML Building
 // ---------------------------------------------------------------------------
 
 type PythonFStringHTML struct{}
 
-func (r *PythonFStringHTML) ID() string                     { return "GTSS-XSS-013" }
+func (r *PythonFStringHTML) ID() string                     { return "BATOU-XSS-013" }
 func (r *PythonFStringHTML) Name() string                   { return "PythonFStringHTML" }
 func (r *PythonFStringHTML) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PythonFStringHTML) Description() string {
@@ -957,11 +957,11 @@ func (r *PythonFStringHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-014: JavaHTMLStringConcat ----------
+// ---------- BATOU-XSS-014: JavaHTMLStringConcat ----------
 
 type JavaHTMLStringConcat struct{}
 
-func (r *JavaHTMLStringConcat) ID() string                      { return "GTSS-XSS-014" }
+func (r *JavaHTMLStringConcat) ID() string                      { return "BATOU-XSS-014" }
 func (r *JavaHTMLStringConcat) Name() string                    { return "JavaHTMLStringConcat" }
 func (r *JavaHTMLStringConcat) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JavaHTMLStringConcat) Description() string {
@@ -1033,11 +1033,11 @@ func (r *JavaHTMLStringConcat) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- GTSS-XSS-015: JavaResponseWriterXSS ----------
+// ---------- BATOU-XSS-015: JavaResponseWriterXSS ----------
 
 type JavaResponseWriterXSS struct{}
 
-func (r *JavaResponseWriterXSS) ID() string                      { return "GTSS-XSS-015" }
+func (r *JavaResponseWriterXSS) ID() string                      { return "BATOU-XSS-015" }
 func (r *JavaResponseWriterXSS) Name() string                    { return "JavaResponseWriterXSS" }
 func (r *JavaResponseWriterXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JavaResponseWriterXSS) Description() string {

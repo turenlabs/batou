@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides security scanning for Kotlin code, covering Android applications (SQLite, WebView, Intent, SharedPreferences, exported components), Ktor server-side applications, Spring Boot Kotlin, and kotlinx.serialization. Analysis includes four layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
+Batou provides security scanning for Kotlin code, covering Android applications (SQLite, WebView, Intent, SharedPreferences, exported components), Ktor server-side applications, Spring Boot Kotlin, and kotlinx.serialization. Analysis includes four layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
 
 Kotlin taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `property_declaration` assignments, `call_expression` nodes, and `navigation_expression` member accesses by walking the parsed AST. The walker handles Kotlin-specific patterns such as nested `variable_declaration` wrappers and `simple_identifier` nodes.
 
@@ -200,14 +200,14 @@ Rules that explicitly include Kotlin in their `Languages()` method, plus rules w
 
 | Rule ID | Name | What It Detects | Severity |
 |---|---|---|---|
-| `GTSS-KT-001` | AndroidSQLInjection | `rawQuery()` / `execSQL()` with string concatenation or Kotlin string template interpolation (`${ }`) | Critical |
-| `GTSS-KT-002` | AndroidIntentInjection | Implicit intents with user-controlled data via `sendBroadcast()` or `startActivity()` with `putExtra()` / `setData()` | High |
-| `GTSS-KT-003` | WebViewJSInjection | `loadUrl("javascript:..." + input)`, `loadUrl("javascript:...${input}")`, `evaluateJavascript()` with concatenation, `addJavascriptInterface()` | Critical |
-| `GTSS-KT-004` | InsecureSharedPreferences | Sensitive data (passwords, tokens, API keys, secrets) stored in unencrypted `SharedPreferences` without `EncryptedSharedPreferences` | High |
-| `GTSS-KT-005` | ExportedComponents | AndroidManifest.xml components with `android:exported="true"` without `android:permission` protection | Medium |
-| `GTSS-KT-006` | KtorCORSMisconfig | Ktor CORS plugin with `anyHost()`, especially combined with `allowCredentials = true` | Medium |
-| `GTSS-KT-007` | UnsafeCoroutineException | `GlobalScope.launch { }` / `GlobalScope.async { }` without `CoroutineExceptionHandler` or `SupervisorJob` | Medium |
-| `GTSS-KT-008` | KotlinSerializationUntrusted | `Json.decodeFromString()` in context with user input sources (Ktor, Spring, Android intents) | High |
+| `BATOU-KT-001` | AndroidSQLInjection | `rawQuery()` / `execSQL()` with string concatenation or Kotlin string template interpolation (`${ }`) | Critical |
+| `BATOU-KT-002` | AndroidIntentInjection | Implicit intents with user-controlled data via `sendBroadcast()` or `startActivity()` with `putExtra()` / `setData()` | High |
+| `BATOU-KT-003` | WebViewJSInjection | `loadUrl("javascript:..." + input)`, `loadUrl("javascript:...${input}")`, `evaluateJavascript()` with concatenation, `addJavascriptInterface()` | Critical |
+| `BATOU-KT-004` | InsecureSharedPreferences | Sensitive data (passwords, tokens, API keys, secrets) stored in unencrypted `SharedPreferences` without `EncryptedSharedPreferences` | High |
+| `BATOU-KT-005` | ExportedComponents | AndroidManifest.xml components with `android:exported="true"` without `android:permission` protection | Medium |
+| `BATOU-KT-006` | KtorCORSMisconfig | Ktor CORS plugin with `anyHost()`, especially combined with `allowCredentials = true` | Medium |
+| `BATOU-KT-007` | UnsafeCoroutineException | `GlobalScope.launch { }` / `GlobalScope.async { }` without `CoroutineExceptionHandler` or `SupervisorJob` | Medium |
+| `BATOU-KT-008` | KotlinSerializationUntrusted | `Json.decodeFromString()` in context with user input sources (Ktor, Spring, Android intents) | High |
 
 ### Cross-Language Rules Applicable to Kotlin
 
@@ -215,58 +215,58 @@ Rules with `LangAny` that also apply when scanning `.kt` files:
 
 | Rule ID | Name | What It Detects |
 |---|---|---|
-| `GTSS-INJ-001` | SQLInjection | SQL queries built via string concatenation |
-| `GTSS-INJ-002` | CommandInjection | OS command construction with unsanitized input |
-| `GTSS-SEC-001` | HardcodedPassword | Hardcoded passwords and credentials |
-| `GTSS-SEC-002` | APIKeyExposure | Hardcoded API keys from known providers |
-| `GTSS-SEC-003` | PrivateKeyInCode | PEM-encoded private keys in source |
-| `GTSS-SEC-004` | ConnectionString | Database connection strings with credentials |
-| `GTSS-TRV-001` | PathTraversal | File operations with unsanitized user input |
-| `GTSS-GEN-001` | DebugModeEnabled | Debug mode left enabled |
-| `GTSS-CRY-001` | WeakHashing | Broken hash algorithms used for security |
-| `GTSS-AUTH-007` | PrivilegeEscalation | Privilege escalation patterns (CWE-269) |
-| `GTSS-GEN-012` | InsecureDownload | Insecure download patterns (CWE-494) |
-| `GTSS-MISC-003` | MissingSecurityHeaders | Missing security headers (CWE-1021, CWE-693) |
-| `GTSS-VAL-005` | FileUploadHardening | File upload hardening (CWE-434) |
+| `BATOU-INJ-001` | SQLInjection | SQL queries built via string concatenation |
+| `BATOU-INJ-002` | CommandInjection | OS command construction with unsanitized input |
+| `BATOU-SEC-001` | HardcodedPassword | Hardcoded passwords and credentials |
+| `BATOU-SEC-002` | APIKeyExposure | Hardcoded API keys from known providers |
+| `BATOU-SEC-003` | PrivateKeyInCode | PEM-encoded private keys in source |
+| `BATOU-SEC-004` | ConnectionString | Database connection strings with credentials |
+| `BATOU-TRV-001` | PathTraversal | File operations with unsanitized user input |
+| `BATOU-GEN-001` | DebugModeEnabled | Debug mode left enabled |
+| `BATOU-CRY-001` | WeakHashing | Broken hash algorithms used for security |
+| `BATOU-AUTH-007` | PrivilegeEscalation | Privilege escalation patterns (CWE-269) |
+| `BATOU-GEN-012` | InsecureDownload | Insecure download patterns (CWE-494) |
+| `BATOU-MISC-003` | MissingSecurityHeaders | Missing security headers (CWE-1021, CWE-693) |
+| `BATOU-VAL-005` | FileUploadHardening | File upload hardening (CWE-434) |
 
 ## Example Detections
 
 ### Android SQL Injection via String Template
 
-GTSS flags `rawQuery()` with Kotlin string template interpolation:
+Batou flags `rawQuery()` with Kotlin string template interpolation:
 
 ```kotlin
-// DETECTED: GTSS-KT-001 + taint flow kotlin.android.intent.getstringextra -> kotlin.android.rawquery
+// DETECTED: BATOU-KT-001 + taint flow kotlin.android.intent.getstringextra -> kotlin.android.rawquery
 val userId = intent.getStringExtra("id")
 val cursor = db.rawQuery("SELECT * FROM users WHERE id = ${userId}", null)
 ```
 
 ### WebView JavaScript Injection
 
-GTSS detects `loadUrl("javascript:...")` with string concatenation:
+Batou detects `loadUrl("javascript:...")` with string concatenation:
 
 ```kotlin
-// DETECTED: GTSS-KT-003
+// DETECTED: BATOU-KT-003
 val userInput = editText.text.toString()
 webView.loadUrl("javascript:updateField('" + userInput + "')")
 ```
 
 ### Insecure SharedPreferences
 
-GTSS catches sensitive data stored in unencrypted SharedPreferences:
+Batou catches sensitive data stored in unencrypted SharedPreferences:
 
 ```kotlin
-// DETECTED: GTSS-KT-004
+// DETECTED: BATOU-KT-004
 val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
 prefs.edit().putString("password", password).apply()
 ```
 
 ### Ktor CORS Misconfiguration
 
-GTSS detects overly permissive CORS with credentials:
+Batou detects overly permissive CORS with credentials:
 
 ```kotlin
-// DETECTED: GTSS-KT-006
+// DETECTED: BATOU-KT-006
 install(CORS) {
     anyHost()
     allowCredentials = true
@@ -277,7 +277,7 @@ install(CORS) {
 
 ### Parameterized SQLite Query
 
-GTSS recognizes `rawQuery` with `arrayOf()` selection args as safe:
+Batou recognizes `rawQuery` with `arrayOf()` selection args as safe:
 
 ```kotlin
 // SAFE: parameterized query with selection args
@@ -286,7 +286,7 @@ val cursor = db.rawQuery("SELECT * FROM users WHERE id = ?", arrayOf(userId))
 
 ### Room DAO
 
-GTSS recognizes Room `@Query` annotations as parameterized:
+Batou recognizes Room `@Query` annotations as parameterized:
 
 ```kotlin
 // SAFE: Room DAO with parameterized query
@@ -299,7 +299,7 @@ interface UserDao {
 
 ### EncryptedSharedPreferences
 
-GTSS recognizes `EncryptedSharedPreferences` as a safe storage mechanism:
+Batou recognizes `EncryptedSharedPreferences` as a safe storage mechanism:
 
 ```kotlin
 // SAFE: encrypted storage for sensitive data
@@ -313,7 +313,7 @@ prefs.edit().putString("password", password).apply()
 
 ### Structured Concurrency
 
-GTSS does not flag structured concurrency scopes (viewModelScope, lifecycleScope, coroutineScope):
+Batou does not flag structured concurrency scopes (viewModelScope, lifecycleScope, coroutineScope):
 
 ```kotlin
 // SAFE: structured concurrency with proper exception handling

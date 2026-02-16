@@ -3,8 +3,8 @@ package swiftast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // SwiftASTAnalyzer performs AST-based security analysis of Swift source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&SwiftASTAnalyzer{})
 }
 
-func (s *SwiftASTAnalyzer) ID() string                        { return "GTSS-SWIFT-AST" }
+func (s *SwiftASTAnalyzer) ID() string                        { return "BATOU-SWIFT-AST" }
 func (s *SwiftASTAnalyzer) Name() string                      { return "Swift AST Security Analyzer" }
 func (s *SwiftASTAnalyzer) DefaultSeverity() rules.Severity   { return rules.High }
 func (s *SwiftASTAnalyzer) Languages() []rules.Language        { return []rules.Language{rules.LangSwift} }
@@ -84,7 +84,7 @@ func (c *swiftChecker) checkSQLiteInjection(n *ast.Node) {
 	for _, arg := range args {
 		if containsSwiftInterpolation(arg) {
 			c.findings = append(c.findings, rules.Finding{
-				RuleID:        "GTSS-SWIFT-AST-001",
+				RuleID:        "BATOU-SWIFT-AST-001",
 				Severity:      rules.Critical,
 				SeverityLabel: rules.Critical.String(),
 				Title:         "SQL injection via " + funcName,
@@ -107,7 +107,7 @@ func (c *swiftChecker) checkSQLiteInjection(n *ast.Node) {
 			// Only flag if the variable name suggests SQL
 			if strings.Contains(argText, "query") || strings.Contains(argText, "sql") || strings.Contains(argText, "stmt") {
 				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "GTSS-SWIFT-AST-001",
+					RuleID:        "BATOU-SWIFT-AST-001",
 					Severity:      rules.High,
 					SeverityLabel: rules.High.String(),
 					Title:         "Potential SQL injection via variable query in " + funcName,
@@ -136,7 +136,7 @@ func (c *swiftChecker) checkUIWebView(n *ast.Node) {
 	}
 
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-SWIFT-AST-002",
+		RuleID:        "BATOU-SWIFT-AST-002",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "Deprecated UIWebView usage",
@@ -184,7 +184,7 @@ func (c *swiftChecker) checkUserDefaultsSensitive(n *ast.Node) {
 		}
 		if isSensitive {
 			c.findings = append(c.findings, rules.Finding{
-				RuleID:        "GTSS-SWIFT-AST-003",
+				RuleID:        "BATOU-SWIFT-AST-003",
 				Severity:      rules.High,
 				SeverityLabel: rules.High.String(),
 				Title:         "Sensitive data stored in UserDefaults",
@@ -213,7 +213,7 @@ func (c *swiftChecker) checkProcessExecution(n *ast.Node) {
 
 	// Just flag the creation - we also check assignments to launchPath/arguments
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-SWIFT-AST-004",
+		RuleID:        "BATOU-SWIFT-AST-004",
 		Severity:      rules.Medium,
 		SeverityLabel: rules.Medium.String(),
 		Title:         "Process/NSTask usage detected",
@@ -259,7 +259,7 @@ func (c *swiftChecker) checkProcessAssignment(n *ast.Node) {
 			label = "arguments"
 		}
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-SWIFT-AST-004",
+			RuleID:        "BATOU-SWIFT-AST-004",
 			Severity:      rules.High,
 			SeverityLabel: rules.High.String(),
 			Title:         "Process " + label + " set from variable",

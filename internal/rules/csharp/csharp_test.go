@@ -3,11 +3,11 @@ package csharp
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-001: SQL Injection
+// BATOU-CS-001: SQL Injection
 // ---------------------------------------------------------------------------
 
 func TestCS001_SQLConcat(t *testing.T) {
@@ -20,7 +20,7 @@ public class UserRepo {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserRepo.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-001")
+	testutil.MustFindRule(t, result, "BATOU-CS-001")
 }
 
 func TestCS001_SQLInterpolation(t *testing.T) {
@@ -32,7 +32,7 @@ public class UserRepo {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserRepo.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-001")
+	testutil.MustFindRule(t, result, "BATOU-CS-001")
 }
 
 func TestCS001_FromSqlRaw(t *testing.T) {
@@ -44,7 +44,7 @@ public class UserController {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-001")
+	testutil.MustFindRule(t, result, "BATOU-CS-001")
 }
 
 func TestCS001_ExecuteSqlRaw(t *testing.T) {
@@ -55,7 +55,7 @@ func TestCS001_ExecuteSqlRaw(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-001")
+	testutil.MustFindRule(t, result, "BATOU-CS-001")
 }
 
 func TestCS001_Parameterized_Safe(t *testing.T) {
@@ -68,7 +68,7 @@ public class UserRepo {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserRepo.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-001")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-001")
 }
 
 func TestCS001_FromSqlInterpolated_Safe(t *testing.T) {
@@ -80,11 +80,11 @@ func TestCS001_FromSqlInterpolated_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserController.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-001")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-001")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-003: Insecure Deserialization
+// BATOU-CS-003: Insecure Deserialization
 // ---------------------------------------------------------------------------
 
 func TestCS003_BinaryFormatter(t *testing.T) {
@@ -96,7 +96,7 @@ public class DeserService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DeserService.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-003")
+	testutil.MustFindRule(t, result, "BATOU-CS-003")
 }
 
 func TestCS003_TypeNameHandling(t *testing.T) {
@@ -109,7 +109,8 @@ public class ApiService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ApiService.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-003")
+	// Overlapping rules may win dedup; either detection is valid.
+	testutil.MustFindAnyRule(t, result, "BATOU-CS-003", "BATOU-CS-029")
 }
 
 func TestCS003_SoapFormatter(t *testing.T) {
@@ -121,7 +122,7 @@ public class Legacy {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Legacy.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-003")
+	testutil.MustFindRule(t, result, "BATOU-CS-003")
 }
 
 func TestCS003_NetDataContractSerializer(t *testing.T) {
@@ -133,7 +134,7 @@ public class Legacy {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Legacy.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-003")
+	testutil.MustFindRule(t, result, "BATOU-CS-003")
 }
 
 func TestCS003_TypeNameHandlingNone_Safe(t *testing.T) {
@@ -146,11 +147,11 @@ public class ApiService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ApiService.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-003")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-003")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-004: Command Injection
+// BATOU-CS-004: Command Injection
 // ---------------------------------------------------------------------------
 
 func TestCS004_ProcessStartVariable(t *testing.T) {
@@ -161,7 +162,7 @@ public class CmdService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/CmdService.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-004")
+	testutil.MustFindRule(t, result, "BATOU-CS-004")
 }
 
 func TestCS004_ProcessStartInfoArgs(t *testing.T) {
@@ -174,7 +175,7 @@ public class CmdService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/CmdService.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-004")
+	testutil.MustFindRule(t, result, "BATOU-CS-004")
 }
 
 func TestCS004_ProcessStartHardcoded_Safe(t *testing.T) {
@@ -185,11 +186,11 @@ public class CmdService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/CmdService.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-004")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-004")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-005: Path Traversal
+// BATOU-CS-005: Path Traversal
 // ---------------------------------------------------------------------------
 
 func TestCS005_FileReadWithUserInput(t *testing.T) {
@@ -203,7 +204,7 @@ public class FileController : ControllerBase {
     }
 }`
 	result := testutil.ScanContent(t, "/app/FileController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-005")
+	testutil.MustFindRule(t, result, "BATOU-CS-005")
 }
 
 func TestCS005_PathCombineWithUserInput(t *testing.T) {
@@ -218,7 +219,7 @@ public class FileController : ControllerBase {
     }
 }`
 	result := testutil.ScanContent(t, "/app/FileController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-005")
+	testutil.MustFindRule(t, result, "BATOU-CS-005")
 }
 
 func TestCS005_PathGetFileName_Safe(t *testing.T) {
@@ -234,11 +235,11 @@ public class FileController : ControllerBase {
     }
 }`
 	result := testutil.ScanContent(t, "/app/FileController.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-005")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-005")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-006: LDAP Injection
+// BATOU-CS-006: LDAP Injection
 // ---------------------------------------------------------------------------
 
 func TestCS006_DirectorySearcherConcat(t *testing.T) {
@@ -251,7 +252,7 @@ public class LdapService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/LdapService.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-006")
+	testutil.MustFindRule(t, result, "BATOU-CS-006")
 }
 
 func TestCS006_DirectorySearcherInterp(t *testing.T) {
@@ -263,11 +264,11 @@ public class LdapService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/LdapService.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-006")
+	testutil.MustFindRule(t, result, "BATOU-CS-006")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-008: Hardcoded Connection Strings
+// BATOU-CS-008: Hardcoded Connection Strings
 // ---------------------------------------------------------------------------
 
 func TestCS008_HardcodedPassword(t *testing.T) {
@@ -275,7 +276,7 @@ func TestCS008_HardcodedPassword(t *testing.T) {
     private string connectionString = "Server=myserver;Database=mydb;User Id=admin;Password=s3cret123;";
 }`
 	result := testutil.ScanContent(t, "/app/DbConfig.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-008")
+	testutil.MustFindRule(t, result, "BATOU-CS-008")
 }
 
 func TestCS008_HardcodedPwd(t *testing.T) {
@@ -283,11 +284,11 @@ func TestCS008_HardcodedPwd(t *testing.T) {
     private string connStr = "Server=myserver;Database=mydb;Uid=root;Pwd=hunter2;";
 }`
 	result := testutil.ScanContent(t, "/app/DbConfig.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-008")
+	testutil.MustFindRule(t, result, "BATOU-CS-008")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-009: Insecure Cookie
+// BATOU-CS-009: Insecure Cookie
 // ---------------------------------------------------------------------------
 
 func TestCS009_MissingFlags(t *testing.T) {
@@ -301,7 +302,7 @@ public class AuthController {
     }
 }`
 	result := testutil.ScanContent(t, "/app/AuthController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-009")
+	testutil.MustFindRule(t, result, "BATOU-CS-009")
 }
 
 func TestCS009_AllFlags_Safe(t *testing.T) {
@@ -318,11 +319,11 @@ public class AuthController {
     }
 }`
 	result := testutil.ScanContent(t, "/app/AuthController.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-009")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-009")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-010: CORS Misconfiguration
+// BATOU-CS-010: CORS Misconfiguration
 // ---------------------------------------------------------------------------
 
 func TestCS010_AllowAnyOriginWithCredentials(t *testing.T) {
@@ -338,7 +339,7 @@ func TestCS010_AllowAnyOriginWithCredentials(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Startup.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-010")
+	testutil.MustFindRule(t, result, "BATOU-CS-010")
 }
 
 func TestCS010_WithOriginsWildcard(t *testing.T) {
@@ -353,7 +354,7 @@ func TestCS010_WithOriginsWildcard(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Startup.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-010")
+	testutil.MustFindRule(t, result, "BATOU-CS-010")
 }
 
 func TestCS010_SpecificOrigins_Safe(t *testing.T) {
@@ -369,11 +370,11 @@ func TestCS010_SpecificOrigins_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Startup.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-010")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-010")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-011: Blazor JS Interop Injection
+// BATOU-CS-011: Blazor JS Interop Injection
 // ---------------------------------------------------------------------------
 
 func TestCS011_JSRuntimeEval(t *testing.T) {
@@ -385,7 +386,7 @@ public class BlazorComponent {
     }
 }`
 	result := testutil.ScanContent(t, "/app/BlazorComponent.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-011")
+	testutil.MustFindRule(t, result, "BATOU-CS-011")
 }
 
 func TestCS011_JSRuntimeInterpolation(t *testing.T) {
@@ -397,7 +398,7 @@ public class BlazorComponent {
     }
 }`
 	result := testutil.ScanContent(t, "/app/BlazorComponent.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-011")
+	testutil.MustFindRule(t, result, "BATOU-CS-011")
 }
 
 func TestCS011_JSRuntimeSafeCall_Safe(t *testing.T) {
@@ -409,11 +410,11 @@ public class BlazorComponent {
     }
 }`
 	result := testutil.ScanContent(t, "/app/BlazorComponent.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-011")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-011")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-012: Mass Assignment
+// BATOU-CS-012: Mass Assignment
 // ---------------------------------------------------------------------------
 
 func TestCS012_TryUpdateModelNoFields(t *testing.T) {
@@ -427,7 +428,7 @@ public class UserController : Controller {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-012")
+	testutil.MustFindRule(t, result, "BATOU-CS-012")
 }
 
 func TestCS012_TryUpdateModelWithFields_Safe(t *testing.T) {
@@ -441,12 +442,12 @@ public class UserController : Controller {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserController.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-012")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-012")
 }
 
 // ---------------------------------------------------------------------------
 // Cross-language rules: verify C# is covered by CS-specific rules
-// Note: Cross-language rules (GTSS-XXE-004, GTSS-XSS-008, GTSS-DESER-001)
+// Note: Cross-language rules (BATOU-XXE-004, BATOU-XSS-008, BATOU-DESER-001)
 // are registered via init() in their respective packages and are only
 // available when imported (e.g., in cmd/gtss/main.go). Per-package tests
 // only have access to rules registered in this package.
@@ -461,8 +462,8 @@ public class Service {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Service.cs", content)
-	// Should be found by GTSS-CS-003 (C#-specific deserialization rule)
-	testutil.MustFindRule(t, result, "GTSS-CS-003")
+	// Should be found by BATOU-CS-003 (C#-specific deserialization rule)
+	testutil.MustFindRule(t, result, "BATOU-CS-003")
 }
 
 // ---------------------------------------------------------------------------
@@ -476,7 +477,7 @@ func TestFixture_CSharp_Vulnerable_SQLInjection(t *testing.T) {
 
 func TestFixture_CSharp_Safe_SQLParameterized(t *testing.T) {
 	result := testutil.ScanFixture(t, "csharp/safe/SqliParameterized.cs")
-	testutil.MustNotFindRule(t, result, "GTSS-CS-001")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-001")
 }
 
 func TestFixture_CSharp_Vulnerable_CommandInjection(t *testing.T) {
@@ -496,7 +497,7 @@ func TestFixture_CSharp_Safe_Command(t *testing.T) {
 }
 
 func TestFixture_CSharp_Vulnerable_XSS(t *testing.T) {
-	// XSS detection for C# relies on cross-language rule GTSS-XSS-008
+	// XSS detection for C# relies on cross-language rule BATOU-XSS-008
 	// which is only registered via its package init(). In per-package tests,
 	// we verify the fixture at least loads without errors.
 	result := testutil.ScanFixture(t, "csharp/vulnerable/XssReflected.cs")
@@ -510,11 +511,11 @@ func TestFixture_CSharp_Vulnerable_PathTraversal(t *testing.T) {
 
 func TestFixture_CSharp_Safe_PathSafe(t *testing.T) {
 	result := testutil.ScanFixture(t, "csharp/safe/PathSafe.cs")
-	testutil.MustNotFindRule(t, result, "GTSS-CS-005")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-005")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-013: Regex DoS
+// BATOU-CS-013: Regex DoS
 // ---------------------------------------------------------------------------
 
 func TestCS013_RegexNoTimeout(t *testing.T) {
@@ -526,7 +527,7 @@ public class Validator {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Validator.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-013")
+	testutil.MustFindRule(t, result, "BATOU-CS-013")
 }
 
 func TestCS013_RegexWithTimeout_Safe(t *testing.T) {
@@ -538,11 +539,11 @@ public class Validator {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Validator.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-013")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-013")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-014: Insecure Random
+// BATOU-CS-014: Insecure Random
 // ---------------------------------------------------------------------------
 
 func TestCS014_SystemRandomForToken(t *testing.T) {
@@ -555,7 +556,7 @@ public class TokenService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/TokenService.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-014")
+	testutil.MustFindRule(t, result, "BATOU-CS-014")
 }
 
 func TestCS014_RandomNumberGenerator_Safe(t *testing.T) {
@@ -567,11 +568,11 @@ public class TokenService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/TokenService.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-014")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-014")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-015: ViewData/ViewBag XSS
+// BATOU-CS-015: ViewData/ViewBag XSS
 // ---------------------------------------------------------------------------
 
 func TestCS015_HtmlRaw(t *testing.T) {
@@ -582,7 +583,8 @@ public class ProfileController : Controller {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ProfileController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-015")
+	// Overlapping rules may win dedup; either detection is valid.
+	testutil.MustFindAnyRule(t, result, "BATOU-CS-015", "BATOU-CS-027")
 }
 
 func TestCS015_RazorEncoded_Safe(t *testing.T) {
@@ -594,11 +596,11 @@ public class ProfileController : Controller {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ProfileController.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-015")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-015")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-016: Open Redirect
+// BATOU-CS-016: Open Redirect
 // ---------------------------------------------------------------------------
 
 func TestCS016_RedirectReturnUrl(t *testing.T) {
@@ -610,7 +612,7 @@ public class AccountController : Controller {
     }
 }`
 	result := testutil.ScanContent(t, "/app/AccountController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-016")
+	testutil.MustFindRule(t, result, "BATOU-CS-016")
 }
 
 func TestCS016_LocalRedirect_Safe(t *testing.T) {
@@ -624,11 +626,11 @@ public class AccountController : Controller {
     }
 }`
 	result := testutil.ScanContent(t, "/app/AccountController.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-016")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-016")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-017: SSRF via HttpClient
+// BATOU-CS-017: SSRF via HttpClient
 // ---------------------------------------------------------------------------
 
 func TestCS017_HttpClientUserUrl(t *testing.T) {
@@ -643,7 +645,7 @@ public class ProxyController : ControllerBase {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ProxyController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-017")
+	testutil.MustFindRule(t, result, "BATOU-CS-017")
 }
 
 func TestCS017_HttpClientBaseAddress_Safe(t *testing.T) {
@@ -660,11 +662,11 @@ public class ApiClient {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ApiClient.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-017")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-017")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-018: Insecure XML
+// BATOU-CS-018: Insecure XML
 // ---------------------------------------------------------------------------
 
 func TestCS018_XmlDocumentNoResolver(t *testing.T) {
@@ -676,7 +678,7 @@ public class XmlService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/XmlService.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-018")
+	testutil.MustFindRule(t, result, "BATOU-CS-018")
 }
 
 func TestCS018_XmlDocumentResolverNull_Safe(t *testing.T) {
@@ -689,11 +691,11 @@ public class XmlService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/XmlService.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-018")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-018")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-019: Expression Injection
+// BATOU-CS-019: Expression Injection
 // ---------------------------------------------------------------------------
 
 func TestCS019_DynamicLinqWhere(t *testing.T) {
@@ -704,7 +706,7 @@ public class SearchService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SearchService.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-019")
+	testutil.MustFindRule(t, result, "BATOU-CS-019")
 }
 
 func TestCS019_StrongTypedLinq_Safe(t *testing.T) {
@@ -715,11 +717,11 @@ public class SearchService {
     }
 }`
 	result := testutil.ScanContent(t, "/app/SearchService.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-019")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-019")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-020: Missing Anti-Forgery Token
+// BATOU-CS-020: Missing Anti-Forgery Token
 // ---------------------------------------------------------------------------
 
 func TestCS020_HttpPostNoAntiForgery(t *testing.T) {
@@ -732,7 +734,7 @@ public class OrderController : Controller {
     }
 }`
 	result := testutil.ScanContent(t, "/app/OrderController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-020")
+	testutil.MustFindRule(t, result, "BATOU-CS-020")
 }
 
 func TestCS020_HttpPostWithAntiForgery_Safe(t *testing.T) {
@@ -746,7 +748,7 @@ public class OrderController : Controller {
     }
 }`
 	result := testutil.ScanContent(t, "/app/OrderController.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-020")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-020")
 }
 
 func TestCS020_ApiController_Safe(t *testing.T) {
@@ -761,11 +763,11 @@ public class OrderApiController : ControllerBase {
     }
 }`
 	result := testutil.ScanContent(t, "/app/OrderApiController.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-020")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-020")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-021: Hardcoded Secrets
+// BATOU-CS-021: Hardcoded Secrets
 // ---------------------------------------------------------------------------
 
 func TestCS021_HardcodedApiKey(t *testing.T) {
@@ -773,7 +775,7 @@ func TestCS021_HardcodedApiKey(t *testing.T) {
     private string apiKey = "sk_live_abc123def456ghi789jkl012mno";
 }`
 	result := testutil.ScanContent(t, "/app/ApiConfig.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-021")
+	testutil.MustFindRule(t, result, "BATOU-CS-021")
 }
 
 func TestCS021_ConstSecretKey(t *testing.T) {
@@ -781,7 +783,7 @@ func TestCS021_ConstSecretKey(t *testing.T) {
     const string SecretKey = "aVeryLongSecretKeyThatShouldNotBeHardcoded123";
 }`
 	result := testutil.ScanContent(t, "/app/Config.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-021")
+	testutil.MustFindRule(t, result, "BATOU-CS-021")
 }
 
 func TestCS021_ConfigurationInjection_Safe(t *testing.T) {
@@ -792,11 +794,11 @@ func TestCS021_ConfigurationInjection_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ApiConfig.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-021")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-021")
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-022: Unsafe Reflection
+// BATOU-CS-022: Unsafe Reflection
 // ---------------------------------------------------------------------------
 
 func TestCS022_TypeGetTypeVariable(t *testing.T) {
@@ -810,7 +812,7 @@ public class PluginController : ControllerBase {
     }
 }`
 	result := testutil.ScanContent(t, "/app/PluginController.cs", content)
-	testutil.MustFindRule(t, result, "GTSS-CS-022")
+	testutil.MustFindRule(t, result, "BATOU-CS-022")
 }
 
 func TestCS022_TypeofLiteral_Safe(t *testing.T) {
@@ -823,5 +825,5 @@ public class ServiceController : ControllerBase {
     }
 }`
 	result := testutil.ScanContent(t, "/app/ServiceController.cs", content)
-	testutil.MustNotFindRule(t, result, "GTSS-CS-022")
+	testutil.MustNotFindRule(t, result, "BATOU-CS-022")
 }

@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
-// Compiled regex patterns for Groovy extension rules (GTSS-GVY-011 .. GTSS-GVY-016)
+// Compiled regex patterns for Groovy extension rules (BATOU-GVY-011 .. BATOU-GVY-016)
 // ---------------------------------------------------------------------------
 
 // GVY-011: GroovyShell.evaluate with user input
@@ -65,12 +65,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GVY-011: Groovy GroovyShell.evaluate with user input
+// BATOU-GVY-011: Groovy GroovyShell.evaluate with user input
 // ---------------------------------------------------------------------------
 
 type GroovyShellEvalUser struct{}
 
-func (r *GroovyShellEvalUser) ID() string                      { return "GTSS-GVY-011" }
+func (r *GroovyShellEvalUser) ID() string                      { return "BATOU-GVY-011" }
 func (r *GroovyShellEvalUser) Name() string                    { return "GroovyShellEvalUser" }
 func (r *GroovyShellEvalUser) Description() string             { return "Detects Groovy GroovyShell.evaluate() with user-controlled input (params, request, GString interpolation), enabling arbitrary code execution." }
 func (r *GroovyShellEvalUser) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -120,12 +120,12 @@ func (r *GroovyShellEvalUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GVY-012: Groovy GString SQL injection
+// BATOU-GVY-012: Groovy GString SQL injection
 // ---------------------------------------------------------------------------
 
 type GroovyGStringSQLInj struct{}
 
-func (r *GroovyGStringSQLInj) ID() string                      { return "GTSS-GVY-012" }
+func (r *GroovyGStringSQLInj) ID() string                      { return "BATOU-GVY-012" }
 func (r *GroovyGStringSQLInj) Name() string                    { return "GroovyGStringSQLInj" }
 func (r *GroovyGStringSQLInj) Description() string             { return "Detects Groovy GString interpolation (${}) in SQL queries including pre-built query strings with SQL keywords." }
 func (r *GroovyGStringSQLInj) DefaultSeverity() rules.Severity { return rules.High }
@@ -174,12 +174,12 @@ func (r *GroovyGStringSQLInj) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GVY-013: Groovy @Grab with untrusted coordinates
+// BATOU-GVY-013: Groovy @Grab with untrusted coordinates
 // ---------------------------------------------------------------------------
 
 type GroovyGrabUntrusted struct{}
 
-func (r *GroovyGrabUntrusted) ID() string                      { return "GTSS-GVY-013" }
+func (r *GroovyGrabUntrusted) ID() string                      { return "BATOU-GVY-013" }
 func (r *GroovyGrabUntrusted) Name() string                    { return "GroovyGrabUntrusted" }
 func (r *GroovyGrabUntrusted) Description() string             { return "Detects Groovy @Grab annotation with variable or interpolated coordinates that could load malicious dependencies." }
 func (r *GroovyGrabUntrusted) DefaultSeverity() rules.Severity { return rules.High }
@@ -231,12 +231,12 @@ func (r *GroovyGrabUntrusted) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GVY-014: Jenkins Groovy sandbox escape patterns
+// BATOU-GVY-014: Jenkins Groovy sandbox escape patterns
 // ---------------------------------------------------------------------------
 
 type GroovyJenkinsSandboxEscape struct{}
 
-func (r *GroovyJenkinsSandboxEscape) ID() string                      { return "GTSS-GVY-014" }
+func (r *GroovyJenkinsSandboxEscape) ID() string                      { return "BATOU-GVY-014" }
 func (r *GroovyJenkinsSandboxEscape) Name() string                    { return "GroovyJenkinsSandboxEscape" }
 func (r *GroovyJenkinsSandboxEscape) Description() string             { return "Detects Jenkins Groovy sandbox escape patterns: reflection, metaClass manipulation, Class.forName, and getDeclaredMethod." }
 func (r *GroovyJenkinsSandboxEscape) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -291,12 +291,12 @@ func (r *GroovyJenkinsSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Findin
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GVY-015: Groovy new GroovyClassLoader with user input
+// BATOU-GVY-015: Groovy new GroovyClassLoader with user input
 // ---------------------------------------------------------------------------
 
 type GroovyClassLoaderUser struct{}
 
-func (r *GroovyClassLoaderUser) ID() string                      { return "GTSS-GVY-015" }
+func (r *GroovyClassLoaderUser) ID() string                      { return "BATOU-GVY-015" }
 func (r *GroovyClassLoaderUser) Name() string                    { return "GroovyClassLoaderUser" }
 func (r *GroovyClassLoaderUser) Description() string             { return "Detects Groovy GroovyClassLoader.parseClass/loadClass with user input, enabling arbitrary class loading and code execution." }
 func (r *GroovyClassLoaderUser) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -352,12 +352,12 @@ func (r *GroovyClassLoaderUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GVY-016: Groovy XmlSlurper without DTD protection
+// BATOU-GVY-016: Groovy XmlSlurper without DTD protection
 // ---------------------------------------------------------------------------
 
 type GroovyXmlSlurperDTD struct{}
 
-func (r *GroovyXmlSlurperDTD) ID() string                      { return "GTSS-GVY-016" }
+func (r *GroovyXmlSlurperDTD) ID() string                      { return "BATOU-GVY-016" }
 func (r *GroovyXmlSlurperDTD) Name() string                    { return "GroovyXmlSlurperDTD" }
 func (r *GroovyXmlSlurperDTD) Description() string             { return "Detects Groovy XmlSlurper parsing user input without disabling external entity processing (XXE)." }
 func (r *GroovyXmlSlurperDTD) DefaultSeverity() rules.Severity { return rules.High }

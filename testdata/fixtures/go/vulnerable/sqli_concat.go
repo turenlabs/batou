@@ -7,7 +7,7 @@ import (
 )
 
 // VULN: SQL injection via string concatenation in db.Query.
-// Should trigger GTSS-INJ-001 (SQL Injection).
+// Should trigger BATOU-INJ-001 (SQL Injection).
 
 func HandleSearch(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	term := r.URL.Query().Get("q")

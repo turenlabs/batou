@@ -1,24 +1,24 @@
-# GTSS Rule Evasion Analysis Report
+# Batou Rule Evasion Analysis Report
 
 **Date:** 2026-02-10
 **Scope:** All 11 rule categories (55+ individual rules)
-**Purpose:** Identify weaknesses in regex-based detection to harden GTSS before production deployment
+**Purpose:** Identify weaknesses in regex-based detection to harden Batou before production deployment
 
 ---
 
 ## Table of Contents
 
-1. [Injection Rules (GTSS-INJ-001 through INJ-007)](#1-injection-rules)
-2. [XSS Rules (GTSS-XSS-001 through XSS-011)](#2-xss-rules)
-3. [Path Traversal Rules (GTSS-TRV-001 through TRV-009)](#3-path-traversal-rules)
-4. [Cryptography Rules (GTSS-CRY-001 through CRY-011)](#4-cryptography-rules)
-5. [Secrets Rules (GTSS-SEC-001 through SEC-006)](#5-secrets-rules)
-6. [SSRF Rules (GTSS-SSRF-001 through SSRF-004)](#6-ssrf-rules)
-7. [Auth Rules (GTSS-AUTH-001 through AUTH-006)](#7-auth-rules)
-8. [Generic Rules (GTSS-GEN-001 through GEN-009)](#8-generic-rules)
-9. [Logging Rules (GTSS-LOG-001 through LOG-003)](#9-logging-rules)
-10. [Validation Rules (GTSS-VAL-001 through VAL-004)](#10-validation-rules)
-11. [Memory Rules (GTSS-MEM-001 through MEM-006)](#11-memory-rules)
+1. [Injection Rules (BATOU-INJ-001 through INJ-007)](#1-injection-rules)
+2. [XSS Rules (BATOU-XSS-001 through XSS-011)](#2-xss-rules)
+3. [Path Traversal Rules (BATOU-TRV-001 through TRV-009)](#3-path-traversal-rules)
+4. [Cryptography Rules (BATOU-CRY-001 through CRY-011)](#4-cryptography-rules)
+5. [Secrets Rules (BATOU-SEC-001 through SEC-006)](#5-secrets-rules)
+6. [SSRF Rules (BATOU-SSRF-001 through SSRF-004)](#6-ssrf-rules)
+7. [Auth Rules (BATOU-AUTH-001 through AUTH-006)](#7-auth-rules)
+8. [Generic Rules (BATOU-GEN-001 through GEN-009)](#8-generic-rules)
+9. [Logging Rules (BATOU-LOG-001 through LOG-003)](#9-logging-rules)
+10. [Validation Rules (BATOU-VAL-001 through VAL-004)](#10-validation-rules)
+11. [Memory Rules (BATOU-MEM-001 through MEM-006)](#11-memory-rules)
 12. [Cross-Cutting Evasion Techniques](#12-cross-cutting-evasion-techniques)
 13. [Summary and Risk Matrix](#13-summary-and-risk-matrix)
 
@@ -26,7 +26,7 @@
 
 ## 1. Injection Rules
 
-### GTSS-INJ-001: SQL Injection
+### BATOU-INJ-001: SQL Injection
 
 **Detection mechanism:** Matches SQL keywords (SELECT, INSERT, UPDATE, DELETE, etc.) inside string formatting/concatenation patterns (fmt.Sprintf, f-strings, .format(), `+` concat, template literals, PHP `$var`, Ruby `#{}`)
 
@@ -60,7 +60,7 @@
 
 ---
 
-### GTSS-INJ-002: Command Injection
+### BATOU-INJ-002: Command Injection
 
 **Detection mechanism:** Matches `os.system`, `subprocess` with `shell=True`, `exec.Command("sh", "-c")`, `child_process.exec`, `Runtime.exec`, etc.
 
@@ -98,7 +98,7 @@
 
 ---
 
-### GTSS-INJ-003: Code Injection
+### BATOU-INJ-003: Code Injection
 
 **Detection mechanism:** Matches `eval()`, `exec()`, `new Function()`, `compile()`, `setTimeout/setInterval` with string arg.
 
@@ -136,7 +136,7 @@
 
 ---
 
-### GTSS-INJ-004: LDAP Injection
+### BATOU-INJ-004: LDAP Injection
 
 **Evasion techniques:**
 
@@ -160,7 +160,7 @@
 
 ---
 
-### GTSS-INJ-005: Template Injection (SSTI)
+### BATOU-INJ-005: Template Injection (SSTI)
 
 **Evasion techniques:**
 
@@ -194,7 +194,7 @@
 
 ---
 
-### GTSS-INJ-006: XPath Injection
+### BATOU-INJ-006: XPath Injection
 
 **Evasion techniques:**
 
@@ -222,7 +222,7 @@
 
 ---
 
-### GTSS-INJ-007: NoSQL Injection
+### BATOU-INJ-007: NoSQL Injection
 
 **Evasion techniques:**
 
@@ -255,7 +255,7 @@
 
 ## 2. XSS Rules
 
-### GTSS-XSS-001: innerHTML Assignment
+### BATOU-XSS-001: innerHTML Assignment
 
 **Detection mechanism:** Matches `.innerHTML =` or `.outerHTML =` where the RHS is not a static string literal.
 
@@ -283,7 +283,7 @@
 
 ---
 
-### GTSS-XSS-002: dangerouslySetInnerHTML
+### BATOU-XSS-002: dangerouslySetInnerHTML
 
 **Detection mechanism:** Matches `dangerouslySetInnerHTML={{ `.
 
@@ -310,7 +310,7 @@
 
 ---
 
-### GTSS-XSS-004: Unescaped Template Output
+### BATOU-XSS-004: Unescaped Template Output
 
 **Evasion techniques:**
 
@@ -337,7 +337,7 @@
 
 ---
 
-### GTSS-XSS-011: Reflected XSS
+### BATOU-XSS-011: Reflected XSS
 
 **Evasion techniques:**
 
@@ -362,7 +362,7 @@
 
 ## 3. Path Traversal Rules
 
-### GTSS-TRV-001: Path Traversal
+### BATOU-TRV-001: Path Traversal
 
 **Detection mechanism:** Matches file operations (os.Open, open(), fs.readFile, etc.) with variable arguments, suppressed if `filepath.Clean` + `strings.HasPrefix` are nearby.
 
@@ -400,7 +400,7 @@
 
 ---
 
-### GTSS-TRV-003: Archive Extraction (Zip Slip)
+### BATOU-TRV-003: Archive Extraction (Zip Slip)
 
 **Evasion techniques:**
 
@@ -422,7 +422,7 @@
 
 ---
 
-### GTSS-TRV-006: Prototype Pollution via Spread
+### BATOU-TRV-006: Prototype Pollution via Spread
 
 **Detection mechanism:** Matches `{ ...req.body }` and `Object.assign({}, req.body)`.
 
@@ -448,7 +448,7 @@
 
 ## 4. Cryptography Rules
 
-### GTSS-CRY-001: Weak Hashing
+### BATOU-CRY-001: Weak Hashing
 
 **Detection mechanism:** Matches language-specific MD5/SHA-1 calls (e.g., `md5.New`, `hashlib.md5`, `crypto.createHash('md5')`).
 
@@ -481,7 +481,7 @@
 
 ---
 
-### GTSS-CRY-003: Weak Cipher
+### BATOU-CRY-003: Weak Cipher
 
 **Detection mechanism:** Matches DES, RC4, Blowfish function calls and ECB mode keyword.
 
@@ -510,7 +510,7 @@
 
 ---
 
-### GTSS-CRY-004: Hardcoded IV
+### BATOU-CRY-004: Hardcoded IV
 
 **Detection mechanism:** Matches variable names containing `iv` or `nonce` assigned to byte arrays, strings, or byte literals.
 
@@ -542,7 +542,7 @@
 
 ---
 
-### GTSS-CRY-005: Insecure TLS
+### BATOU-CRY-005: Insecure TLS
 
 **Detection mechanism:** Matches `InsecureSkipVerify: true`, `verify=False`, `rejectUnauthorized: false`, etc.
 
@@ -568,7 +568,7 @@
 
 ## 5. Secrets Rules
 
-### GTSS-SEC-001: Hardcoded Passwords
+### BATOU-SEC-001: Hardcoded Passwords
 
 **Detection mechanism:** Matches variable names like `password`, `secret`, `api_key`, etc. assigned to string literals, with entropy and placeholder filtering.
 
@@ -609,7 +609,7 @@
 
 ---
 
-### GTSS-SEC-002: API Key Exposure
+### BATOU-SEC-002: API Key Exposure
 
 **Detection mechanism:** Known provider prefixes (AKIA for AWS, ghp_ for GitHub, sk_live_ for Stripe, etc.) plus generic high-entropy patterns.
 
@@ -636,7 +636,7 @@
 
 ---
 
-### GTSS-SEC-003: Private Key in Code
+### BATOU-SEC-003: Private Key in Code
 
 **Detection mechanism:** Matches `-----BEGIN ... PRIVATE KEY-----` header.
 
@@ -664,7 +664,7 @@
 
 ---
 
-### GTSS-SEC-004: Connection Strings
+### BATOU-SEC-004: Connection Strings
 
 **Evasion techniques:**
 
@@ -686,7 +686,7 @@
 
 ## 6. SSRF Rules
 
-### GTSS-SSRF-001: URL from User Input
+### BATOU-SSRF-001: URL from User Input
 
 **Detection mechanism:** Matches HTTP client calls (http.Get, requests.get, fetch, axios, etc.) with a variable (non-literal) argument, suppressed if URL validation patterns are found nearby.
 
@@ -719,7 +719,7 @@
 
 ---
 
-### GTSS-SSRF-002: Internal Network Access
+### BATOU-SSRF-002: Internal Network Access
 
 **Evasion techniques:**
 
@@ -752,7 +752,7 @@
 
 ## 7. Auth Rules
 
-### GTSS-AUTH-001: Hardcoded Credential Check
+### BATOU-AUTH-001: Hardcoded Credential Check
 
 **Detection mechanism:** Matches `password == "literal"` or `username === "admin"` patterns.
 
@@ -785,7 +785,7 @@
 
 ---
 
-### GTSS-AUTH-002: Missing Auth Check
+### BATOU-AUTH-002: Missing Auth Check
 
 **Detection mechanism:** File-level heuristic -- checks if auth middleware keywords exist anywhere in the file, then flags sensitive route handlers.
 
@@ -809,7 +809,7 @@
 
 ---
 
-### GTSS-AUTH-003: CORS Wildcard
+### BATOU-AUTH-003: CORS Wildcard
 
 **Evasion techniques:**
 
@@ -831,7 +831,7 @@
 
 ---
 
-### GTSS-AUTH-006: Insecure Cookie
+### BATOU-AUTH-006: Insecure Cookie
 
 **Evasion techniques:**
 
@@ -854,7 +854,7 @@
 
 ## 8. Generic Rules
 
-### GTSS-GEN-002: Unsafe Deserialization
+### BATOU-GEN-002: Unsafe Deserialization
 
 **Detection mechanism:** Matches `pickle.load`, `yaml.load` (without SafeLoader), `ObjectInputStream`, `Marshal.load`, `unserialize`, `node-serialize.unserialize`.
 
@@ -890,7 +890,7 @@
 
 ---
 
-### GTSS-GEN-004: Open Redirect
+### BATOU-GEN-004: Open Redirect
 
 **Detection mechanism:** Matches redirect calls with request parameter arguments (e.g., `redirect(request.args`, `res.redirect(req.query`).
 
@@ -913,7 +913,7 @@
 
 ---
 
-### GTSS-GEN-007: Mass Assignment
+### BATOU-GEN-007: Mass Assignment
 
 **Detection mechanism:** Matches `BindJSON(&struct)`, `params.permit!`, `fields = '__all__'`, `{ ...req.body }`.
 
@@ -938,7 +938,7 @@
 
 ## 9. Logging Rules
 
-### GTSS-LOG-001: Unsanitized Log Input
+### BATOU-LOG-001: Unsanitized Log Input
 
 **Detection mechanism:** Matches logging calls (logging.info, logger.warn, console.log, etc.) that contain request data references on the same line.
 
@@ -961,7 +961,7 @@
 
 ---
 
-### GTSS-LOG-003: Sensitive Data in Logs
+### BATOU-LOG-003: Sensitive Data in Logs
 
 **Detection mechanism:** Matches logging calls containing words like `password`, `token`, `api_key`, `credit_card`, `ssn`, `private_key`.
 
@@ -986,7 +986,7 @@
 
 ## 10. Validation Rules
 
-### GTSS-VAL-001: Direct Parameter Usage
+### BATOU-VAL-001: Direct Parameter Usage
 
 **Detection mechanism:** Matches request parameter access patterns (req.params, request.args, $_GET, etc.) and suppresses if validation/sanitization keywords appear within 10 lines.
 
@@ -1018,7 +1018,7 @@
 
 ## 11. Memory Rules
 
-### GTSS-MEM-001: Banned Functions
+### BATOU-MEM-001: Banned Functions
 
 **Detection mechanism:** Matches `gets(`, `strcpy(`, `strcat(`, `sprintf(`, `vsprintf(`, `scanf` with `%s`, `atoi(`.
 
@@ -1048,7 +1048,7 @@
 
 ---
 
-### GTSS-MEM-004: Memory Management (Use After Free / Double Free)
+### BATOU-MEM-004: Memory Management (Use After Free / Double Free)
 
 **Detection mechanism:** Tracks `free(ptr)` calls and checks for subsequent use of the same pointer name, resetting on `}` braces.
 
@@ -1093,7 +1093,7 @@ These techniques work against multiple rule categories simultaneously:
 
 **Affects:** ALL rules (INJ, XSS, TRV, SSRF, etc.)
 
-Every rule in GTSS operates on individual lines. Any vulnerability can be made undetectable by splitting the dangerous operation across multiple lines:
+Every rule in Batou operates on individual lines. Any vulnerability can be made undetectable by splitting the dangerous operation across multiple lines:
 
 ```javascript
 // Detected:
@@ -1206,6 +1206,6 @@ password = base64.b64decode("cGFzc3dvcmQxMjM=").decode()  # "password123"
 
 The regex-based approach provides excellent **breadth** of coverage (55+ rules across 11 categories, 8+ programming languages) and catches the most obvious patterns that AI code generators frequently produce. However, it has a fundamental **depth** limitation: per-line analysis without taint tracking means that any code written across multiple lines or using intermediate variables can evade detection.
 
-For the blog post, this represents an honest trade-off: GTSS is designed as a fast, lightweight first line of defense in a Claude Code hook, not as a replacement for a full SAST tool. The evasion techniques documented here would require significantly more complex analysis (AST parsing, data flow tracking, inter-procedural analysis) that would impact the sub-second performance requirement.
+For the blog post, this represents an honest trade-off: Batou is designed as a fast, lightweight first line of defense in a Claude Code hook, not as a replacement for a full SAST tool. The evasion techniques documented here would require significantly more complex analysis (AST parsing, data flow tracking, inter-procedural analysis) that would impact the sub-second performance requirement.
 
-The recommended framing: "GTSS catches the common patterns that AI models produce. For production security, complement it with a full SAST pipeline."
+The recommended framing: "Batou catches the common patterns that AI models produce. For production security, complement it with a full SAST pipeline."

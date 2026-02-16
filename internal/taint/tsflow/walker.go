@@ -3,8 +3,8 @@ package tsflow
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // walkTree finds all function definitions in the tree and analyzes each one.

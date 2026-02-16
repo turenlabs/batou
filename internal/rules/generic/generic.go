@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-GEN-001: Debug mode patterns
+// BATOU-GEN-001: Debug mode patterns
 var (
 	reDjangoDebug   = regexp.MustCompile(`(?i)DEBUG\s*=\s*True`)
 	reFlaskDebug    = regexp.MustCompile(`(?i)app\.debug\s*=\s*True`)
@@ -21,7 +21,7 @@ var (
 	reSpringDebug   = regexp.MustCompile(`(?i)spring\.profiles\.active\s*=\s*dev`)
 )
 
-// GTSS-GEN-002: Unsafe deserialization patterns
+// BATOU-GEN-002: Unsafe deserialization patterns
 var (
 	rePickleLoads       = regexp.MustCompile(`(?:c?[Pp]ickle|_pickle|dill|cloudpickle)\.loads?\s*\(`)
 	reYAMLUnsafe        = regexp.MustCompile(`yaml\.load\s*\(`)
@@ -40,7 +40,7 @@ var (
 	reJSVMRun           = regexp.MustCompile(`\bvm\.run(?:In(?:New|This)?Context)\s*\(\s*[a-zA-Z_]\w*`)
 )
 
-// GTSS-GEN-003: XXE patterns
+// BATOU-GEN-003: XXE patterns
 var (
 	rePythonXMLParse     = regexp.MustCompile(`xml\.(?:etree|dom|sax|parsers)`)
 	reDefusedXML         = regexp.MustCompile(`defusedxml`)
@@ -53,7 +53,7 @@ var (
 	reCSharpDtdProhibit  = regexp.MustCompile(`DtdProcessing\.Prohibit|ProhibitDtd\s*=\s*true`)
 )
 
-// GTSS-GEN-004: Open redirect patterns
+// BATOU-GEN-004: Open redirect patterns
 var (
 	rePyRedirect    = regexp.MustCompile(`redirect\s*\(\s*request\.(?:args|GET|POST|params)`)
 	reJSRedirect    = regexp.MustCompile(`res\.redirect\s*\(\s*req\.(?:query|params|body)`)
@@ -72,7 +72,7 @@ var (
 	reJSUserInputSource = regexp.MustCompile(`req\.(?:query|params|body)\b`)
 )
 
-// GTSS-GEN-005: Log injection patterns
+// BATOU-GEN-005: Log injection patterns
 var (
 	reGoLogUserInput  = regexp.MustCompile(`(?:log\.(?:Print|Fatal|Panic)(?:f|ln)?\s*\(|logger\.(?:Info|Warn|Error|Debug)(?:f|w)?\s*\().*(?:r\.(?:FormValue|URL\.Query)|req\.)`)
 	rePyLogUserInput  = regexp.MustCompile(`(?:logger|logging)\.(?:info|warn|warning|error|debug|critical)\s*\(.*request\.`)
@@ -80,7 +80,7 @@ var (
 	reGenericLogInput = regexp.MustCompile(`(?:log|logger|logging)\.\w+\s*\(.*(?:user_?input|user_?data|params|request\.|req\.)`)
 )
 
-// GTSS-GEN-006: Race condition (TOCTOU) patterns
+// BATOU-GEN-006: Race condition (TOCTOU) patterns
 var (
 	reFileExistsCheck   = regexp.MustCompile(`(?:os\.(?:Stat|Lstat|Access)|os\.path\.exists|fs\.(?:exists|existsSync|access|accessSync)|File\.exist\?|file_exists)\s*\(`)
 	reFileOperation     = regexp.MustCompile(`(?:os\.(?:Open|Create|Remove|Rename|Chmod|WriteFile|ReadFile)|open\s*\(|fs\.(?:readFile|writeFile|unlink|rename)|File\.(?:open|delete|rename))\s*\(`)
@@ -88,7 +88,7 @@ var (
 	rePermCheck         = regexp.MustCompile(`(?i)(?:has_?perm|check_?perm|is_?allowed|can_?access|authorize)\s*\(`)
 )
 
-// GTSS-GEN-007: Mass assignment patterns
+// BATOU-GEN-007: Mass assignment patterns
 var (
 	reGoBindJSON        = regexp.MustCompile(`\.(?:ShouldBindJSON|BindJSON|ShouldBind|Bind)\s*\(\s*&`)
 	reGoDecodeBody      = regexp.MustCompile(`\.Decode\s*\(\s*&`)
@@ -101,7 +101,7 @@ var (
 	reGoStructTag       = regexp.MustCompile(`json:"-"`)
 )
 
-// GTSS-GEN-008: Code-as-string analysis — dangerous calls inside eval/vm string args
+// BATOU-GEN-008: Code-as-string analysis — dangerous calls inside eval/vm string args
 var (
 	// Matches vm.runInContext / vm.runInNewContext / eval / new Function containing dangerous calls in the string arg
 	reVMRunDangerous = regexp.MustCompile(`(?i)vm\.run(?:In(?:New)?Context|InThisContext)\s*\(\s*['"].*(?:yaml\.(?:unsafe_)?load|parseXml|pickle\.loads?|marshal\.load|unserialize|\.exec\s*\(|\.system\s*\(|Command\s*\()`)
@@ -112,7 +112,7 @@ var (
 	reEvalDangerousBT  = regexp.MustCompile("(?i)\\beval\\s*\\(\\s*`[^`]*(?:yaml\\.(?:unsafe_)?load|parseXml|pickle\\.loads?|marshal\\.load|unserialize|\\.exec\\s*\\(|\\.system\\s*\\(|Command\\s*\\()")
 )
 
-// GTSS-GEN-009: XML parser misconfiguration (XXE enablement)
+// BATOU-GEN-009: XML parser misconfiguration (XXE enablement)
 var (
 	// noent: true in libxml/XML parsing options — enables external entity substitution
 	reXMLNoentTrue        = regexp.MustCompile(`(?i)noent\s*:\s*true`)
@@ -128,7 +128,7 @@ var (
 
 type DebugModeEnabled struct{}
 
-func (r *DebugModeEnabled) ID() string                     { return "GTSS-GEN-001" }
+func (r *DebugModeEnabled) ID() string                     { return "BATOU-GEN-001" }
 func (r *DebugModeEnabled) Name() string                   { return "DebugModeEnabled" }
 func (r *DebugModeEnabled) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DebugModeEnabled) Description() string {
@@ -186,7 +186,7 @@ func (r *DebugModeEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeDeserialization struct{}
 
-func (r *UnsafeDeserialization) ID() string                     { return "GTSS-GEN-002" }
+func (r *UnsafeDeserialization) ID() string                     { return "BATOU-GEN-002" }
 func (r *UnsafeDeserialization) Name() string                   { return "UnsafeDeserialization" }
 func (r *UnsafeDeserialization) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *UnsafeDeserialization) Description() string {
@@ -285,7 +285,7 @@ func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XXEVulnerability struct{}
 
-func (r *XXEVulnerability) ID() string                     { return "GTSS-GEN-003" }
+func (r *XXEVulnerability) ID() string                     { return "BATOU-GEN-003" }
 func (r *XXEVulnerability) Name() string                   { return "XXEVulnerability" }
 func (r *XXEVulnerability) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XXEVulnerability) Description() string {
@@ -383,7 +383,7 @@ func (r *XXEVulnerability) makeFinding(ctx *rules.ScanContext, line int, matched
 
 type OpenRedirect struct{}
 
-func (r *OpenRedirect) ID() string                     { return "GTSS-GEN-004" }
+func (r *OpenRedirect) ID() string                     { return "BATOU-GEN-004" }
 func (r *OpenRedirect) Name() string                   { return "OpenRedirect" }
 func (r *OpenRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OpenRedirect) Description() string {
@@ -491,7 +491,7 @@ func hasNearbyUserInput(lines []string, idx int, sourcePattern *regexp.Regexp) b
 
 type LogInjection struct{}
 
-func (r *LogInjection) ID() string                     { return "GTSS-GEN-005" }
+func (r *LogInjection) ID() string                     { return "BATOU-GEN-005" }
 func (r *LogInjection) Name() string                   { return "LogInjection" }
 func (r *LogInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LogInjection) Description() string {
@@ -555,7 +555,7 @@ func (r *LogInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RaceCondition struct{}
 
-func (r *RaceCondition) ID() string                     { return "GTSS-GEN-006" }
+func (r *RaceCondition) ID() string                     { return "BATOU-GEN-006" }
 func (r *RaceCondition) Name() string                   { return "RaceCondition" }
 func (r *RaceCondition) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RaceCondition) Description() string {
@@ -622,7 +622,7 @@ func (r *RaceCondition) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MassAssignment struct{}
 
-func (r *MassAssignment) ID() string                     { return "GTSS-GEN-007" }
+func (r *MassAssignment) ID() string                     { return "BATOU-GEN-007" }
 func (r *MassAssignment) Name() string                   { return "MassAssignment" }
 func (r *MassAssignment) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MassAssignment) Description() string {
@@ -720,7 +720,7 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CodeAsStringEval struct{}
 
-func (r *CodeAsStringEval) ID() string                     { return "GTSS-GEN-008" }
+func (r *CodeAsStringEval) ID() string                     { return "BATOU-GEN-008" }
 func (r *CodeAsStringEval) Name() string                   { return "CodeAsStringEval" }
 func (r *CodeAsStringEval) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CodeAsStringEval) Description() string {
@@ -788,7 +788,7 @@ func (r *CodeAsStringEval) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XMLParserMisconfig struct{}
 
-func (r *XMLParserMisconfig) ID() string                     { return "GTSS-GEN-009" }
+func (r *XMLParserMisconfig) ID() string                     { return "BATOU-GEN-009" }
 func (r *XMLParserMisconfig) Name() string                   { return "XMLParserMisconfig" }
 func (r *XMLParserMisconfig) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XMLParserMisconfig) Description() string {
@@ -852,7 +852,7 @@ func (r *XMLParserMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// GTSS-GEN-010: VM/Sandbox escape patterns (Node.js)
+// BATOU-GEN-010: VM/Sandbox escape patterns (Node.js)
 var (
 	// vm.runInContext / vm.runInNewContext / vm.runInThisContext with any argument
 	reVMRunInContext     = regexp.MustCompile(`\bvm\.run(?:In(?:New|This)?Context)\s*\(`)
@@ -873,7 +873,7 @@ var (
 
 type VMSandboxEscape struct{}
 
-func (r *VMSandboxEscape) ID() string                     { return "GTSS-GEN-010" }
+func (r *VMSandboxEscape) ID() string                     { return "BATOU-GEN-010" }
 func (r *VMSandboxEscape) Name() string                   { return "VMSandboxEscape" }
 func (r *VMSandboxEscape) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *VMSandboxEscape) Description() string {
@@ -987,7 +987,7 @@ func (r *VMSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// GTSS-GEN-011: Unsafe YAML deserialization patterns
+// BATOU-GEN-011: Unsafe YAML deserialization patterns
 var (
 	// Python: yaml.load() without SafeLoader — unsafe by default in PyYAML
 	rePyYAMLLoad     = regexp.MustCompile(`\byaml\.load\s*\(`)
@@ -1006,7 +1006,7 @@ var (
 
 type UnsafeYAMLDeserialization struct{}
 
-func (r *UnsafeYAMLDeserialization) ID() string                     { return "GTSS-GEN-011" }
+func (r *UnsafeYAMLDeserialization) ID() string                     { return "BATOU-GEN-011" }
 func (r *UnsafeYAMLDeserialization) Name() string                   { return "UnsafeYAMLDeserialization" }
 func (r *UnsafeYAMLDeserialization) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnsafeYAMLDeserialization) Description() string {
@@ -1104,7 +1104,7 @@ func (r *UnsafeYAMLDeserialization) makeFinding(ctx *rules.ScanContext, line int
 	}
 }
 
-// GTSS-GEN-012: Insecure download patterns (CWE-494)
+// BATOU-GEN-012: Insecure download patterns (CWE-494)
 var (
 	// curl/wget piped to shell
 	reCurlPipeBash    = regexp.MustCompile(`\bcurl\b[^|]*\|\s*(?:ba)?sh\b`)
@@ -1124,7 +1124,7 @@ var (
 
 type InsecureDownload struct{}
 
-func (r *InsecureDownload) ID() string                     { return "GTSS-GEN-012" }
+func (r *InsecureDownload) ID() string                     { return "BATOU-GEN-012" }
 func (r *InsecureDownload) Name() string                   { return "InsecureDownload" }
 func (r *InsecureDownload) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureDownload) Description() string {

@@ -22,12 +22,12 @@ expected_vulnerabilities:
     pattern: "Incomplete or missing critical security headers"
     cwe: CWE-693
     typical_severity: medium
-    gtss_rules: [GTSS-GEN-003]
+    batou_rules: [BATOU-GEN-003]
   - type: clickjacking
     pattern: "Missing or misconfigured framing protection"
     cwe: CWE-1021
     typical_severity: medium
-    gtss_rules: [GTSS-GEN-004]
+    batou_rules: [BATOU-GEN-004]
 gold_secure_pattern: |
   Comprehensive security headers:
   response.headers["X-Content-Type-Options"] = "nosniff"

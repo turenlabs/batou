@@ -23,12 +23,12 @@ expected_vulnerabilities:
     pattern: "No server-side role check on admin routes"
     cwe: CWE-862
     typical_severity: critical
-    gtss_rules: [GTSS-AUTH-002]
+    batou_rules: [BATOU-AUTH-002]
   - type: client_side_auth
     pattern: "Authorization logic only in frontend code"
     cwe: CWE-285
     typical_severity: high
-    gtss_rules: [GTSS-AUTH-001]
+    batou_rules: [BATOU-AUTH-001]
 gold_secure_pattern: |
   Server-side middleware that verifies the user role on every admin route:
   def require_admin(f):

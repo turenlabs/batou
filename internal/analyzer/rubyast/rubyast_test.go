@@ -3,8 +3,8 @@ package rubyast
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanRuby(code string) []rules.Finding {
@@ -35,7 +35,7 @@ def handler(input)
 end
 `
 	findings := scanRuby(code)
-	f := findByRule(findings, "GTSS-RUBYAST-001")
+	f := findByRule(findings, "BATOU-RUBYAST-001")
 	if f == nil {
 		t.Error("expected eval finding")
 		for _, f := range findings {
@@ -51,7 +51,7 @@ def handler(input)
 end
 `
 	findings := scanRuby(code)
-	f := findByRule(findings, "GTSS-RUBYAST-001")
+	f := findByRule(findings, "BATOU-RUBYAST-001")
 	if f == nil {
 		t.Error("expected instance_eval finding")
 	}
@@ -61,7 +61,7 @@ func TestEvalLiteralSafe(t *testing.T) {
 	code := `eval("1 + 2")`
 	findings := scanRuby(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUBYAST-001" {
+		if f.RuleID == "BATOU-RUBYAST-001" {
 			t.Errorf("should not flag eval with literal: %s", f.Title)
 		}
 	}
@@ -74,7 +74,7 @@ def handler(cmd)
 end
 `
 	findings := scanRuby(code)
-	f := findByRule(findings, "GTSS-RUBYAST-002")
+	f := findByRule(findings, "BATOU-RUBYAST-002")
 	if f == nil {
 		t.Error("expected command injection finding for system()")
 		for _, f := range findings {
@@ -90,7 +90,7 @@ def handler(cmd)
 end
 `
 	findings := scanRuby(code)
-	f := findByRule(findings, "GTSS-RUBYAST-002")
+	f := findByRule(findings, "BATOU-RUBYAST-002")
 	if f == nil {
 		t.Error("expected command injection finding for exec()")
 	}
@@ -100,7 +100,7 @@ func TestSystemLiteralSafe(t *testing.T) {
 	code := `system("ls -la")`
 	findings := scanRuby(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUBYAST-002" {
+		if f.RuleID == "BATOU-RUBYAST-002" {
 			t.Errorf("should not flag system with literal: %s", f.Title)
 		}
 	}
@@ -113,7 +113,7 @@ def handler(input)
 end
 `
 	findings := scanRuby(code)
-	f := findByRule(findings, "GTSS-RUBYAST-003")
+	f := findByRule(findings, "BATOU-RUBYAST-003")
 	if f == nil {
 		t.Error("expected dynamic dispatch finding for send()")
 		for _, f := range findings {
@@ -129,7 +129,7 @@ def handler(cmd)
 end
 `
 	findings := scanRuby(code)
-	f := findByRule(findings, "GTSS-RUBYAST-004")
+	f := findByRule(findings, "BATOU-RUBYAST-004")
 	if f == nil {
 		t.Error("expected IO.popen finding")
 		for _, f := range findings {
@@ -145,7 +145,7 @@ def handler(template)
 end
 `
 	findings := scanRuby(code)
-	f := findByRule(findings, "GTSS-RUBYAST-005")
+	f := findByRule(findings, "BATOU-RUBYAST-005")
 	if f == nil {
 		t.Error("expected ERB.new finding")
 		for _, f := range findings {
@@ -158,7 +158,7 @@ func TestERBNewLiteralSafe(t *testing.T) {
 	code := `ERB.new("<p>Hello</p>").result`
 	findings := scanRuby(code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUBYAST-005" {
+		if f.RuleID == "BATOU-RUBYAST-005" {
 			t.Errorf("should not flag ERB.new with literal: %s", f.Title)
 		}
 	}
@@ -199,7 +199,7 @@ def handler(input)
 end
 `
 	findings := scanRuby(code)
-	f := findByRule(findings, "GTSS-RUBYAST-001")
+	f := findByRule(findings, "BATOU-RUBYAST-001")
 	if f == nil {
 		t.Fatal("expected finding")
 	}

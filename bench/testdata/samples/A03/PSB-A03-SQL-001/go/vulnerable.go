@@ -1,6 +1,6 @@
 // PSB-A03-SQL-001: User search endpoint
 // CWE: CWE-89
-// Expected: GTSS-INJ-001, GTSS-INJ-002
+// Expected: BATOU-INJ-001, BATOU-INJ-002
 package main
 
 import (

@@ -4,60 +4,60 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-ENC-001: Double encoding
+// BATOU-ENC-001: Double encoding
 var (
 	reDoubleEncode     = regexp.MustCompile(`(?i)(?:encodeURIComponent|encodeURI|urllib\.(?:parse\.)?quote|url\.QueryEscape|URLEncoder\.encode|rawurlencode|urlencode|CGI\.escape|Uri\.EscapeDataString)\s*\(\s*(?:encodeURIComponent|encodeURI|urllib\.(?:parse\.)?quote|url\.QueryEscape|URLEncoder\.encode|rawurlencode|urlencode|CGI\.escape|Uri\.EscapeDataString)\s*\(`)
 	reDoubleEscapeHTML = regexp.MustCompile(`(?i)(?:html\.EscapeString|htmlspecialchars|htmlentities|escape|escapeHtml|ERB::Util\.html_escape|cgi\.escape|markupsafe\.escape)\s*\(\s*(?:html\.EscapeString|htmlspecialchars|htmlentities|escape|escapeHtml|ERB::Util\.html_escape|cgi\.escape|markupsafe\.escape)\s*\(`)
 )
 
-// GTSS-ENC-002: Missing output encoding before HTML insertion
+// BATOU-ENC-002: Missing output encoding before HTML insertion
 var (
 	reHTMLConcatVar   = regexp.MustCompile(`(?i)(?:html|output|body|page|content|response|markup)\s*(?:\+?=|=)\s*["']<[^"']*>\s*["']\s*\+\s*\w+`)
 	reHTMLFmtInsert   = regexp.MustCompile(`(?i)(?:html|output|body|page|content|response|markup)\s*(?:\+?=|=)\s*(?:f["'].*<.*\{|["'].*<.*["']\s*%\s*|["'].*<.*["']\s*\.format\s*\()`)
 	reEscapeFuncNearby = regexp.MustCompile(`(?i)(?:html\.EscapeString|htmlspecialchars|htmlentities|escapeHtml|escape|sanitize|DOMPurify|bleach\.clean|markupsafe\.escape|html\.escape|Encode\.forHtml|strip_tags)`)
 )
 
-// GTSS-ENC-003: Incorrect character encoding declaration
+// BATOU-ENC-003: Incorrect character encoding declaration
 var (
 	reCharsetMeta       = regexp.MustCompile(`(?i)<meta\s+[^>]*charset\s*=\s*["']?([^"'\s;>]+)`)
 	reContentTypeBadEnc = regexp.MustCompile(`(?i)Content-Type.*charset\s*=\s*["']?(us-ascii|iso-8859-1|shift_jis|euc-jp|gb2312|big5|windows-1252)["']?`)
 	reCharsetHeader     = regexp.MustCompile(`(?i)(?:\.setHeader|\.header|\.set|\.Header\(\)\.Set)\s*\([^)]*charset\s*=\s*["']?(us-ascii|iso-8859-1|shift_jis|euc-jp|gb2312|big5|windows-1252)`)
 )
 
-// GTSS-ENC-004: URL encoding bypass
+// BATOU-ENC-004: URL encoding bypass
 var (
 	rePercentEncodedCheck = regexp.MustCompile(`(?i)(?:if|match|test|includes|contains|indexOf|==|!=)\s*.*(?:%2[eEfF]|%2[fF]|%5[cC]|%0[aAdD]|%00|%3[cCeE])`)
 	reSecurityCheck       = regexp.MustCompile(`(?i)(?:if|unless|guard|when|check|validate|filter|block|deny|reject)\s*.*(?:%[0-9a-fA-F]{2})`)
 )
 
-// GTSS-ENC-005: Base64 used as encryption
+// BATOU-ENC-005: Base64 used as encryption
 var (
 	reBase64AsEncrypt  = regexp.MustCompile(`(?i)(?:encrypt|cipher|secure|protect|hide|obfuscate)\w*\s*(?:[:=]|=)\s*.*(?:base64|btoa|atob|b64encode|b64decode|Base64\.encode|Base64\.decode|Base64\.getEncoder|Base64\.getDecoder|base64_encode|base64_decode)`)
 	reBase64FuncCrypto = regexp.MustCompile(`(?i)(?:base64|btoa|b64encode|Base64\.encode|base64_encode)\s*\(.*(?:password|secret|token|key|credential|ssn|credit)`)
 )
 
-// GTSS-ENC-006: Unicode normalization bypass
+// BATOU-ENC-006: Unicode normalization bypass
 var (
 	reUnicodeNormCheck  = regexp.MustCompile(`(?i)(?:normalize|NFC|NFD|NFKC|NFKD|unicodedata\.normalize)`)
 	reHomoglyphPattern  = regexp.MustCompile(`[\x{FF01}-\x{FF5E}]|[\x{2000}-\x{200F}]|[\x{2028}-\x{202F}]|[\x{FEFF}]|[\x{200B}-\x{200D}]`)
 	reSecurityCheckAfterNorm = regexp.MustCompile(`(?i)(?:if|match|test|includes|contains|indexOf|==|!=|filter|block|deny|validate)\b`)
 )
 
-// GTSS-ENC-007: Mixed encoding in SQL
+// BATOU-ENC-007: Mixed encoding in SQL
 var (
 	reMixedEncodingSQL = regexp.MustCompile(`(?i)(?:SELECT|INSERT|UPDATE|DELETE|WHERE|FROM)\b.*(?:CHAR\s*\(|CHR\s*\(|CONVERT\s*\(|CAST\s*\(|UNHEX\s*\(|X['"])`)
 	reSQLCharConcat    = regexp.MustCompile(`(?i)(?:CHAR|CHR)\s*\(\s*\d+\s*\)\s*(?:\+|\|\|)\s*(?:CHAR|CHR)\s*\(`)
 	reSQLHexLiteral    = regexp.MustCompile(`(?i)(?:0x[0-9a-fA-F]{4,}|X'[0-9a-fA-F]{4,}')`)
 )
 
-// GTSS-ENC-008: Null byte injection
+// BATOU-ENC-008: Null byte injection
 var (
 	reNullByteParam    = regexp.MustCompile(`(?i)(?:%00|\\x00|\\0|\\u0000|\x00)`)
 	reNullByteInPath   = regexp.MustCompile(`(?i)(?:open|read|include|require|fopen|file_get_contents|readFile|os\.path|Path\.join)\s*\(.*(?:%00|\\x00|\\0|\\u0000)`)
@@ -112,12 +112,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-ENC-001: Double encoding vulnerability
+// BATOU-ENC-001: Double encoding vulnerability
 // ---------------------------------------------------------------------------
 
 type DoubleEncoding struct{}
 
-func (r *DoubleEncoding) ID() string                     { return "GTSS-ENC-001" }
+func (r *DoubleEncoding) ID() string                     { return "BATOU-ENC-001" }
 func (r *DoubleEncoding) Name() string                   { return "DoubleEncoding" }
 func (r *DoubleEncoding) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DoubleEncoding) Description() string {
@@ -165,12 +165,12 @@ func (r *DoubleEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-ENC-002: Missing output encoding before HTML insertion
+// BATOU-ENC-002: Missing output encoding before HTML insertion
 // ---------------------------------------------------------------------------
 
 type MissingOutputEncoding struct{}
 
-func (r *MissingOutputEncoding) ID() string                     { return "GTSS-ENC-002" }
+func (r *MissingOutputEncoding) ID() string                     { return "BATOU-ENC-002" }
 func (r *MissingOutputEncoding) Name() string                   { return "MissingOutputEncoding" }
 func (r *MissingOutputEncoding) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MissingOutputEncoding) Description() string {
@@ -219,12 +219,12 @@ func (r *MissingOutputEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-ENC-003: Incorrect character encoding declaration
+// BATOU-ENC-003: Incorrect character encoding declaration
 // ---------------------------------------------------------------------------
 
 type IncorrectCharEncoding struct{}
 
-func (r *IncorrectCharEncoding) ID() string                     { return "GTSS-ENC-003" }
+func (r *IncorrectCharEncoding) ID() string                     { return "BATOU-ENC-003" }
 func (r *IncorrectCharEncoding) Name() string                   { return "IncorrectCharEncoding" }
 func (r *IncorrectCharEncoding) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *IncorrectCharEncoding) Description() string {
@@ -274,12 +274,12 @@ func (r *IncorrectCharEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-ENC-004: URL encoding bypass
+// BATOU-ENC-004: URL encoding bypass
 // ---------------------------------------------------------------------------
 
 type URLEncodingBypass struct{}
 
-func (r *URLEncodingBypass) ID() string                     { return "GTSS-ENC-004" }
+func (r *URLEncodingBypass) ID() string                     { return "BATOU-ENC-004" }
 func (r *URLEncodingBypass) Name() string                   { return "URLEncodingBypass" }
 func (r *URLEncodingBypass) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *URLEncodingBypass) Description() string {
@@ -338,12 +338,12 @@ func (r *URLEncodingBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-ENC-005: Base64 used as encryption
+// BATOU-ENC-005: Base64 used as encryption
 // ---------------------------------------------------------------------------
 
 type Base64AsEncryption struct{}
 
-func (r *Base64AsEncryption) ID() string                     { return "GTSS-ENC-005" }
+func (r *Base64AsEncryption) ID() string                     { return "BATOU-ENC-005" }
 func (r *Base64AsEncryption) Name() string                   { return "Base64AsEncryption" }
 func (r *Base64AsEncryption) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *Base64AsEncryption) Description() string {
@@ -391,12 +391,12 @@ func (r *Base64AsEncryption) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-ENC-006: Unicode normalization bypass
+// BATOU-ENC-006: Unicode normalization bypass
 // ---------------------------------------------------------------------------
 
 type UnicodeNormBypass struct{}
 
-func (r *UnicodeNormBypass) ID() string                     { return "GTSS-ENC-006" }
+func (r *UnicodeNormBypass) ID() string                     { return "BATOU-ENC-006" }
 func (r *UnicodeNormBypass) Name() string                   { return "UnicodeNormBypass" }
 func (r *UnicodeNormBypass) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UnicodeNormBypass) Description() string {
@@ -474,12 +474,12 @@ func (r *UnicodeNormBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-ENC-007: Mixed encoding in SQL query
+// BATOU-ENC-007: Mixed encoding in SQL query
 // ---------------------------------------------------------------------------
 
 type MixedEncodingSQL struct{}
 
-func (r *MixedEncodingSQL) ID() string                     { return "GTSS-ENC-007" }
+func (r *MixedEncodingSQL) ID() string                     { return "BATOU-ENC-007" }
 func (r *MixedEncodingSQL) Name() string                   { return "MixedEncodingSQL" }
 func (r *MixedEncodingSQL) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MixedEncodingSQL) Description() string {
@@ -539,12 +539,12 @@ func (r *MixedEncodingSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-ENC-008: Null byte injection via encoding
+// BATOU-ENC-008: Null byte injection via encoding
 // ---------------------------------------------------------------------------
 
 type NullByteInjection struct{}
 
-func (r *NullByteInjection) ID() string                     { return "GTSS-ENC-008" }
+func (r *NullByteInjection) ID() string                     { return "BATOU-ENC-008" }
 func (r *NullByteInjection) Name() string                   { return "NullByteInjection" }
 func (r *NullByteInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NullByteInjection) Description() string {

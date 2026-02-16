@@ -3,14 +3,14 @@ package scanner
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // helpers to build findings concisely in tests.
 
 func regexFinding(line int, cwe string, sev rules.Severity, conf string, tags ...string) rules.Finding {
 	return rules.Finding{
-		RuleID:     "GTSS-INJ-001",
+		RuleID:     "BATOU-INJ-001",
 		LineNumber: line,
 		CWEID:      cwe,
 		Severity:   sev,
@@ -21,7 +21,7 @@ func regexFinding(line int, cwe string, sev rules.Severity, conf string, tags ..
 
 func astFinding(line int, cwe string, sev rules.Severity, conf string, tags ...string) rules.Finding {
 	return rules.Finding{
-		RuleID:     "GTSS-AST-002",
+		RuleID:     "BATOU-AST-002",
 		LineNumber: line,
 		CWEID:      cwe,
 		Severity:   sev,
@@ -32,7 +32,7 @@ func astFinding(line int, cwe string, sev rules.Severity, conf string, tags ...s
 
 func taintFinding(line int, cwe string, sev rules.Severity, conf string, tags ...string) rules.Finding {
 	return rules.Finding{
-		RuleID:     "GTSS-TAINT-sqli",
+		RuleID:     "BATOU-TAINT-sqli",
 		LineNumber: line,
 		CWEID:      cwe,
 		Severity:   sev,
@@ -43,7 +43,7 @@ func taintFinding(line int, cwe string, sev rules.Severity, conf string, tags ..
 
 func interprocFinding(line int, cwe string, sev rules.Severity, conf string, tags ...string) rules.Finding {
 	return rules.Finding{
-		RuleID:     "GTSS-INTERPROC-SQLI",
+		RuleID:     "BATOU-INTERPROC-SQLI",
 		LineNumber: line,
 		CWEID:      cwe,
 		Severity:   sev,
@@ -65,7 +65,7 @@ func TestDedup_TaintWinsOverRegex(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(got))
 	}
-	if got[0].RuleID != "GTSS-TAINT-sqli" {
+	if got[0].RuleID != "BATOU-TAINT-sqli" {
 		t.Errorf("expected taint winner, got %s", got[0].RuleID)
 	}
 	// Regex tags should be merged.
@@ -83,7 +83,7 @@ func TestDedup_TaintWinsOverAST(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(got))
 	}
-	if got[0].RuleID != "GTSS-TAINT-sqli" {
+	if got[0].RuleID != "BATOU-TAINT-sqli" {
 		t.Errorf("expected taint winner, got %s", got[0].RuleID)
 	}
 	// AST tag should be merged into the winner.
@@ -101,7 +101,7 @@ func TestDedup_ASTWinsOverRegex(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(got))
 	}
-	if got[0].RuleID != "GTSS-AST-002" {
+	if got[0].RuleID != "BATOU-AST-002" {
 		t.Errorf("expected AST winner, got %s", got[0].RuleID)
 	}
 }
@@ -116,7 +116,7 @@ func TestDedup_ThreeWay(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(got))
 	}
-	if got[0].RuleID != "GTSS-TAINT-sqli" {
+	if got[0].RuleID != "BATOU-TAINT-sqli" {
 		t.Errorf("expected taint winner, got %s", got[0].RuleID)
 	}
 	// All tags should be merged.
@@ -171,7 +171,7 @@ func TestDedup_MissingLineNotGrouped(t *testing.T) {
 
 func TestDedup_SameTierSeverityTiebreak(t *testing.T) {
 	high := rules.Finding{
-		RuleID:     "GTSS-INJ-001",
+		RuleID:     "BATOU-INJ-001",
 		LineNumber: 10,
 		CWEID:      "CWE-89",
 		Severity:   rules.High,
@@ -179,7 +179,7 @@ func TestDedup_SameTierSeverityTiebreak(t *testing.T) {
 		Tags:       []string{"winner"},
 	}
 	medium := rules.Finding{
-		RuleID:     "GTSS-INJ-002",
+		RuleID:     "BATOU-INJ-002",
 		LineNumber: 10,
 		CWEID:      "CWE-89",
 		Severity:   rules.Medium,
@@ -190,8 +190,8 @@ func TestDedup_SameTierSeverityTiebreak(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(got))
 	}
-	if got[0].RuleID != "GTSS-INJ-001" {
-		t.Errorf("expected higher-severity winner GTSS-INJ-001, got %s", got[0].RuleID)
+	if got[0].RuleID != "BATOU-INJ-001" {
+		t.Errorf("expected higher-severity winner BATOU-INJ-001, got %s", got[0].RuleID)
 	}
 	if !hasTag(got[0].Tags, "loser") {
 		t.Error("expected merged tag 'loser' from suppressed finding")
@@ -200,7 +200,7 @@ func TestDedup_SameTierSeverityTiebreak(t *testing.T) {
 
 func TestDedup_SameTierConfidenceTiebreak(t *testing.T) {
 	highConf := rules.Finding{
-		RuleID:     "GTSS-INJ-001",
+		RuleID:     "BATOU-INJ-001",
 		LineNumber: 10,
 		CWEID:      "CWE-89",
 		Severity:   rules.High,
@@ -208,7 +208,7 @@ func TestDedup_SameTierConfidenceTiebreak(t *testing.T) {
 		Tags:       []string{"confident"},
 	}
 	lowConf := rules.Finding{
-		RuleID:     "GTSS-INJ-002",
+		RuleID:     "BATOU-INJ-002",
 		LineNumber: 10,
 		CWEID:      "CWE-89",
 		Severity:   rules.High,
@@ -219,8 +219,8 @@ func TestDedup_SameTierConfidenceTiebreak(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(got))
 	}
-	if got[0].RuleID != "GTSS-INJ-001" {
-		t.Errorf("expected higher-confidence winner GTSS-INJ-001, got %s", got[0].RuleID)
+	if got[0].RuleID != "BATOU-INJ-001" {
+		t.Errorf("expected higher-confidence winner BATOU-INJ-001, got %s", got[0].RuleID)
 	}
 	if !hasTag(got[0].Tags, "tentative") {
 		t.Error("expected merged tag 'tentative' from suppressed finding")
@@ -258,7 +258,7 @@ func TestDedup_InterprocRanking(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(got))
 	}
-	if got[0].RuleID != "GTSS-AST-002" {
+	if got[0].RuleID != "BATOU-AST-002" {
 		t.Errorf("expected AST winner over interproc and regex, got %s", got[0].RuleID)
 	}
 	// Interprocedural and regex tags should be merged.
@@ -273,19 +273,19 @@ func TestDedup_AllASTLanguagePrefixes(t *testing.T) {
 		ruleID string
 		lang   string
 	}{
-		{"GTSS-AST-001", "Go"},
-		{"GTSS-PYAST-001", "Python"},
-		{"GTSS-JSAST-001", "JavaScript"},
-		{"GTSS-JAVAAST-001", "Java"},
-		{"GTSS-PHPAST-001", "PHP"},
-		{"GTSS-RUBYAST-001", "Ruby"},
-		{"GTSS-CAST-001", "C"},
-		{"GTSS-CS-AST-001", "C#"},
-		{"GTSS-KT-AST-001", "Kotlin"},
-		{"GTSS-SWIFT-AST-001", "Swift"},
-		{"GTSS-RUST-AST-001", "Rust"},
-		{"GTSS-LUA-AST-001", "Lua"},
-		{"GTSS-GVY-AST-001", "Groovy"},
+		{"BATOU-AST-001", "Go"},
+		{"BATOU-PYAST-001", "Python"},
+		{"BATOU-JSAST-001", "JavaScript"},
+		{"BATOU-JAVAAST-001", "Java"},
+		{"BATOU-PHPAST-001", "PHP"},
+		{"BATOU-RUBYAST-001", "Ruby"},
+		{"BATOU-CAST-001", "C"},
+		{"BATOU-CS-AST-001", "C#"},
+		{"BATOU-KT-AST-001", "Kotlin"},
+		{"BATOU-SWIFT-AST-001", "Swift"},
+		{"BATOU-RUST-AST-001", "Rust"},
+		{"BATOU-LUA-AST-001", "Lua"},
+		{"BATOU-GVY-AST-001", "Groovy"},
 	}
 	for _, p := range prefixes {
 		f := rules.Finding{
@@ -303,16 +303,57 @@ func TestDedup_AllASTLanguagePrefixes(t *testing.T) {
 	}
 
 	// Non-AST rule IDs must NOT be classified as AST.
-	nonAST := []string{"GTSS-INJ-001", "GTSS-XSS-002", "GTSS-TAINT-sqli", "GTSS-INTERPROC-SQLI"}
+	nonAST := []string{"BATOU-INJ-001", "BATOU-XSS-002", "BATOU-TAINT-sqli", "BATOU-INTERPROC-SQLI"}
 	for _, id := range nonAST {
 		f := rules.Finding{RuleID: id}
 		if isASTRuleID(f.RuleID) && !hasTag(f.Tags, "taint-analysis") && !hasTag(f.Tags, "interprocedural") {
 			// TAINT and INTERPROC are caught by tag checks before isASTRuleID,
 			// so only pure regex IDs could be false positives here.
-			if id == "GTSS-INJ-001" || id == "GTSS-XSS-002" {
+			if id == "BATOU-INJ-001" || id == "BATOU-XSS-002" {
 				t.Errorf("%s: should NOT be classified as AST rule", id)
 			}
 		}
+	}
+}
+
+func TestDedup_RuleIDTiebreaker(t *testing.T) {
+	// When tier, severity, and confidence are identical, the lower RuleID
+	// wins deterministically (prevents flaky tests from goroutine ordering).
+	later := rules.Finding{
+		RuleID:     "BATOU-XSS-015",
+		LineNumber: 7,
+		CWEID:      "CWE-79",
+		Severity:   rules.High,
+		Confidence: "high",
+		Tags:       []string{"later-rule"},
+	}
+	earlier := rules.Finding{
+		RuleID:     "BATOU-XSS-014",
+		LineNumber: 7,
+		CWEID:      "CWE-79",
+		Severity:   rules.High,
+		Confidence: "high",
+		Tags:       []string{"earlier-rule"},
+	}
+	// Regardless of input order, the earlier RuleID should win.
+	got := DeduplicateFindings([]rules.Finding{later, earlier})
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(got))
+	}
+	if got[0].RuleID != "BATOU-XSS-014" {
+		t.Errorf("expected lower RuleID winner BATOU-XSS-014, got %s", got[0].RuleID)
+	}
+	if !hasTag(got[0].Tags, "later-rule") {
+		t.Error("expected merged tag 'later-rule' from suppressed finding")
+	}
+
+	// Reverse input order — same winner.
+	got2 := DeduplicateFindings([]rules.Finding{earlier, later})
+	if len(got2) != 1 {
+		t.Fatalf("expected 1 finding (reversed), got %d", len(got2))
+	}
+	if got2[0].RuleID != "BATOU-XSS-014" {
+		t.Errorf("expected lower RuleID winner (reversed) BATOU-XSS-014, got %s", got2[0].RuleID)
 	}
 }
 

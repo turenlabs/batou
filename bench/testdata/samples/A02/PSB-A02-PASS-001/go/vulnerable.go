@@ -1,6 +1,6 @@
 // PSB-A02-PASS-001: Password storage/registration
 // CWE: CWE-916, CWE-328
-// Expected: GTSS-CRYPTO-001, GTSS-CRYPTO-002
+// Expected: BATOU-CRYPTO-001, BATOU-CRYPTO-002
 package main
 
 import (

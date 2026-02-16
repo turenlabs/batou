@@ -3,11 +3,11 @@ package tsflow
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 
 	// Import taint language catalogs.
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 func hasTaintFlow(flows []taint.TaintFlow, sinkCategory taint.SinkCategory) bool {

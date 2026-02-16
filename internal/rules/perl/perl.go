@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
@@ -123,7 +123,7 @@ func init() {
 
 type CommandInjection struct{}
 
-func (r *CommandInjection) ID() string                      { return "GTSS-PL-001" }
+func (r *CommandInjection) ID() string                      { return "BATOU-PL-001" }
 func (r *CommandInjection) Name() string                    { return "PerlCommandInjection" }
 func (r *CommandInjection) Description() string             { return "Detects Perl command injection via system/exec/backticks/qx with variable interpolation." }
 func (r *CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -192,7 +192,7 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SQLInjection struct{}
 
-func (r *SQLInjection) ID() string                      { return "GTSS-PL-002" }
+func (r *SQLInjection) ID() string                      { return "BATOU-PL-002" }
 func (r *SQLInjection) Name() string                    { return "PerlSQLInjection" }
 func (r *SQLInjection) Description() string             { return "Detects Perl DBI SQL injection via string interpolation or concatenation instead of placeholders." }
 func (r *SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -258,7 +258,7 @@ func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CodeInjection struct{}
 
-func (r *CodeInjection) ID() string                      { return "GTSS-PL-003" }
+func (r *CodeInjection) ID() string                      { return "BATOU-PL-003" }
 func (r *CodeInjection) Name() string                    { return "PerlCodeInjection" }
 func (r *CodeInjection) Description() string             { return "Detects Perl code injection via eval() with variable or string eval." }
 func (r *CodeInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -322,7 +322,7 @@ func (r *CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PathTraversal struct{}
 
-func (r *PathTraversal) ID() string                      { return "GTSS-PL-004" }
+func (r *PathTraversal) ID() string                      { return "BATOU-PL-004" }
 func (r *PathTraversal) Name() string                    { return "PerlPathTraversal" }
 func (r *PathTraversal) Description() string             { return "Detects Perl path traversal via open() with user-controlled input or two-argument open." }
 func (r *PathTraversal) DefaultSeverity() rules.Severity { return rules.High }
@@ -392,7 +392,7 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RegexDoS struct{}
 
-func (r *RegexDoS) ID() string                      { return "GTSS-PL-005" }
+func (r *RegexDoS) ID() string                      { return "BATOU-PL-005" }
 func (r *RegexDoS) Name() string                    { return "PerlRegexDoS" }
 func (r *RegexDoS) Description() string             { return "Detects Perl regex denial of service via user input in regex without quotemeta/\\Q\\E." }
 func (r *RegexDoS) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -457,7 +457,7 @@ func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CGIXSS struct{}
 
-func (r *CGIXSS) ID() string                      { return "GTSS-PL-006" }
+func (r *CGIXSS) ID() string                      { return "BATOU-PL-006" }
 func (r *CGIXSS) Name() string                    { return "PerlCGIXSS" }
 func (r *CGIXSS) Description() string             { return "Detects Perl CGI XSS via printing CGI parameters without HTML encoding." }
 func (r *CGIXSS) DefaultSeverity() rules.Severity { return rules.High }
@@ -528,7 +528,7 @@ func (r *CGIXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureFileOps struct{}
 
-func (r *InsecureFileOps) ID() string                      { return "GTSS-PL-007" }
+func (r *InsecureFileOps) ID() string                      { return "BATOU-PL-007" }
 func (r *InsecureFileOps) Name() string                    { return "PerlInsecureFileOps" }
 func (r *InsecureFileOps) Description() string             { return "Detects Perl insecure file operations: two-argument open, chmod 0777, world-writable permissions." }
 func (r *InsecureFileOps) DefaultSeverity() rules.Severity { return rules.High }
@@ -596,7 +596,7 @@ func (r *InsecureFileOps) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type Deserialization struct{}
 
-func (r *Deserialization) ID() string                      { return "GTSS-PL-008" }
+func (r *Deserialization) ID() string                      { return "BATOU-PL-008" }
 func (r *Deserialization) Name() string                    { return "PerlDeserialization" }
 func (r *Deserialization) Description() string             { return "Detects Perl unsafe deserialization via Storable thaw/retrieve or YAML::Load from untrusted input." }
 func (r *Deserialization) DefaultSeverity() rules.Severity { return rules.High }
@@ -661,7 +661,7 @@ func (r *Deserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LDAPInjection struct{}
 
-func (r *LDAPInjection) ID() string                      { return "GTSS-PL-009" }
+func (r *LDAPInjection) ID() string                      { return "BATOU-PL-009" }
 func (r *LDAPInjection) Name() string                    { return "PerlLDAPInjection" }
 func (r *LDAPInjection) Description() string             { return "Detects Perl LDAP injection via Net::LDAP search with interpolated filter." }
 func (r *LDAPInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -723,7 +723,7 @@ func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureRandomness struct{}
 
-func (r *InsecureRandomness) ID() string                      { return "GTSS-PL-010" }
+func (r *InsecureRandomness) ID() string                      { return "BATOU-PL-010" }
 func (r *InsecureRandomness) Name() string                    { return "PerlInsecureRandomness" }
 func (r *InsecureRandomness) Description() string             { return "Detects Perl insecure random number generation via rand() or srand(time) in security contexts." }
 func (r *InsecureRandomness) DefaultSeverity() rules.Severity { return rules.Medium }

@@ -3,10 +3,10 @@ package goflow
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 
 	// Import taint languages catalog so Go sources/sinks/sanitizers are registered.
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 func scanGoFlow(code string) []rules.Finding {
@@ -30,7 +30,7 @@ func findByRule(findings []rules.Finding, ruleID string) *rules.Finding {
 
 func hasTaintFinding(findings []rules.Finding) bool {
 	for _, f := range findings {
-		if len(f.RuleID) > 10 && f.RuleID[:10] == "GTSS-TAINT" {
+		if len(f.RuleID) > 10 && f.RuleID[:10] == "BATOU-TAINT" {
 			return true
 		}
 	}
@@ -159,7 +159,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	findings := scanGoFlow(code)
 	// After sanitization, there should be no HTML output taint finding
 	for _, f := range findings {
-		if f.RuleID == "GTSS-TAINT-html_output" {
+		if f.RuleID == "BATOU-TAINT-html_output" {
 			t.Error("should not flag sanitized flow through html.EscapeString")
 		}
 	}

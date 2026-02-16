@@ -3,11 +3,11 @@ package ruby
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // ==========================================================================
-// GTSS-RB-001: ERB Output Without Escaping
+// BATOU-RB-001: ERB Output Without Escaping
 // ==========================================================================
 
 func TestRB001_RawWithParams(t *testing.T) {
@@ -17,7 +17,7 @@ func TestRB001_RawWithParams(t *testing.T) {
   end
 end`
 	result := testutil.ScanContent(t, "/app/controllers/users_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-001")
+	testutil.MustFindRule(t, result, "BATOU-RB-001")
 }
 
 func TestRB001_HTMLSafeOnParams(t *testing.T) {
@@ -27,7 +27,7 @@ func TestRB001_HTMLSafeOnParams(t *testing.T) {
   end
 end`
 	result := testutil.ScanContent(t, "/app/controllers/posts_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-001")
+	testutil.MustFindRule(t, result, "BATOU-RB-001")
 }
 
 func TestRB001_HTMLSafeOnInterpolation(t *testing.T) {
@@ -35,7 +35,7 @@ func TestRB001_HTMLSafeOnInterpolation(t *testing.T) {
   "<div>#{user_input}</div>".html_safe
 end`
 	result := testutil.ScanContent(t, "/app/helpers/display_helper.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-001")
+	testutil.MustFindRule(t, result, "BATOU-RB-001")
 }
 
 func TestRB001_SanitizeHelper_Safe(t *testing.T) {
@@ -45,11 +45,11 @@ func TestRB001_SanitizeHelper_Safe(t *testing.T) {
   end
 end`
 	result := testutil.ScanContent(t, "/app/controllers/posts_controller.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-001")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-001")
 }
 
 // ==========================================================================
-// GTSS-RB-002: Command Injection
+// BATOU-RB-002: Command Injection
 // ==========================================================================
 
 func TestRB002_SystemWithParamsInterpolation(t *testing.T) {
@@ -57,7 +57,7 @@ func TestRB002_SystemWithParamsInterpolation(t *testing.T) {
   system("convert #{params[:filename]} output.png")
 end`
 	result := testutil.ScanContent(t, "/app/services/converter.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-002")
+	testutil.MustFindRule(t, result, "BATOU-RB-002")
 }
 
 func TestRB002_SystemWithRequestVar(t *testing.T) {
@@ -65,13 +65,13 @@ func TestRB002_SystemWithRequestVar(t *testing.T) {
   system(request.params[:host])
 end`
 	result := testutil.ScanContent(t, "/app/controllers/network_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-002")
+	testutil.MustFindRule(t, result, "BATOU-RB-002")
 }
 
 func TestRB002_BacktickWithParams(t *testing.T) {
 	content := "def run\n  result = `ls #{params[:dir]}`\nend"
 	result := testutil.ScanContent(t, "/app/services/file_service.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-002")
+	testutil.MustFindRule(t, result, "BATOU-RB-002")
 }
 
 func TestRB002_SystemArrayForm_Safe(t *testing.T) {
@@ -79,11 +79,11 @@ func TestRB002_SystemArrayForm_Safe(t *testing.T) {
   system("convert", file, "output.png")
 end`
 	result := testutil.ScanContent(t, "/app/services/converter.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-002")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-002")
 }
 
 // ==========================================================================
-// GTSS-RB-003: YAML.load
+// BATOU-RB-003: YAML.load
 // ==========================================================================
 
 func TestRB003_YAMLLoad(t *testing.T) {
@@ -92,7 +92,7 @@ func TestRB003_YAMLLoad(t *testing.T) {
   process(config)
 end`
 	result := testutil.ScanContent(t, "/app/services/config_parser.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-003")
+	testutil.MustFindRule(t, result, "BATOU-RB-003")
 }
 
 func TestRB003_YAMLLoadFile(t *testing.T) {
@@ -100,7 +100,7 @@ func TestRB003_YAMLLoadFile(t *testing.T) {
   settings = YAML.load_file(params[:config_path])
 end`
 	result := testutil.ScanContent(t, "/app/services/settings.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-003")
+	testutil.MustFindRule(t, result, "BATOU-RB-003")
 }
 
 func TestRB003_YAMLSafeLoad_Safe(t *testing.T) {
@@ -109,11 +109,11 @@ func TestRB003_YAMLSafeLoad_Safe(t *testing.T) {
   process(config)
 end`
 	result := testutil.ScanContent(t, "/app/services/config_parser.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-003")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-003")
 }
 
 // ==========================================================================
-// GTSS-RB-004: Sinatra Params in SQL/Shell
+// BATOU-RB-004: Sinatra Params in SQL/Shell
 // ==========================================================================
 
 func TestRB004_SinatraParamsInSQL(t *testing.T) {
@@ -121,7 +121,7 @@ func TestRB004_SinatraParamsInSQL(t *testing.T) {
   db.execute("SELECT * FROM users WHERE name = '#{params[:name]}'")
 end`
 	result := testutil.ScanContent(t, "/app/sinatra_app.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-004")
+	testutil.MustFindRule(t, result, "BATOU-RB-004")
 }
 
 func TestRB004_SinatraParamsInShell(t *testing.T) {
@@ -129,7 +129,7 @@ func TestRB004_SinatraParamsInShell(t *testing.T) {
   system("convert #{params[:file]} output.png")
 end`
 	result := testutil.ScanContent(t, "/app/sinatra_app.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-004")
+	testutil.MustFindRule(t, result, "BATOU-RB-004")
 }
 
 func TestRB004_SinatraParamsParameterized_Safe(t *testing.T) {
@@ -137,11 +137,11 @@ func TestRB004_SinatraParamsParameterized_Safe(t *testing.T) {
   db.execute("SELECT * FROM users WHERE name = ?", params[:name])
 end`
 	result := testutil.ScanContent(t, "/app/sinatra_app.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-004")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-004")
 }
 
 // ==========================================================================
-// GTSS-RB-005: Kernel#open with Pipe
+// BATOU-RB-005: Kernel#open with Pipe
 // ==========================================================================
 
 func TestRB005_OpenWithParams(t *testing.T) {
@@ -149,7 +149,7 @@ func TestRB005_OpenWithParams(t *testing.T) {
   data = open(params[:url]).read
 end`
 	result := testutil.ScanContent(t, "/app/controllers/files_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-005")
+	testutil.MustFindRule(t, result, "BATOU-RB-005")
 }
 
 func TestRB005_OpenWithPipe(t *testing.T) {
@@ -157,7 +157,7 @@ func TestRB005_OpenWithPipe(t *testing.T) {
   output = open("| ls -la /tmp")
 end`
 	result := testutil.ScanContent(t, "/app/services/runner.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-005")
+	testutil.MustFindRule(t, result, "BATOU-RB-005")
 }
 
 func TestRB005_URIOpenWithParams(t *testing.T) {
@@ -165,7 +165,7 @@ func TestRB005_URIOpenWithParams(t *testing.T) {
   data = URI.open(params[:url]).read
 end`
 	result := testutil.ScanContent(t, "/app/controllers/proxy_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-005")
+	testutil.MustFindRule(t, result, "BATOU-RB-005")
 }
 
 func TestRB005_FileOpen_Safe(t *testing.T) {
@@ -173,11 +173,11 @@ func TestRB005_FileOpen_Safe(t *testing.T) {
   data = File.open("config.yml").read
 end`
 	result := testutil.ScanContent(t, "/app/services/reader.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-005")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-005")
 }
 
 // ==========================================================================
-// GTSS-RB-006: send/public_send with User Input
+// BATOU-RB-006: send/public_send with User Input
 // ==========================================================================
 
 func TestRB006_SendWithParams(t *testing.T) {
@@ -185,7 +185,8 @@ func TestRB006_SendWithParams(t *testing.T) {
   obj.send(params[:method], params[:arg])
 end`
 	result := testutil.ScanContent(t, "/app/controllers/dynamic_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-006")
+	// Overlapping rules may win dedup; either detection is valid.
+	testutil.MustFindAnyRule(t, result, "BATOU-RB-006", "BATOU-RB-013")
 }
 
 func TestRB006_PublicSendWithParams(t *testing.T) {
@@ -193,7 +194,8 @@ func TestRB006_PublicSendWithParams(t *testing.T) {
   record.public_send(params[:action])
 end`
 	result := testutil.ScanContent(t, "/app/services/dispatcher.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-006")
+	// Overlapping rules may win dedup; either detection is valid.
+	testutil.MustFindAnyRule(t, result, "BATOU-RB-006", "BATOU-RB-013")
 }
 
 func TestRB006_SendWithLiteral_Safe(t *testing.T) {
@@ -201,11 +203,11 @@ func TestRB006_SendWithLiteral_Safe(t *testing.T) {
   record.send(:update_name, new_name)
 end`
 	result := testutil.ScanContent(t, "/app/services/updater.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-006")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-006")
 }
 
 // ==========================================================================
-// GTSS-RB-007: Regex Injection
+// BATOU-RB-007: Regex Injection
 // ==========================================================================
 
 func TestRB007_RegexpNewWithParams(t *testing.T) {
@@ -214,7 +216,7 @@ func TestRB007_RegexpNewWithParams(t *testing.T) {
   results = items.select { |i| i.name =~ pattern }
 end`
 	result := testutil.ScanContent(t, "/app/controllers/search_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-007")
+	testutil.MustFindRule(t, result, "BATOU-RB-007")
 }
 
 func TestRB007_RegexpEscape_Safe(t *testing.T) {
@@ -224,11 +226,11 @@ func TestRB007_RegexpEscape_Safe(t *testing.T) {
 end`
 	result := testutil.ScanContent(t, "/app/controllers/search_controller.rb", content)
 	// Regexp.escape sanitizes the input, so this is safe
-	testutil.MustNotFindRule(t, result, "GTSS-RB-007")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-007")
 }
 
 // ==========================================================================
-// GTSS-RB-008: Insecure SSL
+// BATOU-RB-008: Insecure SSL
 // ==========================================================================
 
 func TestRB008_SSLVerifyNone(t *testing.T) {
@@ -238,7 +240,7 @@ http.use_ssl = true
 http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 response = http.get(uri.path)`
 	result := testutil.ScanContent(t, "/app/services/http_client.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-008")
+	testutil.MustFindRule(t, result, "BATOU-RB-008")
 }
 
 func TestRB008_VerifyPeerFalse(t *testing.T) {
@@ -247,7 +249,7 @@ func TestRB008_VerifyPeerFalse(t *testing.T) {
   verify_peer: false
 )`
 	result := testutil.ScanContent(t, "/app/services/api_client.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-008")
+	testutil.MustFindRule(t, result, "BATOU-RB-008")
 }
 
 func TestRB008_SSLVerifyPeer_Safe(t *testing.T) {
@@ -257,11 +259,11 @@ http.use_ssl = true
 http.verify_mode = OpenSSL::SSL::VERIFY_PEER
 response = http.get(uri.path)`
 	result := testutil.ScanContent(t, "/app/services/http_client.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-008")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-008")
 }
 
 // ==========================================================================
-// GTSS-RB-009: Marshal.load
+// BATOU-RB-009: Marshal.load
 // ==========================================================================
 
 func TestRB009_MarshalLoad(t *testing.T) {
@@ -270,7 +272,7 @@ func TestRB009_MarshalLoad(t *testing.T) {
   process(obj)
 end`
 	result := testutil.ScanContent(t, "/app/services/cache.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-009")
+	testutil.MustFindRule(t, result, "BATOU-RB-009")
 }
 
 func TestRB009_MarshalRestore(t *testing.T) {
@@ -278,7 +280,7 @@ func TestRB009_MarshalRestore(t *testing.T) {
   session = Marshal.restore(blob)
 end`
 	result := testutil.ScanContent(t, "/app/services/session_store.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-009")
+	testutil.MustFindRule(t, result, "BATOU-RB-009")
 }
 
 func TestRB009_JSONParse_Safe(t *testing.T) {
@@ -287,11 +289,11 @@ func TestRB009_JSONParse_Safe(t *testing.T) {
   process(obj)
 end`
 	result := testutil.ScanContent(t, "/app/services/cache.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-009")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-009")
 }
 
 // ==========================================================================
-// GTSS-RB-010: Mass Assignment
+// BATOU-RB-010: Mass Assignment
 // ==========================================================================
 
 func TestRB010_UpdateAttributesWithParams(t *testing.T) {
@@ -299,7 +301,7 @@ func TestRB010_UpdateAttributesWithParams(t *testing.T) {
   @user.update_attributes(params[:user])
 end`
 	result := testutil.ScanContent(t, "/app/controllers/users_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-010")
+	testutil.MustFindRule(t, result, "BATOU-RB-010")
 }
 
 func TestRB010_CreateWithRawParams(t *testing.T) {
@@ -307,7 +309,7 @@ func TestRB010_CreateWithRawParams(t *testing.T) {
   User.create(params[:user])
 end`
 	result := testutil.ScanContent(t, "/app/controllers/users_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-010")
+	testutil.MustFindRule(t, result, "BATOU-RB-010")
 }
 
 func TestRB010_AttrAccessible(t *testing.T) {
@@ -315,7 +317,7 @@ func TestRB010_AttrAccessible(t *testing.T) {
   attr_accessible :name, :email
 end`
 	result := testutil.ScanContent(t, "/app/models/user.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-010")
+	testutil.MustFindRule(t, result, "BATOU-RB-010")
 }
 
 func TestRB010_StrongParams_Safe(t *testing.T) {
@@ -329,11 +331,11 @@ def user_params
   params.require(:user).permit(:name, :email)
 end`
 	result := testutil.ScanContent(t, "/app/controllers/users_controller.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-010")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-010")
 }
 
 // ==========================================================================
-// GTSS-RB-011: Open Redirect
+// BATOU-RB-011: Open Redirect
 // ==========================================================================
 
 func TestRB011_RedirectToParams(t *testing.T) {
@@ -342,7 +344,7 @@ func TestRB011_RedirectToParams(t *testing.T) {
   redirect_to params[:return_url]
 end`
 	result := testutil.ScanContent(t, "/app/controllers/sessions_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-011")
+	testutil.MustFindRule(t, result, "BATOU-RB-011")
 }
 
 func TestRB011_RedirectToReferer(t *testing.T) {
@@ -350,7 +352,7 @@ func TestRB011_RedirectToReferer(t *testing.T) {
   redirect_to request.referer
 end`
 	result := testutil.ScanContent(t, "/app/controllers/application_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-011")
+	testutil.MustFindRule(t, result, "BATOU-RB-011")
 }
 
 func TestRB011_RedirectToNamedRoute_Safe(t *testing.T) {
@@ -359,11 +361,11 @@ func TestRB011_RedirectToNamedRoute_Safe(t *testing.T) {
   redirect_to root_path
 end`
 	result := testutil.ScanContent(t, "/app/controllers/sessions_controller.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-011")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-011")
 }
 
 // ==========================================================================
-// GTSS-RB-012: Cookie Security
+// BATOU-RB-012: Cookie Security
 // ==========================================================================
 
 func TestRB012_CookieFromParams(t *testing.T) {
@@ -371,7 +373,7 @@ func TestRB012_CookieFromParams(t *testing.T) {
   cookies[:theme] = params[:theme]
 end`
 	result := testutil.ScanContent(t, "/app/controllers/prefs_controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-RB-012")
+	testutil.MustFindRule(t, result, "BATOU-RB-012")
 }
 
 func TestRB012_CookieWithFlags_Safe(t *testing.T) {
@@ -379,5 +381,5 @@ func TestRB012_CookieWithFlags_Safe(t *testing.T) {
   cookies[:theme] = { value: "dark", httponly: true, secure: true, same_site: :lax }
 end`
 	result := testutil.ScanContent(t, "/app/controllers/prefs_controller.rb", content)
-	testutil.MustNotFindRule(t, result, "GTSS-RB-012")
+	testutil.MustNotFindRule(t, result, "BATOU-RB-012")
 }

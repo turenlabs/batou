@@ -1,9 +1,9 @@
 // Package graph implements a persistent, session-aware call graph that tracks
 // function relationships across the entire project. As Claude writes and edits
-// code, the graph is incrementally updated so that GTSS can perform interprocedural
+// code, the graph is incrementally updated so that Batou can perform interprocedural
 // taint analysis — tracing data flow across function call boundaries.
 //
-// The graph persists to .gtss/callgraph.json in the project root so it survives
+// The graph persists to .batou/callgraph.json in the project root so it survives
 // across individual hook invocations within a session.
 //
 // When function B is modified:
@@ -18,8 +18,8 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // CallGraph is the project-wide function relationship graph.

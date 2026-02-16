@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-XXE-001: Java XML Parser without Secure Configuration
+// BATOU-XXE-001: Java XML Parser without Secure Configuration
 var (
 	// DocumentBuilderFactory.newInstance() — vulnerable unless features are set
 	reDocBuilderFactory = regexp.MustCompile(`\bDocumentBuilderFactory\s*\.\s*newInstance\s*\(`)
@@ -36,7 +36,7 @@ var (
 	reSetAttribute = regexp.MustCompile(`\.setAttribute\s*\(`)
 )
 
-// GTSS-XXE-002: JavaScript/Node XML Parser with Entity Expansion
+// BATOU-XXE-002: JavaScript/Node XML Parser with Entity Expansion
 var (
 	// libxmljs.parseXml with noent: true (explicit entity expansion)
 	reLibxmlNoent = regexp.MustCompile(`\blibxml(?:js)?\s*\.\s*parseXml\s*\([^)]*\bnoent\s*:\s*true`)
@@ -52,7 +52,7 @@ var (
 	reXMLParseReqInput = regexp.MustCompile(`(?:parse(?:Xml|XML|String)?|parseFromString)\s*\(\s*(?:req\s*\.\s*(?:body|query|params)|request\s*\.\s*(?:body|input))`)
 )
 
-// GTSS-XXE-003: Python XML Parser (unsafe by default)
+// BATOU-XXE-003: Python XML Parser (unsafe by default)
 var (
 	// Python: xml.etree.ElementTree.parse / fromstring
 	rePyElementTree = regexp.MustCompile(`\b(?:ET|ElementTree|xml\.etree\.ElementTree)\s*\.\s*(?:parse|fromstring|XML|iterparse)\s*\(`)
@@ -70,7 +70,7 @@ var (
 	rePyResolveEntitiesFalse = regexp.MustCompile(`resolve_entities\s*=\s*False`)
 )
 
-// GTSS-XXE-004: C#/.NET XML Parser without Secure Configuration
+// BATOU-XXE-004: C#/.NET XML Parser without Secure Configuration
 var (
 	// XmlDocument.Load / LoadXml
 	reCSharpXmlDocument = regexp.MustCompile(`\bXmlDocument\s*\(\s*\)|\.Load(?:Xml)?\s*\(`)
@@ -152,12 +152,12 @@ func hasSecureXMLConfigWithSetters(lines []string, idx int) bool {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XXE-001: Java XML Parser without Secure Configuration
+// BATOU-XXE-001: Java XML Parser without Secure Configuration
 // ---------------------------------------------------------------------------
 
 type JavaXXE struct{}
 
-func (r JavaXXE) ID() string                       { return "GTSS-XXE-001" }
+func (r JavaXXE) ID() string                       { return "BATOU-XXE-001" }
 func (r JavaXXE) Name() string                     { return "Java XXE Vulnerability" }
 func (r JavaXXE) DefaultSeverity() rules.Severity  { return rules.Critical }
 func (r JavaXXE) Description() string {
@@ -221,12 +221,12 @@ func (r JavaXXE) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XXE-002: JavaScript/Node XML Parser with Entity Expansion
+// BATOU-XXE-002: JavaScript/Node XML Parser with Entity Expansion
 // ---------------------------------------------------------------------------
 
 type JavaScriptXXE struct{}
 
-func (r JavaScriptXXE) ID() string                       { return "GTSS-XXE-002" }
+func (r JavaScriptXXE) ID() string                       { return "BATOU-XXE-002" }
 func (r JavaScriptXXE) Name() string                     { return "JavaScript XXE Vulnerability" }
 func (r JavaScriptXXE) DefaultSeverity() rules.Severity  { return rules.Critical }
 func (r JavaScriptXXE) Description() string {
@@ -285,12 +285,12 @@ func (r JavaScriptXXE) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XXE-003: Python XML Parser (unsafe by default)
+// BATOU-XXE-003: Python XML Parser (unsafe by default)
 // ---------------------------------------------------------------------------
 
 type PythonXXE struct{}
 
-func (r PythonXXE) ID() string                       { return "GTSS-XXE-003" }
+func (r PythonXXE) ID() string                       { return "BATOU-XXE-003" }
 func (r PythonXXE) Name() string                     { return "Python XXE Vulnerability" }
 func (r PythonXXE) DefaultSeverity() rules.Severity  { return rules.High }
 func (r PythonXXE) Description() string {
@@ -375,12 +375,12 @@ func hasPySecureXMLConfig(lines []string, idx int) bool {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-XXE-004: C#/.NET XML Parser without Secure Configuration
+// BATOU-XXE-004: C#/.NET XML Parser without Secure Configuration
 // ---------------------------------------------------------------------------
 
 type CSharpXXE struct{}
 
-func (r CSharpXXE) ID() string                       { return "GTSS-XXE-004" }
+func (r CSharpXXE) ID() string                       { return "BATOU-XXE-004" }
 func (r CSharpXXE) Name() string                     { return "C# XXE Vulnerability" }
 func (r CSharpXXE) DefaultSeverity() rules.Severity  { return rules.High }
 func (r CSharpXXE) Description() string {

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,26 +12,26 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-SVELTE-001: {@html} tag with user input
+	// BATOU-FW-SVELTE-001: {@html} tag with user input
 	reSvelteHtmlTag = regexp.MustCompile(`\{@html\s+`)
 
-	// GTSS-FW-SVELTE-002: SvelteKit load function exposing secrets
+	// BATOU-FW-SVELTE-002: SvelteKit load function exposing secrets
 	reSvelteLoadFunction    = regexp.MustCompile(`export\s+(?:async\s+)?function\s+load\s*\(`)
 	reSvelteLoadArrow       = regexp.MustCompile(`export\s+const\s+load\s*[=:]\s*(?:async\s*)?\(`)
 	reSvelteSecretPattern   = regexp.MustCompile(`(?i)(?:process\.env\.|import\.meta\.env\.)(?:SECRET|PRIVATE|API_KEY|DATABASE|DB_|TOKEN|PASSWORD|AUTH)`)
 	reSveltePrivateEnv      = regexp.MustCompile(`\$env/static/private|\$env/dynamic/private`)
 
-	// GTSS-FW-SVELTE-003: SvelteKit form action without CSRF
+	// BATOU-FW-SVELTE-003: SvelteKit form action without CSRF
 	reSvelteFormAction = regexp.MustCompile(`export\s+const\s+actions\s*[=:]`)
 
-	// GTSS-FW-SVELTE-004: SvelteKit API route without auth
+	// BATOU-FW-SVELTE-004: SvelteKit API route without auth
 	reSvelteApiHandler = regexp.MustCompile(`export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH)\s*\(`)
 
-	// GTSS-FW-SVELTE-005: Svelte store with sensitive data
+	// BATOU-FW-SVELTE-005: Svelte store with sensitive data
 	reSvelteWritableStore  = regexp.MustCompile(`writable\s*\(`)
 	reSvelteStoreSensitive = regexp.MustCompile(`(?i)(?:token|secret|password|apiKey|api_key|auth|credential|session|jwt)`)
 
-	// GTSS-FW-SVELTE-006: SvelteKit env leaked to client
+	// BATOU-FW-SVELTE-006: SvelteKit env leaked to client
 	reSveltePublicEnvImport = regexp.MustCompile(`\$env/static/public|\$env/dynamic/public`)
 	reSvelteEnvSensitive    = regexp.MustCompile(`(?i)(?:SECRET|PRIVATE|KEY|TOKEN|PASSWORD|CREDENTIAL|DATABASE|DB_)`)
 )
@@ -46,12 +46,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SVELTE-001: {@html} tag with user input (XSS)
+// BATOU-FW-SVELTE-001: {@html} tag with user input (XSS)
 // ---------------------------------------------------------------------------
 
 type SvelteHtmlTag struct{}
 
-func (r *SvelteHtmlTag) ID() string                      { return "GTSS-FW-SVELTE-001" }
+func (r *SvelteHtmlTag) ID() string                      { return "BATOU-FW-SVELTE-001" }
 func (r *SvelteHtmlTag) Name() string                    { return "SvelteHtmlTag" }
 func (r *SvelteHtmlTag) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SvelteHtmlTag) Description() string {
@@ -97,12 +97,12 @@ func (r *SvelteHtmlTag) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SVELTE-002: SvelteKit load function exposing secrets
+// BATOU-FW-SVELTE-002: SvelteKit load function exposing secrets
 // ---------------------------------------------------------------------------
 
 type SvelteLoadSecrets struct{}
 
-func (r *SvelteLoadSecrets) ID() string                      { return "GTSS-FW-SVELTE-002" }
+func (r *SvelteLoadSecrets) ID() string                      { return "BATOU-FW-SVELTE-002" }
 func (r *SvelteLoadSecrets) Name() string                    { return "SvelteLoadSecrets" }
 func (r *SvelteLoadSecrets) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SvelteLoadSecrets) Description() string {
@@ -154,12 +154,12 @@ func (r *SvelteLoadSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SVELTE-003: SvelteKit form action without CSRF
+// BATOU-FW-SVELTE-003: SvelteKit form action without CSRF
 // ---------------------------------------------------------------------------
 
 type SvelteFormCSRF struct{}
 
-func (r *SvelteFormCSRF) ID() string                      { return "GTSS-FW-SVELTE-003" }
+func (r *SvelteFormCSRF) ID() string                      { return "BATOU-FW-SVELTE-003" }
 func (r *SvelteFormCSRF) Name() string                    { return "SvelteFormCSRF" }
 func (r *SvelteFormCSRF) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SvelteFormCSRF) Description() string {
@@ -208,12 +208,12 @@ func (r *SvelteFormCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SVELTE-004: SvelteKit API route without authentication
+// BATOU-FW-SVELTE-004: SvelteKit API route without authentication
 // ---------------------------------------------------------------------------
 
 type SvelteAPINoAuth struct{}
 
-func (r *SvelteAPINoAuth) ID() string                      { return "GTSS-FW-SVELTE-004" }
+func (r *SvelteAPINoAuth) ID() string                      { return "BATOU-FW-SVELTE-004" }
 func (r *SvelteAPINoAuth) Name() string                    { return "SvelteAPINoAuth" }
 func (r *SvelteAPINoAuth) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SvelteAPINoAuth) Description() string {
@@ -271,12 +271,12 @@ func (r *SvelteAPINoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SVELTE-005: Svelte store with sensitive data
+// BATOU-FW-SVELTE-005: Svelte store with sensitive data
 // ---------------------------------------------------------------------------
 
 type SvelteStoreSensitive struct{}
 
-func (r *SvelteStoreSensitive) ID() string                      { return "GTSS-FW-SVELTE-005" }
+func (r *SvelteStoreSensitive) ID() string                      { return "BATOU-FW-SVELTE-005" }
 func (r *SvelteStoreSensitive) Name() string                    { return "SvelteStoreSensitive" }
 func (r *SvelteStoreSensitive) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SvelteStoreSensitive) Description() string {
@@ -322,12 +322,12 @@ func (r *SvelteStoreSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-SVELTE-006: SvelteKit environment variable leaked to client
+// BATOU-FW-SVELTE-006: SvelteKit environment variable leaked to client
 // ---------------------------------------------------------------------------
 
 type SvelteEnvLeak struct{}
 
-func (r *SvelteEnvLeak) ID() string                      { return "GTSS-FW-SVELTE-006" }
+func (r *SvelteEnvLeak) ID() string                      { return "BATOU-FW-SVELTE-006" }
 func (r *SvelteEnvLeak) Name() string                    { return "SvelteEnvLeak" }
 func (r *SvelteEnvLeak) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SvelteEnvLeak) Description() string {

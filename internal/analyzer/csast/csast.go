@@ -3,8 +3,8 @@ package csast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // CSharpASTAnalyzer performs AST-based security analysis of C# source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&CSharpASTAnalyzer{})
 }
 
-func (a *CSharpASTAnalyzer) ID() string                        { return "GTSS-CS-AST" }
+func (a *CSharpASTAnalyzer) ID() string                        { return "BATOU-CS-AST" }
 func (a *CSharpASTAnalyzer) Name() string                      { return "C# AST Security Analyzer" }
 func (a *CSharpASTAnalyzer) DefaultSeverity() rules.Severity   { return rules.High }
 func (a *CSharpASTAnalyzer) Languages() []rules.Language        { return []rules.Language{rules.LangCSharp} }
@@ -88,7 +88,7 @@ func (c *csChecker) checkSqlCommandConcat(n *ast.Node) {
 			firstArg := args[0]
 			if containsConcatOrInterpolation(firstArg) {
 				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "GTSS-CS-AST-001",
+					RuleID:        "BATOU-CS-AST-001",
 					Severity:      rules.Critical,
 					SeverityLabel: rules.Critical.String(),
 					Title:         "SQL injection via " + typeName + " with string concatenation",
@@ -127,7 +127,7 @@ func (c *csChecker) checkInsecureDeserializer(n *ast.Node) {
 
 	if desc, ok := insecureTypes[typeName]; ok {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-CS-AST-002",
+			RuleID:        "BATOU-CS-AST-002",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Insecure deserializer: " + typeName,
@@ -175,7 +175,7 @@ func (c *csChecker) checkRegexWithoutTimeout(n *ast.Node) {
 				})
 				if isVariable {
 					c.findings = append(c.findings, rules.Finding{
-						RuleID:        "GTSS-CS-AST-003",
+						RuleID:        "BATOU-CS-AST-003",
 						Severity:      rules.High,
 						SeverityLabel: rules.High.String(),
 						Title:         "Regex without timeout (ReDoS risk)",
@@ -241,7 +241,7 @@ func (c *csChecker) checkProcessStart(n *ast.Node) {
 
 	if hasVarArg {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-CS-AST-004",
+			RuleID:        "BATOU-CS-AST-004",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "Command injection via Process.Start",
@@ -304,7 +304,7 @@ func (c *csChecker) checkRawSQLEntityFramework(n *ast.Node) {
 	firstArg := args[0]
 	if isUnsafe && containsConcatOrInterpolation(firstArg) {
 		c.findings = append(c.findings, rules.Finding{
-			RuleID:        "GTSS-CS-AST-005",
+			RuleID:        "BATOU-CS-AST-005",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
 			Title:         "SQL injection via Entity Framework " + methodName,

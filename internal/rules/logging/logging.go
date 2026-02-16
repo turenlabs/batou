@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -84,12 +84,12 @@ func truncate(s string, maxLen int) string {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-001: Unsanitized User Input in Log Calls
+// BATOU-LOG-001: Unsanitized User Input in Log Calls
 // ---------------------------------------------------------------------------
 
 type UnsanitizedLogInput struct{}
 
-func (r UnsanitizedLogInput) ID() string              { return "GTSS-LOG-001" }
+func (r UnsanitizedLogInput) ID() string              { return "BATOU-LOG-001" }
 func (r UnsanitizedLogInput) Name() string            { return "Unsanitized User Input in Log Calls" }
 func (r UnsanitizedLogInput) DefaultSeverity() rules.Severity { return rules.High }
 func (r UnsanitizedLogInput) Description() string {
@@ -178,12 +178,12 @@ func (r UnsanitizedLogInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-002: CRLF Injection in Log Messages
+// BATOU-LOG-002: CRLF Injection in Log Messages
 // ---------------------------------------------------------------------------
 
 type CRLFLogInjection struct{}
 
-func (r CRLFLogInjection) ID() string              { return "GTSS-LOG-002" }
+func (r CRLFLogInjection) ID() string              { return "BATOU-LOG-002" }
 func (r CRLFLogInjection) Name() string            { return "CRLF Injection in Log Messages" }
 func (r CRLFLogInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r CRLFLogInjection) Description() string {
@@ -279,12 +279,12 @@ func (r CRLFLogInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-LOG-003: Sensitive Data in Logs
+// BATOU-LOG-003: Sensitive Data in Logs
 // ---------------------------------------------------------------------------
 
 type SensitiveDataInLogs struct{}
 
-func (r SensitiveDataInLogs) ID() string              { return "GTSS-LOG-003" }
+func (r SensitiveDataInLogs) ID() string              { return "BATOU-LOG-003" }
 func (r SensitiveDataInLogs) Name() string            { return "Sensitive Data in Logs" }
 func (r SensitiveDataInLogs) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r SensitiveDataInLogs) Description() string {

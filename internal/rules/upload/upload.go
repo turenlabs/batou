@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-UPLOAD-001: File upload without type validation
+// BATOU-UPLOAD-001: File upload without type validation
 var (
 	reUploadNoValidationPy    = regexp.MustCompile(`(?i)(?:request\.files|upload|uploaded_file|file_upload)\s*[\[.]\s*["']?\w+["']?\s*\]?\s*\.save\s*\(`)
 	reUploadNoValidationPHP   = regexp.MustCompile(`(?i)move_uploaded_file\s*\(\s*\$_FILES`)
@@ -22,7 +22,7 @@ var (
 	reUploadTypeCheck         = regexp.MustCompile(`(?i)(?:content.?type|mime.?type|file.?type|extension|\.endswith|\.ends_with|getContentType|content_type|mimetype|ALLOWED_EXTENSIONS|allowed_types|accept|file_filter|fileFilter)`)
 )
 
-// GTSS-UPLOAD-002: File upload path traversal
+// BATOU-UPLOAD-002: File upload path traversal
 var (
 	reUploadPathTraversalConcat   = regexp.MustCompile(`(?i)(?:os\.path\.join|Path\.Combine|filepath\.Join|path\.join|File\.join)\s*\([^,)]*,\s*(?:request\.|req\.|params|filename|original_filename|getOriginalFilename|originalname|\$_FILES)`)
 	reUploadPathTraversalDirect   = regexp.MustCompile(`(?i)(?:upload_dir|upload_path|save_path|dest|destination)\s*[=+]\s*[^;]*(?:filename|original_filename|originalname|\$_FILES\s*\[\s*["']\w+["']\s*\]\s*\[\s*["']name["']\])`)
@@ -30,13 +30,13 @@ var (
 	reUploadPathSanitize          = regexp.MustCompile(`(?i)(?:secure_filename|basename|File\.basename|filepath\.Base|path\.basename|Path\.GetFileName|sanitize|strip_path)`)
 )
 
-// GTSS-UPLOAD-003: Upload to publicly accessible directory
+// BATOU-UPLOAD-003: Upload to publicly accessible directory
 var (
 	reUploadPublicDir = regexp.MustCompile(`(?i)(?:upload_dir|upload_path|save_path|dest|destination|upload_folder)\s*[=:]\s*["'](?:[^"']*(?:public|static|www|wwwroot|htdocs|webroot|assets|media|uploads)/?)["']`)
 	reUploadPublicJoin = regexp.MustCompile(`(?i)(?:os\.path\.join|Path\.Combine|filepath\.Join|path\.join)\s*\([^)]*(?:public|static|www|wwwroot|htdocs|webroot|assets)`)
 )
 
-// GTSS-UPLOAD-004: File upload without size limit
+// BATOU-UPLOAD-004: File upload without size limit
 var (
 	reUploadNoSizePy     = regexp.MustCompile(`(?i)(?:MAX_CONTENT_LENGTH|max_content_length|MAX_UPLOAD_SIZE)\s*[=:]\s*None`)
 	reUploadNoSizePHP    = regexp.MustCompile(`(?i)(?:upload_max_filesize|post_max_size)\s*=\s*(?:0|-1|unlimited)`)
@@ -45,26 +45,26 @@ var (
 	reUploadNoSizeJava   = regexp.MustCompile(`(?i)(?:setMaxFileSize|setMaxRequestSize)\s*\(\s*-1\s*\)`)
 )
 
-// GTSS-UPLOAD-005: Upload without magic byte/content verification
+// BATOU-UPLOAD-005: Upload without magic byte/content verification
 var (
 	reUploadExtensionOnly = regexp.MustCompile(`(?i)(?:\.endswith|\.ends_with|\.toLowerCase\(\)\s*===?\s*["']\.\w+["']|\.extension|getOriginalFilename\(\)\.(?:split|substring|endsWith)|\.split\s*\(\s*["']\.\s*["']\s*\)\s*\.pop)`)
 	reUploadMagicCheck    = regexp.MustCompile(`(?i)(?:magic|python-magic|file.?type|imghdr|filetype|mime\.magic|FileTypeDetector|content.?inspection|magic_bytes|file_header|read\s*\(\s*\d+\s*\)|fileTypeFromBuffer|fromBuffer)`)
 )
 
-// GTSS-UPLOAD-006: Executable file extension allowed
+// BATOU-UPLOAD-006: Executable file extension allowed
 var (
 	reUploadExecutableExt = regexp.MustCompile(`(?i)(?:allowed|accept|permit|valid|whitelist|allowlist)(?:_)?(?:ext|extension|type|format)s?\s*[=:]\s*[\[({][^)\]}]*["']\.?(?:php|phtml|php[345]|pht|jsp|jspx|asp|aspx|exe|sh|bat|cmd|cgi|pl|py|rb|war|jar)["']`)
 	reUploadNoExtBlock    = regexp.MustCompile(`(?i)(?:\.(?:php|jsp|asp|aspx|exe|sh|bat|cmd|cgi|war|jar))\s*["']\s*(?:=>|:)\s*(?:true|["'](?:allow|accept))`)
 )
 
-// GTSS-UPLOAD-007: SVG upload without sanitization
+// BATOU-UPLOAD-007: SVG upload without sanitization
 var (
 	reUploadSVGAllow    = regexp.MustCompile(`(?i)(?:allowed|accept|permit|valid|whitelist|allowlist)(?:_)?(?:ext|extension|type|format|mime)s?\s*[=:]\s*[\[({][^)\]}]*["'](?:\.svg|image/svg|svg)["']`)
 	reUploadSVGMime     = regexp.MustCompile(`(?i)(?:content.?type|mime.?type)\s*(?:===?|==|\.includes|\.contains)\s*["']image/svg`)
 	reUploadSVGSanitize = regexp.MustCompile(`(?i)(?:sanitize.?svg|svg.?sanitize|DOMPurify|clean.?svg|svg.?clean|bleach|defused)`)
 )
 
-// GTSS-UPLOAD-008: Client-side only upload validation
+// BATOU-UPLOAD-008: Client-side only upload validation
 var (
 	reClientSideValidation = regexp.MustCompile(`(?i)(?:accept\s*=\s*["'][^"']+["']|\.files\s*\[\s*0\s*\]\s*\.(?:type|name|size)|input\.files|event\.target\.files|FileReader|(?:onChange|onchange)\s*=)`)
 	reClientSideTypeCheck  = regexp.MustCompile(`(?i)(?:file\.type\s*(?:===?|!==?|==)\s*["']|file\.name\.(?:endsWith|match|split)|\.accept\s*=)`)
@@ -108,12 +108,12 @@ func hasNearbyPattern(lines []string, idx, before, after int, re *regexp.Regexp)
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-UPLOAD-001: File upload without type validation
+// BATOU-UPLOAD-001: File upload without type validation
 // ---------------------------------------------------------------------------
 
 type UploadNoTypeValidation struct{}
 
-func (r *UploadNoTypeValidation) ID() string                     { return "GTSS-UPLOAD-001" }
+func (r *UploadNoTypeValidation) ID() string                     { return "BATOU-UPLOAD-001" }
 func (r *UploadNoTypeValidation) Name() string                   { return "UploadNoTypeValidation" }
 func (r *UploadNoTypeValidation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UploadNoTypeValidation) Description() string {
@@ -180,12 +180,12 @@ func (r *UploadNoTypeValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-UPLOAD-002: File upload path traversal
+// BATOU-UPLOAD-002: File upload path traversal
 // ---------------------------------------------------------------------------
 
 type UploadPathTraversal struct{}
 
-func (r *UploadPathTraversal) ID() string                     { return "GTSS-UPLOAD-002" }
+func (r *UploadPathTraversal) ID() string                     { return "BATOU-UPLOAD-002" }
 func (r *UploadPathTraversal) Name() string                   { return "UploadPathTraversal" }
 func (r *UploadPathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UploadPathTraversal) Description() string {
@@ -233,12 +233,12 @@ func (r *UploadPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-UPLOAD-003: Upload to publicly accessible directory
+// BATOU-UPLOAD-003: Upload to publicly accessible directory
 // ---------------------------------------------------------------------------
 
 type UploadPublicDir struct{}
 
-func (r *UploadPublicDir) ID() string                     { return "GTSS-UPLOAD-003" }
+func (r *UploadPublicDir) ID() string                     { return "BATOU-UPLOAD-003" }
 func (r *UploadPublicDir) Name() string                   { return "UploadPublicDir" }
 func (r *UploadPublicDir) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UploadPublicDir) Description() string {
@@ -282,12 +282,12 @@ func (r *UploadPublicDir) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-UPLOAD-004: File upload without size limit
+// BATOU-UPLOAD-004: File upload without size limit
 // ---------------------------------------------------------------------------
 
 type UploadNoSizeLimit struct{}
 
-func (r *UploadNoSizeLimit) ID() string                     { return "GTSS-UPLOAD-004" }
+func (r *UploadNoSizeLimit) ID() string                     { return "BATOU-UPLOAD-004" }
 func (r *UploadNoSizeLimit) Name() string                   { return "UploadNoSizeLimit" }
 func (r *UploadNoSizeLimit) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UploadNoSizeLimit) Description() string {
@@ -346,12 +346,12 @@ func (r *UploadNoSizeLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-UPLOAD-005: Upload without magic byte/content verification
+// BATOU-UPLOAD-005: Upload without magic byte/content verification
 // ---------------------------------------------------------------------------
 
 type UploadNoMagicBytes struct{}
 
-func (r *UploadNoMagicBytes) ID() string                     { return "GTSS-UPLOAD-005" }
+func (r *UploadNoMagicBytes) ID() string                     { return "BATOU-UPLOAD-005" }
 func (r *UploadNoMagicBytes) Name() string                   { return "UploadNoMagicBytes" }
 func (r *UploadNoMagicBytes) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UploadNoMagicBytes) Description() string {
@@ -396,12 +396,12 @@ func (r *UploadNoMagicBytes) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-UPLOAD-006: Executable file extension allowed
+// BATOU-UPLOAD-006: Executable file extension allowed
 // ---------------------------------------------------------------------------
 
 type UploadExecutableExt struct{}
 
-func (r *UploadExecutableExt) ID() string                     { return "GTSS-UPLOAD-006" }
+func (r *UploadExecutableExt) ID() string                     { return "BATOU-UPLOAD-006" }
 func (r *UploadExecutableExt) Name() string                   { return "UploadExecutableExt" }
 func (r *UploadExecutableExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UploadExecutableExt) Description() string {
@@ -445,12 +445,12 @@ func (r *UploadExecutableExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-UPLOAD-007: SVG upload without sanitization
+// BATOU-UPLOAD-007: SVG upload without sanitization
 // ---------------------------------------------------------------------------
 
 type UploadSVGNoSanitize struct{}
 
-func (r *UploadSVGNoSanitize) ID() string                     { return "GTSS-UPLOAD-007" }
+func (r *UploadSVGNoSanitize) ID() string                     { return "BATOU-UPLOAD-007" }
 func (r *UploadSVGNoSanitize) Name() string                   { return "UploadSVGNoSanitize" }
 func (r *UploadSVGNoSanitize) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UploadSVGNoSanitize) Description() string {
@@ -498,12 +498,12 @@ func (r *UploadSVGNoSanitize) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-UPLOAD-008: Client-side only upload validation
+// BATOU-UPLOAD-008: Client-side only upload validation
 // ---------------------------------------------------------------------------
 
 type UploadClientSideOnly struct{}
 
-func (r *UploadClientSideOnly) ID() string                     { return "GTSS-UPLOAD-008" }
+func (r *UploadClientSideOnly) ID() string                     { return "BATOU-UPLOAD-008" }
 func (r *UploadClientSideOnly) Name() string                   { return "UploadClientSideOnly" }
 func (r *UploadClientSideOnly) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UploadClientSideOnly) Description() string {

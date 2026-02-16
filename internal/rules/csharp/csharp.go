@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-CS-001: SQL Injection (SqlCommand/SqlConnection with string concat/interpolation)
+// BATOU-CS-001: SQL Injection (SqlCommand/SqlConnection with string concat/interpolation)
 var (
 	// SqlCommand with string concatenation
 	reSQLCommandConcat = regexp.MustCompile(`(?i)new\s+SqlCommand\s*\(\s*(?:["'][^"']*["']\s*\+|\$"[^"]*\{|[a-zA-Z_]\w*\s*[,)])`)
@@ -30,7 +30,7 @@ var (
 	reSQLSafe = regexp.MustCompile(`(?i)(?:SqlParameter|\.Parameters\.Add|\.Parameters\.AddWithValue|FromSqlInterpolated|ExecuteSqlInterpolated)`)
 )
 
-// GTSS-CS-003: Insecure deserialization
+// BATOU-CS-003: Insecure deserialization
 var (
 	// BinaryFormatter, SoapFormatter, NetDataContractSerializer, LosFormatter, ObjectStateFormatter
 	reInsecureDeserializer = regexp.MustCompile(`\b(?:BinaryFormatter|SoapFormatter|NetDataContractSerializer|LosFormatter|ObjectStateFormatter)\s*(?:\(\s*\)|[^(])`)
@@ -42,7 +42,7 @@ var (
 	reTypeNameHandlingUnsafe = regexp.MustCompile(`(?i)TypeNameHandling\s*=\s*TypeNameHandling\.(?:All|Auto|Objects|Arrays)`)
 )
 
-// GTSS-CS-004: Command injection (Process.Start with user-controlled args)
+// BATOU-CS-004: Command injection (Process.Start with user-controlled args)
 var (
 	// Process.Start with variable as first arg, or with string concat/interpolation
 	reProcessStart = regexp.MustCompile(`Process\.Start\s*\(\s*(?:[a-zA-Z_]\w*|["'][^"']*["']\s*\+|\$")`)
@@ -55,7 +55,7 @@ var (
 	reProcessSafe = regexp.MustCompile(`Process\.Start\s*\(\s*["'][^"']+["']\s*\)`)
 )
 
-// GTSS-CS-005: Path traversal
+// BATOU-CS-005: Path traversal
 var (
 	reFileOpsUserInput = regexp.MustCompile(`(?:File\.(?:ReadAllText|ReadAllBytes|ReadAllLines|WriteAllText|WriteAllBytes|WriteAllLines|Delete|Copy|Move|Exists|Open|Create|AppendAllText)|Directory\.(?:Delete|CreateDirectory|GetFiles|GetDirectories|EnumerateFiles))\s*\(`)
 	rePathCombine      = regexp.MustCompile(`Path\.Combine\s*\(`)
@@ -64,18 +64,18 @@ var (
 	rePathSafe = regexp.MustCompile(`(?:Path\.GetFileName\s*\(|\.StartsWith\s*\(|Path\.GetFullPath\s*\(|\.ToString\s*\(\s*\))`)
 )
 
-// GTSS-CS-006: LDAP injection
+// BATOU-CS-006: LDAP injection
 var (
 	reLDAPFilterConcat     = regexp.MustCompile(`(?i)(?:DirectorySearcher|searcher)\s*(?:\(\s*|\.Filter\s*=\s*)(?:["'][^"']*["']\s*\+|\$"|[a-zA-Z_]\w*\s*[;)])`)
 	reLDAPNewSearcherConcat = regexp.MustCompile(`(?i)new\s+DirectorySearcher\s*\(\s*(?:["'][^"']*["']\s*\+|\$")`)
 )
 
-// GTSS-CS-008: Hardcoded connection strings
+// BATOU-CS-008: Hardcoded connection strings
 var (
 	reHardcodedConnString = regexp.MustCompile(`(?i)(?:connectionString|connStr|conn_str|connection)\s*=\s*["'][^"']*(?:password|pwd|Password|PWD)\s*=\s*[^"']+["']`)
 )
 
-// GTSS-CS-009: Insecure cookie
+// BATOU-CS-009: Insecure cookie
 var (
 	reCookieNoSecure   = regexp.MustCompile(`(?i)new\s+CookieOptions\s*\{`)
 	reCookieSecureTrue = regexp.MustCompile(`(?i)Secure\s*=\s*true`)
@@ -83,7 +83,7 @@ var (
 	reCookieSameSite   = regexp.MustCompile(`(?i)SameSite\s*=`)
 )
 
-// GTSS-CS-010: CORS misconfiguration
+// BATOU-CS-010: CORS misconfiguration
 var (
 	reAllowAnyOrigin    = regexp.MustCompile(`\.AllowAnyOrigin\s*\(`)
 	reAllowCredentials  = regexp.MustCompile(`\.AllowCredentials\s*\(`)
@@ -91,20 +91,20 @@ var (
 	reCORSPolicyStar    = regexp.MustCompile(`(?i)policy\.WithOrigins\s*\(\s*["']\*["']\s*\)`)
 )
 
-// GTSS-CS-011: Blazor JS interop injection
+// BATOU-CS-011: Blazor JS interop injection
 var (
 	reJSRuntimeInvoke = regexp.MustCompile(`(?i)(?:JSRuntime|jsRuntime|_jsRuntime|IJSRuntime)\.InvokeAsync\s*(?:<[^>]*>\s*)?\(\s*["']eval["']`)
 	reJSRuntimeInterp = regexp.MustCompile(`(?i)(?:JSRuntime|jsRuntime|_jsRuntime|IJSRuntime)\.Invoke(?:Async|Void(?:Async)?)\s*(?:<[^>]*>\s*)?\(\s*\$"`)
 )
 
-// GTSS-CS-012: Mass assignment (no [Bind] or DTO, direct model binding)
+// BATOU-CS-012: Mass assignment (no [Bind] or DTO, direct model binding)
 var (
 	// TryUpdateModelAsync without property list
 	reTryUpdateModel    = regexp.MustCompile(`TryUpdateModelAsync\s*<`)
 	reUpdateModelFields = regexp.MustCompile(`TryUpdateModelAsync\s*<[^>]*>\s*\([^)]*,\s*["']`)
 )
 
-// GTSS-CS-013: Regex DoS (new Regex with user input without timeout)
+// BATOU-CS-013: Regex DoS (new Regex with user input without timeout)
 var (
 	reNewRegex        = regexp.MustCompile(`new\s+Regex\s*\(`)
 	reRegexTimeout    = regexp.MustCompile(`(?:RegexOptions\s*\.\s*None|TimeSpan|matchTimeout|RegexOptions\.[^)]*,\s*TimeSpan)`)
@@ -112,7 +112,7 @@ var (
 	reRegexStaticSafe = regexp.MustCompile(`Regex\.(?:IsMatch|Match|Matches|Replace|Split)\s*\([^,)]*,[^,)]*,\s*RegexOptions`)
 )
 
-// GTSS-CS-014: Insecure random (System.Random for security)
+// BATOU-CS-014: Insecure random (System.Random for security)
 var (
 	reSystemRandom     = regexp.MustCompile(`new\s+Random\s*\(`)
 	reRandomNext       = regexp.MustCompile(`\b(?:rand|random|rng|rnd)\s*\.\s*Next(?:Bytes|Double)?\s*\(`)
@@ -120,25 +120,25 @@ var (
 	reSecureRandomSafe = regexp.MustCompile(`(?:RandomNumberGenerator|RNGCryptoServiceProvider)`)
 )
 
-// GTSS-CS-015: ViewData/ViewBag XSS
+// BATOU-CS-015: ViewData/ViewBag XSS
 var (
 	reViewDataAssign = regexp.MustCompile(`(?:ViewData|ViewBag)\s*\[?\s*["']?\w*["']?\]?\s*=`)
 	reHtmlRaw        = regexp.MustCompile(`@?Html\.Raw\s*\(`)
 )
 
-// GTSS-CS-016: Open redirect
+// BATOU-CS-016: Open redirect
 var (
 	reRedirectUserInput = regexp.MustCompile(`(?:Redirect|RedirectToAction|RedirectPermanent)\s*\(\s*(?:[a-zA-Z_]\w*|Request\.|returnUrl|redirectUrl|url|next|goto|return_to)`)
 	reRedirectSafe      = regexp.MustCompile(`(?i)(?:Url\.IsLocalUrl|IsLocalUrl|LocalRedirect|RedirectToAction\s*\(\s*["']|RedirectToPage\s*\(\s*["'])`)
 )
 
-// GTSS-CS-017: SSRF via HttpClient
+// BATOU-CS-017: SSRF via HttpClient
 var (
 	reHttpClientRequest = regexp.MustCompile(`(?:HttpClient|_httpClient|_client|client)\s*\.\s*(?:GetAsync|PostAsync|PutAsync|DeleteAsync|SendAsync|GetStringAsync|GetStreamAsync|GetByteArrayAsync)\s*\(\s*(?:[a-zA-Z_]\w*|\$")`)
 	reHttpClientSafe    = regexp.MustCompile(`(?i)(?:new\s+Uri\s*\(\s*["']https?://|\.BaseAddress\s*=|AllowedHosts|IsAllowedUrl|ValidateUrl|WhitelistUrl)`)
 )
 
-// GTSS-CS-018: Insecure XML (XmlDocument without XmlResolver=null)
+// BATOU-CS-018: Insecure XML (XmlDocument without XmlResolver=null)
 var (
 	reXmlDocument    = regexp.MustCompile(`new\s+XmlDocument\s*\(`)
 	reXmlReaderLoad  = regexp.MustCompile(`\.(?:LoadXml|Load)\s*\(`)
@@ -146,26 +146,26 @@ var (
 	reXmlDtdProc     = regexp.MustCompile(`DtdProcessing\s*=\s*DtdProcessing\.Prohibit`)
 )
 
-// GTSS-CS-019: Expression injection (dynamic LINQ with user input)
+// BATOU-CS-019: Expression injection (dynamic LINQ with user input)
 var (
 	reDynamicLinq = regexp.MustCompile(`\.(?:Where|OrderBy|Select|GroupBy)\s*\(\s*(?:[a-zA-Z_]\w*\s*\+|\$"|[a-zA-Z_]\w*\s*\))\s*`)
 	reDynamicLinqLib = regexp.MustCompile(`(?:System\.Linq\.Dynamic|DynamicQueryable)`)
 )
 
-// GTSS-CS-020: Missing [ValidateAntiForgeryToken] on POST endpoints
+// BATOU-CS-020: Missing [ValidateAntiForgeryToken] on POST endpoints
 var (
 	reHttpPostAttr         = regexp.MustCompile(`\[\s*Http(?:Post|Put|Delete|Patch)\s*\]`)
 	reAntiForgeryToken     = regexp.MustCompile(`\[\s*ValidateAntiForgeryToken\s*\]`)
 	reAutoAntiForgery      = regexp.MustCompile(`(?:AutoValidateAntiforgeryToken|IgnoreAntiforgeryToken|\[ApiController\])`)
 )
 
-// GTSS-CS-021: Hardcoded secrets (API keys, tokens in code)
+// BATOU-CS-021: Hardcoded secrets (API keys, tokens in code)
 var (
 	reHardcodedSecret = regexp.MustCompile(`(?i)(?:apiKey|api_key|secret|secretKey|secret_key|accessKey|access_key|privateKey|private_key|clientSecret|client_secret)\s*=\s*["'][a-zA-Z0-9+/=_\-]{16,}["']`)
 	reHardcodedSecretConst = regexp.MustCompile(`(?i)(?:const|static\s+readonly)\s+string\s+\w*(?:Key|Secret|Token|Password)\w*\s*=\s*["'][^"']{8,}["']`)
 )
 
-// GTSS-CS-022: Unsafe reflection (Type.GetType/Activator.CreateInstance with user input)
+// BATOU-CS-022: Unsafe reflection (Type.GetType/Activator.CreateInstance with user input)
 var (
 	reTypeGetType          = regexp.MustCompile(`Type\.GetType\s*\(\s*[a-zA-Z_]\w*`)
 	reActivatorCreate      = regexp.MustCompile(`Activator\.CreateInstance\s*\(\s*(?:Type\.GetType|[a-zA-Z_]\w*Type|[a-zA-Z_]\w*\))`)
@@ -213,12 +213,12 @@ func hasNearbySafe(lines []string, idx int, pat *regexp.Regexp) bool {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-001: SQL Injection
+// BATOU-CS-001: SQL Injection
 // ---------------------------------------------------------------------------
 
 type SQLInjection struct{}
 
-func (r *SQLInjection) ID() string                      { return "GTSS-CS-001" }
+func (r *SQLInjection) ID() string                      { return "BATOU-CS-001" }
 func (r *SQLInjection) Name() string                    { return "CSharpSQLInjection" }
 func (r *SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *SQLInjection) Description() string {
@@ -285,12 +285,12 @@ func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-003: Insecure Deserialization
+// BATOU-CS-003: Insecure Deserialization
 // ---------------------------------------------------------------------------
 
 type InsecureDeserialization struct{}
 
-func (r *InsecureDeserialization) ID() string                      { return "GTSS-CS-003" }
+func (r *InsecureDeserialization) ID() string                      { return "BATOU-CS-003" }
 func (r *InsecureDeserialization) Name() string                    { return "CSharpInsecureDeserialization" }
 func (r *InsecureDeserialization) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *InsecureDeserialization) Description() string {
@@ -351,12 +351,12 @@ func (r *InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-004: Command Injection
+// BATOU-CS-004: Command Injection
 // ---------------------------------------------------------------------------
 
 type CommandInjection struct{}
 
-func (r *CommandInjection) ID() string                      { return "GTSS-CS-004" }
+func (r *CommandInjection) ID() string                      { return "BATOU-CS-004" }
 func (r *CommandInjection) Name() string                    { return "CSharpCommandInjection" }
 func (r *CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *CommandInjection) Description() string {
@@ -422,12 +422,12 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-005: Path Traversal
+// BATOU-CS-005: Path Traversal
 // ---------------------------------------------------------------------------
 
 type PathTraversal struct{}
 
-func (r *PathTraversal) ID() string                      { return "GTSS-CS-005" }
+func (r *PathTraversal) ID() string                      { return "BATOU-CS-005" }
 func (r *PathTraversal) Name() string                    { return "CSharpPathTraversal" }
 func (r *PathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PathTraversal) Description() string {
@@ -512,12 +512,12 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-006: LDAP Injection
+// BATOU-CS-006: LDAP Injection
 // ---------------------------------------------------------------------------
 
 type LDAPInjection struct{}
 
-func (r *LDAPInjection) ID() string                      { return "GTSS-CS-006" }
+func (r *LDAPInjection) ID() string                      { return "BATOU-CS-006" }
 func (r *LDAPInjection) Name() string                    { return "CSharpLDAPInjection" }
 func (r *LDAPInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LDAPInjection) Description() string {
@@ -567,12 +567,12 @@ func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-008: Hardcoded Connection Strings
+// BATOU-CS-008: Hardcoded Connection Strings
 // ---------------------------------------------------------------------------
 
 type HardcodedConnectionString struct{}
 
-func (r *HardcodedConnectionString) ID() string                      { return "GTSS-CS-008" }
+func (r *HardcodedConnectionString) ID() string                      { return "BATOU-CS-008" }
 func (r *HardcodedConnectionString) Name() string                    { return "CSharpHardcodedConnectionString" }
 func (r *HardcodedConnectionString) DefaultSeverity() rules.Severity { return rules.High }
 func (r *HardcodedConnectionString) Description() string {
@@ -614,12 +614,12 @@ func (r *HardcodedConnectionString) Scan(ctx *rules.ScanContext) []rules.Finding
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-009: Insecure Cookie
+// BATOU-CS-009: Insecure Cookie
 // ---------------------------------------------------------------------------
 
 type InsecureCookie struct{}
 
-func (r *InsecureCookie) ID() string                      { return "GTSS-CS-009" }
+func (r *InsecureCookie) ID() string                      { return "BATOU-CS-009" }
 func (r *InsecureCookie) Name() string                    { return "CSharpInsecureCookie" }
 func (r *InsecureCookie) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureCookie) Description() string {
@@ -690,12 +690,12 @@ func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-010: CORS Misconfiguration
+// BATOU-CS-010: CORS Misconfiguration
 // ---------------------------------------------------------------------------
 
 type CORSMisconfiguration struct{}
 
-func (r *CORSMisconfiguration) ID() string                      { return "GTSS-CS-010" }
+func (r *CORSMisconfiguration) ID() string                      { return "BATOU-CS-010" }
 func (r *CORSMisconfiguration) Name() string                    { return "CSharpCORSMisconfiguration" }
 func (r *CORSMisconfiguration) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *CORSMisconfiguration) Description() string {
@@ -769,12 +769,12 @@ func (r *CORSMisconfiguration) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-011: Blazor JS Interop Injection
+// BATOU-CS-011: Blazor JS Interop Injection
 // ---------------------------------------------------------------------------
 
 type BlazorJSInteropInjection struct{}
 
-func (r *BlazorJSInteropInjection) ID() string                      { return "GTSS-CS-011" }
+func (r *BlazorJSInteropInjection) ID() string                      { return "BATOU-CS-011" }
 func (r *BlazorJSInteropInjection) Name() string                    { return "CSharpBlazorJSInteropInjection" }
 func (r *BlazorJSInteropInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *BlazorJSInteropInjection) Description() string {
@@ -827,12 +827,12 @@ func (r *BlazorJSInteropInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-012: Mass Assignment
+// BATOU-CS-012: Mass Assignment
 // ---------------------------------------------------------------------------
 
 type MassAssignment struct{}
 
-func (r *MassAssignment) ID() string                      { return "GTSS-CS-012" }
+func (r *MassAssignment) ID() string                      { return "BATOU-CS-012" }
 func (r *MassAssignment) Name() string                    { return "CSharpMassAssignment" }
 func (r *MassAssignment) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MassAssignment) Description() string {
@@ -876,12 +876,12 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-013: Regex DoS
+// BATOU-CS-013: Regex DoS
 // ---------------------------------------------------------------------------
 
 type RegexDoS struct{}
 
-func (r *RegexDoS) ID() string                      { return "GTSS-CS-013" }
+func (r *RegexDoS) ID() string                      { return "BATOU-CS-013" }
 func (r *RegexDoS) Name() string                    { return "CSharpRegexDoS" }
 func (r *RegexDoS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RegexDoS) Description() string {
@@ -928,12 +928,12 @@ func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-014: Insecure Random
+// BATOU-CS-014: Insecure Random
 // ---------------------------------------------------------------------------
 
 type InsecureRandom struct{}
 
-func (r *InsecureRandom) ID() string                      { return "GTSS-CS-014" }
+func (r *InsecureRandom) ID() string                      { return "BATOU-CS-014" }
 func (r *InsecureRandom) Name() string                    { return "CSharpInsecureRandom" }
 func (r *InsecureRandom) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureRandom) Description() string {
@@ -997,12 +997,12 @@ func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-015: ViewData/ViewBag XSS
+// BATOU-CS-015: ViewData/ViewBag XSS
 // ---------------------------------------------------------------------------
 
 type ViewDataXSS struct{}
 
-func (r *ViewDataXSS) ID() string                      { return "GTSS-CS-015" }
+func (r *ViewDataXSS) ID() string                      { return "BATOU-CS-015" }
 func (r *ViewDataXSS) Name() string                    { return "CSharpViewDataXSS" }
 func (r *ViewDataXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ViewDataXSS) Description() string {
@@ -1044,12 +1044,12 @@ func (r *ViewDataXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-016: Open Redirect
+// BATOU-CS-016: Open Redirect
 // ---------------------------------------------------------------------------
 
 type OpenRedirect struct{}
 
-func (r *OpenRedirect) ID() string                      { return "GTSS-CS-016" }
+func (r *OpenRedirect) ID() string                      { return "BATOU-CS-016" }
 func (r *OpenRedirect) Name() string                    { return "CSharpOpenRedirect" }
 func (r *OpenRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OpenRedirect) Description() string {
@@ -1095,12 +1095,12 @@ func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-017: SSRF via HttpClient
+// BATOU-CS-017: SSRF via HttpClient
 // ---------------------------------------------------------------------------
 
 type SSRFHttpClient struct{}
 
-func (r *SSRFHttpClient) ID() string                      { return "GTSS-CS-017" }
+func (r *SSRFHttpClient) ID() string                      { return "BATOU-CS-017" }
 func (r *SSRFHttpClient) Name() string                    { return "CSharpSSRFHttpClient" }
 func (r *SSRFHttpClient) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SSRFHttpClient) Description() string {
@@ -1162,12 +1162,12 @@ func (r *SSRFHttpClient) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-018: Insecure XML Processing
+// BATOU-CS-018: Insecure XML Processing
 // ---------------------------------------------------------------------------
 
 type InsecureXML struct{}
 
-func (r *InsecureXML) ID() string                      { return "GTSS-CS-018" }
+func (r *InsecureXML) ID() string                      { return "BATOU-CS-018" }
 func (r *InsecureXML) Name() string                    { return "CSharpInsecureXML" }
 func (r *InsecureXML) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureXML) Description() string {
@@ -1218,12 +1218,12 @@ func (r *InsecureXML) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-019: Expression Injection (Dynamic LINQ)
+// BATOU-CS-019: Expression Injection (Dynamic LINQ)
 // ---------------------------------------------------------------------------
 
 type ExpressionInjection struct{}
 
-func (r *ExpressionInjection) ID() string                      { return "GTSS-CS-019" }
+func (r *ExpressionInjection) ID() string                      { return "BATOU-CS-019" }
 func (r *ExpressionInjection) Name() string                    { return "CSharpExpressionInjection" }
 func (r *ExpressionInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ExpressionInjection) Description() string {
@@ -1271,12 +1271,12 @@ func (r *ExpressionInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-020: Missing Anti-Forgery Token
+// BATOU-CS-020: Missing Anti-Forgery Token
 // ---------------------------------------------------------------------------
 
 type MissingAntiForgeryToken struct{}
 
-func (r *MissingAntiForgeryToken) ID() string                      { return "GTSS-CS-020" }
+func (r *MissingAntiForgeryToken) ID() string                      { return "BATOU-CS-020" }
 func (r *MissingAntiForgeryToken) Name() string                    { return "CSharpMissingAntiForgeryToken" }
 func (r *MissingAntiForgeryToken) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingAntiForgeryToken) Description() string {
@@ -1329,12 +1329,12 @@ func (r *MissingAntiForgeryToken) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-021: Hardcoded Secrets
+// BATOU-CS-021: Hardcoded Secrets
 // ---------------------------------------------------------------------------
 
 type HardcodedSecret struct{}
 
-func (r *HardcodedSecret) ID() string                      { return "GTSS-CS-021" }
+func (r *HardcodedSecret) ID() string                      { return "BATOU-CS-021" }
 func (r *HardcodedSecret) Name() string                    { return "CSharpHardcodedSecret" }
 func (r *HardcodedSecret) DefaultSeverity() rules.Severity { return rules.High }
 func (r *HardcodedSecret) Description() string {
@@ -1385,12 +1385,12 @@ func (r *HardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CS-022: Unsafe Reflection
+// BATOU-CS-022: Unsafe Reflection
 // ---------------------------------------------------------------------------
 
 type UnsafeReflection struct{}
 
-func (r *UnsafeReflection) ID() string                      { return "GTSS-CS-022" }
+func (r *UnsafeReflection) ID() string                      { return "BATOU-CS-022" }
 func (r *UnsafeReflection) Name() string                    { return "CSharpUnsafeReflection" }
 func (r *UnsafeReflection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnsafeReflection) Description() string {

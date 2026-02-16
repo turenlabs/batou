@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-RACE-001: TOCTOU file operation
+// BATOU-RACE-001: TOCTOU file operation
 var (
 	reTOCTOUAccessOpen  = regexp.MustCompile(`(?i)\b(?:os\.access|os\.path\.exists|os\.path\.isfile|os\.path\.isdir|Path\.exists|Path\.is_file)\s*\(`)
 	reTOCTOUStatOpen    = regexp.MustCompile(`(?i)\b(?:os\.Stat|os\.Lstat|syscall\.Stat|stat|lstat|access)\s*\(`)
@@ -20,21 +20,21 @@ var (
 	reFileOpenAfter     = regexp.MustCompile(`(?i)\b(?:open|fopen|os\.Open|os\.Create|os\.OpenFile|ioutil\.ReadFile|ioutil\.WriteFile|File\.new|File\.open)\s*\(`)
 )
 
-// GTSS-RACE-002: Check-then-act without locking
+// BATOU-RACE-002: Check-then-act without locking
 var (
 	reCheckThenActMap   = regexp.MustCompile(`(?i)(?:if\s+.*\b(?:in|contains|containsKey|has|hasKey|get|include\?)\s*\(|if\s+\w+\s*\[\s*\w+\s*\]\s*(?:!=|==))`)
 	reCheckThenActNull  = regexp.MustCompile(`(?i)(?:if\s*\(\s*\w+\s*(?:!=|==)\s*(?:null|nil|None|undefined)\s*\)\s*\{?\s*$)`)
 	reLockNearby        = regexp.MustCompile(`(?i)(?:\.Lock\(\)|\.lock\(\)|synchronized|mutex|Monitor\.Enter|lock\s*\(|threading\.Lock|RLock|Semaphore|\.acquire\(\)|ReentrantLock)`)
 )
 
-// GTSS-RACE-003: Race condition in balance/counter update
+// BATOU-RACE-003: Race condition in balance/counter update
 var (
 	reBalanceUpdate     = regexp.MustCompile(`(?i)(?:balance|amount|quantity|stock|inventory|credits?|points?|counter|count)\s*(?:=\s*(?:balance|amount|quantity|stock|inventory|credits?|points?|counter|count)\s*[-+]|\+=|-=)`)
 	reBalanceRead       = regexp.MustCompile(`(?i)(?:balance|amount|quantity|stock|inventory|credits?|points?)\s*=\s*(?:get|fetch|find|select|read|load|query)`)
 	reAtomicOp          = regexp.MustCompile(`(?i)(?:atomic|AtomicInteger|AtomicLong|\.getAndAdd|\.incrementAndGet|\.compareAndSet|F\s*\(\s*["'](?:balance|amount|quantity)\s*["']\s*\)\s*-\s*|\.update\s*\(|UPDATE\s+\w+\s+SET\s+\w+\s*=\s*\w+\s*[-+])`)
 )
 
-// GTSS-RACE-004: Double-checked locking anti-pattern
+// BATOU-RACE-004: Double-checked locking anti-pattern
 var (
 	reDoubleCheckLock = regexp.MustCompile(`(?i)if\s*\(\s*\w+\s*==\s*null\s*\)\s*\{?\s*$`)
 	reSyncBlock       = regexp.MustCompile(`(?i)(?:synchronized\s*\(|lock\s*\(|Monitor\.Enter|\.Lock\(\))`)
@@ -42,13 +42,13 @@ var (
 	reVolatile        = regexp.MustCompile(`(?i)(?:volatile|Volatile\.Read|Interlocked|AtomicReference|@GuardedBy)`)
 )
 
-// GTSS-RACE-005: Signal handler with non-reentrant function
+// BATOU-RACE-005: Signal handler with non-reentrant function
 var (
 	reSignalHandler    = regexp.MustCompile(`(?i)\b(?:signal|sigaction)\s*\(\s*(?:SIG\w+|SIGINT|SIGTERM|SIGKILL|SIGUSR\d)\s*,`)
 	reNonReentrantFunc = regexp.MustCompile(`(?i)\b(?:printf|fprintf|sprintf|snprintf|malloc|calloc|realloc|free|exit|abort|syslog|strtok|ctime|localtime|asctime|gmtime|gethostbyname|getservbyname|getpwnam|getgrnam|strerror)\s*\(`)
 )
 
-// GTSS-RACE-006: Shared mutable state without synchronization
+// BATOU-RACE-006: Shared mutable state without synchronization
 var (
 	reGoGoroutineWrite     = regexp.MustCompile(`(?i)\bgo\s+(?:func\s*\(|[a-zA-Z_]\w*\s*\()`)
 	reGoSharedWrite        = regexp.MustCompile(`(?i)(?:\w+\s*=\s*|(?:append|delete)\s*\()`)
@@ -57,14 +57,14 @@ var (
 	reJavaThreadStart      = regexp.MustCompile(`(?i)(?:\.start\(\)|ExecutorService|ThreadPoolExecutor|new\s+Thread|CompletableFuture\.(?:runAsync|supplyAsync))`)
 )
 
-// GTSS-RACE-007: Non-atomic read-modify-write
+// BATOU-RACE-007: Non-atomic read-modify-write
 var (
 	reReadModifyWrite   = regexp.MustCompile(`(?i)(\w+)\s*(?:\+=|-=|\*=|/=|%=|\+\+|--)`)
 	reReadModifyWriteExplicit = regexp.MustCompile(`(?i)(\w+)\s*=\s*\1\s*[-+*/]`)
 	reAtomicOrLock      = regexp.MustCompile(`(?i)(?:atomic|Atomic|\.Lock\(\)|synchronized|lock\s*\(|Interlocked|sync\.Mutex|chan\b)`)
 )
 
-// GTSS-RACE-008: Race in lazy initialization singleton
+// BATOU-RACE-008: Race in lazy initialization singleton
 var (
 	reLazyInitJava   = regexp.MustCompile(`(?i)(?:private\s+static\s+\w+\s+instance\s*;|static\s+\w+\s+INSTANCE\s*;)`)
 	reLazyInitCheck  = regexp.MustCompile(`(?i)if\s*\(\s*(?:instance|INSTANCE)\s*==\s*null\s*\)`)
@@ -110,12 +110,12 @@ func hasNearbyPattern(lines []string, idx, before, after int, re *regexp.Regexp)
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RACE-001: TOCTOU file operation
+// BATOU-RACE-001: TOCTOU file operation
 // ---------------------------------------------------------------------------
 
 type TOCTOU struct{}
 
-func (r *TOCTOU) ID() string                     { return "GTSS-RACE-001" }
+func (r *TOCTOU) ID() string                     { return "BATOU-RACE-001" }
 func (r *TOCTOU) Name() string                   { return "TOCTOU" }
 func (r *TOCTOU) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *TOCTOU) Description() string {
@@ -175,12 +175,12 @@ func (r *TOCTOU) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RACE-002: Check-then-act without locking
+// BATOU-RACE-002: Check-then-act without locking
 // ---------------------------------------------------------------------------
 
 type CheckThenAct struct{}
 
-func (r *CheckThenAct) ID() string                     { return "GTSS-RACE-002" }
+func (r *CheckThenAct) ID() string                     { return "BATOU-RACE-002" }
 func (r *CheckThenAct) Name() string                   { return "CheckThenAct" }
 func (r *CheckThenAct) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *CheckThenAct) Description() string {
@@ -239,12 +239,12 @@ func (r *CheckThenAct) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RACE-003: Race condition in balance/counter update
+// BATOU-RACE-003: Race condition in balance/counter update
 // ---------------------------------------------------------------------------
 
 type BalanceRace struct{}
 
-func (r *BalanceRace) ID() string                     { return "GTSS-RACE-003" }
+func (r *BalanceRace) ID() string                     { return "BATOU-RACE-003" }
 func (r *BalanceRace) Name() string                   { return "BalanceRace" }
 func (r *BalanceRace) DefaultSeverity() rules.Severity { return rules.High }
 func (r *BalanceRace) Description() string {
@@ -295,12 +295,12 @@ func (r *BalanceRace) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RACE-004: Double-checked locking anti-pattern
+// BATOU-RACE-004: Double-checked locking anti-pattern
 // ---------------------------------------------------------------------------
 
 type DoubleCheckedLocking struct{}
 
-func (r *DoubleCheckedLocking) ID() string                     { return "GTSS-RACE-004" }
+func (r *DoubleCheckedLocking) ID() string                     { return "BATOU-RACE-004" }
 func (r *DoubleCheckedLocking) Name() string                   { return "DoubleCheckedLocking" }
 func (r *DoubleCheckedLocking) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DoubleCheckedLocking) Description() string {
@@ -358,12 +358,12 @@ func (r *DoubleCheckedLocking) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RACE-005: Signal handler with non-reentrant function
+// BATOU-RACE-005: Signal handler with non-reentrant function
 // ---------------------------------------------------------------------------
 
 type SignalHandlerRace struct{}
 
-func (r *SignalHandlerRace) ID() string                     { return "GTSS-RACE-005" }
+func (r *SignalHandlerRace) ID() string                     { return "BATOU-RACE-005" }
 func (r *SignalHandlerRace) Name() string                   { return "SignalHandlerRace" }
 func (r *SignalHandlerRace) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SignalHandlerRace) Description() string {
@@ -422,12 +422,12 @@ func (r *SignalHandlerRace) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RACE-006: Shared mutable state without synchronization
+// BATOU-RACE-006: Shared mutable state without synchronization
 // ---------------------------------------------------------------------------
 
 type SharedMutableState struct{}
 
-func (r *SharedMutableState) ID() string                     { return "GTSS-RACE-006" }
+func (r *SharedMutableState) ID() string                     { return "BATOU-RACE-006" }
 func (r *SharedMutableState) Name() string                   { return "SharedMutableState" }
 func (r *SharedMutableState) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SharedMutableState) Description() string {
@@ -504,12 +504,12 @@ func (r *SharedMutableState) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RACE-007: Non-atomic read-modify-write
+// BATOU-RACE-007: Non-atomic read-modify-write
 // ---------------------------------------------------------------------------
 
 type NonAtomicRMW struct{}
 
-func (r *NonAtomicRMW) ID() string                     { return "GTSS-RACE-007" }
+func (r *NonAtomicRMW) ID() string                     { return "BATOU-RACE-007" }
 func (r *NonAtomicRMW) Name() string                   { return "NonAtomicRMW" }
 func (r *NonAtomicRMW) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NonAtomicRMW) Description() string {
@@ -570,12 +570,12 @@ func (r *NonAtomicRMW) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RACE-008: Race in lazy initialization singleton
+// BATOU-RACE-008: Race in lazy initialization singleton
 // ---------------------------------------------------------------------------
 
 type LazyInitRace struct{}
 
-func (r *LazyInitRace) ID() string                     { return "GTSS-RACE-008" }
+func (r *LazyInitRace) ID() string                     { return "BATOU-RACE-008" }
 func (r *LazyInitRace) Name() string                   { return "LazyInitRace" }
 func (r *LazyInitRace) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LazyInitRace) Description() string {

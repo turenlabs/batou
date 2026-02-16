@@ -3,11 +3,11 @@ package kotlin
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // ==========================================================================
-// GTSS-KT-001: Android SQL Injection
+// BATOU-KT-001: Android SQL Injection
 // ==========================================================================
 
 func TestKT001_RawQuery_StringConcat(t *testing.T) {
@@ -15,7 +15,7 @@ func TestKT001_RawQuery_StringConcat(t *testing.T) {
     val cursor = db.rawQuery("SELECT * FROM users WHERE name = '" + name + "'", null)
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-001")
+	testutil.MustFindRule(t, result, "BATOU-KT-001")
 }
 
 func TestKT001_RawQuery_StringTemplate(t *testing.T) {
@@ -23,7 +23,7 @@ func TestKT001_RawQuery_StringTemplate(t *testing.T) {
     val cursor = db.rawQuery("SELECT * FROM users WHERE name = '${name}'", null)
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-001")
+	testutil.MustFindRule(t, result, "BATOU-KT-001")
 }
 
 func TestKT001_ExecSQL_StringConcat(t *testing.T) {
@@ -31,7 +31,7 @@ func TestKT001_ExecSQL_StringConcat(t *testing.T) {
     db.execSQL("DELETE FROM users WHERE id = " + id)
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-001")
+	testutil.MustFindRule(t, result, "BATOU-KT-001")
 }
 
 func TestKT001_ExecSQL_StringTemplate(t *testing.T) {
@@ -39,7 +39,7 @@ func TestKT001_ExecSQL_StringTemplate(t *testing.T) {
     db.execSQL("DELETE FROM users WHERE id = ${id}")
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-001")
+	testutil.MustFindRule(t, result, "BATOU-KT-001")
 }
 
 func TestKT001_RawQuery_Parameterized_Safe(t *testing.T) {
@@ -47,7 +47,7 @@ func TestKT001_RawQuery_Parameterized_Safe(t *testing.T) {
     val cursor = db.rawQuery("SELECT * FROM users WHERE name = ?", arrayOf(name))
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-001")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-001")
 }
 
 func TestKT001_RoomDAO_Safe(t *testing.T) {
@@ -57,11 +57,11 @@ interface UserDao {
     fun findByName(name: String): User
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-001")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-001")
 }
 
 // ==========================================================================
-// GTSS-KT-002: Android Intent Injection
+// BATOU-KT-002: Android Intent Injection
 // ==========================================================================
 
 func TestKT002_SendBroadcast_WithUserData(t *testing.T) {
@@ -72,7 +72,7 @@ func TestKT002_SendBroadcast_WithUserData(t *testing.T) {
     sendBroadcast(broadcastIntent)
 }`
 	result := testutil.ScanContent(t, "/app/MyActivity.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-002")
+	testutil.MustFindRule(t, result, "BATOU-KT-002")
 }
 
 func TestKT002_ImplicitIntent_WithUserData(t *testing.T) {
@@ -83,7 +83,7 @@ func TestKT002_ImplicitIntent_WithUserData(t *testing.T) {
     startActivity(shareIntent)
 }`
 	result := testutil.ScanContent(t, "/app/ShareActivity.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-002")
+	testutil.MustFindRule(t, result, "BATOU-KT-002")
 }
 
 func TestKT002_ExplicitIntent_Safe(t *testing.T) {
@@ -93,11 +93,11 @@ func TestKT002_ExplicitIntent_Safe(t *testing.T) {
     startActivity(intent)
 }`
 	result := testutil.ScanContent(t, "/app/MainActivity.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-002")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-002")
 }
 
 // ==========================================================================
-// GTSS-KT-003: WebView JavaScript Injection
+// BATOU-KT-003: WebView JavaScript Injection
 // ==========================================================================
 
 func TestKT003_LoadUrl_JavascriptConcat(t *testing.T) {
@@ -105,7 +105,7 @@ func TestKT003_LoadUrl_JavascriptConcat(t *testing.T) {
     webView.loadUrl("javascript:updateField('" + userInput + "')")
 }`
 	result := testutil.ScanContent(t, "/app/WebActivity.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-003")
+	testutil.MustFindRule(t, result, "BATOU-KT-003")
 }
 
 func TestKT003_LoadUrl_JavascriptTemplate(t *testing.T) {
@@ -113,7 +113,7 @@ func TestKT003_LoadUrl_JavascriptTemplate(t *testing.T) {
     webView.loadUrl("javascript:updateField('${userInput}')")
 }`
 	result := testutil.ScanContent(t, "/app/WebActivity.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-003")
+	testutil.MustFindRule(t, result, "BATOU-KT-003")
 }
 
 func TestKT003_AddJavascriptInterface(t *testing.T) {
@@ -123,7 +123,7 @@ func TestKT003_AddJavascriptInterface(t *testing.T) {
     webView.loadUrl("https://example.com")
 }`
 	result := testutil.ScanContent(t, "/app/WebActivity.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-003")
+	testutil.MustFindRule(t, result, "BATOU-KT-003")
 }
 
 func TestKT003_EvaluateJavascript_Concat(t *testing.T) {
@@ -131,7 +131,7 @@ func TestKT003_EvaluateJavascript_Concat(t *testing.T) {
     webView.evaluateJavascript("document.getElementById('name').value = '" + input + "'", null)
 }`
 	result := testutil.ScanContent(t, "/app/WebActivity.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-003")
+	testutil.MustFindRule(t, result, "BATOU-KT-003")
 }
 
 func TestKT003_LoadUrl_Static_Safe(t *testing.T) {
@@ -139,11 +139,11 @@ func TestKT003_LoadUrl_Static_Safe(t *testing.T) {
     webView.loadUrl("https://example.com/page")
 }`
 	result := testutil.ScanContent(t, "/app/WebActivity.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-003")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-003")
 }
 
 // ==========================================================================
-// GTSS-KT-004: Insecure SharedPreferences
+// BATOU-KT-004: Insecure SharedPreferences
 // ==========================================================================
 
 func TestKT004_SharedPrefs_StoringPassword(t *testing.T) {
@@ -152,7 +152,7 @@ func TestKT004_SharedPrefs_StoringPassword(t *testing.T) {
     prefs.edit().putString("password", password).apply()
 }`
 	result := testutil.ScanContent(t, "/app/CredentialManager.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-004")
+	testutil.MustFindRule(t, result, "BATOU-KT-004")
 }
 
 func TestKT004_SharedPrefs_StoringToken(t *testing.T) {
@@ -161,7 +161,7 @@ func TestKT004_SharedPrefs_StoringToken(t *testing.T) {
     prefs.edit().putString("auth_token", token).apply()
 }`
 	result := testutil.ScanContent(t, "/app/TokenManager.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-004")
+	testutil.MustFindRule(t, result, "BATOU-KT-004")
 }
 
 func TestKT004_EncryptedSharedPrefs_Safe(t *testing.T) {
@@ -175,7 +175,7 @@ func TestKT004_EncryptedSharedPrefs_Safe(t *testing.T) {
     prefs.edit().putString("password", password).apply()
 }`
 	result := testutil.ScanContent(t, "/app/CredentialManager.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-004")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-004")
 }
 
 func TestKT004_SharedPrefs_NonSensitive_Safe(t *testing.T) {
@@ -184,11 +184,11 @@ func TestKT004_SharedPrefs_NonSensitive_Safe(t *testing.T) {
     prefs.edit().putString("theme", theme).apply()
 }`
 	result := testutil.ScanContent(t, "/app/SettingsManager.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-004")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-004")
 }
 
 // ==========================================================================
-// GTSS-KT-005: Android Exported Components
+// BATOU-KT-005: Android Exported Components
 // ==========================================================================
 
 func TestKT005_ExportedActivity_NoPermission(t *testing.T) {
@@ -204,7 +204,7 @@ func TestKT005_ExportedActivity_NoPermission(t *testing.T) {
     </application>
 </manifest>`
 	result := testutil.ScanContent(t, "/app/AndroidManifest.xml", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-005")
+	testutil.MustFindRule(t, result, "BATOU-KT-005")
 }
 
 func TestKT005_ExportedProvider_NoPermission(t *testing.T) {
@@ -218,7 +218,7 @@ func TestKT005_ExportedProvider_NoPermission(t *testing.T) {
     </application>
 </manifest>`
 	result := testutil.ScanContent(t, "/app/AndroidManifest.xml", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-005")
+	testutil.MustFindRule(t, result, "BATOU-KT-005")
 }
 
 func TestKT005_ExportedActivity_WithPermission_Safe(t *testing.T) {
@@ -232,7 +232,7 @@ func TestKT005_ExportedActivity_WithPermission_Safe(t *testing.T) {
     </application>
 </manifest>`
 	result := testutil.ScanContent(t, "/app/AndroidManifest.xml", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-005")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-005")
 }
 
 func TestKT005_NotExported_Safe(t *testing.T) {
@@ -245,11 +245,11 @@ func TestKT005_NotExported_Safe(t *testing.T) {
     </application>
 </manifest>`
 	result := testutil.ScanContent(t, "/app/AndroidManifest.xml", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-005")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-005")
 }
 
 // ==========================================================================
-// GTSS-KT-006: Ktor CORS Misconfiguration
+// BATOU-KT-006: Ktor CORS Misconfiguration
 // ==========================================================================
 
 func TestKT006_KtorCORS_AnyHostWithCredentials(t *testing.T) {
@@ -261,7 +261,7 @@ func TestKT006_KtorCORS_AnyHostWithCredentials(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Cors.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-006")
+	testutil.MustFindRule(t, result, "BATOU-KT-006")
 }
 
 func TestKT006_KtorCORS_AnyHostOnly(t *testing.T) {
@@ -272,7 +272,7 @@ func TestKT006_KtorCORS_AnyHostOnly(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Cors.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-006")
+	testutil.MustFindRule(t, result, "BATOU-KT-006")
 }
 
 func TestKT006_KtorCORS_SpecificHost_Safe(t *testing.T) {
@@ -284,11 +284,11 @@ func TestKT006_KtorCORS_SpecificHost_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/Cors.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-006")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-006")
 }
 
 // ==========================================================================
-// GTSS-KT-007: Unsafe Coroutine Exception Handling
+// BATOU-KT-007: Unsafe Coroutine Exception Handling
 // ==========================================================================
 
 func TestKT007_GlobalScope_NoHandler(t *testing.T) {
@@ -299,7 +299,7 @@ func TestKT007_GlobalScope_NoHandler(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/TaskRunner.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-007")
+	testutil.MustFindRule(t, result, "BATOU-KT-007")
 }
 
 func TestKT007_GlobalScope_Async_NoHandler(t *testing.T) {
@@ -309,7 +309,7 @@ func TestKT007_GlobalScope_Async_NoHandler(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DataFetcher.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-007")
+	testutil.MustFindRule(t, result, "BATOU-KT-007")
 }
 
 func TestKT007_GlobalScope_WithHandler_Safe(t *testing.T) {
@@ -323,7 +323,7 @@ fun performTask() {
     }
 }`
 	result := testutil.ScanContent(t, "/app/TaskRunner.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-007")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-007")
 }
 
 func TestKT007_StructuredConcurrency_Safe(t *testing.T) {
@@ -336,11 +336,11 @@ func TestKT007_StructuredConcurrency_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/MyViewModel.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-007")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-007")
 }
 
 // ==========================================================================
-// GTSS-KT-008: Kotlin Serialization with Untrusted Input
+// BATOU-KT-008: Kotlin Serialization with Untrusted Input
 // ==========================================================================
 
 func TestKT008_JsonDecode_WithUserInput(t *testing.T) {
@@ -350,7 +350,7 @@ func TestKT008_JsonDecode_WithUserInput(t *testing.T) {
     processUser(user)
 }`
 	result := testutil.ScanContent(t, "/app/UserHandler.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-008")
+	testutil.MustFindRule(t, result, "BATOU-KT-008")
 }
 
 func TestKT008_JsonDecode_CustomConfig_WithUserInput(t *testing.T) {
@@ -360,7 +360,7 @@ func TestKT008_JsonDecode_CustomConfig_WithUserInput(t *testing.T) {
     val user = json.decodeFromString<User>(body)
 }`
 	result := testutil.ScanContent(t, "/app/UserHandler.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-008")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-008")
 	// Note: custom Json instance doesn't match the jsonDecodeCustom pattern
 	// because it uses a local variable, not Json{...}.decodeFromString
 }
@@ -371,11 +371,11 @@ func TestKT008_JsonDecode_InternalData_Safe(t *testing.T) {
     val config = Json.decodeFromString<AppConfig>(configJson)
 }`
 	result := testutil.ScanContent(t, "/app/ConfigLoader.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-008")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-008")
 }
 
 // ==========================================================================
-// GTSS-KT-009: Kotlin Reflection Injection
+// BATOU-KT-009: Kotlin Reflection Injection
 // ==========================================================================
 
 func TestKT009_ClassForName_Variable(t *testing.T) {
@@ -385,7 +385,7 @@ func TestKT009_ClassForName_Variable(t *testing.T) {
     (instance as Plugin).execute()
 }`
 	result := testutil.ScanContent(t, "/app/PluginLoader.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-009")
+	testutil.MustFindRule(t, result, "BATOU-KT-009")
 }
 
 func TestKT009_ClassForName_Allowlist_Safe(t *testing.T) {
@@ -397,11 +397,11 @@ fun loadPlugin(className: String) {
     val instance = clazz.newInstance()
 }`
 	result := testutil.ScanContent(t, "/app/PluginLoader.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-009")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-009")
 }
 
 // ==========================================================================
-// GTSS-KT-010: Content Provider Injection
+// BATOU-KT-010: Content Provider Injection
 // ==========================================================================
 
 func TestKT010_ContentResolverQueryUserUri(t *testing.T) {
@@ -411,7 +411,7 @@ func TestKT010_ContentResolverQueryUserUri(t *testing.T) {
     cursor?.use { /* process results */ }
 }`
 	result := testutil.ScanContent(t, "/app/DataActivity.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-010")
+	testutil.MustFindRule(t, result, "BATOU-KT-010")
 }
 
 func TestKT010_ContentResolverHardcodedUri_Safe(t *testing.T) {
@@ -422,11 +422,11 @@ func TestKT010_ContentResolverHardcodedUri_Safe(t *testing.T) {
     cursor?.use { /* process results */ }
 }`
 	result := testutil.ScanContent(t, "/app/ContactActivity.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-010")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-010")
 }
 
 // ==========================================================================
-// GTSS-KT-011: Deep Link Injection
+// BATOU-KT-011: Deep Link Injection
 // ==========================================================================
 
 func TestKT011_IntentGetData_NoValidation(t *testing.T) {
@@ -436,7 +436,7 @@ func TestKT011_IntentGetData_NoValidation(t *testing.T) {
     webView.loadUrl(uri.toString())
 }`
 	result := testutil.ScanContent(t, "/app/DeepLinkActivity.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-011")
+	testutil.MustFindRule(t, result, "BATOU-KT-011")
 }
 
 func TestKT011_IntentGetData_Validated_Safe(t *testing.T) {
@@ -448,11 +448,11 @@ func TestKT011_IntentGetData_Validated_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/DeepLinkActivity.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-011")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-011")
 }
 
 // ==========================================================================
-// GTSS-KT-012: Insecure Network Config
+// BATOU-KT-012: Insecure Network Config
 // ==========================================================================
 
 func TestKT012_CleartextTrafficTrue(t *testing.T) {
@@ -463,7 +463,7 @@ func TestKT012_CleartextTrafficTrue(t *testing.T) {
     </application>
 </manifest>`
 	result := testutil.ScanContent(t, "/app/AndroidManifest.xml", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-012")
+	testutil.MustFindRule(t, result, "BATOU-KT-012")
 }
 
 func TestKT012_CleartextTrafficFalse_Safe(t *testing.T) {
@@ -474,11 +474,11 @@ func TestKT012_CleartextTrafficFalse_Safe(t *testing.T) {
     </application>
 </manifest>`
 	result := testutil.ScanContent(t, "/app/AndroidManifest.xml", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-012")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-012")
 }
 
 // ==========================================================================
-// GTSS-KT-013: Android Logging Sensitive Data
+// BATOU-KT-013: Android Logging Sensitive Data
 // ==========================================================================
 
 func TestKT013_LogDebugPassword(t *testing.T) {
@@ -487,7 +487,7 @@ func TestKT013_LogDebugPassword(t *testing.T) {
     authService.login(user, password)
 }`
 	result := testutil.ScanContent(t, "/app/AuthManager.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-013")
+	testutil.MustFindRule(t, result, "BATOU-KT-013")
 }
 
 func TestKT013_LogVerboseToken(t *testing.T) {
@@ -496,7 +496,7 @@ func TestKT013_LogVerboseToken(t *testing.T) {
     api.refresh(token)
 }`
 	result := testutil.ScanContent(t, "/app/AuthManager.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-013")
+	testutil.MustFindRule(t, result, "BATOU-KT-013")
 }
 
 func TestKT013_LogNonSensitive_Safe(t *testing.T) {
@@ -505,11 +505,11 @@ func TestKT013_LogNonSensitive_Safe(t *testing.T) {
     api.getData(page)
 }`
 	result := testutil.ScanContent(t, "/app/DataLoader.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-013")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-013")
 }
 
 // ==========================================================================
-// GTSS-KT-014: Room Database Raw Query
+// BATOU-KT-014: Room Database Raw Query
 // ==========================================================================
 
 func TestKT014_RoomRawQueryConcat(t *testing.T) {
@@ -517,7 +517,7 @@ func TestKT014_RoomRawQueryConcat(t *testing.T) {
     val cursor = database.query("SELECT * FROM products WHERE name = '" + query + "'")
 }`
 	result := testutil.ScanContent(t, "/app/ProductDao.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-014")
+	testutil.MustFindRule(t, result, "BATOU-KT-014")
 }
 
 func TestKT014_SimpleSQLiteQueryTemplate(t *testing.T) {
@@ -526,7 +526,7 @@ func TestKT014_SimpleSQLiteQueryTemplate(t *testing.T) {
     userDao.rawQuery(query)
 }`
 	result := testutil.ScanContent(t, "/app/UserDao.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-014")
+	testutil.MustFindRule(t, result, "BATOU-KT-014")
 }
 
 func TestKT014_RoomDaoAnnotation_Safe(t *testing.T) {
@@ -536,11 +536,11 @@ interface ProductDao {
     fun findByName(name: String): List<Product>
 }`
 	result := testutil.ScanContent(t, "/app/ProductDao.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-014")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-014")
 }
 
 // ==========================================================================
-// GTSS-KT-015: Ktor Route Parameter Injection
+// BATOU-KT-015: Ktor Route Parameter Injection
 // ==========================================================================
 
 func TestKT015_KtorParamInQuery(t *testing.T) {
@@ -553,7 +553,7 @@ func TestKT015_KtorParamInQuery(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserRoutes.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-015")
+	testutil.MustFindRule(t, result, "BATOU-KT-015")
 }
 
 func TestKT015_KtorParamPreparedStmt_Safe(t *testing.T) {
@@ -567,11 +567,11 @@ func TestKT015_KtorParamPreparedStmt_Safe(t *testing.T) {
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserRoutes.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-015")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-015")
 }
 
 // ==========================================================================
-// GTSS-KT-016: Broadcast Receiver Without Permission
+// BATOU-KT-016: Broadcast Receiver Without Permission
 // ==========================================================================
 
 func TestKT016_RegisterReceiverNoPermission(t *testing.T) {
@@ -581,7 +581,7 @@ func TestKT016_RegisterReceiverNoPermission(t *testing.T) {
     registerReceiver(receiver, filter)
 }`
 	result := testutil.ScanContent(t, "/app/ReceiverActivity.kt", content)
-	testutil.MustFindRule(t, result, "GTSS-KT-016")
+	testutil.MustFindRule(t, result, "BATOU-KT-016")
 }
 
 func TestKT016_LocalBroadcastManager_Safe(t *testing.T) {
@@ -591,5 +591,5 @@ func TestKT016_LocalBroadcastManager_Safe(t *testing.T) {
     LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filter)
 }`
 	result := testutil.ScanContent(t, "/app/ReceiverActivity.kt", content)
-	testutil.MustNotFindRule(t, result, "GTSS-KT-016")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-016")
 }

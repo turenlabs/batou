@@ -4,55 +4,55 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended redirect rules
 // ---------------------------------------------------------------------------
 
-// GTSS-REDIR-003: Open redirect via meta refresh tag
+// BATOU-REDIR-003: Open redirect via meta refresh tag
 var (
 	reMetaRefresh     = regexp.MustCompile(`(?i)<meta\s+[^>]*http-equiv\s*=\s*['"]refresh['"][^>]*content\s*=\s*['"][^'"]*url\s*=`)
 	reMetaRefreshVar  = regexp.MustCompile(`(?i)meta.*refresh.*url\s*=\s*['"]?\s*(?:\$\{|\+\s*\w+|%s|%v|\{\{|<%=|#\{)`)
 )
 
-// GTSS-REDIR-004: Open redirect via window.location
+// BATOU-REDIR-004: Open redirect via window.location
 var (
 	reWindowLocation     = regexp.MustCompile(`(?i)(?:window\.location|document\.location)\s*(?:\.\s*href\s*)?\s*=\s*(?:(?:req|request|params|query|body|searchParams|location\.(?:search|hash)|document\.(?:URL|referrer)|URLSearchParams)[\w.]*)`)
 	reWindowLocationGet  = regexp.MustCompile(`(?i)(?:window\.location|document\.location)\s*(?:\.\s*href\s*)?\s*=\s*\w+\.get\s*\(`)
 )
 
-// GTSS-REDIR-005: Redirect using unvalidated host header
+// BATOU-REDIR-005: Redirect using unvalidated host header
 var (
 	reHostHeaderRedirect = regexp.MustCompile(`(?i)(?:redirect|location|Location)\s*[:=]\s*[^;{}\n]*(?:req\.headers\.host|request\.headers\[['"]host['"]\]|request\.META\[['"]HTTP_HOST['"]\]|\$_SERVER\[['"]HTTP_HOST['"]\]|r\.Host|request\.host|request\.getHeader\s*\(\s*['"]host['"]\))`)
 )
 
-// GTSS-REDIR-006: JavaScript redirect via location.href
+// BATOU-REDIR-006: JavaScript redirect via location.href
 var (
 	reLocationHrefUserInput = regexp.MustCompile(`(?i)(?:window\.)?location\.href\s*=\s*(?:(?:new\s+URLSearchParams|URLSearchParams|location\.search|location\.hash|document\.referrer|document\.URL)[\w.()]*)`)
 	reLocationHrefGet       = regexp.MustCompile(`(?i)(?:window\.)?location\.href\s*=\s*\w+\.(?:get|searchParams)`)
 )
 
-// GTSS-REDIR-007: Open redirect via form action
+// BATOU-REDIR-007: Open redirect via form action
 var (
 	reFormActionVar    = regexp.MustCompile(`(?i)<form\s+[^>]*action\s*=\s*['"]?\s*(?:\$\{|\{\{|<%=|#\{|%s)`)
 	reFormActionParam  = regexp.MustCompile(`(?i)(?:action|formAction)\s*[:=]\s*(?:req\.|request\.|params|query|body|searchParams|props\.)`)
 )
 
-// GTSS-REDIR-008: Protocol-relative URL redirect
+// BATOU-REDIR-008: Protocol-relative URL redirect
 var (
 	reProtocolRelative = regexp.MustCompile(`(?i)(?:redirect|location|href|window\.location|res\.redirect|sendRedirect|redirect_to|HttpResponseRedirect)\s*(?:[:=(]\s*)['"]//[^/]`)
 	reProtocolRelativeVar = regexp.MustCompile(`(?i)(?:redirect|location|href)\s*[:=]\s*['"]?\s*(?:\$\{|#\{|\+\s*)\s*['"]?//`)
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-REDIR-003: Open Redirect via Meta Refresh Tag
+// BATOU-REDIR-003: Open Redirect via Meta Refresh Tag
 // ---------------------------------------------------------------------------
 
 type MetaRefreshRedirect struct{}
 
-func (r *MetaRefreshRedirect) ID() string                     { return "GTSS-REDIR-003" }
+func (r *MetaRefreshRedirect) ID() string                     { return "BATOU-REDIR-003" }
 func (r *MetaRefreshRedirect) Name() string                   { return "MetaRefreshRedirect" }
 func (r *MetaRefreshRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MetaRefreshRedirect) Description() string {
@@ -102,12 +102,12 @@ func (r *MetaRefreshRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-REDIR-004: Open Redirect via window.location
+// BATOU-REDIR-004: Open Redirect via window.location
 // ---------------------------------------------------------------------------
 
 type WindowLocationRedirect struct{}
 
-func (r *WindowLocationRedirect) ID() string                     { return "GTSS-REDIR-004" }
+func (r *WindowLocationRedirect) ID() string                     { return "BATOU-REDIR-004" }
 func (r *WindowLocationRedirect) Name() string                   { return "WindowLocationRedirect" }
 func (r *WindowLocationRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WindowLocationRedirect) Languages() []rules.Language {
@@ -154,12 +154,12 @@ func (r *WindowLocationRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-REDIR-005: Redirect Using Unvalidated Host Header
+// BATOU-REDIR-005: Redirect Using Unvalidated Host Header
 // ---------------------------------------------------------------------------
 
 type HostHeaderRedirect struct{}
 
-func (r *HostHeaderRedirect) ID() string                     { return "GTSS-REDIR-005" }
+func (r *HostHeaderRedirect) ID() string                     { return "BATOU-REDIR-005" }
 func (r *HostHeaderRedirect) Name() string                   { return "HostHeaderRedirect" }
 func (r *HostHeaderRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *HostHeaderRedirect) Description() string {
@@ -200,12 +200,12 @@ func (r *HostHeaderRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-REDIR-006: JavaScript Redirect via location.href
+// BATOU-REDIR-006: JavaScript Redirect via location.href
 // ---------------------------------------------------------------------------
 
 type LocationHrefRedirect struct{}
 
-func (r *LocationHrefRedirect) ID() string                     { return "GTSS-REDIR-006" }
+func (r *LocationHrefRedirect) ID() string                     { return "BATOU-REDIR-006" }
 func (r *LocationHrefRedirect) Name() string                   { return "LocationHrefRedirect" }
 func (r *LocationHrefRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LocationHrefRedirect) Languages() []rules.Language {
@@ -252,12 +252,12 @@ func (r *LocationHrefRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-REDIR-007: Open Redirect via Form Action
+// BATOU-REDIR-007: Open Redirect via Form Action
 // ---------------------------------------------------------------------------
 
 type FormActionRedirect struct{}
 
-func (r *FormActionRedirect) ID() string                     { return "GTSS-REDIR-007" }
+func (r *FormActionRedirect) ID() string                     { return "BATOU-REDIR-007" }
 func (r *FormActionRedirect) Name() string                   { return "FormActionRedirect" }
 func (r *FormActionRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FormActionRedirect) Description() string {
@@ -304,12 +304,12 @@ func (r *FormActionRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-REDIR-008: Protocol-Relative URL Redirect
+// BATOU-REDIR-008: Protocol-Relative URL Redirect
 // ---------------------------------------------------------------------------
 
 type ProtocolRelativeRedirect struct{}
 
-func (r *ProtocolRelativeRedirect) ID() string                     { return "GTSS-REDIR-008" }
+func (r *ProtocolRelativeRedirect) ID() string                     { return "BATOU-REDIR-008" }
 func (r *ProtocolRelativeRedirect) Name() string                   { return "ProtocolRelativeRedirect" }
 func (r *ProtocolRelativeRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ProtocolRelativeRedirect) Description() string {

@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns — Flask
 // ---------------------------------------------------------------------------
 
-// Flask Misconfiguration (GTSS-FW-FLASK-001)
+// Flask Misconfiguration (BATOU-FW-FLASK-001)
 var (
 	// app.run(debug=True) or app.run(..., debug=True, ...)
 	reFlaskDebugRun = regexp.MustCompile(`(?i)\.run\s*\([^)]*debug\s*=\s*True`)
@@ -21,7 +21,7 @@ var (
 	reFlaskSessionCookieInsecure = regexp.MustCompile(`(?i)app\.config\s*\[\s*["']SESSION_COOKIE_SECURE["']\s*\]\s*=\s*False`)
 )
 
-// Flask SSTI (GTSS-FW-FLASK-002)
+// Flask SSTI (BATOU-FW-FLASK-002)
 var (
 	// render_template_string(user_input) — variable, not a string literal
 	reFlaskRenderTemplateString = regexp.MustCompile(`(?i)\brender_template_string\s*\(\s*(?:f["']|[^"'\s)][^)]*\+|[^"'\s)][^)]*\.format\s*\(|[^"'\s)][^)]*%|request\.)`)
@@ -29,7 +29,7 @@ var (
 	reFlaskRenderTemplateStringVar = regexp.MustCompile(`(?i)\brender_template_string\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
 )
 
-// Flask Path Traversal (GTSS-FW-FLASK-003)
+// Flask Path Traversal (BATOU-FW-FLASK-003)
 var (
 	// send_file(user_input) — variable argument without validation
 	reFlaskSendFile = regexp.MustCompile(`(?i)\bsend_file\s*\(\s*(?:request\.|[a-zA-Z_]\w*\s*[,)])`)
@@ -37,7 +37,7 @@ var (
 	reFlaskSendFromDir = regexp.MustCompile(`(?i)\bsend_from_directory\s*\([^)]*request\.`)
 )
 
-// Flask XSS (GTSS-FW-FLASK-004)
+// Flask XSS (BATOU-FW-FLASK-004)
 var (
 	// Markup(user_input) — marks string as safe HTML
 	reFlaskMarkup = regexp.MustCompile(`(?i)\bMarkup\s*\(\s*(?:f["']|[^"'\s)][^)]*\+|[^"'\s)][^)]*\.format\s*\(|[^"'\s)][^)]*%|request\.)`)
@@ -46,12 +46,12 @@ var (
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FLASK-001: Flask Misconfiguration
+// BATOU-FW-FLASK-001: Flask Misconfiguration
 // ---------------------------------------------------------------------------
 
 type FlaskMisconfiguration struct{}
 
-func (r FlaskMisconfiguration) ID() string              { return "GTSS-FW-FLASK-001" }
+func (r FlaskMisconfiguration) ID() string              { return "BATOU-FW-FLASK-001" }
 func (r FlaskMisconfiguration) Name() string            { return "Flask Misconfiguration" }
 func (r FlaskMisconfiguration) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r FlaskMisconfiguration) Description() string {
@@ -143,12 +143,12 @@ func (r FlaskMisconfiguration) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FLASK-002: Flask SSTI (Server-Side Template Injection)
+// BATOU-FW-FLASK-002: Flask SSTI (Server-Side Template Injection)
 // ---------------------------------------------------------------------------
 
 type FlaskSSTI struct{}
 
-func (r FlaskSSTI) ID() string              { return "GTSS-FW-FLASK-002" }
+func (r FlaskSSTI) ID() string              { return "BATOU-FW-FLASK-002" }
 func (r FlaskSSTI) Name() string            { return "Flask Server-Side Template Injection" }
 func (r FlaskSSTI) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r FlaskSSTI) Description() string {
@@ -199,12 +199,12 @@ func (r FlaskSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FLASK-003: Flask Path Traversal via send_file
+// BATOU-FW-FLASK-003: Flask Path Traversal via send_file
 // ---------------------------------------------------------------------------
 
 type FlaskPathTraversal struct{}
 
-func (r FlaskPathTraversal) ID() string              { return "GTSS-FW-FLASK-003" }
+func (r FlaskPathTraversal) ID() string              { return "BATOU-FW-FLASK-003" }
 func (r FlaskPathTraversal) Name() string            { return "Flask Path Traversal" }
 func (r FlaskPathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r FlaskPathTraversal) Description() string {
@@ -275,12 +275,12 @@ func (r FlaskPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FLASK-004: Flask Markup XSS
+// BATOU-FW-FLASK-004: Flask Markup XSS
 // ---------------------------------------------------------------------------
 
 type FlaskMarkupXSS struct{}
 
-func (r FlaskMarkupXSS) ID() string              { return "GTSS-FW-FLASK-004" }
+func (r FlaskMarkupXSS) ID() string              { return "BATOU-FW-FLASK-004" }
 func (r FlaskMarkupXSS) Name() string            { return "Flask Markup XSS" }
 func (r FlaskMarkupXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r FlaskMarkupXSS) Description() string {

@@ -24,17 +24,17 @@ expected_vulnerabilities:
     pattern: "Password changed without verifying current password"
     cwe: CWE-620
     typical_severity: high
-    gtss_rules: [GTSS-AUTH-001]
+    batou_rules: [BATOU-AUTH-001]
   - type: session_persistence
     pattern: "Existing sessions not invalidated after password change"
     cwe: CWE-613
     typical_severity: medium
-    gtss_rules: []
+    batou_rules: []
   - type: admin_bypass
     pattern: "Admin reset endpoint without proper authorization"
     cwe: CWE-862
     typical_severity: high
-    gtss_rules: [GTSS-AUTH-002]
+    batou_rules: [BATOU-AUTH-002]
 gold_secure_pattern: |
   Verify current password and invalidate sessions:
   if not bcrypt.checkpw(current_password, user.password_hash):

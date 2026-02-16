@@ -23,12 +23,12 @@ expected_vulnerabilities:
     pattern: "Dynamic WHERE clause built with string concatenation"
     cwe: CWE-89
     typical_severity: critical
-    gtss_rules: [GTSS-INJ-001, GTSS-INJ-002]
+    batou_rules: [BATOU-INJ-001, BATOU-INJ-002]
   - type: sql_injection_order_by
     pattern: "ORDER BY clause using unsanitized user input"
     cwe: CWE-89
     typical_severity: high
-    gtss_rules: [GTSS-INJ-001]
+    batou_rules: [BATOU-INJ-001]
 gold_secure_pattern: |
   Use query builder with parameterized values and column allowlist:
   ALLOWED_SORT = {"date", "status", "customer_name", "total"}

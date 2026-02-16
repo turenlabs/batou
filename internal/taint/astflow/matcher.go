@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"strings"
 
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // CatalogMatcher indexes catalog entries by method name for O(1) lookup

@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
-// Compiled regex patterns for Ruby extension rules (GTSS-RB-013 .. GTSS-RB-020)
+// Compiled regex patterns for Ruby extension rules (BATOU-RB-013 .. BATOU-RB-020)
 // ---------------------------------------------------------------------------
 
 // RB-013: send() with user-controlled method name (broader than RB-006)
@@ -74,12 +74,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-013: Ruby send() with user-controlled method name
+// BATOU-RB-013: Ruby send() with user-controlled method name
 // ---------------------------------------------------------------------------
 
 type RubySendUserMethod struct{}
 
-func (r *RubySendUserMethod) ID() string                      { return "GTSS-RB-013" }
+func (r *RubySendUserMethod) ID() string                      { return "BATOU-RB-013" }
 func (r *RubySendUserMethod) Name() string                    { return "RubySendUserMethod" }
 func (r *RubySendUserMethod) Description() string             { return "Detects Ruby send/public_send/__send__ with user-controlled method name via interpolation or params, enabling arbitrary method invocation." }
 func (r *RubySendUserMethod) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -127,12 +127,12 @@ func (r *RubySendUserMethod) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-014: Ruby constantize/classify with user input
+// BATOU-RB-014: Ruby constantize/classify with user input
 // ---------------------------------------------------------------------------
 
 type RubyConstantize struct{}
 
-func (r *RubyConstantize) ID() string                      { return "GTSS-RB-014" }
+func (r *RubyConstantize) ID() string                      { return "BATOU-RB-014" }
 func (r *RubyConstantize) Name() string                    { return "RubyConstantize" }
 func (r *RubyConstantize) Description() string             { return "Detects Ruby constantize/classify with user input, enabling arbitrary class instantiation." }
 func (r *RubyConstantize) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -190,12 +190,12 @@ func (r *RubyConstantize) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-015: Ruby open() with user-controlled path (command injection via pipe)
+// BATOU-RB-015: Ruby open() with user-controlled path (command injection via pipe)
 // ---------------------------------------------------------------------------
 
 type RubyOpenCmdPipe struct{}
 
-func (r *RubyOpenCmdPipe) ID() string                      { return "GTSS-RB-015" }
+func (r *RubyOpenCmdPipe) ID() string                      { return "BATOU-RB-015" }
 func (r *RubyOpenCmdPipe) Name() string                    { return "RubyOpenCmdPipe" }
 func (r *RubyOpenCmdPipe) Description() string             { return "Detects Ruby Kernel#open with user-controlled path, which allows command injection if input starts with pipe character." }
 func (r *RubyOpenCmdPipe) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -243,12 +243,12 @@ func (r *RubyOpenCmdPipe) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-016: Ruby Kernel.system with string interpolation
+// BATOU-RB-016: Ruby Kernel.system with string interpolation
 // ---------------------------------------------------------------------------
 
 type RubyKernelSystemInterp struct{}
 
-func (r *RubyKernelSystemInterp) ID() string                      { return "GTSS-RB-016" }
+func (r *RubyKernelSystemInterp) ID() string                      { return "BATOU-RB-016" }
 func (r *RubyKernelSystemInterp) Name() string                    { return "RubyKernelSystemInterp" }
 func (r *RubyKernelSystemInterp) Description() string             { return "Detects Ruby Kernel.system or system() with string interpolation, enabling command injection." }
 func (r *RubyKernelSystemInterp) DefaultSeverity() rules.Severity { return rules.High }
@@ -296,12 +296,12 @@ func (r *RubyKernelSystemInterp) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-017: Ruby YAML.load with untrusted input
+// BATOU-RB-017: Ruby YAML.load with untrusted input
 // ---------------------------------------------------------------------------
 
 type RubyYAMLLoadUntrusted struct{}
 
-func (r *RubyYAMLLoadUntrusted) ID() string                      { return "GTSS-RB-017" }
+func (r *RubyYAMLLoadUntrusted) ID() string                      { return "BATOU-RB-017" }
 func (r *RubyYAMLLoadUntrusted) Name() string                    { return "RubyYAMLLoadUntrusted" }
 func (r *RubyYAMLLoadUntrusted) Description() string             { return "Detects Ruby YAML.load with untrusted input sources (params, request body, IO, network), enabling unsafe deserialization." }
 func (r *RubyYAMLLoadUntrusted) DefaultSeverity() rules.Severity { return rules.High }
@@ -352,12 +352,12 @@ func (r *RubyYAMLLoadUntrusted) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-018: Ruby Regexp with user input (ReDoS)
+// BATOU-RB-018: Ruby Regexp with user input (ReDoS)
 // ---------------------------------------------------------------------------
 
 type RubyRegexpReDoS struct{}
 
-func (r *RubyRegexpReDoS) ID() string                      { return "GTSS-RB-018" }
+func (r *RubyRegexpReDoS) ID() string                      { return "BATOU-RB-018" }
 func (r *RubyRegexpReDoS) Name() string                    { return "RubyRegexpReDoS" }
 func (r *RubyRegexpReDoS) Description() string             { return "Detects Ruby regex construction with user input via interpolation or Regexp.new, enabling ReDoS attacks." }
 func (r *RubyRegexpReDoS) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -405,12 +405,12 @@ func (r *RubyRegexpReDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-019: Ruby ERB.new with user data
+// BATOU-RB-019: Ruby ERB.new with user data
 // ---------------------------------------------------------------------------
 
 type RubyERBNewUser struct{}
 
-func (r *RubyERBNewUser) ID() string                      { return "GTSS-RB-019" }
+func (r *RubyERBNewUser) ID() string                      { return "BATOU-RB-019" }
 func (r *RubyERBNewUser) Name() string                    { return "RubyERBNewUser" }
 func (r *RubyERBNewUser) Description() string             { return "Detects Ruby ERB.new with user-controlled template data, enabling server-side template injection (SSTI)." }
 func (r *RubyERBNewUser) DefaultSeverity() rules.Severity { return rules.High }
@@ -467,12 +467,12 @@ func (r *RubyERBNewUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-RB-020: Ruby File.read/write with user-controlled path
+// BATOU-RB-020: Ruby File.read/write with user-controlled path
 // ---------------------------------------------------------------------------
 
 type RubyFilePathTraversal struct{}
 
-func (r *RubyFilePathTraversal) ID() string                      { return "GTSS-RB-020" }
+func (r *RubyFilePathTraversal) ID() string                      { return "BATOU-RB-020" }
 func (r *RubyFilePathTraversal) Name() string                    { return "RubyFilePathTraversal" }
 func (r *RubyFilePathTraversal) Description() string             { return "Detects Ruby File.read/write/open/delete with user-controlled path, enabling path traversal attacks." }
 func (r *RubyFilePathTraversal) DefaultSeverity() rules.Severity { return rules.High }

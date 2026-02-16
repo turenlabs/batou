@@ -4,19 +4,19 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-FW-EXPRESS-001: Missing Helmet middleware
+// BATOU-FW-EXPRESS-001: Missing Helmet middleware
 var (
 	expressAppCreate = regexp.MustCompile(`\b(?:express\s*\(\s*\)|require\s*\(\s*['"]express['"]\s*\))`)
 	helmetUse        = regexp.MustCompile(`(?:app|server|router)\s*\.\s*use\s*\(\s*helmet\s*\(`)
 	helmetImport     = regexp.MustCompile(`(?:require\s*\(\s*['"]helmet['"]\s*\)|import\s+.*\bhelmet\b.*from\s+['"]helmet['"])`)
 )
 
-// GTSS-FW-EXPRESS-002: Insecure session configuration
+// BATOU-FW-EXPRESS-002: Insecure session configuration
 var (
 	sessionConfig      = regexp.MustCompile(`session\s*\(\s*\{`)
 	sessionSecureFalse = regexp.MustCompile(`secure\s*:\s*false`)
@@ -24,14 +24,14 @@ var (
 	sessionSameSiteNone = regexp.MustCompile(`sameSite\s*:\s*['"]none['"]`)
 )
 
-// GTSS-FW-EXPRESS-003: Stack trace leak in error handler
+// BATOU-FW-EXPRESS-003: Stack trace leak in error handler
 var (
 	errorHandlerSig  = regexp.MustCompile(`\(\s*err\s*,\s*req\s*,\s*res\s*,\s*next\s*\)`)
 	stackTraceLeak   = regexp.MustCompile(`res\s*\.(?:\s*status\s*\([^)]*\)\s*\.)?\s*(?:send|json|write|end)\s*\(\s*(?:err\s*\.\s*stack|err\s*\.\s*message|err\.toString\s*\(\s*\)|String\s*\(\s*err\s*\))`)
 	stackTraceRender = regexp.MustCompile(`res\s*\.(?:\s*status\s*\([^)]*\)\s*\.)?\s*(?:send|json|write)\s*\(\s*\{[^}]*(?:error|message|stack)\s*:\s*err(?:\s*\.\s*(?:stack|message))?\b`)
 )
 
-// GTSS-FW-EXPRESS-004: Dynamic require with user input
+// BATOU-FW-EXPRESS-004: Dynamic require with user input
 var (
 	dynamicRequire     = regexp.MustCompile(`require\s*\(\s*(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|` +
 		`[^)]*\+\s*(?:req\s*\.\s*(?:params|query|body)\b|userInput|input|moduleName|modName|name)|` +
@@ -43,7 +43,7 @@ var (
 	importVariable     = regexp.MustCompile(`(?:await\s+)?import\s*\(\s*[a-zA-Z_]\w*\s*\)`)
 )
 
-// GTSS-FW-EXPRESS-005: Static serving sensitive directories
+// BATOU-FW-EXPRESS-005: Static serving sensitive directories
 var (
 	expressStatic = regexp.MustCompile(`express\s*\.\s*static\s*\(\s*['"]([^'"]+)['"]`)
 	sensitiveStaticDirs = []string{
@@ -53,19 +53,19 @@ var (
 	}
 )
 
-// GTSS-FW-EXPRESS-006: Trust proxy misconfiguration
+// BATOU-FW-EXPRESS-006: Trust proxy misconfiguration
 var (
 	trustProxyTrue = regexp.MustCompile(`(?:app|server)\s*\.\s*set\s*\(\s*['"]trust\s+proxy['"]\s*,\s*true\s*\)`)
 )
 
-// GTSS-FW-EXPRESS-007: Missing session expiration
+// BATOU-FW-EXPRESS-007: Missing session expiration
 var (
 	sessionCookieConfig = regexp.MustCompile(`session\s*\(\s*\{`)
 	sessionMaxAge       = regexp.MustCompile(`maxAge\s*:`)
 	sessionExpires      = regexp.MustCompile(`expires\s*:`)
 )
 
-// GTSS-FW-EXPRESS-008: Process.env leaked to client response
+// BATOU-FW-EXPRESS-008: Process.env leaked to client response
 var (
 	processEnvLeak = regexp.MustCompile(`res\s*\.(?:\s*status\s*\([^)]*\)\s*\.)?\s*(?:send|json|write|render)\s*\(\s*process\s*\.\s*env\s*[),;\s]`)
 	processEnvSpread = regexp.MustCompile(`(?:\.\.\.process\.env|\bprocess\.env\b)\s*(?:\)|,|\})`)
@@ -92,11 +92,11 @@ func isExpressApp(content string) bool {
 		strings.Contains(content, "require(\"express\")")
 }
 
-// --- GTSS-FW-EXPRESS-001: Missing Helmet ---
+// --- BATOU-FW-EXPRESS-001: Missing Helmet ---
 
 type MissingHelmet struct{}
 
-func (r *MissingHelmet) ID() string                    { return "GTSS-FW-EXPRESS-001" }
+func (r *MissingHelmet) ID() string                    { return "BATOU-FW-EXPRESS-001" }
 func (r *MissingHelmet) Name() string                  { return "MissingHelmet" }
 func (r *MissingHelmet) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingHelmet) Languages() []rules.Language {
@@ -145,11 +145,11 @@ func (r *MissingHelmet) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return nil
 }
 
-// --- GTSS-FW-EXPRESS-002: Insecure Session Configuration ---
+// --- BATOU-FW-EXPRESS-002: Insecure Session Configuration ---
 
 type InsecureSession struct{}
 
-func (r *InsecureSession) ID() string                    { return "GTSS-FW-EXPRESS-002" }
+func (r *InsecureSession) ID() string                    { return "BATOU-FW-EXPRESS-002" }
 func (r *InsecureSession) Name() string                  { return "InsecureSession" }
 func (r *InsecureSession) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureSession) Languages() []rules.Language {
@@ -242,11 +242,11 @@ func (r *InsecureSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-EXPRESS-003: Stack Trace Leak ---
+// --- BATOU-FW-EXPRESS-003: Stack Trace Leak ---
 
 type StackTraceLeak struct{}
 
-func (r *StackTraceLeak) ID() string                    { return "GTSS-FW-EXPRESS-003" }
+func (r *StackTraceLeak) ID() string                    { return "BATOU-FW-EXPRESS-003" }
 func (r *StackTraceLeak) Name() string                  { return "StackTraceLeak" }
 func (r *StackTraceLeak) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *StackTraceLeak) Languages() []rules.Language {
@@ -320,11 +320,11 @@ func (r *StackTraceLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-EXPRESS-004: Dynamic Require with User Input ---
+// --- BATOU-FW-EXPRESS-004: Dynamic Require with User Input ---
 
 type DynamicRequire struct{}
 
-func (r *DynamicRequire) ID() string                    { return "GTSS-FW-EXPRESS-004" }
+func (r *DynamicRequire) ID() string                    { return "BATOU-FW-EXPRESS-004" }
 func (r *DynamicRequire) Name() string                  { return "DynamicRequire" }
 func (r *DynamicRequire) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *DynamicRequire) Languages() []rules.Language {
@@ -447,11 +447,11 @@ func (r *DynamicRequire) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-EXPRESS-005: Sensitive Static Directory ---
+// --- BATOU-FW-EXPRESS-005: Sensitive Static Directory ---
 
 type SensitiveStaticDir struct{}
 
-func (r *SensitiveStaticDir) ID() string                    { return "GTSS-FW-EXPRESS-005" }
+func (r *SensitiveStaticDir) ID() string                    { return "BATOU-FW-EXPRESS-005" }
 func (r *SensitiveStaticDir) Name() string                  { return "SensitiveStaticDir" }
 func (r *SensitiveStaticDir) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SensitiveStaticDir) Languages() []rules.Language {
@@ -518,11 +518,11 @@ func (r *SensitiveStaticDir) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-EXPRESS-006: Trust Proxy Misconfiguration ---
+// --- BATOU-FW-EXPRESS-006: Trust Proxy Misconfiguration ---
 
 type TrustProxyMisconfig struct{}
 
-func (r *TrustProxyMisconfig) ID() string                    { return "GTSS-FW-EXPRESS-006" }
+func (r *TrustProxyMisconfig) ID() string                    { return "BATOU-FW-EXPRESS-006" }
 func (r *TrustProxyMisconfig) Name() string                  { return "TrustProxyMisconfig" }
 func (r *TrustProxyMisconfig) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *TrustProxyMisconfig) Languages() []rules.Language {
@@ -562,11 +562,11 @@ func (r *TrustProxyMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-EXPRESS-007: Missing Session Expiration ---
+// --- BATOU-FW-EXPRESS-007: Missing Session Expiration ---
 
 type MissingSessionExpiry struct{}
 
-func (r *MissingSessionExpiry) ID() string                    { return "GTSS-FW-EXPRESS-007" }
+func (r *MissingSessionExpiry) ID() string                    { return "BATOU-FW-EXPRESS-007" }
 func (r *MissingSessionExpiry) Name() string                  { return "MissingSessionExpiry" }
 func (r *MissingSessionExpiry) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingSessionExpiry) Languages() []rules.Language {
@@ -631,11 +631,11 @@ func (r *MissingSessionExpiry) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-EXPRESS-008: Process.env Leak to Client ---
+// --- BATOU-FW-EXPRESS-008: Process.env Leak to Client ---
 
 type ProcessEnvLeak struct{}
 
-func (r *ProcessEnvLeak) ID() string                    { return "GTSS-FW-EXPRESS-008" }
+func (r *ProcessEnvLeak) ID() string                    { return "BATOU-FW-EXPRESS-008" }
 func (r *ProcessEnvLeak) Name() string                  { return "ProcessEnvLeak" }
 func (r *ProcessEnvLeak) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ProcessEnvLeak) Languages() []rules.Language {

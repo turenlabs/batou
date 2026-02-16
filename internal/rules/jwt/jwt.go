@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-JWT-001: JWT none algorithm accepted
+// BATOU-JWT-001: JWT none algorithm accepted
 var (
 	reJWTNoneAlg     = regexp.MustCompile(`(?i)["'](?:alg|algorithm)["']\s*[=:]\s*["'](?:none|None|NONE|nOnE)["']`)
 	reJWTAlgNone     = regexp.MustCompile(`(?i)(?:algorithms?\s*[=:]\s*\[?\s*["']none["']|verify\s*[=:]\s*(?:false|False|FALSE))`)
@@ -19,44 +19,44 @@ var (
 	reJWTNoAlgCheck  = regexp.MustCompile(`(?i)(?:algorithms?\s*=\s*\[\s*["']none["'])`)
 )
 
-// GTSS-JWT-002: JWT hardcoded secret key
+// BATOU-JWT-002: JWT hardcoded secret key
 var (
 	reJWTHardcodedSecret = regexp.MustCompile(`(?i)(?:jwt\.(?:sign|encode|create|Sign)|JWT\.(?:create|encode|sign)|jose\.\w+\.sign|jsonwebtoken\.sign)\s*\([^,]+,\s*["'][^"']{1,100}["']`)
 	reJWTSecretAssign    = regexp.MustCompile(`(?i)(?:jwt_secret|jwt_key|secret_key|signing_key|token_secret|JWT_SECRET|SIGNING_KEY)\s*[=:]\s*["'][^"']{1,100}["']`)
 	reJWTSecretConst     = regexp.MustCompile(`(?i)(?:const|var|let|final|static)\s+\w*(?:secret|key|Secret|Key)\w*\s*[=:]\s*["'][^"']{3,100}["']`)
 )
 
-// GTSS-JWT-003: JWT algorithm confusion RS/HS
+// BATOU-JWT-003: JWT algorithm confusion RS/HS
 var (
 	reJWTAlgConfusion = regexp.MustCompile(`(?i)(?:algorithms?\s*[=:]\s*\[\s*["'](?:HS256|HS384|HS512)["']\s*,\s*["'](?:RS256|RS384|RS512)["']|algorithms?\s*[=:]\s*\[\s*["'](?:RS256|RS384|RS512)["']\s*,\s*["'](?:HS256|HS384|HS512)["'])`)
 	reJWTAlgMixed     = regexp.MustCompile(`(?i)(?:algorithms?\s*[=:]\s*\[(?:[^]]*["'](?:HS|RS|ES|PS)\d{3}["']\s*,?\s*){2,})`)
 )
 
-// GTSS-JWT-004: JWT not verifying expiration
+// BATOU-JWT-004: JWT not verifying expiration
 var (
 	reJWTNoExpVerify = regexp.MustCompile(`(?i)(?:verify_exp\s*[=:]\s*(?:false|False)|options\s*[=:]\s*\{[^}]*ignoreExpiration\s*[=:]\s*true|ignore_expiration\s*[=:]\s*(?:true|True)|exp\s*[=:]\s*false)`)
 	reJWTNoExpCheck  = regexp.MustCompile(`(?i)(?:ClockSkew\s*=\s*TimeSpan\.MaxValue|verify_expiration\s*=\s*False)`)
 )
 
-// GTSS-JWT-005: JWT not verifying issuer/audience
+// BATOU-JWT-005: JWT not verifying issuer/audience
 var (
 	reJWTNoIssVerify = regexp.MustCompile(`(?i)(?:verify_iss\s*[=:]\s*(?:false|False)|ValidateIssuer\s*=\s*false|ignoreIssuer\s*[=:]\s*true)`)
 	reJWTNoAudVerify = regexp.MustCompile(`(?i)(?:verify_aud\s*[=:]\s*(?:false|False)|ValidateAudience\s*=\s*false|ignoreAudience\s*[=:]\s*true)`)
 )
 
-// GTSS-JWT-006: JWT weak HMAC secret (short string literal)
+// BATOU-JWT-006: JWT weak HMAC secret (short string literal)
 var (
 	reJWTWeakSecret = regexp.MustCompile(`(?i)(?:jwt\.(?:sign|encode)|JWT\.(?:create|encode)|jsonwebtoken\.sign)\s*\([^,]+,\s*["'][^"']{1,15}["']`)
 )
 
-// GTSS-JWT-007: JWT token in URL parameter
+// BATOU-JWT-007: JWT token in URL parameter
 var (
 	reJWTInURL = regexp.MustCompile(`(?i)(?:\?|&)(?:token|jwt|access_token|id_token|auth_token)\s*=\s*(?:eyJ|\w+\.ey)`)
 	reJWTURLParam = regexp.MustCompile(`(?i)(?:req\.(?:query|params)|request\.(?:GET|args|params)|getParameter)\s*[\[(]\s*["'](?:token|jwt|access_token|id_token)["']`)
 	reJWTInQueryStr = regexp.MustCompile(`(?i)(?:url|uri|href|redirect|link)\s*[=+:]\s*[^;]*[?&](?:token|jwt|access_token)=`)
 )
 
-// GTSS-JWT-008: JWT decode without verify
+// BATOU-JWT-008: JWT decode without verify
 var (
 	reJWTDecodeNoVerify  = regexp.MustCompile(`(?i)\bjwt\.decode\s*\([^)]*(?:verify\s*=\s*False|options\s*=\s*\{[^}]*"verify"\s*:\s*false|algorithms?\s*=\s*\[\s*\])`)
 	reJWTDecodeUnsafe    = regexp.MustCompile(`(?i)(?:jwt_decode|jose\.JWT\.Decode|JWT\.decode)\s*\([^)]*(?:verify\s*[=:]\s*false|do_verify\s*[=:]\s*false)`)
@@ -64,14 +64,14 @@ var (
 	reJWTBase64Decode    = regexp.MustCompile(`(?i)(?:base64\.(?:b64decode|urlsafe_b64decode|decode)|atob|Buffer\.from)\s*\(\s*(?:token|jwt|access_token)\b`)
 )
 
-// GTSS-JWT-009: JWT kid header injection
+// BATOU-JWT-009: JWT kid header injection
 var (
 	reJWTKidSQL    = regexp.MustCompile(`(?i)["']kid["']\s*[=:]\s*(?:["'][^"']*(?:UNION|SELECT|OR|AND|\x27|--|;)[^"']*["']|.*(?:request\.|getParameter|params|query))`)
 	reJWTKidFile   = regexp.MustCompile(`(?i)["']kid["']\s*[=:]\s*["'][^"']*(?:\.\.\/|/etc/|/dev/null|/proc/)[^"']*["']`)
 	reJWTKidCmd    = regexp.MustCompile(`(?i)["']kid["']\s*[=:]\s*["'][^"']*(?:\||;|` + "`" + `|\$\()[^"']*["']`)
 )
 
-// GTSS-JWT-010: JWT stored in localStorage
+// BATOU-JWT-010: JWT stored in localStorage
 var (
 	reJWTLocalStorage    = regexp.MustCompile(`(?i)localStorage\.setItem\s*\(\s*["'](?:token|jwt|access_token|id_token|auth_token|refreshToken|refresh_token)["']`)
 	reJWTLocalStorageGet = regexp.MustCompile(`(?i)localStorage\.getItem\s*\(\s*["'](?:token|jwt|access_token|id_token|auth_token)["']`)
@@ -98,12 +98,12 @@ func truncate(s string, maxLen int) string {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JWT-001: JWT none/None algorithm accepted
+// BATOU-JWT-001: JWT none/None algorithm accepted
 // ---------------------------------------------------------------------------
 
 type JWTNoneAlgorithm struct{}
 
-func (r *JWTNoneAlgorithm) ID() string                     { return "GTSS-JWT-001" }
+func (r *JWTNoneAlgorithm) ID() string                     { return "BATOU-JWT-001" }
 func (r *JWTNoneAlgorithm) Name() string                   { return "JWTNoneAlgorithm" }
 func (r *JWTNoneAlgorithm) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JWTNoneAlgorithm) Description() string {
@@ -147,12 +147,12 @@ func (r *JWTNoneAlgorithm) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JWT-002: JWT hardcoded secret key
+// BATOU-JWT-002: JWT hardcoded secret key
 // ---------------------------------------------------------------------------
 
 type JWTHardcodedSecret struct{}
 
-func (r *JWTHardcodedSecret) ID() string                     { return "GTSS-JWT-002" }
+func (r *JWTHardcodedSecret) ID() string                     { return "BATOU-JWT-002" }
 func (r *JWTHardcodedSecret) Name() string                   { return "JWTHardcodedSecret" }
 func (r *JWTHardcodedSecret) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JWTHardcodedSecret) Description() string {
@@ -196,12 +196,12 @@ func (r *JWTHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JWT-003: JWT algorithm confusion RS/HS
+// BATOU-JWT-003: JWT algorithm confusion RS/HS
 // ---------------------------------------------------------------------------
 
 type JWTAlgorithmConfusion struct{}
 
-func (r *JWTAlgorithmConfusion) ID() string                     { return "GTSS-JWT-003" }
+func (r *JWTAlgorithmConfusion) ID() string                     { return "BATOU-JWT-003" }
 func (r *JWTAlgorithmConfusion) Name() string                   { return "JWTAlgorithmConfusion" }
 func (r *JWTAlgorithmConfusion) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JWTAlgorithmConfusion) Description() string {
@@ -245,12 +245,12 @@ func (r *JWTAlgorithmConfusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JWT-004: JWT not verifying expiration
+// BATOU-JWT-004: JWT not verifying expiration
 // ---------------------------------------------------------------------------
 
 type JWTNoExpiration struct{}
 
-func (r *JWTNoExpiration) ID() string                     { return "GTSS-JWT-004" }
+func (r *JWTNoExpiration) ID() string                     { return "BATOU-JWT-004" }
 func (r *JWTNoExpiration) Name() string                   { return "JWTNoExpiration" }
 func (r *JWTNoExpiration) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *JWTNoExpiration) Description() string {
@@ -294,12 +294,12 @@ func (r *JWTNoExpiration) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JWT-005: JWT not verifying issuer/audience
+// BATOU-JWT-005: JWT not verifying issuer/audience
 // ---------------------------------------------------------------------------
 
 type JWTNoIssuerAudience struct{}
 
-func (r *JWTNoIssuerAudience) ID() string                     { return "GTSS-JWT-005" }
+func (r *JWTNoIssuerAudience) ID() string                     { return "BATOU-JWT-005" }
 func (r *JWTNoIssuerAudience) Name() string                   { return "JWTNoIssuerAudience" }
 func (r *JWTNoIssuerAudience) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *JWTNoIssuerAudience) Description() string {
@@ -343,12 +343,12 @@ func (r *JWTNoIssuerAudience) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JWT-006: JWT weak HMAC secret (short string literal)
+// BATOU-JWT-006: JWT weak HMAC secret (short string literal)
 // ---------------------------------------------------------------------------
 
 type JWTWeakSecret struct{}
 
-func (r *JWTWeakSecret) ID() string                     { return "GTSS-JWT-006" }
+func (r *JWTWeakSecret) ID() string                     { return "BATOU-JWT-006" }
 func (r *JWTWeakSecret) Name() string                   { return "JWTWeakSecret" }
 func (r *JWTWeakSecret) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JWTWeakSecret) Description() string {
@@ -389,12 +389,12 @@ func (r *JWTWeakSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JWT-007: JWT token in URL parameter
+// BATOU-JWT-007: JWT token in URL parameter
 // ---------------------------------------------------------------------------
 
 type JWTInURL struct{}
 
-func (r *JWTInURL) ID() string                     { return "GTSS-JWT-007" }
+func (r *JWTInURL) ID() string                     { return "BATOU-JWT-007" }
 func (r *JWTInURL) Name() string                   { return "JWTInURL" }
 func (r *JWTInURL) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *JWTInURL) Description() string {
@@ -438,12 +438,12 @@ func (r *JWTInURL) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JWT-008: JWT decode without verify
+// BATOU-JWT-008: JWT decode without verify
 // ---------------------------------------------------------------------------
 
 type JWTDecodeNoVerify struct{}
 
-func (r *JWTDecodeNoVerify) ID() string                     { return "GTSS-JWT-008" }
+func (r *JWTDecodeNoVerify) ID() string                     { return "BATOU-JWT-008" }
 func (r *JWTDecodeNoVerify) Name() string                   { return "JWTDecodeNoVerify" }
 func (r *JWTDecodeNoVerify) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JWTDecodeNoVerify) Description() string {
@@ -487,12 +487,12 @@ func (r *JWTDecodeNoVerify) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JWT-009: JWT kid header injection
+// BATOU-JWT-009: JWT kid header injection
 // ---------------------------------------------------------------------------
 
 type JWTKidInjection struct{}
 
-func (r *JWTKidInjection) ID() string                     { return "GTSS-JWT-009" }
+func (r *JWTKidInjection) ID() string                     { return "BATOU-JWT-009" }
 func (r *JWTKidInjection) Name() string                   { return "JWTKidInjection" }
 func (r *JWTKidInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JWTKidInjection) Description() string {
@@ -536,12 +536,12 @@ func (r *JWTKidInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-JWT-010: JWT stored in localStorage
+// BATOU-JWT-010: JWT stored in localStorage
 // ---------------------------------------------------------------------------
 
 type JWTLocalStorage struct{}
 
-func (r *JWTLocalStorage) ID() string                     { return "GTSS-JWT-010" }
+func (r *JWTLocalStorage) ID() string                     { return "BATOU-JWT-010" }
 func (r *JWTLocalStorage) Name() string                   { return "JWTLocalStorage" }
 func (r *JWTLocalStorage) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *JWTLocalStorage) Description() string {

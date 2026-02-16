@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,37 +12,37 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-NOSQL-004: MongoDB $where with user input
+	// BATOU-NOSQL-004: MongoDB $where with user input
 	reExtMongoWhere      = regexp.MustCompile(`(?i)\$where\s*['":]`)
 	reExtMongoWhereConcat = regexp.MustCompile(`(?i)['"]\$where['"]\s*(?::|=>)\s*(?:[^"'\n]*\+|[^"'\n]*\$\{|f["']|[^"'\n]*\.format|[^"'\n]*%\s)`)
 	reExtMongoWhereFunc  = regexp.MustCompile(`(?i)['"]\$where['"]\s*(?::|=>)\s*['"](?:function|this\.)`)
 
-	// GTSS-NOSQL-005: Redis EVAL with user input
+	// BATOU-NOSQL-005: Redis EVAL with user input
 	reExtRedisEval       = regexp.MustCompile(`(?i)(?:redis|client|r|conn)\s*\.\s*(?:eval|evalsha)\s*\(`)
 	reExtRedisEvalConcat = regexp.MustCompile(`(?i)(?:redis|client|r|conn)\s*\.\s*eval\s*\([^)]*(?:\+|req\.|request\.|params|user_?input|\$_)`)
 
-	// GTSS-NOSQL-006: CouchDB Mango query injection
+	// BATOU-NOSQL-006: CouchDB Mango query injection
 	reExtCouchDBFind     = regexp.MustCompile(`(?i)(?:couch|couchdb|nano|cradle).*\.(?:find|view|query)\s*\(`)
 	reExtCouchDBUserInput = regexp.MustCompile(`(?i)(?:couch|couchdb|nano|cradle).*\.(?:find|view|query)\s*\(\s*(?:req\.(?:body|query|params)|request\.|JSON\.parse|params\[)`)
 
-	// GTSS-NOSQL-007: Elasticsearch query_string with user input
+	// BATOU-NOSQL-007: Elasticsearch query_string with user input
 	reExtESQueryString    = regexp.MustCompile(`(?i)(?:query_string|query_?string)\s*['":]`)
 	reExtESQueryUserInput = regexp.MustCompile(`(?i)(?:query_string|query_?string)\s*['":]\s*[^}]*(?:req\.|request\.|params|user_?input|query|input|\$_|\+\s*[a-zA-Z_])`)
 	reExtESSearch         = regexp.MustCompile(`(?i)(?:elastic|es|client)\s*\.\s*search\s*\(`)
 
-	// GTSS-NOSQL-008: Cassandra CQL injection via concat
+	// BATOU-NOSQL-008: Cassandra CQL injection via concat
 	reExtCQLConcat = regexp.MustCompile(`(?i)(?:session|cassandra|cluster)\s*\.\s*execute\s*\(\s*(?:["'][^"']*["']\s*\+|f["']|["'][^"']*["']\s*%\s*|["'][^"']*["']\s*\.format\s*\()`)
 	reExtCQLPrepared = regexp.MustCompile(`(?i)(?:session|cassandra|cluster)\s*\.\s*(?:prepare|execute)\s*\(\s*["'][^"']*\?\s*["']`)
 
-	// GTSS-NOSQL-009: DynamoDB filter expression injection
+	// BATOU-NOSQL-009: DynamoDB filter expression injection
 	reExtDynamoFilter    = regexp.MustCompile(`(?i)(?:FilterExpression|KeyConditionExpression|ProjectionExpression|ConditionExpression)\s*[:=]\s*(?:[^"'\n]*\+|f["']|[^"'\n]*\.format|[^"'\n]*%\s)`)
 	reExtDynamoSafe      = regexp.MustCompile(`(?i)ExpressionAttributeValues`)
 
-	// GTSS-NOSQL-010: Firebase Realtime DB rules bypass
+	// BATOU-NOSQL-010: Firebase Realtime DB rules bypass
 	reExtFirebaseNoAuth  = regexp.MustCompile(`(?i)['"]\s*\.(?:read|write)['"]\s*:\s*['"]?\s*true\s*['"]?`)
 	reExtFirebaseRules   = regexp.MustCompile(`(?i)(?:database\.rules|firestore\.rules|security\s*rules|firebase.*rules)`)
 
-	// GTSS-NOSQL-011: Neo4j Cypher injection via concat
+	// BATOU-NOSQL-011: Neo4j Cypher injection via concat
 	reExtCypherConcat = regexp.MustCompile(`(?i)(?:session|driver|neo4j|tx)\s*\.\s*(?:run|query|execute|cypher)\s*\(\s*(?:["'][^"']*["']\s*\+|f["']|["'][^"']*["']\s*%\s*|["'][^"']*["']\s*\.format\s*\()`)
 	reExtCypherParam  = regexp.MustCompile(`(?i)(?:session|driver|neo4j|tx)\s*\.\s*(?:run|query|execute)\s*\(\s*["'][^"']*\$[a-zA-Z_]`)
 )
@@ -63,12 +63,12 @@ func init() {
 }
 
 // ========================================================================
-// GTSS-NOSQL-004: MongoDB $where with User Input
+// BATOU-NOSQL-004: MongoDB $where with User Input
 // ========================================================================
 
 type MongoWhereExt struct{}
 
-func (r *MongoWhereExt) ID() string                     { return "GTSS-NOSQL-004" }
+func (r *MongoWhereExt) ID() string                     { return "BATOU-NOSQL-004" }
 func (r *MongoWhereExt) Name() string                   { return "MongoWhereExt" }
 func (r *MongoWhereExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *MongoWhereExt) Description() string {
@@ -114,12 +114,12 @@ func (r *MongoWhereExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-NOSQL-005: Redis EVAL with User Input
+// BATOU-NOSQL-005: Redis EVAL with User Input
 // ========================================================================
 
 type RedisEvalRule struct{}
 
-func (r *RedisEvalRule) ID() string                     { return "GTSS-NOSQL-005" }
+func (r *RedisEvalRule) ID() string                     { return "BATOU-NOSQL-005" }
 func (r *RedisEvalRule) Name() string                   { return "RedisEval" }
 func (r *RedisEvalRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RedisEvalRule) Description() string {
@@ -176,12 +176,12 @@ func (r *RedisEvalRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-NOSQL-006: CouchDB Mango Query Injection
+// BATOU-NOSQL-006: CouchDB Mango Query Injection
 // ========================================================================
 
 type CouchDBInjection struct{}
 
-func (r *CouchDBInjection) ID() string                     { return "GTSS-NOSQL-006" }
+func (r *CouchDBInjection) ID() string                     { return "BATOU-NOSQL-006" }
 func (r *CouchDBInjection) Name() string                   { return "CouchDBInjection" }
 func (r *CouchDBInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CouchDBInjection) Description() string {
@@ -221,12 +221,12 @@ func (r *CouchDBInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-NOSQL-007: Elasticsearch query_string with User Input
+// BATOU-NOSQL-007: Elasticsearch query_string with User Input
 // ========================================================================
 
 type ESQueryStringRule struct{}
 
-func (r *ESQueryStringRule) ID() string                     { return "GTSS-NOSQL-007" }
+func (r *ESQueryStringRule) ID() string                     { return "BATOU-NOSQL-007" }
 func (r *ESQueryStringRule) Name() string                   { return "ESQueryString" }
 func (r *ESQueryStringRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ESQueryStringRule) Description() string {
@@ -266,12 +266,12 @@ func (r *ESQueryStringRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-NOSQL-008: Cassandra CQL Injection via Concatenation
+// BATOU-NOSQL-008: Cassandra CQL Injection via Concatenation
 // ========================================================================
 
 type CQLInjection struct{}
 
-func (r *CQLInjection) ID() string                     { return "GTSS-NOSQL-008" }
+func (r *CQLInjection) ID() string                     { return "BATOU-NOSQL-008" }
 func (r *CQLInjection) Name() string                   { return "CQLInjection" }
 func (r *CQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CQLInjection) Description() string {
@@ -315,12 +315,12 @@ func (r *CQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-NOSQL-009: DynamoDB Filter Expression Injection
+// BATOU-NOSQL-009: DynamoDB Filter Expression Injection
 // ========================================================================
 
 type DynamoFilterRule struct{}
 
-func (r *DynamoFilterRule) ID() string                     { return "GTSS-NOSQL-009" }
+func (r *DynamoFilterRule) ID() string                     { return "BATOU-NOSQL-009" }
 func (r *DynamoFilterRule) Name() string                   { return "DynamoFilterInjection" }
 func (r *DynamoFilterRule) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DynamoFilterRule) Description() string {
@@ -369,12 +369,12 @@ func (r *DynamoFilterRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-NOSQL-010: Firebase Realtime DB Rules Bypass
+// BATOU-NOSQL-010: Firebase Realtime DB Rules Bypass
 // ========================================================================
 
 type FirebaseRulesRule struct{}
 
-func (r *FirebaseRulesRule) ID() string                     { return "GTSS-NOSQL-010" }
+func (r *FirebaseRulesRule) ID() string                     { return "BATOU-NOSQL-010" }
 func (r *FirebaseRulesRule) Name() string                   { return "FirebaseRulesBypass" }
 func (r *FirebaseRulesRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FirebaseRulesRule) Description() string {
@@ -415,12 +415,12 @@ func (r *FirebaseRulesRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-NOSQL-011: Neo4j Cypher Injection via Concatenation
+// BATOU-NOSQL-011: Neo4j Cypher Injection via Concatenation
 // ========================================================================
 
 type CypherInjection struct{}
 
-func (r *CypherInjection) ID() string                     { return "GTSS-NOSQL-011" }
+func (r *CypherInjection) ID() string                     { return "BATOU-NOSQL-011" }
 func (r *CypherInjection) Name() string                   { return "CypherInjection" }
 func (r *CypherInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CypherInjection) Description() string {

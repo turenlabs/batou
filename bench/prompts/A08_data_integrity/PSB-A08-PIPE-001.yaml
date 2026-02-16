@@ -24,17 +24,17 @@ expected_vulnerabilities:
     pattern: "Third-party actions referenced by mutable tag instead of SHA"
     cwe: CWE-829
     typical_severity: medium
-    gtss_rules: []
+    batou_rules: []
   - type: overly_broad_permissions
     pattern: "Workflow permissions not scoped to minimum required"
     cwe: CWE-250
     typical_severity: medium
-    gtss_rules: []
+    batou_rules: []
   - type: script_injection
     pattern: "PR metadata used in shell commands without sanitization"
     cwe: CWE-78
     typical_severity: high
-    gtss_rules: [GTSS-INJ-005]
+    batou_rules: [BATOU-INJ-005]
 gold_secure_pattern: |
   Pin actions by SHA, scope permissions, validate inputs:
   permissions:

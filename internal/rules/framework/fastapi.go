@@ -4,49 +4,49 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns -- FastAPI
 // ---------------------------------------------------------------------------
 
-// GTSS-FW-FASTAPI-001: Endpoint without auth dependency
+// BATOU-FW-FASTAPI-001: Endpoint without auth dependency
 var (
 	reFastapiRoute       = regexp.MustCompile(`@app\.(?:get|post|put|delete|patch|options|head)\s*\(`)
 	reFastapiDepends     = regexp.MustCompile(`Depends\s*\(`)
 	reFastapiAuthKeyword = regexp.MustCompile(`(?i)(?:auth|security|token|current_user|get_current|verify|jwt|oauth|api_key|permission|require_auth)`)
 )
 
-// GTSS-FW-FASTAPI-002: CORS wildcard
+// BATOU-FW-FASTAPI-002: CORS wildcard
 var reFastapiCORSWildcard = regexp.MustCompile(`allow_origins\s*=\s*\[\s*["']\*["']\s*\]`)
 
-// GTSS-FW-FASTAPI-003: Debug mode
+// BATOU-FW-FASTAPI-003: Debug mode
 var reFastapiDebug = regexp.MustCompile(`uvicorn\.run\s*\([^)]*debug\s*=\s*True`)
 
-// GTSS-FW-FASTAPI-004: SQL injection via f-string
+// BATOU-FW-FASTAPI-004: SQL injection via f-string
 var reFastapiSQLFString = regexp.MustCompile(`(?:execute|text|raw)\s*\(\s*f["'](?i)(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|MERGE)\b`)
 
-// GTSS-FW-FASTAPI-005: Response model exposing internal fields
+// BATOU-FW-FASTAPI-005: Response model exposing internal fields
 var reFastapiResponseInternal = regexp.MustCompile(`(?:response_model\s*=\s*\w+)`)
 var reFastapiInternalFields = regexp.MustCompile(`(?:password|hashed_password|secret|token|salt|ssn|credit_card|internal_id|api_key)\s*(?::|=)`)
 
-// GTSS-FW-FASTAPI-006: File upload without validation
+// BATOU-FW-FASTAPI-006: File upload without validation
 var reFastapiFileUpload = regexp.MustCompile(`(?:file|upload)\s*:\s*UploadFile`)
 var reFastapiFileValidation = regexp.MustCompile(`(?:content_type|filename|size|\.endswith|allowed_extensions|validate_file|file_extension|ALLOWED_TYPES)`)
 
-// GTSS-FW-FASTAPI-007: OAuth2 without HTTPS
+// BATOU-FW-FASTAPI-007: OAuth2 without HTTPS
 var reFastapiOAuth2HTTP = regexp.MustCompile(`OAuth2PasswordBearer\s*\(\s*tokenUrl\s*=\s*["']http://`)
 
-// GTSS-FW-FASTAPI-008: Depends() without error handling
+// BATOU-FW-FASTAPI-008: Depends() without error handling
 var reFastapiDependsNaked = regexp.MustCompile(`Depends\s*\(\s*\w+\s*\)`)
 var reFastapiDependsErrorHandling = regexp.MustCompile(`(?:try\s*:|except\s+|HTTPException|raise\s+)`)
 
-// GTSS-FW-FASTAPI-009: Jinja2 without autoescaping
+// BATOU-FW-FASTAPI-009: Jinja2 without autoescaping
 var reFastapiJinja2NoEscape = regexp.MustCompile(`Jinja2Templates\s*\(`)
 var reFastapiAutoescapeFalse = regexp.MustCompile(`autoescape\s*=\s*False`)
 
-// GTSS-FW-FASTAPI-010: Background task with sensitive data
+// BATOU-FW-FASTAPI-010: Background task with sensitive data
 var reFastapiBackgroundTask = regexp.MustCompile(`(?:background_tasks\.add_task|BackgroundTasks)\s*\(`)
 var reFastapiSensitiveDataInTask = regexp.MustCompile(`(?:password|secret|token|api_key|credit_card|ssn|private_key)`)
 
@@ -64,12 +64,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FASTAPI-001: FastAPI endpoint without authentication dependency
+// BATOU-FW-FASTAPI-001: FastAPI endpoint without authentication dependency
 // ---------------------------------------------------------------------------
 
 type FastAPINoAuth struct{}
 
-func (r *FastAPINoAuth) ID() string                      { return "GTSS-FW-FASTAPI-001" }
+func (r *FastAPINoAuth) ID() string                      { return "BATOU-FW-FASTAPI-001" }
 func (r *FastAPINoAuth) Name() string                    { return "FastAPINoAuth" }
 func (r *FastAPINoAuth) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FastAPINoAuth) Description() string {
@@ -134,12 +134,12 @@ func (r *FastAPINoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FASTAPI-002: CORS middleware with allow_origins=["*"]
+// BATOU-FW-FASTAPI-002: CORS middleware with allow_origins=["*"]
 // ---------------------------------------------------------------------------
 
 type FastAPICORSWildcard struct{}
 
-func (r *FastAPICORSWildcard) ID() string                      { return "GTSS-FW-FASTAPI-002" }
+func (r *FastAPICORSWildcard) ID() string                      { return "BATOU-FW-FASTAPI-002" }
 func (r *FastAPICORSWildcard) Name() string                    { return "FastAPICORSWildcard" }
 func (r *FastAPICORSWildcard) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FastAPICORSWildcard) Description() string {
@@ -183,12 +183,12 @@ func (r *FastAPICORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FASTAPI-003: Debug mode enabled
+// BATOU-FW-FASTAPI-003: Debug mode enabled
 // ---------------------------------------------------------------------------
 
 type FastAPIDebugMode struct{}
 
-func (r *FastAPIDebugMode) ID() string                      { return "GTSS-FW-FASTAPI-003" }
+func (r *FastAPIDebugMode) ID() string                      { return "BATOU-FW-FASTAPI-003" }
 func (r *FastAPIDebugMode) Name() string                    { return "FastAPIDebugMode" }
 func (r *FastAPIDebugMode) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FastAPIDebugMode) Description() string {
@@ -232,12 +232,12 @@ func (r *FastAPIDebugMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FASTAPI-004: SQL injection via f-string
+// BATOU-FW-FASTAPI-004: SQL injection via f-string
 // ---------------------------------------------------------------------------
 
 type FastAPISQLInjection struct{}
 
-func (r *FastAPISQLInjection) ID() string                      { return "GTSS-FW-FASTAPI-004" }
+func (r *FastAPISQLInjection) ID() string                      { return "BATOU-FW-FASTAPI-004" }
 func (r *FastAPISQLInjection) Name() string                    { return "FastAPISQLInjection" }
 func (r *FastAPISQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FastAPISQLInjection) Description() string {
@@ -281,12 +281,12 @@ func (r *FastAPISQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FASTAPI-005: Response model exposing internal fields
+// BATOU-FW-FASTAPI-005: Response model exposing internal fields
 // ---------------------------------------------------------------------------
 
 type FastAPIResponseExposure struct{}
 
-func (r *FastAPIResponseExposure) ID() string                      { return "GTSS-FW-FASTAPI-005" }
+func (r *FastAPIResponseExposure) ID() string                      { return "BATOU-FW-FASTAPI-005" }
 func (r *FastAPIResponseExposure) Name() string                    { return "FastAPIResponseExposure" }
 func (r *FastAPIResponseExposure) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FastAPIResponseExposure) Description() string {
@@ -340,12 +340,12 @@ func (r *FastAPIResponseExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FASTAPI-006: File upload without validation
+// BATOU-FW-FASTAPI-006: File upload without validation
 // ---------------------------------------------------------------------------
 
 type FastAPIFileUpload struct{}
 
-func (r *FastAPIFileUpload) ID() string                      { return "GTSS-FW-FASTAPI-006" }
+func (r *FastAPIFileUpload) ID() string                      { return "BATOU-FW-FASTAPI-006" }
 func (r *FastAPIFileUpload) Name() string                    { return "FastAPIFileUpload" }
 func (r *FastAPIFileUpload) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FastAPIFileUpload) Description() string {
@@ -402,12 +402,12 @@ func (r *FastAPIFileUpload) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FASTAPI-007: OAuth2 without HTTPS
+// BATOU-FW-FASTAPI-007: OAuth2 without HTTPS
 // ---------------------------------------------------------------------------
 
 type FastAPIOAuth2HTTP struct{}
 
-func (r *FastAPIOAuth2HTTP) ID() string                      { return "GTSS-FW-FASTAPI-007" }
+func (r *FastAPIOAuth2HTTP) ID() string                      { return "BATOU-FW-FASTAPI-007" }
 func (r *FastAPIOAuth2HTTP) Name() string                    { return "FastAPIOAuth2HTTP" }
 func (r *FastAPIOAuth2HTTP) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FastAPIOAuth2HTTP) Description() string {
@@ -451,12 +451,12 @@ func (r *FastAPIOAuth2HTTP) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FASTAPI-008: Depends() without error handling
+// BATOU-FW-FASTAPI-008: Depends() without error handling
 // ---------------------------------------------------------------------------
 
 type FastAPIDependsNoError struct{}
 
-func (r *FastAPIDependsNoError) ID() string                      { return "GTSS-FW-FASTAPI-008" }
+func (r *FastAPIDependsNoError) ID() string                      { return "BATOU-FW-FASTAPI-008" }
 func (r *FastAPIDependsNoError) Name() string                    { return "FastAPIDependsNoError" }
 func (r *FastAPIDependsNoError) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FastAPIDependsNoError) Description() string {
@@ -515,12 +515,12 @@ func (r *FastAPIDependsNoError) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FASTAPI-009: Jinja2 template without autoescaping
+// BATOU-FW-FASTAPI-009: Jinja2 template without autoescaping
 // ---------------------------------------------------------------------------
 
 type FastAPIJinja2NoEscape struct{}
 
-func (r *FastAPIJinja2NoEscape) ID() string                      { return "GTSS-FW-FASTAPI-009" }
+func (r *FastAPIJinja2NoEscape) ID() string                      { return "BATOU-FW-FASTAPI-009" }
 func (r *FastAPIJinja2NoEscape) Name() string                    { return "FastAPIJinja2NoEscape" }
 func (r *FastAPIJinja2NoEscape) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FastAPIJinja2NoEscape) Description() string {
@@ -577,12 +577,12 @@ func (r *FastAPIJinja2NoEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FASTAPI-010: Background task with sensitive data in memory
+// BATOU-FW-FASTAPI-010: Background task with sensitive data in memory
 // ---------------------------------------------------------------------------
 
 type FastAPIBackgroundSensitive struct{}
 
-func (r *FastAPIBackgroundSensitive) ID() string { return "GTSS-FW-FASTAPI-010" }
+func (r *FastAPIBackgroundSensitive) ID() string { return "BATOU-FW-FASTAPI-010" }
 func (r *FastAPIBackgroundSensitive) Name() string {
 	return "FastAPIBackgroundSensitive"
 }

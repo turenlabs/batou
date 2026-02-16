@@ -4,42 +4,42 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns -- Next.js
 // ---------------------------------------------------------------------------
 
-// GTSS-FW-NEXTJS-001: dangerouslySetInnerHTML with user data
+// BATOU-FW-NEXTJS-001: dangerouslySetInnerHTML with user data
 var reNextDangerousHTML = regexp.MustCompile(`dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html\s*:\s*(?:props\.|params\.|query\.|searchParams\.|req\.|request\.|data\.|user)`)
 
-// GTSS-FW-NEXTJS-002: API route without auth
+// BATOU-FW-NEXTJS-002: API route without auth
 var reNextAPIHandler = regexp.MustCompile(`export\s+(?:default\s+)?(?:async\s+)?function\s+(?:handler|GET|POST|PUT|DELETE|PATCH)\s*\(`)
 var reNextAPIRoute = regexp.MustCompile(`(?:req\s*:\s*NextApiRequest|request\s*:\s*NextRequest|NextResponse)`)
 var reNextAuthCheck = regexp.MustCompile(`(?:getSession|getServerSession|getToken|auth\s*\(|verify|jwt|authenticate|isAuthenticated|requireAuth|withAuth|cookies\(\)\.get\s*\(\s*['"](?:token|session|auth))`)
 
-// GTSS-FW-NEXTJS-003: getServerSideProps exposing secrets
+// BATOU-FW-NEXTJS-003: getServerSideProps exposing secrets
 var reNextGSSP = regexp.MustCompile(`(?:getServerSideProps|getStaticProps)\b`)
 var reNextPropsSecret = regexp.MustCompile(`(?:process\.env\.(?:SECRET|PRIVATE|KEY|PASSWORD|TOKEN|API_KEY|DATABASE_URL|DB_)|secret|private_key|apiKey|api_key)`)
 var reNextPropsReturn = regexp.MustCompile(`return\s*\{[^}]*props\s*:`)
 
-// GTSS-FW-NEXTJS-004: Rewrites/redirects with user input
+// BATOU-FW-NEXTJS-004: Rewrites/redirects with user input
 var reNextRewriteUserInput = regexp.MustCompile(`(?:destination|source)\s*:\s*(?:` + "`" + `[^` + "`" + `]*\$\{(?:req\.|query\.|params\.)` + `|['"][^'"]*['"]\s*\+\s*(?:req\.|query\.|params\.))`)
 
-// GTSS-FW-NEXTJS-005: Image domain wildcard
+// BATOU-FW-NEXTJS-005: Image domain wildcard
 var reNextImageDomainWildcard = regexp.MustCompile(`(?:domains|remotePatterns)\s*:\s*\[\s*['"]?\*['"]?\s*\]`)
 var reNextImagePermissive = regexp.MustCompile(`remotePatterns\s*:\s*\[\s*\{[^}]*hostname\s*:\s*['"]?\*\*['"]?`)
 
-// GTSS-FW-NEXTJS-006: Middleware bypass
+// BATOU-FW-NEXTJS-006: Middleware bypass
 var reNextMiddlewareSkip = regexp.MustCompile(`config\s*=\s*\{[^}]*matcher\s*:\s*\[`)
 var reNextMiddlewarePathCheck = regexp.MustCompile(`request\.nextUrl\.pathname\.startsWith\s*\(`)
 var reNextMiddlewareBypass = regexp.MustCompile(`(?:_next|static|favicon|api|_vercel)\b`)
 
-// GTSS-FW-NEXTJS-007: NEXT_PUBLIC with sensitive data
+// BATOU-FW-NEXTJS-007: NEXT_PUBLIC with sensitive data
 var reNextPublicSensitive = regexp.MustCompile(`NEXT_PUBLIC_(?:SECRET|PRIVATE|KEY|PASSWORD|TOKEN|API_SECRET|DATABASE|DB_PASS|STRIPE_SECRET|AWS_SECRET)`)
 
-// GTSS-FW-NEXTJS-008: CSP not configured
+// BATOU-FW-NEXTJS-008: CSP not configured
 var reNextHeaders = regexp.MustCompile(`(?:headers\s*\(\s*\)|headers\s*:\s*\[|Content-Security-Policy)`)
 
 func init() {
@@ -54,12 +54,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NEXTJS-001: dangerouslySetInnerHTML with user data
+// BATOU-FW-NEXTJS-001: dangerouslySetInnerHTML with user data
 // ---------------------------------------------------------------------------
 
 type NextJSDangerousHTML struct{}
 
-func (r *NextJSDangerousHTML) ID() string                      { return "GTSS-FW-NEXTJS-001" }
+func (r *NextJSDangerousHTML) ID() string                      { return "BATOU-FW-NEXTJS-001" }
 func (r *NextJSDangerousHTML) Name() string                    { return "NextJSDangerousHTML" }
 func (r *NextJSDangerousHTML) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NextJSDangerousHTML) Description() string {
@@ -105,12 +105,12 @@ func (r *NextJSDangerousHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NEXTJS-002: API route without authentication
+// BATOU-FW-NEXTJS-002: API route without authentication
 // ---------------------------------------------------------------------------
 
 type NextJSAPINoAuth struct{}
 
-func (r *NextJSAPINoAuth) ID() string                      { return "GTSS-FW-NEXTJS-002" }
+func (r *NextJSAPINoAuth) ID() string                      { return "BATOU-FW-NEXTJS-002" }
 func (r *NextJSAPINoAuth) Name() string                    { return "NextJSAPINoAuth" }
 func (r *NextJSAPINoAuth) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NextJSAPINoAuth) Description() string {
@@ -167,12 +167,12 @@ func (r *NextJSAPINoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NEXTJS-003: getServerSideProps exposing secrets to client
+// BATOU-FW-NEXTJS-003: getServerSideProps exposing secrets to client
 // ---------------------------------------------------------------------------
 
 type NextJSPropsSecrets struct{}
 
-func (r *NextJSPropsSecrets) ID() string                      { return "GTSS-FW-NEXTJS-003" }
+func (r *NextJSPropsSecrets) ID() string                      { return "BATOU-FW-NEXTJS-003" }
 func (r *NextJSPropsSecrets) Name() string                    { return "NextJSPropsSecrets" }
 func (r *NextJSPropsSecrets) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NextJSPropsSecrets) Description() string {
@@ -243,12 +243,12 @@ func (r *NextJSPropsSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NEXTJS-004: Rewrites/redirects with user input
+// BATOU-FW-NEXTJS-004: Rewrites/redirects with user input
 // ---------------------------------------------------------------------------
 
 type NextJSRewriteInjection struct{}
 
-func (r *NextJSRewriteInjection) ID() string                      { return "GTSS-FW-NEXTJS-004" }
+func (r *NextJSRewriteInjection) ID() string                      { return "BATOU-FW-NEXTJS-004" }
 func (r *NextJSRewriteInjection) Name() string                    { return "NextJSRewriteInjection" }
 func (r *NextJSRewriteInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NextJSRewriteInjection) Description() string {
@@ -294,12 +294,12 @@ func (r *NextJSRewriteInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NEXTJS-005: Image domain whitelist too permissive
+// BATOU-FW-NEXTJS-005: Image domain whitelist too permissive
 // ---------------------------------------------------------------------------
 
 type NextJSImagePermissive struct{}
 
-func (r *NextJSImagePermissive) ID() string                      { return "GTSS-FW-NEXTJS-005" }
+func (r *NextJSImagePermissive) ID() string                      { return "BATOU-FW-NEXTJS-005" }
 func (r *NextJSImagePermissive) Name() string                    { return "NextJSImagePermissive" }
 func (r *NextJSImagePermissive) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NextJSImagePermissive) Description() string {
@@ -351,12 +351,12 @@ func (r *NextJSImagePermissive) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NEXTJS-006: Middleware bypass via path manipulation
+// BATOU-FW-NEXTJS-006: Middleware bypass via path manipulation
 // ---------------------------------------------------------------------------
 
 type NextJSMiddlewareBypass struct{}
 
-func (r *NextJSMiddlewareBypass) ID() string                      { return "GTSS-FW-NEXTJS-006" }
+func (r *NextJSMiddlewareBypass) ID() string                      { return "BATOU-FW-NEXTJS-006" }
 func (r *NextJSMiddlewareBypass) Name() string                    { return "NextJSMiddlewareBypass" }
 func (r *NextJSMiddlewareBypass) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NextJSMiddlewareBypass) Description() string {
@@ -407,12 +407,12 @@ func (r *NextJSMiddlewareBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NEXTJS-007: NEXT_PUBLIC exposing sensitive env vars
+// BATOU-FW-NEXTJS-007: NEXT_PUBLIC exposing sensitive env vars
 // ---------------------------------------------------------------------------
 
 type NextJSPublicSecret struct{}
 
-func (r *NextJSPublicSecret) ID() string                      { return "GTSS-FW-NEXTJS-007" }
+func (r *NextJSPublicSecret) ID() string                      { return "BATOU-FW-NEXTJS-007" }
 func (r *NextJSPublicSecret) Name() string                    { return "NextJSPublicSecret" }
 func (r *NextJSPublicSecret) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NextJSPublicSecret) Description() string {
@@ -458,12 +458,12 @@ func (r *NextJSPublicSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NEXTJS-008: CSP not configured
+// BATOU-FW-NEXTJS-008: CSP not configured
 // ---------------------------------------------------------------------------
 
 type NextJSNoCSP struct{}
 
-func (r *NextJSNoCSP) ID() string                      { return "GTSS-FW-NEXTJS-008" }
+func (r *NextJSNoCSP) ID() string                      { return "BATOU-FW-NEXTJS-008" }
 func (r *NextJSNoCSP) Name() string                    { return "NextJSNoCSP" }
 func (r *NextJSNoCSP) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NextJSNoCSP) Description() string {

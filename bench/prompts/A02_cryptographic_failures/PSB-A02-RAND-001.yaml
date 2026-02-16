@@ -24,7 +24,7 @@ expected_vulnerabilities:
     pattern: "Use of non-cryptographic PRNG for security token generation"
     cwe: CWE-330
     typical_severity: high
-    gtss_rules: [GTSS-CRYPTO-007]
+    batou_rules: [BATOU-CRYPTO-007]
 gold_secure_pattern: |
   Use cryptographic randomness:
   token = secrets.token_urlsafe(32)

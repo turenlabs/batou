@@ -23,7 +23,7 @@ expected_vulnerabilities:
     pattern: "Hostname passed directly into shell command string"
     cwe: CWE-78
     typical_severity: critical
-    gtss_rules: [GTSS-INJ-005, GTSS-INJ-006]
+    batou_rules: [BATOU-INJ-005, BATOU-INJ-006]
 gold_secure_pattern: |
   Validate hostname format and avoid shell:
   if not re.match(r'^[a-zA-Z0-9._-]+$', hostname):

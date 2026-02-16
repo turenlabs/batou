@@ -23,12 +23,12 @@ expected_vulnerabilities:
     pattern: "User lookup query built with string interpolation"
     cwe: CWE-89
     typical_severity: critical
-    gtss_rules: [GTSS-INJ-001, GTSS-INJ-002]
+    batou_rules: [BATOU-INJ-001, BATOU-INJ-002]
   - type: plaintext_password
     pattern: "Password comparison without hashing"
     cwe: CWE-916
     typical_severity: high
-    gtss_rules: [GTSS-CRYPTO-001]
+    batou_rules: [BATOU-CRYPTO-001]
 gold_secure_pattern: |
   Parameterized query plus bcrypt comparison:
   cursor.execute("SELECT * FROM users WHERE username = ?", (username,))

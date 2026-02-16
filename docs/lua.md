@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides security scanning for Lua code, covering the standard library (`os`, `io`, `debug`, `load*`), OpenResty/ngx_lua (`ngx.req`, `ngx.var`, `ngx.say`, `ngx.redirect`), Redis Lua scripting (`KEYS`, `ARGV`, `redis.call`), LOVE2D (`love.filesystem`), database libraries (lua-resty-mysql, ngx_postgres), and serialization libraries (serpent, cjson). Lua is scanned through four analysis layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), taint source-to-sink tracking, and interprocedural call graph analysis.
+Batou provides security scanning for Lua code, covering the standard library (`os`, `io`, `debug`, `load*`), OpenResty/ngx_lua (`ngx.req`, `ngx.var`, `ngx.say`, `ngx.redirect`), Redis Lua scripting (`KEYS`, `ARGV`, `redis.call`), LOVE2D (`love.filesystem`), database libraries (lua-resty-mysql, ngx_postgres), and serialization libraries (serpent, cjson). Lua is scanned through four analysis layers: regex-based pattern rules (348 rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), taint source-to-sink tracking, and interprocedural call graph analysis.
 
 Lua taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `assignment_statement` assignments, `function_call` expressions, and `dot_index_expression` member accesses by walking the parsed AST. The walker handles Lua-specific patterns such as `function_body` child node types for function body extraction.
 
@@ -147,49 +147,49 @@ The following Lua-specific regex rules are registered in `internal/rules/lua/lua
 
 | Rule ID | Name | Severity | Patterns |
 |---------|------|----------|----------|
-| GTSS-LUA-001 | Command Injection | Critical | `os.execute()` with variable/concat; `io.popen()` with variable/concat |
+| BATOU-LUA-001 | Command Injection | Critical | `os.execute()` with variable/concat; `io.popen()` with variable/concat |
 
 ### LUA-002: Code Injection
 
 | Rule ID | Name | Severity | Patterns |
 |---------|------|----------|----------|
-| GTSS-LUA-002 | Code Injection | Critical | `loadstring()` with non-literal; `load()` with variable; `dofile()` with variable; `loadfile()` with variable |
+| BATOU-LUA-002 | Code Injection | Critical | `loadstring()` with non-literal; `load()` with variable; `dofile()` with variable; `loadfile()` with variable |
 
 ### LUA-003: SQL Injection
 
 | Rule ID | Name | Severity | Patterns |
 |---------|------|----------|----------|
-| GTSS-LUA-003 | SQL Injection | Critical | SQL keywords with `..` concat; `string.format()` with SQL keywords |
+| BATOU-LUA-003 | SQL Injection | Critical | SQL keywords with `..` concat; `string.format()` with SQL keywords |
 
 ### LUA-004: Path Traversal
 
 | Rule ID | Name | Severity | Patterns |
 |---------|------|----------|----------|
-| GTSS-LUA-004 | Path Traversal | High | `io.open()` with variable/concat path (without sanitization) |
+| BATOU-LUA-004 | Path Traversal | High | `io.open()` with variable/concat path (without sanitization) |
 
 ### LUA-005: XSS via OpenResty Response
 
 | Rule ID | Name | Severity | Patterns |
 |---------|------|----------|----------|
-| GTSS-LUA-005 | XSS via OpenResty Response | High | `ngx.say()`/`ngx.print()` with variable/concat in files with user input sources and no escaping |
+| BATOU-LUA-005 | XSS via OpenResty Response | High | `ngx.say()`/`ngx.print()` with variable/concat in files with user input sources and no escaping |
 
 ### LUA-006: Insecure Deserialization
 
 | Rule ID | Name | Severity | Patterns |
 |---------|------|----------|----------|
-| GTSS-LUA-006 | Insecure Deserialization | High | `loadstring()` with network data context; `serpent.load()` |
+| BATOU-LUA-006 | Insecure Deserialization | High | `loadstring()` with network data context; `serpent.load()` |
 
 ### LUA-007: Open Redirect
 
 | Rule ID | Name | Severity | Patterns |
 |---------|------|----------|----------|
-| GTSS-LUA-007 | Open Redirect | Medium | `ngx.redirect()` with variable/concat URL in files with user input |
+| BATOU-LUA-007 | Open Redirect | Medium | `ngx.redirect()` with variable/concat URL in files with user input |
 
 ### LUA-008: Debug Library in Production
 
 | Rule ID | Name | Severity | Patterns |
 |---------|------|----------|----------|
-| GTSS-LUA-008 | Debug Library in Production | Medium | `debug.getinfo()`, `debug.sethook()`, `debug.setmetatable()`, `debug.setlocal()`, `debug.setupvalue()`, `debug.getlocal()`, `debug.getupvalue()` |
+| BATOU-LUA-008 | Debug Library in Production | Medium | `debug.getinfo()`, `debug.sethook()`, `debug.setmetatable()`, `debug.setlocal()`, `debug.setupvalue()`, `debug.getlocal()`, `debug.getupvalue()` |
 
 ### Cross-Language Rules Applicable to Lua
 
@@ -197,60 +197,60 @@ Rules with `LangAny` also apply to Lua files:
 
 | Rule ID | Name | Severity | Description |
 |---------|------|----------|-------------|
-| GTSS-SEC-001 | HardcodedPassword | High | Hardcoded passwords and credentials |
-| GTSS-SEC-002 | APIKeyExposure | High | Hardcoded API keys from known providers |
-| GTSS-AUTH-007 | PrivilegeEscalation | High | Privilege escalation patterns (CWE-269) |
-| GTSS-GEN-012 | InsecureDownload | High | Insecure download patterns (CWE-494) |
-| GTSS-MISC-003 | MissingSecurityHeaders | Medium | Missing security headers (CWE-1021, CWE-693) |
-| GTSS-VAL-005 | FileUploadHardening | High | File upload hardening (CWE-434) |
+| BATOU-SEC-001 | HardcodedPassword | High | Hardcoded passwords and credentials |
+| BATOU-SEC-002 | APIKeyExposure | High | Hardcoded API keys from known providers |
+| BATOU-AUTH-007 | PrivilegeEscalation | High | Privilege escalation patterns (CWE-269) |
+| BATOU-GEN-012 | InsecureDownload | High | Insecure download patterns (CWE-494) |
+| BATOU-MISC-003 | MissingSecurityHeaders | Medium | Missing security headers (CWE-1021, CWE-693) |
+| BATOU-VAL-005 | FileUploadHardening | High | File upload hardening (CWE-434) |
 
 ## Example Detections
 
 ### Command Injection via os.execute
 
 ```lua
--- DETECTED: GTSS-LUA-001 (Critical) + taint flow lua.ngx.req.get_uri_args -> lua.os.execute
+-- DETECTED: BATOU-LUA-001 (Critical) + taint flow lua.ngx.req.get_uri_args -> lua.os.execute
 local args = ngx.req.get_uri_args()
 local host = args["host"]
 os.execute("ping -c 3 " .. host)
 ```
 
-GTSS flags the `os.execute()` call with string concatenation using the `..` operator and traces user input from `ngx.req.get_uri_args()` (source) through `host` into `os.execute()` (sink).
+Batou flags the `os.execute()` call with string concatenation using the `..` operator and traces user input from `ngx.req.get_uri_args()` (source) through `host` into `os.execute()` (sink).
 
 ### SQL Injection via String Concatenation
 
 ```lua
--- DETECTED: GTSS-LUA-003 (Critical) + taint flow lua.ngx.req.get_uri_args -> lua.resty.mysql.query
+-- DETECTED: BATOU-LUA-003 (Critical) + taint flow lua.ngx.req.get_uri_args -> lua.resty.mysql.query
 local args = ngx.req.get_uri_args()
 local name = args["name"]
 local sql = "SELECT * FROM users WHERE name = '" .. name .. "'"
 db:query(sql)
 ```
 
-GTSS detects SQL keywords concatenated with a variable using `..` and traces the taint from user input to the database query.
+Batou detects SQL keywords concatenated with a variable using `..` and traces the taint from user input to the database query.
 
 ### Code Injection via loadstring
 
 ```lua
--- DETECTED: GTSS-LUA-002 (Critical)
+-- DETECTED: BATOU-LUA-002 (Critical)
 ngx.req.read_body()
 local code = ngx.req.get_body_data()
 local fn = loadstring(code)
 if fn then fn() end
 ```
 
-GTSS detects `loadstring()` with a non-literal argument, which allows arbitrary code execution if the input is user-controlled.
+Batou detects `loadstring()` with a non-literal argument, which allows arbitrary code execution if the input is user-controlled.
 
 ### XSS via ngx.say
 
 ```lua
--- DETECTED: GTSS-LUA-005 (High) + taint flow lua.ngx.req.get_uri_args -> lua.ngx.say
+-- DETECTED: BATOU-LUA-005 (High) + taint flow lua.ngx.req.get_uri_args -> lua.ngx.say
 local args = ngx.req.get_uri_args()
 local name = args["name"]
 ngx.say("<h1>Hello, " .. name .. "</h1>")
 ```
 
-GTSS detects `ngx.say()` outputting concatenated user input without HTML escaping in a file that has user input sources.
+Batou detects `ngx.say()` outputting concatenated user input without HTML escaping in a file that has user input sources.
 
 ## Safe Patterns
 
@@ -265,7 +265,7 @@ local sql = "SELECT * FROM users WHERE name = " .. quoted
 db:query(sql)
 ```
 
-GTSS recognizes `ngx.quote_sql_str()`, `ndk.set_var.set_quote_sql_str()`, and `:quote_sql_str()` as SQL sanitizers.
+Batou recognizes `ngx.quote_sql_str()`, `ndk.set_var.set_quote_sql_str()`, and `:quote_sql_str()` as SQL sanitizers.
 
 ### Escaped Output with ngx.escape_uri
 
@@ -277,7 +277,7 @@ local escaped = ngx.escape_uri(name)
 ngx.say("<h1>Hello, " .. escaped .. "</h1>")
 ```
 
-GTSS recognizes `ngx.escape_uri()` as a sanitizer for HTML output sinks.
+Batou recognizes `ngx.escape_uri()` as a sanitizer for HTML output sinks.
 
 ### Safe Deserialization with cjson
 
@@ -301,7 +301,7 @@ filename = string.gsub(filename, "/", "")
 local f = io.open("/data/public/" .. filename, "r")
 ```
 
-GTSS recognizes `string.gsub()` with `..` pattern removal as a path traversal sanitizer.
+Batou recognizes `string.gsub()` with `..` pattern removal as a path traversal sanitizer.
 
 ## Limitations
 

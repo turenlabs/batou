@@ -1,5 +1,5 @@
 # Vulnerable: Server-side template injection via render_template_string
-# Expected: GTSS-INJ-005 (Template Injection)
+# Expected: BATOU-INJ-005 (Template Injection)
 
 from flask import Flask, request, render_template_string
 

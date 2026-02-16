@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,32 +12,32 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-RAILS-001: html_safe on dynamic/user content (broader than XSS-008 which requires user-input indicators)
+	// BATOU-FW-RAILS-001: html_safe on dynamic/user content (broader than XSS-008 which requires user-input indicators)
 	// Matches variable.html_safe and "string#{interp}".html_safe
 	reRailsHTMLSafe = regexp.MustCompile(`\.html_safe\b`)
 	// Safe: string literal without interpolation .html_safe (e.g., "<br>".html_safe)
 	reRailsHTMLSafeLiteral = regexp.MustCompile(`["'][^"'#]*["']\s*\.html_safe\b`)
 
-	// GTSS-FW-RAILS-002: render inline with dynamic content (SSTI)
+	// BATOU-FW-RAILS-002: render inline with dynamic content (SSTI)
 	reRailsRenderInline = regexp.MustCompile(`\brender\s+inline\s*:\s*[^"'\s]`)
 	// render inline: with string interpolation
 	reRailsRenderInlineInterp = regexp.MustCompile(`\brender\s+inline\s*:\s*"[^"]*#\{`)
 
-	// GTSS-FW-RAILS-003: constantize / safe_constantize with user input
+	// BATOU-FW-RAILS-003: constantize / safe_constantize with user input
 	reRailsConstantize = regexp.MustCompile(`\.(?:constantize|safe_constantize)\b`)
 	// Indicators that the string being constantized comes from user input
 	reRailsConstantizeParams = regexp.MustCompile(`params\s*\[.*\]\s*\.(?:constantize|safe_constantize)`)
 
-	// GTSS-FW-RAILS-004: params.permit! mass assignment bypass
+	// BATOU-FW-RAILS-004: params.permit! mass assignment bypass
 	reRailsPermitBang = regexp.MustCompile(`\bparams\s*\.permit!`)
 
-	// GTSS-FW-RAILS-005: Rails misconfigurations
+	// BATOU-FW-RAILS-005: Rails misconfigurations
 	reRailsDebugTrue     = regexp.MustCompile(`config\.consider_all_requests_local\s*=\s*true`)
 	reRailsForceSSLFalse = regexp.MustCompile(`config\.force_ssl\s*=\s*false`)
 	reRailsNullSession   = regexp.MustCompile(`protect_from_forgery\s+.*:null_session`)
 	reRailsSkipCSRF      = regexp.MustCompile(`skip_before_action\s+:verify_authenticity_token`)
 
-	// GTSS-FW-RAILS-006: SQL interpolation in ActiveRecord (complementing INJ-001)
+	// BATOU-FW-RAILS-006: SQL interpolation in ActiveRecord (complementing INJ-001)
 	// User.where("name = '#{params[:name]}'") — explicit params interpolation in where
 	reRailsWhereParamsInterp = regexp.MustCompile(`\.where\(\s*"[^"]*#\{\s*params\s*\[`)
 	// User.where(params[:conditions]) — hash injection
@@ -48,12 +48,12 @@ var (
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-001: html_safe on dynamic content
+// BATOU-FW-RAILS-001: html_safe on dynamic content
 // ---------------------------------------------------------------------------
 
 type RailsHTMLSafe struct{}
 
-func (r *RailsHTMLSafe) ID() string                      { return "GTSS-FW-RAILS-001" }
+func (r *RailsHTMLSafe) ID() string                      { return "BATOU-FW-RAILS-001" }
 func (r *RailsHTMLSafe) Name() string                    { return "RailsHTMLSafe" }
 func (r *RailsHTMLSafe) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RailsHTMLSafe) Description() string {
@@ -101,12 +101,12 @@ func (r *RailsHTMLSafe) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-002: render inline with dynamic content (SSTI)
+// BATOU-FW-RAILS-002: render inline with dynamic content (SSTI)
 // ---------------------------------------------------------------------------
 
 type RailsRenderInline struct{}
 
-func (r *RailsRenderInline) ID() string                      { return "GTSS-FW-RAILS-002" }
+func (r *RailsRenderInline) ID() string                      { return "BATOU-FW-RAILS-002" }
 func (r *RailsRenderInline) Name() string                    { return "RailsRenderInline" }
 func (r *RailsRenderInline) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RailsRenderInline) Description() string {
@@ -153,12 +153,12 @@ func (r *RailsRenderInline) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-003: constantize / safe_constantize
+// BATOU-FW-RAILS-003: constantize / safe_constantize
 // ---------------------------------------------------------------------------
 
 type RailsConstantize struct{}
 
-func (r *RailsConstantize) ID() string                      { return "GTSS-FW-RAILS-003" }
+func (r *RailsConstantize) ID() string                      { return "BATOU-FW-RAILS-003" }
 func (r *RailsConstantize) Name() string                    { return "RailsConstantize" }
 func (r *RailsConstantize) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RailsConstantize) Description() string {
@@ -211,12 +211,12 @@ func (r *RailsConstantize) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-004: params.permit! mass assignment
+// BATOU-FW-RAILS-004: params.permit! mass assignment
 // ---------------------------------------------------------------------------
 
 type RailsPermitBang struct{}
 
-func (r *RailsPermitBang) ID() string                      { return "GTSS-FW-RAILS-004" }
+func (r *RailsPermitBang) ID() string                      { return "BATOU-FW-RAILS-004" }
 func (r *RailsPermitBang) Name() string                    { return "RailsPermitBang" }
 func (r *RailsPermitBang) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RailsPermitBang) Description() string {
@@ -259,12 +259,12 @@ func (r *RailsPermitBang) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-005: Rails misconfigurations
+// BATOU-FW-RAILS-005: Rails misconfigurations
 // ---------------------------------------------------------------------------
 
 type RailsMisconfig struct{}
 
-func (r *RailsMisconfig) ID() string                      { return "GTSS-FW-RAILS-005" }
+func (r *RailsMisconfig) ID() string                      { return "BATOU-FW-RAILS-005" }
 func (r *RailsMisconfig) Name() string                    { return "RailsMisconfig" }
 func (r *RailsMisconfig) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RailsMisconfig) Description() string {
@@ -349,12 +349,12 @@ func (r *RailsMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-RAILS-006: ActiveRecord SQL injection with params
+// BATOU-FW-RAILS-006: ActiveRecord SQL injection with params
 // ---------------------------------------------------------------------------
 
 type RailsSQLParams struct{}
 
-func (r *RailsSQLParams) ID() string                      { return "GTSS-FW-RAILS-006" }
+func (r *RailsSQLParams) ID() string                      { return "BATOU-FW-RAILS-006" }
 func (r *RailsSQLParams) Name() string                    { return "RailsSQLParams" }
 func (r *RailsSQLParams) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RailsSQLParams) Description() string {

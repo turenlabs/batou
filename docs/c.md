@@ -1,8 +1,8 @@
-# C Language Support in GTSS
+# C Language Support in Batou
 
 ## Overview
 
-GTSS provides deep security scanning for C source files, with particular emphasis on memory safety -- the dominant vulnerability class in C programs. Coverage spans four analysis layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). C is one of two languages (alongside C++) with dedicated memory safety rules.
+Batou provides deep security scanning for C source files, with particular emphasis on memory safety -- the dominant vulnerability class in C programs. Coverage spans four analysis layers: regex-based rule matching (Layer 1), tree-sitter AST structural analysis providing comment-aware false positive filtering and structural code inspection (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). C is one of two languages (alongside C++) with dedicated memory safety rules.
 
 C taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `init_declarator` assignments and call expressions by walking the parsed AST. The walker handles C-specific patterns such as `pointer_declarator` wrapper nodes and `compound_statement` function bodies.
 
@@ -223,24 +223,24 @@ All six memory rules target C and C++ exclusively.
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| GTSS-MEM-001 | Banned Functions | Critical | `gets()`, `strcpy()`, `strcat()`, `sprintf()`, `vsprintf()`, `scanf` with `%s`, `atoi()`/`atol()` |
-| GTSS-MEM-002 | Format String Vulnerability | Critical | `printf(var)`, `fprintf(f, var)`, `syslog(pri, var)`, `snprintf(b, n, var)` -- variable as format string |
-| GTSS-MEM-003 | Buffer Overflow | High | `memcpy`/`memmove` with variable size, `strncpy` with `strlen(src)`, `read`/`recv` into fixed buffers |
-| GTSS-MEM-004 | Memory Management | High | Double free (calling `free(ptr)` twice), use-after-free (dereferencing freed pointer) |
-| GTSS-MEM-005 | Integer Overflow in Allocation | High | `malloc(n * sizeof(...))` multiplication overflow, `calloc` with variable count, `realloc` with arithmetic |
-| GTSS-MEM-006 | Null Pointer Dereference | Medium | `malloc`/`calloc`/`realloc` return used without NULL check within 5 lines |
+| BATOU-MEM-001 | Banned Functions | Critical | `gets()`, `strcpy()`, `strcat()`, `sprintf()`, `vsprintf()`, `scanf` with `%s`, `atoi()`/`atol()` |
+| BATOU-MEM-002 | Format String Vulnerability | Critical | `printf(var)`, `fprintf(f, var)`, `syslog(pri, var)`, `snprintf(b, n, var)` -- variable as format string |
+| BATOU-MEM-003 | Buffer Overflow | High | `memcpy`/`memmove` with variable size, `strncpy` with `strlen(src)`, `read`/`recv` into fixed buffers |
+| BATOU-MEM-004 | Memory Management | High | Double free (calling `free(ptr)` twice), use-after-free (dereferencing freed pointer) |
+| BATOU-MEM-005 | Integer Overflow in Allocation | High | `malloc(n * sizeof(...))` multiplication overflow, `calloc` with variable count, `realloc` with arithmetic |
+| BATOU-MEM-006 | Null Pointer Dereference | Medium | `malloc`/`calloc`/`realloc` return used without NULL check within 5 lines |
 
 #### Path Traversal (`internal/rules/traversal/traversal.go`)
 
 | Rule ID | Name | Severity | C-Specific Behavior |
 |---------|------|----------|---------------------|
-| GTSS-TRV-001 | Path Traversal | Critical | Detects `fopen`, `fread`, `fwrite`, `open`, `freopen`, `fdopen`, `remove`, `rename` called with variable arguments (not string literals), flagged when no traversal guard is found |
+| BATOU-TRV-001 | Path Traversal | Critical | Detects `fopen`, `fread`, `fwrite`, `open`, `freopen`, `fdopen`, `remove`, `rename` called with variable arguments (not string literals), flagged when no traversal guard is found |
 
 #### Cryptography (`internal/rules/crypto/crypto.go`)
 
 | Rule ID | Name | Severity | C-Specific Behavior |
 |---------|------|----------|---------------------|
-| GTSS-CRY-011 | Predictable Seed | High | Detects `srand(time(NULL))` -- time-based seeds make `rand()` output predictable |
+| BATOU-CRY-011 | Predictable Seed | High | Detects `srand(time(NULL))` -- time-based seeds make `rand()` output predictable |
 
 ### Language-Agnostic Rules (Apply to C via `LangAny`)
 
@@ -248,30 +248,30 @@ These rules use patterns that match across all languages, including C.
 
 | Rule ID | Category | Severity | What It Detects |
 |---------|----------|----------|-----------------|
-| GTSS-TRV-001 | Traversal | Critical | Dot-dot-slash patterns in file paths (generic fallback) |
-| GTSS-TRV-003 | Traversal | High | Unsafe archive extraction (zip slip) |
-| GTSS-TRV-008 | Traversal | Medium | Null byte injection in file paths |
-| GTSS-SEC-002 | Secrets | High | Hardcoded API keys (AWS, GitHub, Slack, Stripe, etc.) |
-| GTSS-SEC-003 | Secrets | Critical | PEM-encoded private keys in source |
-| GTSS-SEC-004 | Secrets | High | Database connection strings with embedded credentials |
-| GTSS-SEC-006 | Secrets | Medium | Environment variable leaks |
-| GTSS-CRY-003 | Crypto | High | Weak/obsolete ciphers |
-| GTSS-CRY-004 | Crypto | High | Hardcoded initialization vectors |
-| GTSS-CRY-005 | Crypto | High | Insecure TLS configuration |
-| GTSS-CRY-006 | Crypto | High | Weak key sizes |
-| GTSS-CRY-007 | Crypto | Medium | Plaintext protocols (HTTP, FTP, Telnet) |
-| GTSS-SSRF-001 | SSRF | High | URLs constructed from user input |
-| GTSS-SSRF-002 | SSRF | High | Access to internal network addresses |
-| GTSS-AUTH-007 | Auth | High | Privilege escalation patterns (CWE-269) |
-| GTSS-GEN-012 | Generic | High | Insecure download patterns (CWE-494) |
-| GTSS-MISC-003 | Misconfig | Medium | Missing security headers (CWE-1021, CWE-693) |
-| GTSS-VAL-005 | Validation | High | File upload without proper validation (CWE-434) |
+| BATOU-TRV-001 | Traversal | Critical | Dot-dot-slash patterns in file paths (generic fallback) |
+| BATOU-TRV-003 | Traversal | High | Unsafe archive extraction (zip slip) |
+| BATOU-TRV-008 | Traversal | Medium | Null byte injection in file paths |
+| BATOU-SEC-002 | Secrets | High | Hardcoded API keys (AWS, GitHub, Slack, Stripe, etc.) |
+| BATOU-SEC-003 | Secrets | Critical | PEM-encoded private keys in source |
+| BATOU-SEC-004 | Secrets | High | Database connection strings with embedded credentials |
+| BATOU-SEC-006 | Secrets | Medium | Environment variable leaks |
+| BATOU-CRY-003 | Crypto | High | Weak/obsolete ciphers |
+| BATOU-CRY-004 | Crypto | High | Hardcoded initialization vectors |
+| BATOU-CRY-005 | Crypto | High | Insecure TLS configuration |
+| BATOU-CRY-006 | Crypto | High | Weak key sizes |
+| BATOU-CRY-007 | Crypto | Medium | Plaintext protocols (HTTP, FTP, Telnet) |
+| BATOU-SSRF-001 | SSRF | High | URLs constructed from user input |
+| BATOU-SSRF-002 | SSRF | High | Access to internal network addresses |
+| BATOU-AUTH-007 | Auth | High | Privilege escalation patterns (CWE-269) |
+| BATOU-GEN-012 | Generic | High | Insecure download patterns (CWE-494) |
+| BATOU-MISC-003 | Misconfig | Medium | Missing security headers (CWE-1021, CWE-693) |
+| BATOU-VAL-005 | Validation | High | File upload without proper validation (CWE-434) |
 
 ## Example Detections
 
 ### Buffer Overflow via strcpy
 
-This triggers **GTSS-MEM-001** (Banned Function) and taint sink **c.mem.strcpy** when the source is user input.
+This triggers **BATOU-MEM-001** (Banned Function) and taint sink **c.mem.strcpy** when the source is user input.
 
 ```c
 #include <stdio.h>
@@ -291,7 +291,7 @@ int main(int argc, char *argv[]) {
 
 ### Format String Vulnerability
 
-This triggers **GTSS-MEM-002** (Format String Vulnerability) and taint sink **c.fmt.printf**.
+This triggers **BATOU-MEM-002** (Format String Vulnerability) and taint sink **c.fmt.printf**.
 
 ```c
 void log_message(const char *user_input) {
@@ -321,7 +321,7 @@ int main(int argc, char *argv[]) {
 
 ### Bounded String Copy with snprintf
 
-GTSS recognizes `snprintf` as a sanitizer that prevents buffer overflow.
+Batou recognizes `snprintf` as a sanitizer that prevents buffer overflow.
 
 ```c
 void process_name(const char *input) {
@@ -333,7 +333,7 @@ void process_name(const char *input) {
 
 ### printf with Literal Format String
 
-GTSS does not flag `printf` when the format string is a literal and user input is a data argument.
+Batou does not flag `printf` when the format string is a literal and user input is a data argument.
 
 ```c
 void log_message(const char *user_input) {
@@ -343,7 +343,7 @@ void log_message(const char *user_input) {
 
 ### Allocation with NULL Check and Overflow Guard
 
-GTSS checks for NULL within 5 lines of a `malloc`/`calloc`/`realloc` call and recognizes overflow guards before allocation.
+Batou checks for NULL within 5 lines of a `malloc`/`calloc`/`realloc` call and recognizes overflow guards before allocation.
 
 ```c
 struct Record *allocate_records(size_t count) {
@@ -363,18 +363,18 @@ struct Record *allocate_records(size_t count) {
 
 1. **No inter-file taint tracking for C.** Taint analysis operates on a single file at a time. If tainted data is passed through a function defined in a different `.c` file, the flow is not tracked across translation units. The call graph (Layer 3) partially mitigates this, but C's separate compilation model limits coverage.
 
-2. **No macro expansion.** GTSS scans source text, not preprocessed output. Macros that wrap dangerous functions (e.g., `#define COPY(d,s) strcpy(d,s)`) are not expanded, so the underlying call is invisible to pattern matching.
+2. **No macro expansion.** Batou scans source text, not preprocessed output. Macros that wrap dangerous functions (e.g., `#define COPY(d,s) strcpy(d,s)`) are not expanded, so the underlying call is invisible to pattern matching.
 
-3. **No control-flow-sensitive analysis.** The memory management rules (GTSS-MEM-004) use a simple linear scan with function-boundary resets. They cannot track pointer aliasing, conditional frees, or freed pointers passed to other functions.
+3. **No control-flow-sensitive analysis.** The memory management rules (BATOU-MEM-004) use a simple linear scan with function-boundary resets. They cannot track pointer aliasing, conditional frees, or freed pointers passed to other functions.
 
-4. **No SQL injection regex rules for C.** While the taint engine tracks `sqlite3_exec`, `mysql_query`, and `PQexec` as sinks, the regex-based SQL injection rules (GTSS-INJ-001) do not list C in their Languages -- they only apply via taint analysis (Layer 2).
+4. **No SQL injection regex rules for C.** While the taint engine tracks `sqlite3_exec`, `mysql_query`, and `PQexec` as sinks, the regex-based SQL injection rules (BATOU-INJ-001) do not list C in their Languages -- they only apply via taint analysis (Layer 2).
 
-5. **No command injection regex rules for C.** Similarly, the regex-based command injection rules (GTSS-INJ-002) do not list C. Command injection in C is detected solely through taint sinks (`c.exec.system`, `c.exec.popen`, etc.).
+5. **No command injection regex rules for C.** Similarly, the regex-based command injection rules (BATOU-INJ-002) do not list C. Command injection in C is detected solely through taint sinks (`c.exec.system`, `c.exec.popen`, etc.).
 
 6. **Header file ambiguity.** The `.h` extension is always classified as C, even when the header is intended for C++ or mixed C/C++ use. C++-specific rules will not run on `.h` files.
 
 7. **No RTOS or embedded-specific sources.** The source catalog covers POSIX and standard library functions. Embedded-specific input sources (e.g., DMA buffers, hardware registers, RTOS message queues) are not tracked.
 
-8. **Limited sanitizer awareness for custom wrappers.** If a project uses custom safe wrappers around dangerous functions (e.g., a `safe_strcpy` that performs bounds checking), GTSS will not recognize them as sanitizers unless they match one of the known sanitizer patterns.
+8. **Limited sanitizer awareness for custom wrappers.** If a project uses custom safe wrappers around dangerous functions (e.g., a `safe_strcpy` that performs bounds checking), Batou will not recognize them as sanitizers unless they match one of the known sanitizer patterns.
 
 9. **Confidence decay on unknown functions.** When tainted data passes through an unknown function, taint propagates with 0.8x confidence decay. For C codebases with many small helper functions, this can cause legitimate taint flows to drop below the reporting threshold.

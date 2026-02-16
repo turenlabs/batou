@@ -8,7 +8,7 @@ import (
 )
 
 // FormatTable renders a ModelReport as an ASCII table for terminal output,
-// following the style of the existing GTSS scorecard in scorecard_test.go.
+// following the style of the existing Batou scorecard in scorecard_test.go.
 func FormatTable(report ModelReport) string {
 	var sb strings.Builder
 

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/graph"
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/graph"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // guardedStat wraps os.Stat with filepath.Clean + strings.HasPrefix validation.
@@ -44,7 +44,7 @@ func guardedWriteFile(base, target string, data []byte, perm os.FileMode) error 
 
 func TestGraphPath(t *testing.T) {
 	got := graph.GraphPath("/project")
-	want := "/project/.gtss/callgraph.json"
+	want := "/project/.batou/callgraph.json"
 	if got != want {
 		t.Errorf("GraphPath = %q, want %q", got, want)
 	}
@@ -173,14 +173,14 @@ func TestLoadGraphCorruptedFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Write corrupt data to the graph location using guarded helpers.
-	gtssDir := filepath.Clean(filepath.Join(tmpDir, ".gtss"))
-	if !strings.HasPrefix(gtssDir, filepath.Clean(tmpDir)) {
+	batouDir := filepath.Clean(filepath.Join(tmpDir, ".batou"))
+	if !strings.HasPrefix(batouDir, filepath.Clean(tmpDir)) {
 		t.Fatal("unexpected path traversal")
 	}
-	if err := guardedMkdirAll(tmpDir, gtssDir, 0o755); err != nil {
+	if err := guardedMkdirAll(tmpDir, batouDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	corruptFile := filepath.Clean(filepath.Join(gtssDir, "callgraph.json"))
+	corruptFile := filepath.Clean(filepath.Join(batouDir, "callgraph.json"))
 	if !strings.HasPrefix(corruptFile, filepath.Clean(tmpDir)) {
 		t.Fatal("unexpected path traversal")
 	}
@@ -199,7 +199,7 @@ func TestLoadGraphCorruptedFile(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SaveGraph creates .gtss directory
+// SaveGraph creates .batou directory
 // ---------------------------------------------------------------------------
 
 func TestSaveGraphCreatesDirectory(t *testing.T) {
@@ -210,15 +210,15 @@ func TestSaveGraphCreatesDirectory(t *testing.T) {
 		t.Fatalf("SaveGraph: %v", err)
 	}
 
-	expectedDir := filepath.Clean(filepath.Join(tmpDir, ".gtss"))
+	expectedDir := filepath.Clean(filepath.Join(tmpDir, ".batou"))
 	if !strings.HasPrefix(expectedDir, filepath.Clean(tmpDir)) {
 		t.Fatal("unexpected path traversal")
 	}
 	info, err := guardedStat(tmpDir, expectedDir)
 	if err != nil {
-		t.Fatalf(".gtss directory not created: %v", err)
+		t.Fatalf(".batou directory not created: %v", err)
 	}
 	if !info.IsDir() {
-		t.Error(".gtss should be a directory")
+		t.Error(".batou should be a directory")
 	}
 }

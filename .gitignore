@@ -10,7 +10,7 @@ coverage.out
 coverage.html
 
 # Cache
-.gtss/
+.batou/
 
 # IDE
 .idea/
@@ -24,3 +24,6 @@ Thumbs.db
 
 # Test binaries
 *.test
+
+# Generated rule files
+*_gen.go

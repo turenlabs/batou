@@ -3,11 +3,11 @@ package taintrule
 import (
 	"time"
 
-	gtssast "github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
-	"github.com/turenio/gtss/internal/taint/astflow"
-	"github.com/turenio/gtss/internal/taint/tsflow"
+	batouast "github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
+	"github.com/turenlabs/batou/internal/taint/astflow"
+	"github.com/turenlabs/batou/internal/taint/tsflow"
 )
 
 // TaintRule implements rules.Rule using the taint analysis engine.
@@ -18,7 +18,7 @@ func init() {
 	rules.Register(&TaintRule{})
 }
 
-func (t *TaintRule) ID() string              { return "GTSS-TAINT" }
+func (t *TaintRule) ID() string              { return "BATOU-TAINT" }
 func (t *TaintRule) Name() string            { return "Taint Analysis" }
 func (t *TaintRule) Description() string     { return "Source-to-sink dataflow taint tracking" }
 func (t *TaintRule) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -55,7 +55,7 @@ func (t *TaintRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 		flows = astflow.AnalyzeGoWithAST(ctx.Content, ctx.FilePath, goParsed)
 	} else if tsflow.Supports(ctx.Language) {
 		// Reuse tree-sitter tree from Layer 2 (stored in ctx.Tree).
-		tree := gtssast.TreeFromContext(ctx)
+		tree := batouast.TreeFromContext(ctx)
 		flows = tsflow.AnalyzeWithTree(ctx.Content, ctx.FilePath, ctx.Language, tree)
 	} else {
 		flows = taint.Analyze(ctx.Content, ctx.FilePath, ctx.Language)

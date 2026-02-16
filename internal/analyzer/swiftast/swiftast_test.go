@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanSwift(t *testing.T, code string) []rules.Finding {
@@ -32,7 +32,7 @@ func getUser(db: OpaquePointer, userId: String) {
 	findings := scanSwift(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-SWIFT-AST-001" {
+		if f.RuleID == "BATOU-SWIFT-AST-001" {
 			found = true
 			if f.Severity != rules.Critical && f.Severity != rules.High {
 				t.Errorf("expected Critical or High severity, got %s", f.Severity)
@@ -54,7 +54,7 @@ func getUser(db: OpaquePointer) {
 `
 	findings := scanSwift(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-SWIFT-AST-001" {
+		if f.RuleID == "BATOU-SWIFT-AST-001" {
 			t.Error("unexpected SQL injection finding for safe parameterized query")
 		}
 	}
@@ -70,7 +70,7 @@ func setup() {
 	findings := scanSwift(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-SWIFT-AST-002" {
+		if f.RuleID == "BATOU-SWIFT-AST-002" {
 			found = true
 			if !strings.Contains(f.Title, "UIWebView") {
 				t.Errorf("expected UIWebView in title, got %s", f.Title)
@@ -92,7 +92,7 @@ func setup() {
 `
 	findings := scanSwift(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-SWIFT-AST-002" {
+		if f.RuleID == "BATOU-SWIFT-AST-002" {
 			t.Error("unexpected UIWebView finding for WKWebView")
 		}
 	}
@@ -107,7 +107,7 @@ func save(password: String) {
 	findings := scanSwift(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-SWIFT-AST-003" {
+		if f.RuleID == "BATOU-SWIFT-AST-003" {
 			found = true
 			break
 		}
@@ -125,7 +125,7 @@ func save() {
 `
 	findings := scanSwift(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-SWIFT-AST-003" {
+		if f.RuleID == "BATOU-SWIFT-AST-003" {
 			t.Error("unexpected finding for non-sensitive UserDefaults key")
 		}
 	}
@@ -142,7 +142,7 @@ func run(userPath: String) {
 	foundProcess := false
 	foundAssignment := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-SWIFT-AST-004" {
+		if f.RuleID == "BATOU-SWIFT-AST-004" {
 			if strings.Contains(f.Title, "launchPath") {
 				foundAssignment = true
 			}

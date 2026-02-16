@@ -2,7 +2,7 @@
 
 AI coding assistants are fast. They generate hundreds of lines in seconds. But speed creates a problem: vulnerabilities ship just as quickly as features. SQL injection, hardcoded secrets, command injection -- these show up constantly in AI-generated code, and most developers don't catch them until a security review weeks later.
 
-So I built GTSS (Generation Time Security Scanning), a tool that intercepts every file write from Claude Code, scans it for vulnerabilities, and either blocks the write or teaches the AI to fix its own mistakes -- all before the code hits disk.
+So I built Batou (Generation Time Security Scanning), a tool that intercepts every file write from Claude Code, scans it for vulnerabilities, and either blocks the write or teaches the AI to fix its own mistakes -- all before the code hits disk.
 
 ## The Problem With Post-Hoc Security
 
@@ -19,20 +19,20 @@ The question isn't whether AI writes vulnerable code. It's whether you catch it 
 
 ## Shifting Left to Generation Time
 
-GTSS takes a different approach. Instead of scanning after code is written, it scans *as* code is being written. It hooks into Claude Code's tool system using the [hooks API](https://docs.anthropic.com/en/docs/claude-code/hooks), intercepting `Write`, `Edit`, and `NotebookEdit` operations.
+Batou takes a different approach. Instead of scanning after code is written, it scans *as* code is being written. It hooks into Claude Code's tool system using the [hooks API](https://docs.anthropic.com/en/docs/claude-code/hooks), intercepting `Write`, `Edit`, and `NotebookEdit` operations.
 
 The flow is simple:
 
 ```
 Claude generates code
-    -> GTSS intercepts the write
+    -> Batou intercepts the write
     -> Three-layer security scan runs (~16-20ms)
     -> Critical vulns? Block the write.
     -> Non-critical? Send hints back to Claude.
     -> Claude fixes its own code.
 ```
 
-The key insight is the **hint system**. When GTSS finds a vulnerability, it doesn't just flag it -- it sends detailed fix guidance back to Claude as `additionalContext`. Claude reads the hint and rewrites the code correctly. The AI learns from its own mistakes in real time.
+The key insight is the **hint system**. When Batou finds a vulnerability, it doesn't just flag it -- it sends detailed fix guidance back to Claude as `additionalContext`. Claude reads the hint and rewrites the code correctly. The AI learns from its own mistakes in real time.
 
 Here's what that looks like in practice. Claude writes a Python handler with a SQL injection vulnerability:
 
@@ -43,7 +43,7 @@ def get_user(request):
     return cursor.fetchone()
 ```
 
-GTSS catches it and sends this hint back:
+Batou catches it and sends this hint back:
 
 ```
 Tainted data flows from user_input to sql_query (line 2 -> 3)
@@ -63,7 +63,7 @@ Claude reads the hint, understands the issue, and rewrites the code with a param
 
 ## Three Layers of Analysis
 
-GTSS doesn't rely on a single detection method. It runs three complementary analysis layers on every write:
+Batou doesn't rely on a single detection method. It runs three complementary analysis layers on every write:
 
 ### Layer 1: Pattern Matching
 
@@ -73,7 +73,7 @@ The rule categories cover injection, XSS, path traversal, weak cryptography, har
 
 ### Layer 2: Taint Analysis
 
-Pattern matching alone produces too many false positives. GTSS's taint engine tracks data flow from *sources* (user input, request parameters, file reads) through variable assignments and function calls to *sinks* (SQL queries, shell commands, HTML output).
+Pattern matching alone produces too many false positives. Batou's taint engine tracks data flow from *sources* (user input, request parameters, file reads) through variable assignments and function calls to *sinks* (SQL queries, shell commands, HTML output).
 
 If user input flows to a dangerous function without passing through a sanitizer, that's a real vulnerability. If the same pattern uses a parameterized query or escapes output, the taint is neutralized and no finding is reported.
 
@@ -81,13 +81,13 @@ The taint catalog covers 8 languages with 1,100+ entries mapping framework-speci
 
 ### Layer 3: Interprocedural Call Graph
 
-The most sophisticated layer maintains a persistent call graph across the session. When you write a function that takes user input and passes it to another function that executes a query, GTSS tracks the taint across function boundaries.
+The most sophisticated layer maintains a persistent call graph across the session. When you write a function that takes user input and passes it to another function that executes a query, Batou tracks the taint across function boundaries.
 
 The call graph persists to disk (`.gtss/` directory), so it builds up context over the course of a coding session. The longer you work, the smarter it gets.
 
 ## Zero Dependencies, Pure Go
 
-GTSS is written in pure Go with zero external dependencies. The entire `go.mod` has no `require` entries. This was a deliberate design choice:
+Batou is written in pure Go with zero external dependencies. The entire `go.mod` has no `require` entries. This was a deliberate design choice:
 
 - **No supply chain risk** -- there's nothing to get compromised in a dependency
 - **Fast compilation** -- builds in seconds
@@ -100,11 +100,11 @@ The scanner runs in under 20ms for typical files, with a 10-second hard timeout 
 
 Claude Code hooks provide two interception points:
 
-**PreToolUse** runs before the file is written. GTSS scans the content and returns one of two exit codes:
+**PreToolUse** runs before the file is written. Batou scans the content and returns one of two exit codes:
 - `0` (allow) -- the write proceeds, with optional hints attached
 - `2` (block) -- the write is rejected, and Claude receives the reason plus fix guidance
 
-**PostToolUse** runs after the write completes. GTSS performs deeper analysis and sends hints as `additionalContext`. This is where the call graph and interprocedural analysis shine -- they can reference the full session context.
+**PostToolUse** runs after the write completes. Batou performs deeper analysis and sends hints as `additionalContext`. This is where the call graph and interprocedural analysis shine -- they can reference the full session context.
 
 A critical design detail: hints are always output *before* a potential block. This ensures Claude always receives the security feedback, even when the write is blocked. Claude gets the "why" and the "how to fix" simultaneously.
 
@@ -127,16 +127,16 @@ Some real examples from testing against common AI-generated code patterns:
 ## Building It
 
 ```bash
-git clone https://github.com/turenio/gtss.git
-cd gtss
+git clone https://github.com/turenlabs/batou.git
+cd batou
 ./install.sh --setup /path/to/your/project
 ```
 
-The install script builds the binary, copies it into your project's `.claude/hooks/` directory, and configures the hook in `.claude/settings.json`. From that point on, every file write in Claude Code passes through GTSS.
+The install script builds the binary, copies it into your project's `.claude/hooks/` directory, and configures the hook in `.claude/settings.json`. From that point on, every file write in Claude Code passes through Batou.
 
 ## What's Next
 
-GTSS currently covers the most common vulnerability patterns across 8 languages, but there's room to grow:
+Batou currently covers the most common vulnerability patterns across 8 languages, but there's room to grow:
 
 - **More languages** -- Rust and C# taint catalogs are partially started
 - **Framework-specific rules** -- Deeper coverage for Spring Boot, Django, Express, Laravel, Rails
@@ -148,10 +148,10 @@ The core idea -- scanning at generation time and feeding hints back to the AI --
 
 ## Try It
 
-GTSS is open source under the MIT license. If you're using Claude Code and want to stop AI-generated vulnerabilities at the source, give it a shot.
+Batou is open source under the MIT license. If you're using Claude Code and want to stop AI-generated vulnerabilities at the source, give it a shot.
 
-The code is at [github.com/turenio/gtss](https://github.com/turenio/gtss).
+The code is at [github.com/turenlabs/batou](https://github.com/turenlabs/batou).
 
 ---
 
-*GTSS is built by [Turen](https://turen.io). We build tools that make AI-assisted development safer.*
+*Batou is built by [Turen](https://turen.io). We build tools that make AI-assisted development safer.*

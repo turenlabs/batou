@@ -6,7 +6,7 @@ import (
 )
 
 // VULN: Path traversal via unsanitized user-controlled path passed to http.ServeFile.
-// Should trigger GTSS-TRV-001 (Path Traversal).
+// Should trigger BATOU-TRV-001 (Path Traversal).
 
 const staticDir = "/var/www/static"
 

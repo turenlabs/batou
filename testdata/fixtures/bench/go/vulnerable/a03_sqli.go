@@ -1,5 +1,5 @@
 // Source: CWE-89 - SQL Injection in Go web handler
-// Expected: GTSS-INJ-001 (SQL Injection via fmt.Sprintf)
+// Expected: BATOU-INJ-001 (SQL Injection via fmt.Sprintf)
 // OWASP: A03:2021 - Injection (SQL Injection)
 
 package handler

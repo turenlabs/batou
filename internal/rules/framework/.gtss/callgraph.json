@@ -1,0 +1,691 @@
+{
+  "nodes": {
+    "/app/ApiController.java:getData": {
+      "id": "/app/ApiController.java:getData",
+      "file_path": "/app/ApiController.java",
+      "name": "getData",
+      "package": "",
+      "start_line": 5,
+      "end_line": 7,
+      "calls": [],
+      "called_by": [
+        "/app/ApiController.java:getData"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "41a5e18144be9f89",
+      "last_scan_at": "2026-02-13T10:50:35.598082-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/SecurityConfig.java:configure": {
+      "id": "/app/SecurityConfig.java:configure",
+      "file_path": "/app/SecurityConfig.java",
+      "name": "configure",
+      "package": "",
+      "start_line": 5,
+      "end_line": 15,
+      "calls": [
+        "/app/SecurityConfig.java:configure"
+      ],
+      "called_by": [
+        "/app/SecurityConfig.java:configure"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "7672980845cd6359",
+      "last_scan_at": "2026-02-16T15:25:34.513182-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/SpringSecurityMisconfig.java:filterChain": {
+      "id": "/app/SpringSecurityMisconfig.java:filterChain",
+      "file_path": "/app/SpringSecurityMisconfig.java",
+      "name": "filterChain",
+      "package": "",
+      "start_line": 21,
+      "end_line": 31,
+      "calls": [],
+      "called_by": [
+        "/app/SpringSecurityMisconfig.java:filterChain"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "08b5eb456544d964",
+      "last_scan_at": "2026-02-13T10:50:35.621702-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/SpringSecurityMisconfig.java:findByName": {
+      "id": "/app/SpringSecurityMisconfig.java:findByName",
+      "file_path": "/app/SpringSecurityMisconfig.java",
+      "name": "findByName",
+      "package": "",
+      "start_line": 55,
+      "end_line": 58,
+      "calls": [],
+      "called_by": [
+        "/app/SpringSecurityMisconfig.java:findByName"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "dc9282012539a8f4",
+      "last_scan_at": "2026-02-13T10:50:35.621746-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/SpringSecuritySafe.java:filterChain": {
+      "id": "/app/SpringSecuritySafe.java:filterChain",
+      "file_path": "/app/SpringSecuritySafe.java",
+      "name": "filterChain",
+      "package": "",
+      "start_line": 22,
+      "end_line": 33,
+      "calls": [],
+      "called_by": [
+        "/app/SpringSecuritySafe.java:filterChain"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "0f2158f5274da821",
+      "last_scan_at": "2026-02-13T10:50:35.624258-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/SpringSecuritySafe.java:findByName": {
+      "id": "/app/SpringSecuritySafe.java:findByName",
+      "file_path": "/app/SpringSecuritySafe.java",
+      "name": "findByName",
+      "package": "",
+      "start_line": 58,
+      "end_line": 62,
+      "calls": [],
+      "called_by": [
+        "/app/SpringSecuritySafe.java:findByName"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "f9b5e4627a5eacd6",
+      "last_scan_at": "2026-02-13T10:50:35.624508-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/UserController.java:initBinder": {
+      "id": "/app/UserController.java:initBinder",
+      "file_path": "/app/UserController.java",
+      "name": "initBinder",
+      "package": "",
+      "start_line": 4,
+      "end_line": 6,
+      "calls": [
+        "/app/UserController.java:initBinder"
+      ],
+      "called_by": [
+        "/app/UserController.java:initBinder"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "c035a197e6094f8c",
+      "last_scan_at": "2026-02-16T15:25:34.499429-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/UserController.java:updateUser": {
+      "id": "/app/UserController.java:updateUser",
+      "file_path": "/app/UserController.java",
+      "name": "updateUser",
+      "package": "",
+      "start_line": 4,
+      "end_line": 7,
+      "calls": [],
+      "called_by": [
+        "/app/UserController.java:updateUser"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "60161728d02b146c",
+      "last_scan_at": "2026-02-13T10:50:35.609103-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/UserDao.java:findUsers": {
+      "id": "/app/UserDao.java:findUsers",
+      "file_path": "/app/UserDao.java",
+      "name": "findUsers",
+      "package": "",
+      "start_line": 1,
+      "end_line": 5,
+      "calls": [
+        "/app/UserDao.java:findUsers"
+      ],
+      "called_by": [
+        "/app/UserDao.java:findUsers"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "5c5a8ca666a50e51",
+      "last_scan_at": "2026-02-16T15:25:34.497299-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/UserService.java:search": {
+      "id": "/app/UserService.java:search",
+      "file_path": "/app/UserService.java",
+      "name": "search",
+      "package": "",
+      "start_line": 1,
+      "end_line": 4,
+      "calls": [],
+      "called_by": [
+        "/app/UserService.java:search"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "ff4a6dc3caeb43cd",
+      "last_scan_at": "2026-02-13T10:50:35.606487-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/ViewController.java:viewPage": {
+      "id": "/app/ViewController.java:viewPage",
+      "file_path": "/app/ViewController.java",
+      "name": "viewPage",
+      "package": "",
+      "start_line": 2,
+      "end_line": 4,
+      "calls": [],
+      "called_by": [
+        "/app/ViewController.java:viewPage"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "61ad01d255f83e62",
+      "last_scan_at": "2026-02-13T10:50:35.616934-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/app.py:comment": {
+      "id": "/app/app.py:comment",
+      "file_path": "/app/app.py",
+      "name": "comment",
+      "package": "",
+      "start_line": 10,
+      "end_line": 13,
+      "calls": [
+        "/app/app.py:comment"
+      ],
+      "called_by": [
+        "/app/app.py:comment"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "746647a9763fa836",
+      "last_scan_at": "2026-02-16T15:25:34.413471-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/app.py:message": {
+      "id": "/app/app.py:message",
+      "file_path": "/app/app.py",
+      "name": "message",
+      "package": "",
+      "start_line": 25,
+      "end_line": 30,
+      "calls": [
+        "/app/app.py:message"
+      ],
+      "called_by": [
+        "/app/app.py:message"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "0e05071f30a1fcdd",
+      "last_scan_at": "2026-02-16T15:25:34.413505-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/app.py:profile": {
+      "id": "/app/app.py:profile",
+      "file_path": "/app/app.py",
+      "name": "profile",
+      "package": "",
+      "start_line": 17,
+      "end_line": 21,
+      "calls": [
+        "/app/app.py:profile"
+      ],
+      "called_by": [
+        "/app/app.py:profile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "4b9778046ffb812e",
+      "last_scan_at": "2026-02-16T15:25:34.413487-06:00",
+      "language": "python",
+      "finding_count": 0
+    },
+    "/app/config.js:app.get": {
+      "id": "/app/config.js:app.get",
+      "file_path": "/app/config.js",
+      "name": "app.get",
+      "package": "",
+      "start_line": 1,
+      "end_line": 3,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "d7e5c0defa22ce5f",
+      "last_scan_at": "2026-02-13T10:50:40.418399-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/debug.js:app.get": {
+      "id": "/app/debug.js:app.get",
+      "file_path": "/app/debug.js",
+      "name": "app.get",
+      "package": "",
+      "start_line": 1,
+      "end_line": 3,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "3bf94be85297d93a",
+      "last_scan_at": "2026-02-16T15:25:34.347365-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/loader.js:app.post": {
+      "id": "/app/loader.js:app.post",
+      "file_path": "/app/loader.js",
+      "name": "app.post",
+      "package": "",
+      "start_line": 1,
+      "end_line": 8,
+      "calls": [
+        "/app/loader.js:loadProcessor"
+      ],
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "f6af018c1d745e02",
+      "last_scan_at": "2026-02-16T15:25:34.329788-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/loader.js:loadProcessor": {
+      "id": "/app/loader.js:loadProcessor",
+      "file_path": "/app/loader.js",
+      "name": "loadProcessor",
+      "package": "",
+      "start_line": 3,
+      "end_line": 6,
+      "calls": [
+        "/app/loader.js:loadProcessor"
+      ],
+      "called_by": [
+        "/app/loader.js:app.post",
+        "/app/loader.js:loadProcessor"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "7646f61e70cbe7a8",
+      "last_scan_at": "2026-02-16T15:25:34.329775-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/loader.ts:app.get": {
+      "id": "/app/loader.ts:app.get",
+      "file_path": "/app/loader.ts",
+      "name": "app.get",
+      "package": "",
+      "start_line": 1,
+      "end_line": 4,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "a1db8a916bbd5560",
+      "last_scan_at": "2026-02-13T10:50:40.405707-06:00",
+      "language": "typescript",
+      "finding_count": 0
+    },
+    "/app/server.js:app.use": {
+      "id": "/app/server.js:app.use",
+      "file_path": "/app/server.js",
+      "name": "app.use",
+      "package": "",
+      "start_line": 1,
+      "end_line": 7,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "7c6b34baa06d9084",
+      "last_scan_at": "2026-02-16T15:25:34.34278-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/src-tauri/src/commands.rs:find_user": {
+      "id": "/app/src-tauri/src/commands.rs:find_user",
+      "file_path": "/app/src-tauri/src/commands.rs",
+      "name": "find_user",
+      "package": "",
+      "start_line": 85,
+      "end_line": 87,
+      "calls": [
+        "/app/src-tauri/src/commands.rs:find_user"
+      ],
+      "called_by": [
+        "/app/src-tauri/src/commands.rs:find_user",
+        "/app/src-tauri/src/commands.rs:get_user"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "d6c5463130f53077",
+      "last_scan_at": "2026-02-16T15:25:34.588411-06:00",
+      "language": "rust",
+      "finding_count": 0
+    },
+    "/app/src-tauri/src/commands.rs:get_system_info": {
+      "id": "/app/src-tauri/src/commands.rs:get_system_info",
+      "file_path": "/app/src-tauri/src/commands.rs",
+      "name": "get_system_info",
+      "package": "",
+      "start_line": 22,
+      "end_line": 28,
+      "calls": [
+        "/app/src-tauri/src/commands.rs:get_system_info"
+      ],
+      "called_by": [
+        "/app/src-tauri/src/commands.rs:get_system_info"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "6952aab121c239f8",
+      "last_scan_at": "2026-02-16T15:25:34.588321-06:00",
+      "language": "rust",
+      "finding_count": 0
+    },
+    "/app/src-tauri/src/commands.rs:get_user": {
+      "id": "/app/src-tauri/src/commands.rs:get_user",
+      "file_path": "/app/src-tauri/src/commands.rs",
+      "name": "get_user",
+      "package": "",
+      "start_line": 32,
+      "end_line": 35,
+      "calls": [
+        "/app/src-tauri/src/commands.rs:get_user",
+        "/app/src-tauri/src/commands.rs:find_user"
+      ],
+      "called_by": [
+        "/app/src-tauri/src/commands.rs:get_user"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "d02e79ae58fd3703",
+      "last_scan_at": "2026-02-16T15:25:34.588332-06:00",
+      "language": "rust",
+      "finding_count": 0
+    },
+    "/app/src-tauri/src/commands.rs:main": {
+      "id": "/app/src-tauri/src/commands.rs:main",
+      "file_path": "/app/src-tauri/src/commands.rs",
+      "name": "main",
+      "package": "",
+      "start_line": 90,
+      "end_line": 100,
+      "calls": [
+        "/app/src-tauri/src/commands.rs:main"
+      ],
+      "called_by": [
+        "/app/src-tauri/src/commands.rs:main"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "78f4403c7d4ab98e",
+      "last_scan_at": "2026-02-16T15:25:34.588419-06:00",
+      "language": "rust",
+      "finding_count": 0
+    },
+    "/app/src-tauri/src/commands.rs:read_app_file": {
+      "id": "/app/src-tauri/src/commands.rs:read_app_file",
+      "file_path": "/app/src-tauri/src/commands.rs",
+      "name": "read_app_file",
+      "package": "",
+      "start_line": 39,
+      "end_line": 51,
+      "calls": [
+        "/app/src-tauri/src/commands.rs:read_app_file"
+      ],
+      "called_by": [
+        "/app/src-tauri/src/commands.rs:read_app_file"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "877cd11681aa9526",
+      "last_scan_at": "2026-02-16T15:25:34.588342-06:00",
+      "language": "rust",
+      "finding_count": 0
+    },
+    "/app/src-tauri/src/commands.rs:run_allowed_program": {
+      "id": "/app/src-tauri/src/commands.rs:run_allowed_program",
+      "file_path": "/app/src-tauri/src/commands.rs",
+      "name": "run_allowed_program",
+      "package": "",
+      "start_line": 7,
+      "end_line": 18,
+      "calls": [
+        "/app/src-tauri/src/commands.rs:run_allowed_program"
+      ],
+      "called_by": [
+        "/app/src-tauri/src/commands.rs:run_allowed_program"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1d4b23a3dc98b972",
+      "last_scan_at": "2026-02-16T15:25:34.588297-06:00",
+      "language": "rust",
+      "finding_count": 0
+    },
+    "/app/src-tauri/src/commands.rs:setup_protocol": {
+      "id": "/app/src-tauri/src/commands.rs:setup_protocol",
+      "file_path": "/app/src-tauri/src/commands.rs",
+      "name": "setup_protocol",
+      "package": "",
+      "start_line": 54,
+      "end_line": 76,
+      "calls": [
+        "/app/src-tauri/src/commands.rs:setup_protocol"
+      ],
+      "called_by": [
+        "/app/src-tauri/src/commands.rs:setup_protocol"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "a5b33a04ecea69ed",
+      "last_scan_at": "2026-02-16T15:25:34.588376-06:00",
+      "language": "rust",
+      "finding_count": 0
+    },
+    "/app/src-tauri/src/main.rs:setup": {
+      "id": "/app/src-tauri/src/main.rs:setup",
+      "file_path": "/app/src-tauri/src/main.rs",
+      "name": "setup",
+      "package": "",
+      "start_line": 3,
+      "end_line": 13,
+      "calls": [
+        "/app/src-tauri/src/main.rs:setup"
+      ],
+      "called_by": [
+        "/app/src-tauri/src/main.rs:setup"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "f4cb434111cf9932",
+      "last_scan_at": "2026-02-16T15:25:34.557332-06:00",
+      "language": "rust",
+      "finding_count": 0
+    },
+    "/app/src/commands.js:displayResult": {
+      "id": "/app/src/commands.js:displayResult",
+      "file_path": "/app/src/commands.js",
+      "name": "displayResult",
+      "package": "",
+      "start_line": 38,
+      "end_line": 41,
+      "calls": [
+        "/app/src/commands.js:displayResult"
+      ],
+      "called_by": [
+        "/app/src/commands.js:displayResult"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "cd994192ee4a4e2e",
+      "last_scan_at": "2026-02-16T15:25:34.598018-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/src/commands.js:executeAction": {
+      "id": "/app/src/commands.js:executeAction",
+      "file_path": "/app/src/commands.js",
+      "name": "executeAction",
+      "package": "",
+      "start_line": 24,
+      "end_line": 35,
+      "calls": [
+        "/app/src/commands.js:executeAction"
+      ],
+      "called_by": [
+        "/app/src/commands.js:executeAction"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "5c909cb8903b02bd",
+      "last_scan_at": "2026-02-16T15:25:34.597985-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/src/commands.js:getData": {
+      "id": "/app/src/commands.js:getData",
+      "file_path": "/app/src/commands.js",
+      "name": "getData",
+      "package": "",
+      "start_line": 6,
+      "end_line": 9,
+      "calls": [
+        "/app/src/commands.js:getData"
+      ],
+      "called_by": [
+        "/app/src/commands.js:getData"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1a86870c3b98b0b3",
+      "last_scan_at": "2026-02-16T15:25:34.597941-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/src/commands.js:readFile": {
+      "id": "/app/src/commands.js:readFile",
+      "file_path": "/app/src/commands.js",
+      "name": "readFile",
+      "package": "",
+      "start_line": 44,
+      "end_line": 47,
+      "calls": [
+        "/app/src/commands.js:readFile"
+      ],
+      "called_by": [
+        "/app/src/commands.js:readFile"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "e321d665272fba65",
+      "last_scan_at": "2026-02-16T15:25:34.598033-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/src/commands.js:saveDocument": {
+      "id": "/app/src/commands.js:saveDocument",
+      "file_path": "/app/src/commands.js",
+      "name": "saveDocument",
+      "package": "",
+      "start_line": 12,
+      "end_line": 21,
+      "calls": [
+        "/app/src/commands.js:saveDocument"
+      ],
+      "called_by": [
+        "/app/src/commands.js:saveDocument"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "34d945193fb8d13b",
+      "last_scan_at": "2026-02-16T15:25:34.597957-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    },
+    "/app/src/commands.js:sendToIframe": {
+      "id": "/app/src/commands.js:sendToIframe",
+      "file_path": "/app/src/commands.js",
+      "name": "sendToIframe",
+      "package": "",
+      "start_line": 50,
+      "end_line": 56,
+      "calls": [
+        "/app/src/commands.js:sendToIframe"
+      ],
+      "called_by": [
+        "/app/src/commands.js:sendToIframe"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "b18be9f8842ad179",
+      "last_scan_at": "2026-02-16T15:25:34.598046-06:00",
+      "language": "javascript",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/framework",
+  "session_id": "",
+  "last_updated": "2026-02-16T15:25:34.598047-06:00",
+  "version": 1
+}

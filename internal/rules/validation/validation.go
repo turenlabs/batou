@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-VAL-001: Direct use of request params in operations without validation
+// BATOU-VAL-001: Direct use of request params in operations without validation
 var (
 	// Python: request params flow into operations
 	reFlaskRequestArgs  = regexp.MustCompile(`request\.(?:args|form|values|json)\s*(?:\.\s*get\s*\(|(?:\[))`)
@@ -135,7 +135,7 @@ var (
 		`)`)
 )
 
-// GTSS-VAL-002: Missing type coercion / bounds checking
+// BATOU-VAL-002: Missing type coercion / bounds checking
 var (
 	// parseInt without isNaN check (JS)
 	reParseIntNoCheck = regexp.MustCompile(`parseInt\s*\(\s*(?:req\.|request\.|params|query|body)\w*`)
@@ -147,7 +147,7 @@ var (
 	reNaNCheck = regexp.MustCompile(`(?i)\b(?:isNaN|Number\.isNaN|Number\.isFinite|isFinite|Number\.isInteger|!==?\s*NaN)\b`)
 )
 
-// GTSS-VAL-003: Missing length/size validation
+// BATOU-VAL-003: Missing length/size validation
 var (
 	// User input in DB operations without length check (JS)
 	reBodyInDB = regexp.MustCompile(`(?:req\.body\.\w+|request\.body\.\w+)`)
@@ -161,7 +161,7 @@ var (
 	reLengthCheck = regexp.MustCompile(`(?i)(?:\.length\b|\.trim\(\)|\.size\b|maxlength|maxLength|max_length|strlen|len\()`)
 )
 
-// GTSS-VAL-004: Missing enum/allowlist validation
+// BATOU-VAL-004: Missing enum/allowlist validation
 var (
 	// Dynamic property access from user input (JS/TS)
 	reDynPropAccess = regexp.MustCompile(`\w+\s*\[\s*(?:req\.|request\.|params\.|query\.|body\.)[\w.]+\s*\]`)
@@ -216,12 +216,12 @@ func scopeHasPattern(lines []string, lineIdx int, re *regexp.Regexp, window int)
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-001: Direct use of request params without validation
+// BATOU-VAL-001: Direct use of request params without validation
 // ---------------------------------------------------------------------------
 
 type DirectParamUsage struct{}
 
-func (r DirectParamUsage) ID() string              { return "GTSS-VAL-001" }
+func (r DirectParamUsage) ID() string              { return "BATOU-VAL-001" }
 func (r DirectParamUsage) Name() string            { return "Direct Request Parameter Usage" }
 func (r DirectParamUsage) DefaultSeverity() rules.Severity { return rules.High }
 func (r DirectParamUsage) Description() string {
@@ -357,12 +357,12 @@ func (r DirectParamUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-002: Missing type coercion / bounds checking
+// BATOU-VAL-002: Missing type coercion / bounds checking
 // ---------------------------------------------------------------------------
 
 type MissingTypeCoercion struct{}
 
-func (r MissingTypeCoercion) ID() string              { return "GTSS-VAL-002" }
+func (r MissingTypeCoercion) ID() string              { return "BATOU-VAL-002" }
 func (r MissingTypeCoercion) Name() string            { return "Missing Type Coercion" }
 func (r MissingTypeCoercion) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r MissingTypeCoercion) Description() string {
@@ -435,12 +435,12 @@ func (r MissingTypeCoercion) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-003: Missing length/size validation
+// BATOU-VAL-003: Missing length/size validation
 // ---------------------------------------------------------------------------
 
 type MissingLengthValidation struct{}
 
-func (r MissingLengthValidation) ID() string              { return "GTSS-VAL-003" }
+func (r MissingLengthValidation) ID() string              { return "BATOU-VAL-003" }
 func (r MissingLengthValidation) Name() string            { return "Missing Length Validation" }
 func (r MissingLengthValidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r MissingLengthValidation) Description() string {
@@ -544,12 +544,12 @@ func (r MissingLengthValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-004: Missing enum/allowlist validation
+// BATOU-VAL-004: Missing enum/allowlist validation
 // ---------------------------------------------------------------------------
 
 type MissingAllowlistValidation struct{}
 
-func (r MissingAllowlistValidation) ID() string              { return "GTSS-VAL-004" }
+func (r MissingAllowlistValidation) ID() string              { return "BATOU-VAL-004" }
 func (r MissingAllowlistValidation) Name() string            { return "Missing Allowlist Validation" }
 func (r MissingAllowlistValidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r MissingAllowlistValidation) Description() string {
@@ -625,7 +625,7 @@ func (r MissingAllowlistValidation) Scan(ctx *rules.ScanContext) []rules.Finding
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-005: File upload without content-type validation (CWE-434)
+// BATOU-VAL-005: File upload without content-type validation (CWE-434)
 // ---------------------------------------------------------------------------
 
 // File upload handler patterns
@@ -662,7 +662,7 @@ var (
 
 type FileUploadHardening struct{}
 
-func (r FileUploadHardening) ID() string              { return "GTSS-VAL-005" }
+func (r FileUploadHardening) ID() string              { return "BATOU-VAL-005" }
 func (r FileUploadHardening) Name() string            { return "File Upload Hardening" }
 func (r FileUploadHardening) DefaultSeverity() rules.Severity { return rules.High }
 func (r FileUploadHardening) Description() string {

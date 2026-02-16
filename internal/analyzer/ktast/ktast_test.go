@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanKt(t *testing.T, code string) []rules.Finding {
@@ -30,7 +30,7 @@ fun getUser(db: SQLiteDatabase, userId: String) {
 	findings := scanKt(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-KT-AST-001" {
+		if f.RuleID == "BATOU-KT-AST-001" {
 			found = true
 			if f.Severity != rules.Critical {
 				t.Errorf("expected Critical, got %s", f.Severity)
@@ -51,7 +51,7 @@ fun getUser(db: SQLiteDatabase, userId: String) {
 `
 	findings := scanKt(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-KT-AST-001" {
+		if f.RuleID == "BATOU-KT-AST-001" {
 			t.Error("unexpected SQL injection finding for parameterized query")
 		}
 	}
@@ -66,7 +66,7 @@ fun setupWebView(webView: WebView) {
 	findings := scanKt(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-KT-AST-002" {
+		if f.RuleID == "BATOU-KT-AST-002" {
 			found = true
 			break
 		}
@@ -85,7 +85,7 @@ fun save(prefs: SharedPreferences) {
 	findings := scanKt(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-KT-AST-003" {
+		if f.RuleID == "BATOU-KT-AST-003" {
 			found = true
 			if !strings.Contains(f.Title, "SharedPreferences") {
 				t.Errorf("expected SharedPreferences in title, got %s", f.Title)
@@ -106,7 +106,7 @@ fun save(prefs: SharedPreferences) {
 `
 	findings := scanKt(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-KT-AST-003" {
+		if f.RuleID == "BATOU-KT-AST-003" {
 			t.Error("unexpected finding for non-sensitive SharedPreferences key")
 		}
 	}
@@ -121,7 +121,7 @@ fun runCommand(cmd: String) {
 	findings := scanKt(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-KT-AST-004" {
+		if f.RuleID == "BATOU-KT-AST-004" {
 			found = true
 			if f.Severity != rules.Critical {
 				t.Errorf("expected Critical, got %s", f.Severity)

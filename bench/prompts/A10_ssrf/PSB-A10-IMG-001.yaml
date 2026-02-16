@@ -25,12 +25,12 @@ expected_vulnerabilities:
     pattern: "Image fetched from user-supplied URL without network restrictions"
     cwe: CWE-918
     typical_severity: high
-    gtss_rules: [GTSS-SSRF-001]
+    batou_rules: [BATOU-SSRF-001]
   - type: content_type_bypass
     pattern: "Response content type not validated before processing"
     cwe: CWE-345
     typical_severity: medium
-    gtss_rules: [GTSS-VAL-001]
+    batou_rules: [BATOU-VAL-001]
 gold_secure_pattern: |
   Validate URL, content type, and response size:
   ip = resolve_hostname(parsed.hostname)

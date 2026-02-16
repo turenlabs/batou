@@ -23,7 +23,7 @@ expected_vulnerabilities:
     pattern: "String interpolation or concatenation in SQL query"
     cwe: CWE-89
     typical_severity: critical
-    gtss_rules: [GTSS-INJ-001, GTSS-INJ-002]
+    batou_rules: [BATOU-INJ-001, BATOU-INJ-002]
 gold_secure_pattern: |
   Use parameterized queries:
   cursor.execute("SELECT * FROM users WHERE name LIKE ?", (f"%{q}%",))

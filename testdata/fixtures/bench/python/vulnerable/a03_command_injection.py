@@ -1,5 +1,5 @@
 # Source: CVE-2022-42889 - Apache Commons Text (adapted to Python os.system)
-# Expected: GTSS-INJ-002 (Command Injection via os.system/subprocess)
+# Expected: BATOU-INJ-002 (Command Injection via os.system/subprocess)
 # OWASP: A03:2021 - Injection (OS Command Injection)
 
 import os

@@ -1,5 +1,5 @@
 # Source: CWE-327/CWE-328 - Use of broken cryptographic algorithms
-# Expected: GTSS-CRY-001 (Weak Hashing - MD5/SHA1), GTSS-CRY-002 (Insecure Random)
+# Expected: BATOU-CRY-001 (Weak Hashing - MD5/SHA1), BATOU-CRY-002 (Insecure Random)
 # OWASP: A02:2021 - Cryptographic Failures
 
 import hashlib

@@ -1,5 +1,5 @@
 // Source: CWE-16 - Security misconfiguration in Go HTTP server
-// Expected: GTSS-AUTH-003 (CORS Wildcard), GTSS-AUTH-006 (Insecure Cookie)
+// Expected: BATOU-AUTH-003 (CORS Wildcard), BATOU-AUTH-006 (Insecure Cookie)
 // OWASP: A05:2021 - Security Misconfiguration
 
 package handler

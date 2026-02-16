@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,36 +12,36 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-TRV-011: Zip slip vulnerability (archive extraction)
+	// BATOU-TRV-011: Zip slip vulnerability (archive extraction)
 	reExtZipSlipGo     = regexp.MustCompile(`(?:zip\.File|tar\.Header|zip\.Reader|tar\.Reader)`)
 	reExtZipSlipCreate = regexp.MustCompile(`(?:os\.Create|os\.OpenFile|os\.MkdirAll|ioutil\.WriteFile)\s*\([^)]*(?:\.Name\b|header\.Name|entry|f\.Name|file\.Name)`)
 	reExtZipSlipJava   = regexp.MustCompile(`(?:ZipEntry|TarArchiveEntry|JarEntry)\s*.*(?:getName|getPath)\s*\(`)
 	reExtZipSlipPy     = regexp.MustCompile(`\.(?:extractall|extract)\s*\([^)]*\)`)
 	reExtZipSlipJS     = regexp.MustCompile(`(?:entry\.(?:fileName|path|name)|zipEntry)\s*`)
 
-	// GTSS-TRV-012: Path traversal via URL-encoded sequences
+	// BATOU-TRV-012: Path traversal via URL-encoded sequences
 	reExtURLEncodedTraversal = regexp.MustCompile(`(?:%2e%2e|%2e%2e%2f|%2e%2e/|\.\.%2f|%2e%2e%5c|\.\.%5c|%252e%252e|%c0%ae|%c1%9c)`)
 	reExtDecodeURI           = regexp.MustCompile(`(?i)(?:decodeURI|urldecode|url_decode|URLDecoder\.decode|QueryUnescape|unquote)\s*\(`)
 
-	// GTSS-TRV-013: Symlink following in file operations
+	// BATOU-TRV-013: Symlink following in file operations
 	reExtSymlinkFollow   = regexp.MustCompile(`(?:os\.Readlink|readlink|File\.readlink|os\.readlink|fs\.readlink|Path\.readlink|lstat)\s*\(`)
 	reExtSymlinkValidate = regexp.MustCompile(`(?i)(?:filepath\.EvalSymlinks|os\.path\.realpath|fs\.realpathSync|File\.realpath|readlink.*realpath|symlink.*check|lstat.*isSymbolicLink)`)
 
-	// GTSS-TRV-014: Path traversal in template include/require
+	// BATOU-TRV-014: Path traversal in template include/require
 	reExtTemplateInclude = regexp.MustCompile(`(?i)(?:include|require|require_once|include_once|load|render)\s*[\(]?\s*(?:\$(?:_GET|_POST|_REQUEST)|req\.(?:query|params|body)|request\.(?:GET|POST|args|form)|params\[)`)
 
-	// GTSS-TRV-015: Directory listing enabled
+	// BATOU-TRV-015: Directory listing enabled
 	reExtDirListing     = regexp.MustCompile(`(?i)(?:express\.static|serveStatic|directory_listing|autoindex\s+on|Options\s+\+?Indexes|DirectoryIndex|enable_dir_listing|browse\s*=\s*true|list_?directory|FancyIndexing)`)
 	reExtDirListingPy   = regexp.MustCompile(`(?i)(?:send_from_directory|SimpleHTTPServer|http\.server|directory_listing\s*=\s*True)`)
 
-	// GTSS-TRV-016: Absolute path traversal (user controls full path)
+	// BATOU-TRV-016: Absolute path traversal (user controls full path)
 	reExtAbsPathTraversal = regexp.MustCompile(`(?i)(?:os\.(?:Open|ReadFile|Create|Remove)|ioutil\.ReadFile|fs\.(?:readFile|writeFile|readFileSync|writeFileSync)|open|fopen|file_get_contents|File\.(?:read|open|write))\s*\(\s*(?:req\.(?:query|params|body)\s*[\[.]|request\.(?:GET|POST|args|form)\s*[\[.]|params\[|\$_(?:GET|POST|REQUEST)\[)`)
 
-	// GTSS-TRV-017: Path traversal via null byte injection
+	// BATOU-TRV-017: Path traversal via null byte injection
 	reExtNullByteInPath  = regexp.MustCompile(`(?:%00|\\x00|\\0|\\u0000)`)
 	reExtFileOpWithInput = regexp.MustCompile(`(?i)(?:open|readFile|readFileSync|fopen|file_get_contents|ReadFile|Open|sendFile|download)\s*\(`)
 
-	// GTSS-TRV-018: Unsafe file serve (serving user-specified path)
+	// BATOU-TRV-018: Unsafe file serve (serving user-specified path)
 	reExtUnsafeServe = regexp.MustCompile(`(?i)(?:res\.sendFile|res\.download|send_file|send_from_directory|serve_file|FileResponse|StreamingResponse)\s*\(\s*(?:req\.|request\.|params|path|file|input|user)`)
 )
 
@@ -61,12 +61,12 @@ func init() {
 }
 
 // ========================================================================
-// GTSS-TRV-011: Zip Slip Vulnerability
+// BATOU-TRV-011: Zip Slip Vulnerability
 // ========================================================================
 
 type ZipSlipExt struct{}
 
-func (r *ZipSlipExt) ID() string                     { return "GTSS-TRV-011" }
+func (r *ZipSlipExt) ID() string                     { return "BATOU-TRV-011" }
 func (r *ZipSlipExt) Name() string                   { return "ZipSlipExt" }
 func (r *ZipSlipExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ZipSlipExt) Description() string {
@@ -138,12 +138,12 @@ func (r *ZipSlipExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-TRV-012: Path Traversal via URL-Encoded Sequences
+// BATOU-TRV-012: Path Traversal via URL-Encoded Sequences
 // ========================================================================
 
 type URLEncodedTraversal struct{}
 
-func (r *URLEncodedTraversal) ID() string                     { return "GTSS-TRV-012" }
+func (r *URLEncodedTraversal) ID() string                     { return "BATOU-TRV-012" }
 func (r *URLEncodedTraversal) Name() string                   { return "URLEncodedTraversal" }
 func (r *URLEncodedTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *URLEncodedTraversal) Description() string {
@@ -217,12 +217,12 @@ func (r *URLEncodedTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-TRV-013: Symlink Following in File Operations
+// BATOU-TRV-013: Symlink Following in File Operations
 // ========================================================================
 
 type SymlinkFollowingExt struct{}
 
-func (r *SymlinkFollowingExt) ID() string                     { return "GTSS-TRV-013" }
+func (r *SymlinkFollowingExt) ID() string                     { return "BATOU-TRV-013" }
 func (r *SymlinkFollowingExt) Name() string                   { return "SymlinkFollowingExt" }
 func (r *SymlinkFollowingExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SymlinkFollowingExt) Description() string {
@@ -272,12 +272,12 @@ func (r *SymlinkFollowingExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-TRV-014: Path Traversal in Template Include/Require
+// BATOU-TRV-014: Path Traversal in Template Include/Require
 // ========================================================================
 
 type TemplateIncludeTraversal struct{}
 
-func (r *TemplateIncludeTraversal) ID() string                     { return "GTSS-TRV-014" }
+func (r *TemplateIncludeTraversal) ID() string                     { return "BATOU-TRV-014" }
 func (r *TemplateIncludeTraversal) Name() string                   { return "TemplateIncludeTraversal" }
 func (r *TemplateIncludeTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TemplateIncludeTraversal) Description() string {
@@ -325,12 +325,12 @@ func (r *TemplateIncludeTraversal) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ========================================================================
-// GTSS-TRV-015: Directory Listing Enabled
+// BATOU-TRV-015: Directory Listing Enabled
 // ========================================================================
 
 type DirectoryListingEnabled struct{}
 
-func (r *DirectoryListingEnabled) ID() string                     { return "GTSS-TRV-015" }
+func (r *DirectoryListingEnabled) ID() string                     { return "BATOU-TRV-015" }
 func (r *DirectoryListingEnabled) Name() string                   { return "DirectoryListingEnabled" }
 func (r *DirectoryListingEnabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DirectoryListingEnabled) Description() string {
@@ -380,12 +380,12 @@ func (r *DirectoryListingEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-TRV-016: Absolute Path Traversal
+// BATOU-TRV-016: Absolute Path Traversal
 // ========================================================================
 
 type AbsolutePathTraversal struct{}
 
-func (r *AbsolutePathTraversal) ID() string                     { return "GTSS-TRV-016" }
+func (r *AbsolutePathTraversal) ID() string                     { return "BATOU-TRV-016" }
 func (r *AbsolutePathTraversal) Name() string                   { return "AbsolutePathTraversal" }
 func (r *AbsolutePathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AbsolutePathTraversal) Description() string {
@@ -433,12 +433,12 @@ func (r *AbsolutePathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-TRV-017: Path Traversal via Null Byte Injection
+// BATOU-TRV-017: Path Traversal via Null Byte Injection
 // ========================================================================
 
 type NullByteTraversal struct{}
 
-func (r *NullByteTraversal) ID() string                     { return "GTSS-TRV-017" }
+func (r *NullByteTraversal) ID() string                     { return "BATOU-TRV-017" }
 func (r *NullByteTraversal) Name() string                   { return "NullByteTraversal" }
 func (r *NullByteTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NullByteTraversal) Description() string {
@@ -482,12 +482,12 @@ func (r *NullByteTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-TRV-018: Unsafe File Serve
+// BATOU-TRV-018: Unsafe File Serve
 // ========================================================================
 
 type UnsafeFileServe struct{}
 
-func (r *UnsafeFileServe) ID() string                     { return "GTSS-TRV-018" }
+func (r *UnsafeFileServe) ID() string                     { return "BATOU-TRV-018" }
 func (r *UnsafeFileServe) Name() string                   { return "UnsafeFileServe" }
 func (r *UnsafeFileServe) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnsafeFileServe) Description() string {

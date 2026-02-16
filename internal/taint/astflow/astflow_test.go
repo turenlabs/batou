@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/taint"
 
 	// Import taint languages catalog so Go sources/sinks/sanitizers are registered.
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 func hasTaintFlow(flows []taint.TaintFlow, sinkCategory taint.SinkCategory) bool {
@@ -452,8 +452,8 @@ var db *sql.DB
 	}
 
 	finding := flows[0].ToFinding()
-	if !strings.HasPrefix(finding.RuleID, "GTSS-TAINT-") {
-		t.Errorf("expected RuleID to start with GTSS-TAINT-, got %s", finding.RuleID)
+	if !strings.HasPrefix(finding.RuleID, "BATOU-TAINT-") {
+		t.Errorf("expected RuleID to start with BATOU-TAINT-, got %s", finding.RuleID)
 	}
 	if finding.FilePath != "/app/handler.go" {
 		t.Errorf("expected FilePath /app/handler.go, got %s", finding.FilePath)

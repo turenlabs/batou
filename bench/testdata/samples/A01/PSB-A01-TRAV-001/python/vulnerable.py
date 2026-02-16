@@ -1,6 +1,6 @@
 # PSB-A01-TRAV-001: File download endpoint
 # CWE: CWE-22, CWE-23
-# Expected: GTSS-TRAV-001, GTSS-TRAV-003
+# Expected: BATOU-TRAV-001, BATOU-TRAV-003
 from flask import Flask, request, send_file
 import os
 

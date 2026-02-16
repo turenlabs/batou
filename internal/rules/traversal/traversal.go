@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-TRV-001: Path Traversal
+// BATOU-TRV-001: Path Traversal
 var (
 	// Go: os.Open/ReadFile/etc with variable (not string literal)
 	goFileOpUserInput = regexp.MustCompile(`\b(?:os\.(?:Open|OpenFile|ReadFile|Create|Remove|RemoveAll|Stat|Lstat|Mkdir|MkdirAll)|ioutil\.ReadFile)\s*\(\s*[a-zA-Z_]\w*`)
@@ -33,14 +33,14 @@ var (
 	dotDotSlashInVar = regexp.MustCompile(`(?:["']\s*\+\s*|["']?\s*\.\.\s*/|\.\.\\\\)`)
 )
 
-// GTSS-TRV-002: File Inclusion
+// BATOU-TRV-002: File Inclusion
 var (
 	phpDynamicInclude    = regexp.MustCompile(`\b(?:include|require|include_once|require_once)\s*[\(]?\s*\$`)
 	pyDynamicImport      = regexp.MustCompile(`\b(?:__import__|importlib\.import_module)\s*\(\s*[a-zA-Z_]\w*`)
 	rubyDynamicLoadReq   = regexp.MustCompile(`\b(?:load|require)\s*[\(]?\s*[a-zA-Z_]\w*`)
 )
 
-// GTSS-TRV-003: Archive Extraction (Zip Slip / Tar Slip)
+// BATOU-TRV-003: Archive Extraction (Zip Slip / Tar Slip)
 var (
 	// Go: zip.OpenReader / zip.NewReader extraction without path checking
 	goZipExtract = regexp.MustCompile(`(?:zip\.(?:OpenReader|NewReader)|archive/zip)`)
@@ -55,14 +55,14 @@ var (
 	goCreateFromZip = regexp.MustCompile(`os\.Create\s*\(\s*(?:filepath\.Join|path\.Join|name|entry\.Name|header\.Name|f\.Name)`)
 )
 
-// GTSS-TRV-004: Symlink Following
+// BATOU-TRV-004: Symlink Following
 var (
 	goReadlink    = regexp.MustCompile(`os\.Readlink\s*\(`)
 	goLstat       = regexp.MustCompile(`os\.Lstat\s*\(`)
 	goEvalSymlink = regexp.MustCompile(`filepath\.EvalSymlinks\s*\(`)
 )
 
-// GTSS-TRV-005: Template Path Injection
+// BATOU-TRV-005: Template Path Injection
 var (
 	// JS/TS: res.render(variable) where first arg is not a string literal
 	jsResRender = regexp.MustCompile(`\bres\.render\s*\(\s*[a-zA-Z_]\w*`)
@@ -72,7 +72,7 @@ var (
 	genericRender = regexp.MustCompile(`\brender\s*\(\s*[a-zA-Z_]\w*`)
 )
 
-// GTSS-TRV-006: Prototype Pollution via Spread
+// BATOU-TRV-006: Prototype Pollution via Spread
 var (
 	// JS/TS: { ...req.body } spread operator
 	jsSpreadReqBody = regexp.MustCompile(`\{\s*\.\.\.req\.body\b`)
@@ -80,7 +80,7 @@ var (
 	jsObjectAssignReqBody = regexp.MustCompile(`Object\.assign\s*\(\s*\{\s*\}\s*,\s*req\.body\b`)
 )
 
-// GTSS-TRV-007: Express sendFile/download with Variable Path
+// BATOU-TRV-007: Express sendFile/download with Variable Path
 var (
 	// JS/TS: res.sendFile(variable) — not a string literal
 	jsSendFile = regexp.MustCompile(`\bres\.sendFile\s*\(\s*[a-zA-Z_]\w*`)
@@ -88,13 +88,13 @@ var (
 	jsDownload = regexp.MustCompile(`\bres\.download\s*\(\s*[a-zA-Z_]\w*`)
 )
 
-// GTSS-TRV-008: Null Byte in File Path
+// BATOU-TRV-008: Null Byte in File Path
 var (
 	// File operations with user input variables but no null byte sanitization
 	nullByteFileOp = regexp.MustCompile(`(?:open|readFile|readFileSync|createReadStream|sendFile|download|ReadFile|Open|OpenFile)\s*\(\s*[a-zA-Z_]\w*`)
 )
 
-// GTSS-TRV-009: Express Render Options Injection (layout override via spread)
+// BATOU-TRV-009: Express Render Options Injection (layout override via spread)
 var (
 	// JS/TS: res.render('template', { ...req.body }) or res.render('template', { ...req.body, ... })
 	jsRenderSpreadBody = regexp.MustCompile(`\bres\.render\s*\([^,]+,\s*\{[^}]*\.\.\.req\.body\b`)
@@ -104,7 +104,7 @@ var (
 	jsRenderSpreadReq = regexp.MustCompile(`\bres\.render\s*\([^,]+,\s*\{[^}]*\.\.\.req\.(?:query|params)\b`)
 )
 
-// GTSS-TRV-010: Zip Slip Path Traversal
+// BATOU-TRV-010: Zip Slip Path Traversal
 var (
 	// Go: zip.File.Name or header.Name used in filepath.Join/os.Create without path check
 	goZipSlipJoinCreate = regexp.MustCompile(`(?:filepath\.Join|os\.Create|os\.OpenFile|os\.MkdirAll)\s*\([^)]*(?:\.Name\b|entry\.Name|header\.Name|f\.Name|file\.Name|zipEntry|zf\.Name)`)
@@ -141,11 +141,11 @@ func init() {
 	rules.Register(&ZipSlipTraversal{})
 }
 
-// --- GTSS-TRV-001: Path Traversal ---
+// --- BATOU-TRV-001: Path Traversal ---
 
 type PathTraversal struct{}
 
-func (r *PathTraversal) ID() string             { return "GTSS-TRV-001" }
+func (r *PathTraversal) ID() string             { return "BATOU-TRV-001" }
 func (r *PathTraversal) Name() string            { return "PathTraversal" }
 func (r *PathTraversal) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PathTraversal) Languages() []rules.Language {
@@ -420,11 +420,11 @@ func isAllowlistGuard(line string) bool {
 	return false
 }
 
-// --- GTSS-TRV-002: File Inclusion ---
+// --- BATOU-TRV-002: File Inclusion ---
 
 type FileInclusion struct{}
 
-func (r *FileInclusion) ID() string             { return "GTSS-TRV-002" }
+func (r *FileInclusion) ID() string             { return "BATOU-TRV-002" }
 func (r *FileInclusion) Name() string            { return "FileInclusion" }
 func (r *FileInclusion) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *FileInclusion) Languages() []rules.Language {
@@ -516,11 +516,11 @@ func hasPHPIncludeGuard(lines []string, idx int) bool {
 	return false
 }
 
-// --- GTSS-TRV-003: Archive Extraction ---
+// --- BATOU-TRV-003: Archive Extraction ---
 
 type ArchiveExtraction struct{}
 
-func (r *ArchiveExtraction) ID() string             { return "GTSS-TRV-003" }
+func (r *ArchiveExtraction) ID() string             { return "BATOU-TRV-003" }
 func (r *ArchiveExtraction) Name() string            { return "ArchiveExtraction" }
 func (r *ArchiveExtraction) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ArchiveExtraction) Languages() []rules.Language {
@@ -614,11 +614,11 @@ func hasZipSlipGuard(lines []string) bool {
 	return false
 }
 
-// --- GTSS-TRV-004: Symlink Following ---
+// --- BATOU-TRV-004: Symlink Following ---
 
 type SymlinkFollowing struct{}
 
-func (r *SymlinkFollowing) ID() string             { return "GTSS-TRV-004" }
+func (r *SymlinkFollowing) ID() string             { return "BATOU-TRV-004" }
 func (r *SymlinkFollowing) Name() string            { return "SymlinkFollowing" }
 func (r *SymlinkFollowing) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SymlinkFollowing) Languages() []rules.Language {
@@ -679,11 +679,11 @@ func (r *SymlinkFollowing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-TRV-005: Template Path Injection ---
+// --- BATOU-TRV-005: Template Path Injection ---
 
 type TemplatePathInjection struct{}
 
-func (r *TemplatePathInjection) ID() string             { return "GTSS-TRV-005" }
+func (r *TemplatePathInjection) ID() string             { return "BATOU-TRV-005" }
 func (r *TemplatePathInjection) Name() string            { return "TemplatePathInjection" }
 func (r *TemplatePathInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TemplatePathInjection) Languages() []rules.Language {
@@ -754,11 +754,11 @@ func (r *TemplatePathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-TRV-006: Prototype Pollution via Spread ---
+// --- BATOU-TRV-006: Prototype Pollution via Spread ---
 
 type PrototypePollution struct{}
 
-func (r *PrototypePollution) ID() string             { return "GTSS-TRV-006" }
+func (r *PrototypePollution) ID() string             { return "BATOU-TRV-006" }
 func (r *PrototypePollution) Name() string            { return "PrototypePollution" }
 func (r *PrototypePollution) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PrototypePollution) Languages() []rules.Language {
@@ -812,11 +812,11 @@ func (r *PrototypePollution) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-TRV-007: Express sendFile/download with Variable Path ---
+// --- BATOU-TRV-007: Express sendFile/download with Variable Path ---
 
 type ExpressSendFilePath struct{}
 
-func (r *ExpressSendFilePath) ID() string             { return "GTSS-TRV-007" }
+func (r *ExpressSendFilePath) ID() string             { return "BATOU-TRV-007" }
 func (r *ExpressSendFilePath) Name() string            { return "ExpressSendFilePath" }
 func (r *ExpressSendFilePath) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ExpressSendFilePath) Languages() []rules.Language {
@@ -874,11 +874,11 @@ func (r *ExpressSendFilePath) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-TRV-008: Null Byte in File Path ---
+// --- BATOU-TRV-008: Null Byte in File Path ---
 
 type NullByteFilePath struct{}
 
-func (r *NullByteFilePath) ID() string             { return "GTSS-TRV-008" }
+func (r *NullByteFilePath) ID() string             { return "BATOU-TRV-008" }
 func (r *NullByteFilePath) Name() string            { return "NullByteFilePath" }
 func (r *NullByteFilePath) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NullByteFilePath) Languages() []rules.Language {
@@ -964,11 +964,11 @@ func hasUserInputIndicator(lines []string, idx int) bool {
 	return false
 }
 
-// --- GTSS-TRV-009: Express Render Options Injection ---
+// --- BATOU-TRV-009: Express Render Options Injection ---
 
 type RenderOptionsInjection struct{}
 
-func (r *RenderOptionsInjection) ID() string             { return "GTSS-TRV-009" }
+func (r *RenderOptionsInjection) ID() string             { return "BATOU-TRV-009" }
 func (r *RenderOptionsInjection) Name() string            { return "RenderOptionsInjection" }
 func (r *RenderOptionsInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RenderOptionsInjection) Languages() []rules.Language {
@@ -1052,11 +1052,11 @@ func isStringLiteralArg(line, funcName string) bool {
 	return strings.HasPrefix(after, `"`) || strings.HasPrefix(after, `'`) || strings.HasPrefix(after, "`")
 }
 
-// --- GTSS-TRV-010: Zip Slip Path Traversal ---
+// --- BATOU-TRV-010: Zip Slip Path Traversal ---
 
 type ZipSlipTraversal struct{}
 
-func (r *ZipSlipTraversal) ID() string                    { return "GTSS-TRV-010" }
+func (r *ZipSlipTraversal) ID() string                    { return "BATOU-TRV-010" }
 func (r *ZipSlipTraversal) Name() string                  { return "ZipSlipTraversal" }
 func (r *ZipSlipTraversal) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ZipSlipTraversal) Languages() []rules.Language {

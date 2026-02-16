@@ -1,8 +1,8 @@
-# GTSS Deep Audit Report
+# Batou Deep Audit Report
 
 **Auditor:** code-auditor agent
 **Date:** 2026-02-10
-**Scope:** All 66 Go source files in the GTSS codebase
+**Scope:** All 66 Go source files in the Batou codebase
 **Severity Rating:** Each finding rated CRITICAL / HIGH / MEDIUM / LOW / INFO
 
 ---
@@ -17,14 +17,14 @@
 6. [Architectural Weaknesses](#6-architectural-weaknesses)
 7. [Rule Quality](#7-rule-quality)
 8. [Taint Analysis Gaps](#8-taint-analysis-gaps)
-9. [Security of GTSS Itself](#9-security-of-gtss-itself)
+9. [Security of Batou Itself](#9-security-of-batou-itself)
 10. [Recommendations](#10-recommendations)
 
 ---
 
 ## 1. Executive Summary
 
-GTSS is a well-structured generation-time security scanner with three analysis layers: regex-based pattern matching, regex-based taint tracking, and Go AST-based taint tracking. The architecture is sound, but this audit found **52 distinct weaknesses** across the codebase (including 10 additional findings from the complete rule file review):
+Batou is a well-structured generation-time security scanner with three analysis layers: regex-based pattern matching, regex-based taint tracking, and Go AST-based taint tracking. The architecture is sound, but this audit found **52 distinct weaknesses** across the codebase (including 10 additional findings from the complete rule file review):
 
 | Category | Critical | High | Medium | Low | Info |
 |----------|----------|------|--------|-----|------|
@@ -60,7 +60,7 @@ if err != nil {
 }
 ```
 
-When stdin contains invalid JSON or ReadInput fails for any reason, GTSS exits with code 0, which tells Claude Code "no objections." This means **any malformed hook invocation silently allows the write through**. An attacker who can corrupt stdin or cause a read timeout effectively disables all security scanning.
+When stdin contains invalid JSON or ReadInput fails for any reason, Batou exits with code 0, which tells Claude Code "no objections." This means **any malformed hook invocation silently allows the write through**. An attacker who can corrupt stdin or cause a read timeout effectively disables all security scanning.
 
 **Impact:** Complete bypass of security scanning.
 
@@ -74,7 +74,7 @@ if result.ShouldBlock() {
 }
 // Always output context
 if context != "" {
-    hook.OutputPreTool("allow", "GTSS: security analysis complete", context)
+    hook.OutputPreTool("allow", "Batou: security analysis complete", context)
 }
 ```
 
@@ -229,7 +229,7 @@ Ruby's `end` detection checks `trimmed == "end"` or prefix `"end "` or `"end;"`.
 The lock acquisition has multiple issues:
 1. After detecting a stale lock and removing it, there's a TOCTOU race: another process could grab the lock between `os.Remove(lockFile)` and `os.OpenFile(lockFile, O_CREATE|O_EXCL, ...)`.
 2. When the lock is "recent" (less than 30 seconds), the code falls through and **overwrites the lock** with `O_CREATE|O_WRONLY|O_TRUNC`. The comment says "a brief conflict is unlikely" but this defeats the purpose of locking entirely.
-3. If two GTSS instances run concurrently (e.g., Claude writes two files in rapid succession), both could read the graph, modify it independently, and one's save will overwrite the other's changes.
+3. If two Batou instances run concurrently (e.g., Claude writes two files in rapid succession), both could read the graph, modify it independently, and one's save will overwrite the other's changes.
 
 **Impact:** Call graph corruption when concurrent hooks fire.
 
@@ -266,7 +266,7 @@ This reads the entire stdin into memory with no limit. A very large file being w
 **File:** `cmd/gtss/main.go:59,64`
 
 ```go
-hook.OutputPreTool("allow", "GTSS: security analysis complete", context)
+hook.OutputPreTool("allow", "Batou: security analysis complete", context)
 // ...
 hook.OutputPostTool(context)
 ```
@@ -378,7 +378,7 @@ The entropy function converts to `[]rune` to get the length, but iterates with `
 
 ### AW-01: Single-file analysis cannot detect multi-file vulnerabilities (CRITICAL)
 
-GTSS analyzes one file at a time as a hook on Write/Edit operations. This means:
+Batou analyzes one file at a time as a hook on Write/Edit operations. This means:
 - A source in file A and a sink in file B connected via imports will never be detected
 - Shared utility functions that propagate taint are invisible
 - Configuration files (e.g., database URLs) that should be treated as sources are not correlated with code files
@@ -390,7 +390,7 @@ The call graph partially addresses this for same-session analysis, but only for 
 **File:** `internal/hook/hook.go:96-107` and `internal/scanner/scanner.go:153-166`
 
 For Edit operations in PreToolUse, `ResolveContent()` returns only `new_string` (the replacement text). This means:
-- If the replacement is just `sanitize(input)`, GTSS analyzes only that snippet, not the full file
+- If the replacement is just `sanitize(input)`, Batou analyzes only that snippet, not the full file
 - The context around the edit (where the sanitized value goes) is invisible
 - An attacker could split a vulnerability across the old text and new text
 
@@ -426,13 +426,13 @@ Every new Claude Code session starts with a blank call graph. All interprocedura
 
 ### AW-05: No semantic understanding of framework patterns (HIGH)
 
-GTSS doesn't understand framework-specific routing or middleware patterns:
+Batou doesn't understand framework-specific routing or middleware patterns:
 - Express.js: `app.use(cors())` -- middleware is invisible to taint analysis
 - Django: URL routing in `urls.py` connecting views is not tracked
 - Go: `http.HandleFunc` registrations connecting routes to handlers aren't correlated
 - React: JSX rendering and component data flow is not modeled
 
-This means GTSS can detect vulnerabilities within handler functions but not in how data flows through framework layers.
+This means Batou can detect vulnerabilities within handler functions but not in how data flows through framework layers.
 
 ### AW-06: TypeScript and JavaScript share some but not all analysis (MEDIUM)
 
@@ -693,7 +693,7 @@ Only direct variable-to-variable assignments propagate taint.
 
 ---
 
-## 9. Security of GTSS Itself
+## 9. Security of Batou Itself
 
 ### SS-01: No timeout on scan execution (HIGH)
 
@@ -705,7 +705,7 @@ The `Scan` function has no timeout. A maliciously crafted file could trigger:
 - Very long lines causing regex performance degradation
 - Thousands of functions causing call graph operations to be slow
 
-Since GTSS runs as a hook, a slow scan blocks Claude Code from writing the file. If it hangs indefinitely, the user's session is stuck.
+Since Batou runs as a hook, a slow scan blocks Claude Code from writing the file. If it hangs indefinitely, the user's session is stuck.
 
 ### SS-02: Regex patterns may be vulnerable to ReDoS (MEDIUM)
 

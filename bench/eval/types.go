@@ -1,13 +1,13 @@
 // Package eval provides the ProductSecBench evaluation harness.
 //
-// It uses GTSS's scanner infrastructure to score LLM-generated code samples
+// It uses Batou's scanner infrastructure to score LLM-generated code samples
 // against a corpus of security-focused prompts, computing per-model metrics
 // like vulnerability rate, severity distribution, OWASP coverage, and a
 // composite ProductSec Score (0-100).
 package eval
 
 import (
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // SeverityWeight maps severity levels to numeric weights used in composite scoring.

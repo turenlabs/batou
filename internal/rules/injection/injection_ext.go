@@ -4,107 +4,107 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended injection rules
 // ---------------------------------------------------------------------------
 
-// GTSS-INJ-010: LDAP injection via string concat (broader)
+// BATOU-INJ-010: LDAP injection via string concat (broader)
 var (
 	reLDAPConcatBroad = regexp.MustCompile(`(?i)(?:ldap_search|ldap_bind|ldap_read|ldap_list|ldap_mod|ldap\.search|ldap3\.Connection|LdapConnection|DirectorySearcher)\s*\(.*(?:\+\s*\w+|%[sv]|\.format\(|f["'])`)
 	reLDAPFilterBuild = regexp.MustCompile(`(?i)(?:filter|search_filter|ldap_filter|query)\s*[:=]\s*["']\s*\(\s*(?:&|\|)?\s*\(\s*\w+\s*=\s*["']\s*\+`)
 )
 
-// GTSS-INJ-011: XPath injection via string concat (broader)
+// BATOU-INJ-011: XPath injection via string concat (broader)
 var (
 	reXPathConcatBroad = regexp.MustCompile(`(?i)(?:xpath\.compile|XPathFactory|selectNodes|selectSingleNode|evaluate|querySelector|etree\.XPath|lxml\.etree)\s*\(.*(?:\+\s*\w+|%[sv]|\.format\(|f["'])`)
 	reXPathVarEmbed    = regexp.MustCompile(`(?i)["'][^"']*(?://|/)\w+\s*\[.*=\s*["']\s*\+\s*\w+`)
 )
 
-// GTSS-INJ-012: Header injection / CRLF
+// BATOU-INJ-012: Header injection / CRLF
 var (
 	reHeaderCRLFLiteral = regexp.MustCompile(`(?i)(?:\\r\\n|\\x0d\\x0a|%0d%0a|%0D%0A).*(?:\.setHeader|\.header|\.set|Header\(\)\.Set|add_header|header\()`)
 	reHeaderUserInput   = regexp.MustCompile(`(?i)(?:\.setHeader|\.header|\.addHeader|\.set|Header\(\)\.Set|header\()\s*\([^)]*(?:\+\s*(?:req\.|request\.|params|query|body|\$_GET|\$_POST|\$_REQUEST)|\.format\(|f["'].*\{)`)
 )
 
-// GTSS-INJ-013: Log injection / log forging
+// BATOU-INJ-013: Log injection / log forging
 var (
 	reLogForging = regexp.MustCompile(`(?i)(?:log(?:ger)?\.(?:info|warn|error|debug|fatal|critical|warning|log)|console\.(?:log|warn|error|info)|logging\.(?:info|warn|error|debug|critical|warning))\s*\(.*(?:req\.|request\.|params|query|body|args|input|user_input|\$_GET|\$_POST|\$_REQUEST)`)
 	reLogFString = regexp.MustCompile(`(?i)(?:log(?:ger)?\.(?:info|warn|error|debug|fatal|critical|warning|log))\s*\(\s*f["']`)
 	reLogConcat  = regexp.MustCompile(`(?i)(?:log(?:ger)?\.(?:info|warn|error|debug|fatal|critical|warning|log)|console\.(?:log|warn|error|info))\s*\(\s*["'][^"']*["']\s*\+\s*(?:req\.|request\.|user|input|param|data)`)
 )
 
-// GTSS-INJ-014: Expression Language injection (Java)
+// BATOU-INJ-014: Expression Language injection (Java)
 var (
 	reELInjection     = regexp.MustCompile(`(?i)(?:ExpressionFactory|ValueExpression|MethodExpression|ELProcessor)\s*\.(?:createValueExpression|createMethodExpression|eval|getValue|setValue)\s*\(.*(?:request\.getParameter|getHeader|getAttribute|\+)`)
 	reSpELParse       = regexp.MustCompile(`(?i)(?:SpelExpressionParser|ExpressionParser)\s*(?:\(\))?\.parseExpression\s*\(\s*(?:request|param|input|data|user|\w+\s*\+)`)
 )
 
-// GTSS-INJ-015: OGNL injection (Java/Groovy)
+// BATOU-INJ-015: OGNL injection (Java/Groovy)
 var (
 	reOGNLInject   = regexp.MustCompile(`(?i)(?:Ognl\.getValue|Ognl\.setValue|OgnlUtil\.getValue|OgnlUtil\.setValue|ognl\.Ognl)\s*\(.*(?:request|param|input|user|\+)`)
 	reOGNLParse    = regexp.MustCompile(`(?i)(?:Ognl\.parseExpression|OgnlUtil\.compile|ActionContext)\s*\(.*(?:request|param|input|user|\+)`)
 )
 
-// GTSS-INJ-016: HQL/JPQL injection (Java)
+// BATOU-INJ-016: HQL/JPQL injection (Java)
 var (
 	reHQLConcat     = regexp.MustCompile(`(?i)(?:createQuery|createNativeQuery)\s*\(\s*["'](?:SELECT|FROM|DELETE|UPDATE|INSERT)\b[^"']*["']\s*\+`)
 	reHQLFmt        = regexp.MustCompile(`(?i)(?:createQuery|createNativeQuery)\s*\(\s*String\.format\s*\(\s*["'](?:SELECT|FROM|DELETE|UPDATE|INSERT)\b`)
 	reJPQLNamedVar  = regexp.MustCompile(`(?i)(?:createQuery|createNativeQuery)\s*\(\s*["'][^"']*\b(?:SELECT|FROM|DELETE|UPDATE|INSERT)\b[^"']*["']\s*\+\s*\w+`)
 )
 
-// GTSS-INJ-017: CSS injection
+// BATOU-INJ-017: CSS injection
 var (
 	reCSSInjection     = regexp.MustCompile(`(?i)(?:style|css|stylesheet)\s*(?:\+?=|=)\s*(?:["'][^"']*["']\s*\+\s*(?:req\.|request\.|params|query|body|input|user)|f["'].*\{.*(?:req|request|params|query|body|input|user))`)
 	reCSSExpression    = regexp.MustCompile(`(?i)expression\s*\(\s*(?:\w+\s*\+|req\.|request\.|params|query|body|input|user)`)
 	reCSSStyleTag      = regexp.MustCompile(`(?i)<style[^>]*>.*(?:req\.|request\.|params|query|body|input|user)`)
 )
 
-// GTSS-INJ-018: Formula/CSV injection
+// BATOU-INJ-018: Formula/CSV injection
 var (
 	reCSVFormulaPrefix = regexp.MustCompile(`(?i)(?:csv|excel|spreadsheet|export|download|report)\w*.*(?:=\s*["'][=+\-@]|["'][=+\-@].*\+\s*\w+)`)
 	reFormulaWrite     = regexp.MustCompile(`(?i)(?:write|append|add)(?:Row|Cell|Field)?\s*\(.*(?:["'][=+\-@]|req\.|request\.|input|user|param|data)`)
 	reCSVWriter        = regexp.MustCompile(`(?i)(?:csv\.writer|CSVWriter|writerow|write_csv|to_csv)\s*.*(?:req\.|request\.|input|user|param|data)`)
 )
 
-// GTSS-INJ-019: Email header injection
+// BATOU-INJ-019: Email header injection
 var (
 	reEmailHeaderInj = regexp.MustCompile(`(?i)(?:mail|email|send_mail|sendmail|smtp)\s*\(.*(?:req\.|request\.|params|query|body|input|user|\$_GET|\$_POST|\$_REQUEST).*(?:subject|to|from|cc|bcc|reply)`)
 	reEmailSubject   = regexp.MustCompile(`(?i)(?:subject|to|from|cc|bcc|reply[-_]?to)\s*[:=]\s*(?:req\.|request\.|params|query|body|input|user|\$_GET|\$_POST|\$_REQUEST)`)
 	reEmailCRLF      = regexp.MustCompile(`(?i)(?:mail|email|send_mail|sendmail|smtp).*(?:\\r\\n|\\n|%0[aAdD])`)
 )
 
-// GTSS-INJ-020: XML injection via string concat
+// BATOU-INJ-020: XML injection via string concat
 var (
 	reXMLConcat   = regexp.MustCompile(`(?i)(?:xml|soap)\w*\s*(?:\+?=|=)\s*["']<[^"']*>\s*["']\s*\+\s*\w+`)
 	reXMLFmt      = regexp.MustCompile(`(?i)(?:xml|soap)\w*\s*(?:\+?=|=)\s*(?:f["'].*<.*\{|["'].*<.*["']\s*%|String\.format\s*\(\s*["'].*<)`)
 	reXMLTemplate = regexp.MustCompile("(?i)(?:xml|soap)\\w*\\s*(?:\\+?=|=)\\s*`[^`]*<[^`]*\\$\\{")
 )
 
-// GTSS-INJ-021: RegExp injection
+// BATOU-INJ-021: RegExp injection
 var (
 	reRegexNew      = regexp.MustCompile(`(?i)(?:new\s+RegExp|re\.compile|regexp\.Compile|regexp\.MustCompile|Pattern\.compile|Regex\.new|preg_match)\s*\(\s*(?:req\.|request\.|params|query|body|input|user|\w+\s*\+)`)
 	reRegexVar      = regexp.MustCompile(`(?i)(?:new\s+RegExp|re\.compile|regexp\.Compile|Pattern\.compile|Regex\.new)\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
 	reRegexUserCtx  = regexp.MustCompile(`(?i)(?:req\.|request\.|params|query|body|input|user|search|filter|pattern)`)
 )
 
-// GTSS-INJ-022: MongoDB operator injection
+// BATOU-INJ-022: MongoDB operator injection
 var (
 	reMongoOperatorInj  = regexp.MustCompile(`(?i)(?:find|findOne|updateOne|updateMany|deleteOne|deleteMany|count|aggregate)\s*\(\s*\{[^}]*\$(?:gt|gte|lt|lte|ne|nin|in|regex|where|expr|or|and|not)\s*:`)
 	reMongoReqDirect    = regexp.MustCompile(`(?i)(?:find|findOne|updateOne|updateMany|deleteOne|deleteMany)\s*\(\s*(?:req\.body|req\.query|req\.params|request\.json|request\.args|request\.form)`)
 	reMongoNoSanitize   = regexp.MustCompile(`(?i)(?:mongo-sanitize|sanitize|express-mongo-sanitize|sanitizeInput|stripDollarSign)`)
 )
 
-// GTSS-INJ-023: SSTI via string concatenation
+// BATOU-INJ-023: SSTI via string concatenation
 var (
 	reSSTIConcat     = regexp.MustCompile(`(?i)(?:render_template_string|template\.render|Template|Jinja2|Environment)\s*\(\s*["'][^"']*["']\s*\+\s*(?:req\.|request\.|params|query|body|input|user|\$_GET|\$_POST)`)
 	reSSTIFString    = regexp.MustCompile(`(?i)(?:render_template_string|Template)\s*\(\s*f["'].*\{.*(?:req|request|params|query|body|input|user)`)
 	reSSTIEngine     = regexp.MustCompile(`(?i)(?:ejs\.render|pug\.render|nunjucks\.renderString|Handlebars\.compile|mustache\.render)\s*\(\s*(?:req\.|request\.|params|query|body|input|user|\w+\s*\+)`)
 )
 
-// GTSS-INJ-024: Shell metacharacter injection
+// BATOU-INJ-024: Shell metacharacter injection
 var (
 	reShellMeta     = regexp.MustCompile(`(?i)(?:exec|system|popen|spawn|shell_exec|passthru|proc_open|Runtime\.exec|ProcessBuilder|os\.system|subprocess)\s*\(.*(?:\||\$\(|` + "`" + `|;|&&|\|\||\$\{).*(?:req\.|request\.|params|query|body|input|user|\$_GET|\$_POST)`)
 	reShellPipe     = regexp.MustCompile(`(?i)(?:exec|system|popen|shell_exec)\s*\(\s*["'][^"']*(?:\||;|&&)\s*["']\s*\.\s*\$`)
@@ -134,12 +134,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-010: LDAP injection via string concat (broader)
+// BATOU-INJ-010: LDAP injection via string concat (broader)
 // ---------------------------------------------------------------------------
 
 type LDAPInjectionBroad struct{}
 
-func (r *LDAPInjectionBroad) ID() string                     { return "GTSS-INJ-010" }
+func (r *LDAPInjectionBroad) ID() string                     { return "BATOU-INJ-010" }
 func (r *LDAPInjectionBroad) Name() string                   { return "LDAPInjectionBroad" }
 func (r *LDAPInjectionBroad) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LDAPInjectionBroad) Description() string {
@@ -178,12 +178,12 @@ func (r *LDAPInjectionBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-011: XPath injection via string concat (broader)
+// BATOU-INJ-011: XPath injection via string concat (broader)
 // ---------------------------------------------------------------------------
 
 type XPathInjectionBroad struct{}
 
-func (r *XPathInjectionBroad) ID() string                     { return "GTSS-INJ-011" }
+func (r *XPathInjectionBroad) ID() string                     { return "BATOU-INJ-011" }
 func (r *XPathInjectionBroad) Name() string                   { return "XPathInjectionBroad" }
 func (r *XPathInjectionBroad) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XPathInjectionBroad) Description() string {
@@ -222,12 +222,12 @@ func (r *XPathInjectionBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-012: Header injection / CRLF injection
+// BATOU-INJ-012: Header injection / CRLF injection
 // ---------------------------------------------------------------------------
 
 type CRLFInjection struct{}
 
-func (r *CRLFInjection) ID() string                     { return "GTSS-INJ-012" }
+func (r *CRLFInjection) ID() string                     { return "BATOU-INJ-012" }
 func (r *CRLFInjection) Name() string                   { return "CRLFInjection" }
 func (r *CRLFInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CRLFInjection) Description() string {
@@ -266,12 +266,12 @@ func (r *CRLFInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-013: Log injection / log forging
+// BATOU-INJ-013: Log injection / log forging
 // ---------------------------------------------------------------------------
 
 type LogInjection struct{}
 
-func (r *LogInjection) ID() string                     { return "GTSS-INJ-013" }
+func (r *LogInjection) ID() string                     { return "BATOU-INJ-013" }
 func (r *LogInjection) Name() string                   { return "LogInjection" }
 func (r *LogInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LogInjection) Description() string {
@@ -310,12 +310,12 @@ func (r *LogInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-014: Expression Language injection (Java)
+// BATOU-INJ-014: Expression Language injection (Java)
 // ---------------------------------------------------------------------------
 
 type ExpressionLangInjection struct{}
 
-func (r *ExpressionLangInjection) ID() string                     { return "GTSS-INJ-014" }
+func (r *ExpressionLangInjection) ID() string                     { return "BATOU-INJ-014" }
 func (r *ExpressionLangInjection) Name() string                   { return "ExpressionLangInjection" }
 func (r *ExpressionLangInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ExpressionLangInjection) Description() string {
@@ -357,12 +357,12 @@ func (r *ExpressionLangInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-015: OGNL injection (Java/Groovy)
+// BATOU-INJ-015: OGNL injection (Java/Groovy)
 // ---------------------------------------------------------------------------
 
 type OGNLInjection struct{}
 
-func (r *OGNLInjection) ID() string                     { return "GTSS-INJ-015" }
+func (r *OGNLInjection) ID() string                     { return "BATOU-INJ-015" }
 func (r *OGNLInjection) Name() string                   { return "OGNLInjection" }
 func (r *OGNLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *OGNLInjection) Description() string {
@@ -401,12 +401,12 @@ func (r *OGNLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-016: HQL/JPQL injection (Java)
+// BATOU-INJ-016: HQL/JPQL injection (Java)
 // ---------------------------------------------------------------------------
 
 type HQLInjection struct{}
 
-func (r *HQLInjection) ID() string                     { return "GTSS-INJ-016" }
+func (r *HQLInjection) ID() string                     { return "BATOU-INJ-016" }
 func (r *HQLInjection) Name() string                   { return "HQLInjection" }
 func (r *HQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *HQLInjection) Description() string {
@@ -448,12 +448,12 @@ func (r *HQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-017: CSS injection
+// BATOU-INJ-017: CSS injection
 // ---------------------------------------------------------------------------
 
 type CSSInjection struct{}
 
-func (r *CSSInjection) ID() string                     { return "GTSS-INJ-017" }
+func (r *CSSInjection) ID() string                     { return "BATOU-INJ-017" }
 func (r *CSSInjection) Name() string                   { return "CSSInjection" }
 func (r *CSSInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *CSSInjection) Description() string {
@@ -492,12 +492,12 @@ func (r *CSSInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-018: Formula/CSV injection
+// BATOU-INJ-018: Formula/CSV injection
 // ---------------------------------------------------------------------------
 
 type FormulaInjection struct{}
 
-func (r *FormulaInjection) ID() string                     { return "GTSS-INJ-018" }
+func (r *FormulaInjection) ID() string                     { return "BATOU-INJ-018" }
 func (r *FormulaInjection) Name() string                   { return "FormulaInjection" }
 func (r *FormulaInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FormulaInjection) Description() string {
@@ -536,12 +536,12 @@ func (r *FormulaInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-019: Email header injection
+// BATOU-INJ-019: Email header injection
 // ---------------------------------------------------------------------------
 
 type EmailHeaderInjection struct{}
 
-func (r *EmailHeaderInjection) ID() string                     { return "GTSS-INJ-019" }
+func (r *EmailHeaderInjection) ID() string                     { return "BATOU-INJ-019" }
 func (r *EmailHeaderInjection) Name() string                   { return "EmailHeaderInjection" }
 func (r *EmailHeaderInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *EmailHeaderInjection) Description() string {
@@ -580,12 +580,12 @@ func (r *EmailHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-020: XML injection via string concat
+// BATOU-INJ-020: XML injection via string concat
 // ---------------------------------------------------------------------------
 
 type XMLInjection struct{}
 
-func (r *XMLInjection) ID() string                     { return "GTSS-INJ-020" }
+func (r *XMLInjection) ID() string                     { return "BATOU-INJ-020" }
 func (r *XMLInjection) Name() string                   { return "XMLInjection" }
 func (r *XMLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XMLInjection) Description() string {
@@ -624,12 +624,12 @@ func (r *XMLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-021: RegExp injection
+// BATOU-INJ-021: RegExp injection
 // ---------------------------------------------------------------------------
 
 type RegExpInjection struct{}
 
-func (r *RegExpInjection) ID() string                     { return "GTSS-INJ-021" }
+func (r *RegExpInjection) ID() string                     { return "BATOU-INJ-021" }
 func (r *RegExpInjection) Name() string                   { return "RegExpInjection" }
 func (r *RegExpInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RegExpInjection) Description() string {
@@ -679,12 +679,12 @@ func (r *RegExpInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-022: MongoDB operator injection
+// BATOU-INJ-022: MongoDB operator injection
 // ---------------------------------------------------------------------------
 
 type MongoOperatorInjection struct{}
 
-func (r *MongoOperatorInjection) ID() string                     { return "GTSS-INJ-022" }
+func (r *MongoOperatorInjection) ID() string                     { return "BATOU-INJ-022" }
 func (r *MongoOperatorInjection) Name() string                   { return "MongoOperatorInjection" }
 func (r *MongoOperatorInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MongoOperatorInjection) Description() string {
@@ -723,12 +723,12 @@ func (r *MongoOperatorInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-023: SSTI via string concatenation
+// BATOU-INJ-023: SSTI via string concatenation
 // ---------------------------------------------------------------------------
 
 type SSTIConcat struct{}
 
-func (r *SSTIConcat) ID() string                     { return "GTSS-INJ-023" }
+func (r *SSTIConcat) ID() string                     { return "BATOU-INJ-023" }
 func (r *SSTIConcat) Name() string                   { return "SSTIConcat" }
 func (r *SSTIConcat) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SSTIConcat) Description() string {
@@ -767,12 +767,12 @@ func (r *SSTIConcat) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-INJ-024: Shell metacharacter injection
+// BATOU-INJ-024: Shell metacharacter injection
 // ---------------------------------------------------------------------------
 
 type ShellMetacharInjection struct{}
 
-func (r *ShellMetacharInjection) ID() string                     { return "GTSS-INJ-024" }
+func (r *ShellMetacharInjection) ID() string                     { return "BATOU-INJ-024" }
 func (r *ShellMetacharInjection) Name() string                   { return "ShellMetacharInjection" }
 func (r *ShellMetacharInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ShellMetacharInjection) Description() string {

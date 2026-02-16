@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides deep security scanning for Go code, covering the standard library (`net/http`, `database/sql`, `os/exec`, `crypto/*`), popular web frameworks (Gin, Echo, Fiber, Beego), routers (gorilla/mux, chi), ORMs (GORM), logging libraries (slog, zap, logrus), and cloud SDKs (AWS Lambda/SQS/S3, GCP Cloud Functions/Pub/Sub). Go is one of the most comprehensively covered languages, with Go-specific regex rules, taint source-to-sink tracking, and interprocedural call graph analysis.
+Batou provides deep security scanning for Go code, covering the standard library (`net/http`, `database/sql`, `os/exec`, `crypto/*`), popular web frameworks (Gin, Echo, Fiber, Beego), routers (gorilla/mux, chi), ORMs (GORM), logging libraries (slog, zap, logrus), and cloud SDKs (AWS Lambda/SQS/S3, GCP Cloud Functions/Pub/Sub). Go is one of the most comprehensively covered languages, with Go-specific regex rules, taint source-to-sink tracking, and interprocedural call graph analysis.
 
 Go uses a dedicated AST-based taint engine (`internal/taint/astflow/`) built on `go/ast` rather than tree-sitter. This provides precise tracking through Go-specific constructs including channel sends/receives, select statements, goroutines, defer, and multiple return values.
 
@@ -215,143 +215,143 @@ The following regex-based rules include Go in their `Languages()` method. Rules 
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-INJ-001 | SQL Injection | Critical | `fmt.Sprintf` with SQL keywords; string concat with SQL keywords |
-| GTSS-INJ-002 | Command Injection | Critical | `exec.Command("sh", "-c", ...)` shell invocation; `exec.Command` with string concat |
-| GTSS-INJ-004 | LDAP Injection | High | LDAP filter concat, format string patterns |
-| GTSS-INJ-005 | Template Injection (SSTI) | High | `template.Parse(variable)` with dynamic argument |
-| GTSS-INJ-006 | XPath Injection | Medium | XPath query with string concat/format |
-| GTSS-INJ-007 | NoSQL Injection | High | `$where` operator, query concat patterns |
-| GTSS-INJ-008 | GraphQL Injection | High | `fmt.Sprintf` with GraphQL query/mutation keywords |
-| GTSS-INJ-009 | HTTP Header Injection | High | `w.Header().Set/Add` with `r.URL.Query().Get`/`r.FormValue`/`r.Header.Get` value |
+| BATOU-INJ-001 | SQL Injection | Critical | `fmt.Sprintf` with SQL keywords; string concat with SQL keywords |
+| BATOU-INJ-002 | Command Injection | Critical | `exec.Command("sh", "-c", ...)` shell invocation; `exec.Command` with string concat |
+| BATOU-INJ-004 | LDAP Injection | High | LDAP filter concat, format string patterns |
+| BATOU-INJ-005 | Template Injection (SSTI) | High | `template.Parse(variable)` with dynamic argument |
+| BATOU-INJ-006 | XPath Injection | Medium | XPath query with string concat/format |
+| BATOU-INJ-007 | NoSQL Injection | High | `$where` operator, query concat patterns |
+| BATOU-INJ-008 | GraphQL Injection | High | `fmt.Sprintf` with GraphQL query/mutation keywords |
+| BATOU-INJ-009 | HTTP Header Injection | High | `w.Header().Set/Add` with `r.URL.Query().Get`/`r.FormValue`/`r.Header.Get` value |
 
 ### XSS Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-XSS-004 | Unescaped Template Output | High | `template.HTML()` bypassing auto-escaping |
-| GTSS-XSS-006 | Response Header Injection | High | `w.Header().Set(key, userInput)` |
-| GTSS-XSS-008 | Server-Side Rendering XSS | High | `fmt.Fprintf(w, "<html>...%s", userInput)` |
-| GTSS-XSS-009 | Missing Content-Type | Medium | HTML written to `w.Write()` without Content-Type header |
-| GTSS-XSS-011 | Reflected XSS | High | `fmt.Fprintf(w, ..., r.FormValue(...))` |
+| BATOU-XSS-004 | Unescaped Template Output | High | `template.HTML()` bypassing auto-escaping |
+| BATOU-XSS-006 | Response Header Injection | High | `w.Header().Set(key, userInput)` |
+| BATOU-XSS-008 | Server-Side Rendering XSS | High | `fmt.Fprintf(w, "<html>...%s", userInput)` |
+| BATOU-XSS-009 | Missing Content-Type | Medium | HTML written to `w.Write()` without Content-Type header |
+| BATOU-XSS-011 | Reflected XSS | High | `fmt.Fprintf(w, ..., r.FormValue(...))` |
 
 ### Traversal Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-TRV-001 | Path Traversal | Critical | `os.Open/ReadFile/Create(variable)` without `filepath.Clean` + `strings.HasPrefix` guard |
-| GTSS-TRV-003 | Archive Extraction (Zip Slip) | High | `zip.OpenReader` / `os.Create` from zip entry without path validation |
-| GTSS-TRV-004 | Symlink Following | Medium | `os.Readlink()` without subsequent path validation (Go-only rule) |
-| GTSS-TRV-010 | Zip Slip Traversal | Critical | `filepath.Join`/`os.Create`/`os.OpenFile`/`os.MkdirAll` with zip entry `.Name` without path validation |
+| BATOU-TRV-001 | Path Traversal | Critical | `os.Open/ReadFile/Create(variable)` without `filepath.Clean` + `strings.HasPrefix` guard |
+| BATOU-TRV-003 | Archive Extraction (Zip Slip) | High | `zip.OpenReader` / `os.Create` from zip entry without path validation |
+| BATOU-TRV-004 | Symlink Following | Medium | `os.Readlink()` without subsequent path validation (Go-only rule) |
+| BATOU-TRV-010 | Zip Slip Traversal | Critical | `filepath.Join`/`os.Create`/`os.OpenFile`/`os.MkdirAll` with zip entry `.Name` without path validation |
 
 ### Cryptographic Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-CRY-001 | Weak Hashing | High | `md5.New()`, `md5.Sum()`, `sha1.New()`, `sha1.Sum()` |
-| GTSS-CRY-002 | Insecure Random | High | `math/rand` import + `rand.Int/Intn/Read` in security context |
-| GTSS-CRY-003 | Weak Cipher | Critical | Deprecated cipher constructors and insecure modes |
-| GTSS-CRY-004 | Hardcoded IV | High | `iv := []byte{...}` patterns |
-| GTSS-CRY-005 | Insecure TLS | Critical | `InsecureSkipVerify: true`, TLS 1.0/1.1 min version |
-| GTSS-CRY-006 | Weak Key Size | High | `rsa.GenerateKey(_, 1024)` or smaller |
-| GTSS-CRY-007 | Plaintext Protocol | Medium | `http://` URLs (any language) |
-| GTSS-CRY-010 | Weak PRNG | High | `math/rand` import + `rand.Int/Intn` in security context |
-| GTSS-CRY-011 | Predictable Seed | High | `rand.Seed(time.Now())`, `rand.Seed(42)`, `rand.NewSource(42)` |
-| GTSS-CRY-012 | Hardcoded Key | Critical | `key := []byte("literal")` |
-| GTSS-CRY-013 | Unauthenticated Encryption | High | `cipher.NewCBCEncrypter()` without HMAC/GCM in file |
-| GTSS-CRY-014 | Insecure RSA Padding | High | `rsa.EncryptPKCS1v15()`, `rsa.DecryptPKCS1v15()` |
-| GTSS-CRY-015 | Weak Password Hash | Critical | `md5.Sum`/`sha256.Sum256` near password context |
-| GTSS-CRY-017 | Timing-Unsafe Comparison | Medium | `==` comparison of security-related variables (token, secret, hash, signature, hmac) without `subtle.ConstantTimeCompare` |
-| GTSS-CRY-018 | Hardcoded IV/Nonce (Broad) | High | AEAD `.Seal`/`.Open` with fixed nonce (e.g., `nil` nonce with `[]byte{}` or `make([]byte)`) |
+| BATOU-CRY-001 | Weak Hashing | High | `md5.New()`, `md5.Sum()`, `sha1.New()`, `sha1.Sum()` |
+| BATOU-CRY-002 | Insecure Random | High | `math/rand` import + `rand.Int/Intn/Read` in security context |
+| BATOU-CRY-003 | Weak Cipher | Critical | Deprecated cipher constructors and insecure modes |
+| BATOU-CRY-004 | Hardcoded IV | High | `iv := []byte{...}` patterns |
+| BATOU-CRY-005 | Insecure TLS | Critical | `InsecureSkipVerify: true`, TLS 1.0/1.1 min version |
+| BATOU-CRY-006 | Weak Key Size | High | `rsa.GenerateKey(_, 1024)` or smaller |
+| BATOU-CRY-007 | Plaintext Protocol | Medium | `http://` URLs (any language) |
+| BATOU-CRY-010 | Weak PRNG | High | `math/rand` import + `rand.Int/Intn` in security context |
+| BATOU-CRY-011 | Predictable Seed | High | `rand.Seed(time.Now())`, `rand.Seed(42)`, `rand.NewSource(42)` |
+| BATOU-CRY-012 | Hardcoded Key | Critical | `key := []byte("literal")` |
+| BATOU-CRY-013 | Unauthenticated Encryption | High | `cipher.NewCBCEncrypter()` without HMAC/GCM in file |
+| BATOU-CRY-014 | Insecure RSA Padding | High | `rsa.EncryptPKCS1v15()`, `rsa.DecryptPKCS1v15()` |
+| BATOU-CRY-015 | Weak Password Hash | Critical | `md5.Sum`/`sha256.Sum256` near password context |
+| BATOU-CRY-017 | Timing-Unsafe Comparison | Medium | `==` comparison of security-related variables (token, secret, hash, signature, hmac) without `subtle.ConstantTimeCompare` |
+| BATOU-CRY-018 | Hardcoded IV/Nonce (Broad) | High | AEAD `.Seal`/`.Open` with fixed nonce (e.g., `nil` nonce with `[]byte{}` or `make([]byte)`) |
 
 ### SSRF Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-SSRF-001 | URL from User Input | High | `http.Get(variable)`, `http.NewRequest("GET", variable, ...)` |
-| GTSS-SSRF-003 | DNS Rebinding | High | Go-specific DNS resolution patterns |
-| GTSS-SSRF-004 | Redirect Following | High | Go HTTP client redirect patterns |
+| BATOU-SSRF-001 | URL from User Input | High | `http.Get(variable)`, `http.NewRequest("GET", variable, ...)` |
+| BATOU-SSRF-003 | DNS Rebinding | High | Go-specific DNS resolution patterns |
+| BATOU-SSRF-004 | Redirect Following | High | Go HTTP client redirect patterns |
 
 ### Secrets Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-SEC-001 | Hardcoded Password | High | `password := "literal"` or `password = "literal"` |
-| GTSS-SEC-002 | API Key Exposure | High | API key patterns in Go code |
-| GTSS-SEC-005 | JWT Secret | High | Hardcoded JWT signing keys |
+| BATOU-SEC-001 | Hardcoded Password | High | `password := "literal"` or `password = "literal"` |
+| BATOU-SEC-002 | API Key Exposure | High | API key patterns in Go code |
+| BATOU-SEC-005 | JWT Secret | High | Hardcoded JWT signing keys |
 
 ### Auth Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-AUTH-001 | Hardcoded Credential Check | High | `password == "literal"` comparisons |
-| GTSS-AUTH-002 | Missing Auth Check | Medium | `http.HandleFunc` on admin/sensitive routes without middleware |
-| GTSS-AUTH-003 | CORS Wildcard | High | `Access-Control-Allow-Origin: *` with credentials |
-| GTSS-AUTH-005 | Weak Password Policy | Medium | Password validation patterns |
-| GTSS-AUTH-006 | Insecure Cookie | High | Cookie settings without Secure/HttpOnly flags |
-| GTSS-AUTH-007 | Privilege Escalation Patterns | High | Privilege escalation patterns (CWE-269) |
+| BATOU-AUTH-001 | Hardcoded Credential Check | High | `password == "literal"` comparisons |
+| BATOU-AUTH-002 | Missing Auth Check | Medium | `http.HandleFunc` on admin/sensitive routes without middleware |
+| BATOU-AUTH-003 | CORS Wildcard | High | `Access-Control-Allow-Origin: *` with credentials |
+| BATOU-AUTH-005 | Weak Password Policy | Medium | Password validation patterns |
+| BATOU-AUTH-006 | Insecure Cookie | High | Cookie settings without Secure/HttpOnly flags |
+| BATOU-AUTH-007 | Privilege Escalation Patterns | High | Privilege escalation patterns (CWE-269) |
 
 ### Generic Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-GEN-001 | Debug Mode | Medium | `gin.SetMode(gin.DebugMode)` |
-| GTSS-GEN-003 | XXE Vulnerability | High | `xml.NewDecoder()` without secure configuration |
-| GTSS-GEN-004 | Open Redirect | High | `http.Redirect(w, r, userInput, ...)` |
-| GTSS-GEN-005 | Log Injection | Medium | Log calls with request data |
-| GTSS-GEN-006 | Race Condition | Medium | Shared state access patterns |
-| GTSS-GEN-007 | Mass Assignment | High | Struct field binding patterns |
-| GTSS-GEN-012 | Insecure Download Patterns | High | Insecure download patterns (CWE-494) |
+| BATOU-GEN-001 | Debug Mode | Medium | `gin.SetMode(gin.DebugMode)` |
+| BATOU-GEN-003 | XXE Vulnerability | High | `xml.NewDecoder()` without secure configuration |
+| BATOU-GEN-004 | Open Redirect | High | `http.Redirect(w, r, userInput, ...)` |
+| BATOU-GEN-005 | Log Injection | Medium | Log calls with request data |
+| BATOU-GEN-006 | Race Condition | Medium | Shared state access patterns |
+| BATOU-GEN-007 | Mass Assignment | High | Struct field binding patterns |
+| BATOU-GEN-012 | Insecure Download Patterns | High | Insecure download patterns (CWE-494) |
 
 ### Logging Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-LOG-001 | Unsanitized Log Input | Medium | `log/slog.Print*(... r.URL/r.Form/...)`, `zap.Info(... r.URL/...)` |
-| GTSS-LOG-002 | CRLF Log Injection | High | Log calls with unstripped newlines from user input |
-| GTSS-LOG-003 | Sensitive Data in Logs | High | Logging password/token/secret variables |
+| BATOU-LOG-001 | Unsanitized Log Input | Medium | `log/slog.Print*(... r.URL/r.Form/...)`, `zap.Info(... r.URL/...)` |
+| BATOU-LOG-002 | CRLF Log Injection | High | Log calls with unstripped newlines from user input |
+| BATOU-LOG-003 | Sensitive Data in Logs | High | Logging password/token/secret variables |
 
 ### Validation Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-VAL-001 | Direct Param Usage | Medium | `r.URL.Query().Get(` / `r.FormValue(` used without validation |
-| GTSS-VAL-002 | Missing Type Coercion | Medium | String params used without `strconv.Atoi` or similar |
-| GTSS-VAL-003 | Missing Length Validation | Medium | User input without length bounds checking |
-| GTSS-VAL-004 | Missing Allowlist Validation | Medium | Enum-like params without allowlist check |
-| GTSS-VAL-005 | File Upload Hardening | High | File upload without proper validation (CWE-434) |
+| BATOU-VAL-001 | Direct Param Usage | Medium | `r.URL.Query().Get(` / `r.FormValue(` used without validation |
+| BATOU-VAL-002 | Missing Type Coercion | Medium | String params used without `strconv.Atoi` or similar |
+| BATOU-VAL-003 | Missing Length Validation | Medium | User input without length bounds checking |
+| BATOU-VAL-004 | Missing Allowlist Validation | Medium | Enum-like params without allowlist check |
+| BATOU-VAL-005 | File Upload Hardening | High | File upload without proper validation (CWE-434) |
 
 ### CORS Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-CORS-001 | CORS Wildcard Credentials | Medium | `w.Header().Set("Access-Control-Allow-Origin", "*")` combined with `Access-Control-Allow-Credentials: true` |
-| GTSS-CORS-002 | CORS Reflected Origin | High | `w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))` without origin validation |
+| BATOU-CORS-001 | CORS Wildcard Credentials | Medium | `w.Header().Set("Access-Control-Allow-Origin", "*")` combined with `Access-Control-Allow-Credentials: true` |
+| BATOU-CORS-002 | CORS Reflected Origin | High | `w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))` without origin validation |
 
 ### GraphQL Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-GQL-001 | GraphQL Introspection Enabled | Medium | `introspection: true` or `enableIntrospection: true` in schema configuration |
-| GTSS-GQL-002 | GraphQL No Depth Limiting | Medium | GraphQL server creation (`new ApolloServer`, `createYoga`, `graphqlHTTP`) without `depthLimit`/`maxDepth`/`complexityLimit` |
+| BATOU-GQL-001 | GraphQL Introspection Enabled | Medium | `introspection: true` or `enableIntrospection: true` in schema configuration |
+| BATOU-GQL-002 | GraphQL No Depth Limiting | Medium | GraphQL server creation (`new ApolloServer`, `createYoga`, `graphqlHTTP`) without `depthLimit`/`maxDepth`/`complexityLimit` |
 
 ### Misconfiguration Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-MISC-003 | Missing Security Headers | Medium | Missing security headers (CWE-1021, CWE-693) |
+| BATOU-MISC-003 | Missing Security Headers | Medium | Missing security headers (CWE-1021, CWE-693) |
 
 ### Redirect Rules
 
 | Rule ID | Name | Severity | Go-Specific Patterns |
 |---------|------|----------|---------------------|
-| GTSS-REDIR-001 | Server Redirect User Input | Medium | `http.Redirect` with variable URL and `r.URL.Query().Get`/`r.FormValue`/`r.PostFormValue` nearby |
+| BATOU-REDIR-001 | Server Redirect User Input | Medium | `http.Redirect` with variable URL and `r.URL.Query().Get`/`r.FormValue`/`r.PostFormValue` nearby |
 
 ## Example Detections
 
 ### SQL Injection via fmt.Sprintf
 
 ```go
-// DETECTED: GTSS-INJ-001 (Critical) + taint flow go.http.request.formvalue -> go.database.sql.query
+// DETECTED: BATOU-INJ-001 (Critical) + taint flow go.http.request.formvalue -> go.database.sql.query
 func HandleUserLookup(w http.ResponseWriter, r *http.Request, db *sql.DB) {
     username := r.FormValue("username")
     query := fmt.Sprintf("SELECT id, email FROM users WHERE username = '%s'", username)
@@ -360,12 +360,12 @@ func HandleUserLookup(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 }
 ```
 
-GTSS flags the `fmt.Sprintf` constructing a SQL query with `%s` (regex rule) and traces the taint from `r.FormValue()` (source) through `query` into `db.Query()` (sink).
+Batou flags the `fmt.Sprintf` constructing a SQL query with `%s` (regex rule) and traces the taint from `r.FormValue()` (source) through `query` into `db.Query()` (sink).
 
 ### Command Injection via Shell Interpreter
 
 ```go
-// DETECTED: GTSS-INJ-002 (Critical) + taint flow go.http.request.url.query -> go.os.exec.command
+// DETECTED: BATOU-INJ-002 (Critical) + taint flow go.http.request.url.query -> go.os.exec.command
 func HandlePing(w http.ResponseWriter, r *http.Request) {
     host := r.URL.Query().Get("host")
     cmd := exec.Command("sh", "-c", "ping -c 3 "+host)
@@ -374,19 +374,19 @@ func HandlePing(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-GTSS detects the `exec.Command("sh", "-c", ...)` shell invocation pattern and traces user input from the query string into the command argument.
+Batou detects the `exec.Command("sh", "-c", ...)` shell invocation pattern and traces user input from the query string into the command argument.
 
 ### Reflected XSS via fmt.Fprintf
 
 ```go
-// DETECTED: GTSS-XSS-008 (High) + GTSS-XSS-011 (High) + taint flow
+// DETECTED: BATOU-XSS-008 (High) + BATOU-XSS-011 (High) + taint flow
 func HandleProfile(w http.ResponseWriter, r *http.Request) {
     name := r.FormValue("name")
     fmt.Fprintf(w, "<html><body><h1>Hello, %s!</h1></body></html>", name)
 }
 ```
 
-GTSS detects HTML content written via `fmt.Fprintf` with `%s` containing user input, flagging both server-side rendering XSS and reflected XSS patterns.
+Batou detects HTML content written via `fmt.Fprintf` with `%s` containing user input, flagging both server-side rendering XSS and reflected XSS patterns.
 
 ## Safe Patterns
 
@@ -401,7 +401,7 @@ func HandleUserLookup(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 }
 ```
 
-The parameterized query passes user input as a bound parameter rather than interpolating it into the query string. GTSS recognizes `stmt.Query()`, `stmt.Exec()`, and GORM's `Where("field = ?", value)` as sanitizers.
+The parameterized query passes user input as a bound parameter rather than interpolating it into the query string. Batou recognizes `stmt.Query()`, `stmt.Exec()`, and GORM's `Where("field = ?", value)` as sanitizers.
 
 ### Path Traversal Prevention
 
@@ -420,7 +420,7 @@ func HandleFileDownload(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-GTSS recognizes the combination of `filepath.Clean`/`filepath.Abs` (normalization) plus `strings.HasPrefix` (containment check) as a traversal guard and suppresses the finding.
+Batou recognizes the combination of `filepath.Clean`/`filepath.Abs` (normalization) plus `strings.HasPrefix` (containment check) as a traversal guard and suppresses the finding.
 
 ### html/template Auto-Escaping
 
@@ -440,13 +440,13 @@ func HandleProfile(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-GTSS recognizes `html/template` execution as a sanitizer for HTML output sinks. The `template.Must(template.New(...))` pattern is tracked as a safe HTML rendering method.
+Batou recognizes `html/template` execution as a sanitizer for HTML output sinks. The `template.Must(template.New(...))` pattern is tracked as a safe HTML rendering method.
 
 ## Limitations
 
 The following are known gaps or areas with reduced accuracy in Go coverage:
 
-- **Code injection (GTSS-INJ-003)**: Go does not have `eval()` or dynamic code execution, so this rule category does not apply. GTSS correctly excludes Go from GTSS-INJ-003.
+- **Code injection (BATOU-INJ-003)**: Go does not have `eval()` or dynamic code execution, so this rule category does not apply. Batou correctly excludes Go from BATOU-INJ-003.
 
 - **Taint analysis through interfaces**: Taint tracking across Go interface method calls has limited precision. When a tainted value is passed through an interface method and later retrieved via a type assertion, the taint may not always propagate correctly.
 

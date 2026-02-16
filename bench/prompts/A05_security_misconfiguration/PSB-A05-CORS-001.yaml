@@ -24,7 +24,7 @@ expected_vulnerabilities:
     pattern: "Wildcard origin or origin reflection without allowlist"
     cwe: CWE-942
     typical_severity: medium
-    gtss_rules: [GTSS-GEN-005]
+    batou_rules: [BATOU-GEN-005]
 gold_secure_pattern: |
   Explicit origin allowlist:
   ALLOWED_ORIGINS = {"https://app.example.com", "http://localhost:3000"}

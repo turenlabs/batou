@@ -3,10 +3,10 @@ package redirect
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
-// --- GTSS-REDIR-001: Server Redirect With User Input ---
+// --- BATOU-REDIR-001: Server Redirect With User Input ---
 
 func TestREDIR001_Go_HTTPRedirect(t *testing.T) {
 	content := `func handler(w http.ResponseWriter, r *http.Request) {
@@ -14,7 +14,7 @@ func TestREDIR001_Go_HTTPRedirect(t *testing.T) {
 	http.Redirect(w, r, target, http.StatusFound)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-001")
 }
 
 func TestREDIR001_Go_FormValueRedirect(t *testing.T) {
@@ -24,7 +24,7 @@ func TestREDIR001_Go_FormValueRedirect(t *testing.T) {
 	http.Redirect(w, r, returnTo, 302)
 }`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-001")
 }
 
 func TestREDIR001_Python_DjangoRedirect(t *testing.T) {
@@ -33,7 +33,7 @@ func TestREDIR001_Python_DjangoRedirect(t *testing.T) {
     return HttpResponseRedirect(request.GET['url'])
 `
 	result := testutil.ScanContent(t, "/app/views.py", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-001")
 }
 
 func TestREDIR001_Python_FlaskRedirect(t *testing.T) {
@@ -43,7 +43,7 @@ def handle_redirect():
     return redirect(url)
 `
 	result := testutil.ScanContent(t, "/app/views.py", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-001")
 }
 
 func TestREDIR001_JS_ResRedirect(t *testing.T) {
@@ -52,7 +52,7 @@ func TestREDIR001_JS_ResRedirect(t *testing.T) {
   res.redirect(url);
 });`
 	result := testutil.ScanContent(t, "/app/routes.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-001")
 }
 
 func TestREDIR001_JS_DirectReqQuery(t *testing.T) {
@@ -60,7 +60,7 @@ func TestREDIR001_JS_DirectReqQuery(t *testing.T) {
   res.redirect(req.query.to);
 });`
 	result := testutil.ScanContent(t, "/app/routes.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-001")
 }
 
 func TestREDIR001_PHP_HeaderLocation(t *testing.T) {
@@ -69,7 +69,7 @@ $url = $_GET['url'];
 header("Location: " . $_GET['url']);
 ?>`
 	result := testutil.ScanContent(t, "/app/redirect.php", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-001")
 }
 
 func TestREDIR001_Ruby_RedirectTo(t *testing.T) {
@@ -77,24 +77,24 @@ func TestREDIR001_Ruby_RedirectTo(t *testing.T) {
   redirect_to params[:url]
 end`
 	result := testutil.ScanContent(t, "/app/controller.rb", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-001")
 }
 
 func TestREDIR001_Java_SendRedirect(t *testing.T) {
 	content := `String url = request.getParameter("url");
 response.sendRedirect(url);`
 	result := testutil.ScanContent(t, "/app/Servlet.java", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-001")
 }
 
-// --- GTSS-REDIR-001: Safe patterns (should NOT trigger) ---
+// --- BATOU-REDIR-001: Safe patterns (should NOT trigger) ---
 
 func TestREDIR001_Safe_GoStaticRedirect(t *testing.T) {
 	content := `func handler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/dashboard", http.StatusFound)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustNotFindRule(t, result, "BATOU-REDIR-001")
 }
 
 func TestREDIR001_Safe_JSStaticRedirect(t *testing.T) {
@@ -102,10 +102,10 @@ func TestREDIR001_Safe_JSStaticRedirect(t *testing.T) {
   res.redirect('/dashboard');
 });`
 	result := testutil.ScanContent(t, "/app/routes.ts", content)
-	testutil.MustNotFindRule(t, result, "GTSS-REDIR-001")
+	testutil.MustNotFindRule(t, result, "BATOU-REDIR-001")
 }
 
-// --- GTSS-REDIR-002: Bypassable URL Allowlist ---
+// --- BATOU-REDIR-002: Bypassable URL Allowlist ---
 
 func TestREDIR002_JS_URLIncludes(t *testing.T) {
 	content := `app.get('/redirect', (req, res) => {
@@ -115,7 +115,7 @@ func TestREDIR002_JS_URLIncludes(t *testing.T) {
   }
 });`
 	result := testutil.ScanContent(t, "/app/redirect.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-002")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-002")
 }
 
 func TestREDIR002_JS_URLIndexOf(t *testing.T) {
@@ -126,7 +126,7 @@ func TestREDIR002_JS_URLIndexOf(t *testing.T) {
   }
 }`
 	result := testutil.ScanContent(t, "/app/redirect.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-002")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-002")
 }
 
 func TestREDIR002_JS_StartsWithHTTP(t *testing.T) {
@@ -137,7 +137,7 @@ func TestREDIR002_JS_StartsWithHTTP(t *testing.T) {
   }
 }`
 	result := testutil.ScanContent(t, "/app/redirect.ts", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-002")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-002")
 }
 
 func TestREDIR002_Python_InOperator(t *testing.T) {
@@ -147,7 +147,7 @@ func TestREDIR002_Python_InOperator(t *testing.T) {
         return redirect(url)
 `
 	result := testutil.ScanContent(t, "/app/views.py", content)
-	testutil.MustFindRule(t, result, "GTSS-REDIR-002")
+	testutil.MustFindRule(t, result, "BATOU-REDIR-002")
 }
 
 func TestREDIR002_Safe_NoRedirectContext(t *testing.T) {
@@ -159,7 +159,7 @@ func TestREDIR002_Safe_NoRedirectContext(t *testing.T) {
   }
 }`
 	result := testutil.ScanContent(t, "/app/api.ts", content)
-	testutil.MustNotFindRule(t, result, "GTSS-REDIR-002")
+	testutil.MustNotFindRule(t, result, "BATOU-REDIR-002")
 }
 
 // --- Fixture tests ---
@@ -170,7 +170,7 @@ func TestREDIR001_Fixture_Go_OpenRedirect(t *testing.T) {
 	}
 	content := testutil.LoadFixture(t, "go/vulnerable/open_redirect.go")
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	hasRedirect := testutil.HasFinding(result, "GTSS-REDIR-001") || testutil.HasFinding(result, "GTSS-GEN-004")
+	hasRedirect := testutil.HasFinding(result, "BATOU-REDIR-001") || testutil.HasFinding(result, "BATOU-GEN-004")
 	if !hasRedirect {
 		t.Errorf("expected redirect finding in open_redirect.go, got: %v", testutil.FindingRuleIDs(result))
 	}
@@ -182,7 +182,7 @@ func TestREDIR001_Fixture_JS_OpenRedirect(t *testing.T) {
 	}
 	content := testutil.LoadFixture(t, "javascript/vulnerable/open_redirect.ts")
 	result := testutil.ScanContent(t, "/app/routes.ts", content)
-	hasRedirect := testutil.HasFinding(result, "GTSS-REDIR-001") || testutil.HasFinding(result, "GTSS-GEN-004")
+	hasRedirect := testutil.HasFinding(result, "BATOU-REDIR-001") || testutil.HasFinding(result, "BATOU-GEN-004")
 	if !hasRedirect {
 		t.Errorf("expected redirect finding in open_redirect.ts, got: %v", testutil.FindingRuleIDs(result))
 	}

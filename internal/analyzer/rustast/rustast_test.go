@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanRust(t *testing.T, code string) []rules.Finding {
@@ -32,7 +32,7 @@ fn convert(x: u32) -> f32 {
 	findings := scanRust(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-001" && strings.Contains(f.Title, "transmute") {
+		if f.RuleID == "BATOU-RUST-AST-001" && strings.Contains(f.Title, "transmute") {
 			found = true
 			break
 		}
@@ -53,7 +53,7 @@ fn deref_raw(p: *const i32) -> i32 {
 	findings := scanRust(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-001" && strings.Contains(f.Title, "Raw pointer") {
+		if f.RuleID == "BATOU-RUST-AST-001" && strings.Contains(f.Title, "Raw pointer") {
 			found = true
 			break
 		}
@@ -71,7 +71,7 @@ fn add(a: i32, b: i32) -> i32 {
 `
 	findings := scanRust(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-001" {
+		if f.RuleID == "BATOU-RUST-AST-001" {
 			t.Error("unexpected unsafe finding in safe code")
 		}
 	}
@@ -87,7 +87,7 @@ fn get_user(id: &str) -> String {
 	findings := scanRust(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-002" {
+		if f.RuleID == "BATOU-RUST-AST-002" {
 			found = true
 			if f.Severity != rules.Critical {
 				t.Errorf("expected Critical severity, got %s", f.Severity)
@@ -108,7 +108,7 @@ fn greet(name: &str) -> String {
 `
 	findings := scanRust(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-002" {
+		if f.RuleID == "BATOU-RUST-AST-002" {
 			t.Error("unexpected SQL injection finding for non-SQL format!()")
 		}
 	}
@@ -123,7 +123,7 @@ fn run_cmd(input: &str) {
 	findings := scanRust(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-003" && f.Severity == rules.Critical {
+		if f.RuleID == "BATOU-RUST-AST-003" && f.Severity == rules.Critical {
 			found = true
 			break
 		}
@@ -142,7 +142,7 @@ fn run_cmd(filename: &str) {
 	findings := scanRust(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-003" {
+		if f.RuleID == "BATOU-RUST-AST-003" {
 			found = true
 			break
 		}
@@ -160,7 +160,7 @@ fn list_files() {
 `
 	findings := scanRust(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-003" && f.Severity == rules.Critical {
+		if f.RuleID == "BATOU-RUST-AST-003" && f.Severity == rules.Critical {
 			t.Error("unexpected critical finding for command with literal args")
 		}
 	}
@@ -175,7 +175,7 @@ fn parse_input(s: &str) -> i32 {
 	findings := scanRust(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-004" {
+		if f.RuleID == "BATOU-RUST-AST-004" {
 			found = true
 			break
 		}
@@ -194,7 +194,7 @@ fn first() -> i32 {
 `
 	findings := scanRust(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-004" {
+		if f.RuleID == "BATOU-RUST-AST-004" {
 			t.Error("unexpected finding for unwrap on non-network call")
 		}
 	}
@@ -236,7 +236,7 @@ func TestLineNumbers(t *testing.T) {
 `
 	findings := scanRust(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-RUST-AST-001" && f.LineNumber < 1 {
+		if f.RuleID == "BATOU-RUST-AST-001" && f.LineNumber < 1 {
 			t.Errorf("expected positive line number, got %d", f.LineNumber)
 		}
 	}

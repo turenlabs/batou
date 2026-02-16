@@ -24,12 +24,12 @@ expected_vulnerabilities:
     pattern: "Use of MD5, SHA-1, or SHA-256 for password hashing"
     cwe: CWE-916
     typical_severity: high
-    gtss_rules: [GTSS-CRYPTO-001, GTSS-CRYPTO-002]
+    batou_rules: [BATOU-CRYPTO-001, BATOU-CRYPTO-002]
   - type: missing_salt
     pattern: "Password hashed without a unique per-user salt"
     cwe: CWE-916
     typical_severity: medium
-    gtss_rules: [GTSS-CRYPTO-002]
+    batou_rules: [BATOU-CRYPTO-002]
 gold_secure_pattern: |
   Use bcrypt with adequate cost:
   hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12))

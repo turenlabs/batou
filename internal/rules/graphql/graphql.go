@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-GQL-001: GraphQL Introspection Enabled
+// BATOU-GQL-001: GraphQL Introspection Enabled
 var (
 	// introspection: true in schema config
 	reIntrospectionEnabled = regexp.MustCompile(`(?i)\bintrospection\s*[:=]\s*true\b`)
@@ -30,7 +30,7 @@ var (
 	rePyIntrospection = regexp.MustCompile(`(?i)\bintrospection\s*=\s*True\b`)
 )
 
-// GTSS-GQL-002: No Query Depth Limiting
+// BATOU-GQL-002: No Query Depth Limiting
 var (
 	// Apollo Server / graphql-yoga / express-graphql creation
 	reGQLServerCreate = regexp.MustCompile(`(?i)(?:new\s+ApolloServer|createYoga|graphqlHTTP|new\s+GraphQLServer)\s*\(\s*\{`)
@@ -59,12 +59,12 @@ func truncate(s string, maxLen int) string {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GQL-001: GraphQL Introspection Enabled
+// BATOU-GQL-001: GraphQL Introspection Enabled
 // ---------------------------------------------------------------------------
 
 type IntrospectionEnabled struct{}
 
-func (r IntrospectionEnabled) ID() string                    { return "GTSS-GQL-001" }
+func (r IntrospectionEnabled) ID() string                    { return "BATOU-GQL-001" }
 func (r IntrospectionEnabled) Name() string                  { return "GraphQL Introspection Enabled" }
 func (r IntrospectionEnabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r IntrospectionEnabled) Description() string {
@@ -138,12 +138,12 @@ func (r IntrospectionEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-GQL-002: No Query Depth Limiting
+// BATOU-GQL-002: No Query Depth Limiting
 // ---------------------------------------------------------------------------
 
 type NoDepthLimiting struct{}
 
-func (r NoDepthLimiting) ID() string                    { return "GTSS-GQL-002" }
+func (r NoDepthLimiting) ID() string                    { return "BATOU-GQL-002" }
 func (r NoDepthLimiting) Name() string                  { return "GraphQL No Depth Limiting" }
 func (r NoDepthLimiting) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r NoDepthLimiting) Description() string {

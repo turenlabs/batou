@@ -1,5 +1,5 @@
 # Safe: Strong cryptography with bcrypt and secrets module
-# Expected: No findings for GTSS-CRY-001 or GTSS-CRY-009
+# Expected: No findings for BATOU-CRY-001 or BATOU-CRY-009
 
 import bcrypt
 import secrets

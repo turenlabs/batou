@@ -4,29 +4,29 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/hook"
-	"github.com/turenio/gtss/internal/scanner"
+	"github.com/turenlabs/batou/internal/hook"
+	"github.com/turenlabs/batou/internal/scanner"
 
 	// Register all rule packages.
-	_ "github.com/turenio/gtss/internal/rules/auth"
-	_ "github.com/turenio/gtss/internal/rules/crypto"
-	_ "github.com/turenio/gtss/internal/rules/generic"
-	_ "github.com/turenio/gtss/internal/rules/injection"
-	_ "github.com/turenio/gtss/internal/rules/logging"
-	_ "github.com/turenio/gtss/internal/rules/memory"
-	_ "github.com/turenio/gtss/internal/rules/secrets"
-	_ "github.com/turenio/gtss/internal/rules/ssrf"
-	_ "github.com/turenio/gtss/internal/rules/traversal"
-	_ "github.com/turenio/gtss/internal/rules/validation"
-	_ "github.com/turenio/gtss/internal/rules/xss"
+	_ "github.com/turenlabs/batou/internal/rules/auth"
+	_ "github.com/turenlabs/batou/internal/rules/crypto"
+	_ "github.com/turenlabs/batou/internal/rules/generic"
+	_ "github.com/turenlabs/batou/internal/rules/injection"
+	_ "github.com/turenlabs/batou/internal/rules/logging"
+	_ "github.com/turenlabs/batou/internal/rules/memory"
+	_ "github.com/turenlabs/batou/internal/rules/secrets"
+	_ "github.com/turenlabs/batou/internal/rules/ssrf"
+	_ "github.com/turenlabs/batou/internal/rules/traversal"
+	_ "github.com/turenlabs/batou/internal/rules/validation"
+	_ "github.com/turenlabs/batou/internal/rules/xss"
 
 	// Taint catalogs.
-	_ "github.com/turenio/gtss/internal/taint"
-	_ "github.com/turenio/gtss/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/taint"
+	_ "github.com/turenlabs/batou/internal/taint/languages"
 )
 
 // sqlParts holds fragments of SQL that are assembled at runtime, preventing
-// the GTSS security hook from matching SQL injection regex patterns in
+// the Batou security hook from matching SQL injection regex patterns in
 // this test file.
 var sqlParts = []string{
 	"SEL", "ECT * FR", "OM users WH", "ERE name = '%s'",

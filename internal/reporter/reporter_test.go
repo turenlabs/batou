@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/reporter"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/reporter"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ func TestFormatForClaudeContainsHeader(t *testing.T) {
 		ScanTimeMs: 42,
 		Findings: []rules.Finding{
 			{
-				RuleID:      "GTSS-INJ-001",
+				RuleID:      "BATOU-INJ-001",
 				Severity:    rules.Critical,
 				Title:       "SQL Injection",
 				Description: "User input in SQL query",
@@ -147,8 +147,8 @@ func TestFormatForClaudeContainsHeader(t *testing.T) {
 
 	output := reporter.FormatForClaude(result)
 
-	if !strings.Contains(output, "GTSS Security Scan") {
-		t.Error("expected GTSS Security Scan header")
+	if !strings.Contains(output, "Batou Security Scan") {
+		t.Error("expected Batou Security Scan header")
 	}
 	if !strings.Contains(output, "/app/handler.go") {
 		t.Error("expected file path in output")
@@ -231,8 +231,8 @@ func TestFormatForClaudeFooter(t *testing.T) {
 
 	output := reporter.FormatForClaude(result)
 
-	if !strings.Contains(output, "End GTSS Scan") {
-		t.Error("expected End GTSS Scan footer")
+	if !strings.Contains(output, "End Batou Scan") {
+		t.Error("expected End Batou Scan footer")
 	}
 }
 

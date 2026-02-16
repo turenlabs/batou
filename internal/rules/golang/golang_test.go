@@ -3,11 +3,11 @@ package golang
 import (
 	"testing"
 
-	"github.com/turenio/gtss/internal/testutil"
+	"github.com/turenlabs/batou/internal/testutil"
 )
 
 // ==========================================================================
-// GTSS-GO-001: GORM Raw SQL Injection
+// BATOU-GO-001: GORM Raw SQL Injection
 // ==========================================================================
 
 func TestGO001_GORMRaw_Sprintf(t *testing.T) {
@@ -19,7 +19,7 @@ func getUser(db *gorm.DB, name string) {
 	db.Raw(fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", name)).Scan(&user)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-001")
+	testutil.MustFindRule(t, result, "BATOU-GO-001")
 }
 
 func TestGO001_GORMExec_Sprintf(t *testing.T) {
@@ -31,7 +31,7 @@ func deleteUser(db *gorm.DB, id string) {
 	db.Exec(fmt.Sprintf("DELETE FROM users WHERE id = %s", id))
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-001")
+	testutil.MustFindRule(t, result, "BATOU-GO-001")
 }
 
 func TestGO001_GORMRaw_Concat(t *testing.T) {
@@ -41,7 +41,7 @@ func getUser(db *gorm.DB, name string) {
 	db.Raw("SELECT * FROM users WHERE name = '" + name + "'").Scan(&user)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-001")
+	testutil.MustFindRule(t, result, "BATOU-GO-001")
 }
 
 func TestGO001_GORMWhere_Sprintf(t *testing.T) {
@@ -53,7 +53,7 @@ func getUser(db *gorm.DB, name string) {
 	db.Where(fmt.Sprintf("name = '%s'", name)).First(&user)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-001")
+	testutil.MustFindRule(t, result, "BATOU-GO-001")
 }
 
 func TestGO001_GORMWhere_Parameterized_Safe(t *testing.T) {
@@ -63,7 +63,7 @@ func getUser(db *gorm.DB, name string) {
 	db.Where("name = ?", name).First(&user)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-001")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-001")
 }
 
 func TestGO001_GORMRaw_Parameterized_Safe(t *testing.T) {
@@ -73,11 +73,11 @@ func getUser(db *gorm.DB, id int) {
 	db.Raw("SELECT * FROM users WHERE id = ?", id).Scan(&user)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-001")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-001")
 }
 
 // ==========================================================================
-// GTSS-GO-002: template.HTML type conversion
+// BATOU-GO-002: template.HTML type conversion
 // ==========================================================================
 
 func TestGO002_TemplateHTML_Variable(t *testing.T) {
@@ -89,7 +89,7 @@ func render(userInput string) template.HTML {
 	return template.HTML(userInput)
 }`
 	result := testutil.ScanContent(t, "/app/render.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-002")
+	testutil.MustFindRule(t, result, "BATOU-GO-002")
 }
 
 func TestGO002_TemplateJS_Variable(t *testing.T) {
@@ -101,7 +101,7 @@ func render(data string) template.JS {
 	return template.JS(data)
 }`
 	result := testutil.ScanContent(t, "/app/render.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-002")
+	testutil.MustFindRule(t, result, "BATOU-GO-002")
 }
 
 func TestGO002_TemplateHTMLAttr_Variable(t *testing.T) {
@@ -113,7 +113,7 @@ func render(attr string) template.HTMLAttr {
 	return template.HTMLAttr(attr)
 }`
 	result := testutil.ScanContent(t, "/app/render.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-002")
+	testutil.MustFindRule(t, result, "BATOU-GO-002")
 }
 
 func TestGO002_TemplateHTML_Literal_Safe(t *testing.T) {
@@ -125,11 +125,11 @@ func render() template.HTML {
 	return template.HTML("<b>Hello</b>")
 }`
 	result := testutil.ScanContent(t, "/app/render.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-002")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-002")
 }
 
 // ==========================================================================
-// GTSS-GO-003: ListenAndServe without TLS
+// BATOU-GO-003: ListenAndServe without TLS
 // ==========================================================================
 
 func TestGO003_ListenAndServe_NoTLS(t *testing.T) {
@@ -141,7 +141,7 @@ func main() {
 	http.ListenAndServe(":8080", handler)
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-003")
+	testutil.MustFindRule(t, result, "BATOU-GO-003")
 }
 
 func TestGO003_ListenAndServeTLS_Safe(t *testing.T) {
@@ -153,7 +153,7 @@ func main() {
 	http.ListenAndServeTLS(":443", "cert.pem", "key.pem", handler)
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-003")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-003")
 }
 
 func TestGO003_ListenAndServe_Localhost_Safe(t *testing.T) {
@@ -165,7 +165,7 @@ func main() {
 	http.ListenAndServe("localhost:8080", handler)
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-003")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-003")
 }
 
 func TestGO003_ListenAndServe_WithTLSConfig_Safe(t *testing.T) {
@@ -182,15 +182,15 @@ func main() {
 	http.ListenAndServe(":8080", handler)
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-003")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-003")
 }
 
 // ==========================================================================
-// GTSS-GO-005: filepath traversal
+// BATOU-GO-005: filepath traversal
 // ==========================================================================
 
 // ==========================================================================
-// GTSS-GO-004: Bind without validation
+// BATOU-GO-004: Bind without validation
 // ==========================================================================
 
 func TestGO004_GinBindJSON_NoValidation(t *testing.T) {
@@ -202,7 +202,7 @@ func createUser(c *gin.Context) {
 	db.Create(&user)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-004")
+	testutil.MustFindRule(t, result, "BATOU-GO-004")
 }
 
 func TestGO004_GinShouldBindJSON_NoValidation(t *testing.T) {
@@ -214,7 +214,7 @@ func createUser(c *gin.Context) {
 	db.Create(&user)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-004")
+	testutil.MustFindRule(t, result, "BATOU-GO-004")
 }
 
 func TestGO004_GinBindQuery_NoValidation(t *testing.T) {
@@ -226,7 +226,7 @@ func searchUsers(c *gin.Context) {
 	db.Find(&users, query)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-004")
+	testutil.MustFindRule(t, result, "BATOU-GO-004")
 }
 
 func TestGO004_EchoBind_NoValidation(t *testing.T) {
@@ -238,7 +238,7 @@ func createUser(c echo.Context) error {
 	return db.Create(&user).Error
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-004")
+	testutil.MustFindRule(t, result, "BATOU-GO-004")
 }
 
 func TestGO004_Safe_GinBindWithValidation(t *testing.T) {
@@ -257,7 +257,7 @@ func createUser(c *gin.Context) {
 	db.Create(&user)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-004")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-004")
 }
 
 func TestGO004_Safe_GinBindWithBindingTag(t *testing.T) {
@@ -273,7 +273,7 @@ func createUser(c *gin.Context) {
 	c.ShouldBindJSON(&user)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-004")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-004")
 }
 
 func TestGO005_FilepathJoin_UserInput(t *testing.T) {
@@ -290,7 +290,7 @@ func serveFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-005")
+	testutil.MustFindRule(t, result, "BATOU-GO-005")
 }
 
 func TestGO005_FilepathJoin_WithHasPrefix_Safe(t *testing.T) {
@@ -312,11 +312,11 @@ func serveFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-005")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-005")
 }
 
 // ==========================================================================
-// GTSS-GO-006: math/rand for crypto
+// BATOU-GO-006: math/rand for crypto
 // ==========================================================================
 
 func TestGO006_MathRand_TokenGeneration(t *testing.T) {
@@ -332,7 +332,7 @@ func generateToken() string {
 	return string(token)
 }`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-006")
+	testutil.MustFindRule(t, result, "BATOU-GO-006")
 }
 
 func TestGO006_MathRand_NonCrypto_Safe(t *testing.T) {
@@ -346,11 +346,11 @@ func shuffle(items []string) {
 	})
 }`
 	result := testutil.ScanContent(t, "/app/util.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-006")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-006")
 }
 
 // ==========================================================================
-// GTSS-GO-007: Goroutine leak in HTTP handler
+// BATOU-GO-007: Goroutine leak in HTTP handler
 // ==========================================================================
 
 func TestGO007_GoroutineLeak_NoContext(t *testing.T) {
@@ -365,7 +365,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("accepted"))
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-007")
+	testutil.MustFindRule(t, result, "BATOU-GO-007")
 }
 
 func TestGO007_Goroutine_WithContextDone_Safe(t *testing.T) {
@@ -389,11 +389,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("accepted"))
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-007")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-007")
 }
 
 // ==========================================================================
-// GTSS-GO-008: Race condition in HTTP handler
+// BATOU-GO-008: Race condition in HTTP handler
 // ==========================================================================
 
 func TestGO008_SharedMap_NoMutex(t *testing.T) {
@@ -406,7 +406,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	cache[id] = time.Now()
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-008")
+	testutil.MustFindRule(t, result, "BATOU-GO-008")
 }
 
 func TestGO008_SharedMap_WithMutex_Safe(t *testing.T) {
@@ -426,11 +426,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-008")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-008")
 }
 
 // ==========================================================================
-// GTSS-GO-009: Unvalidated redirect
+// BATOU-GO-009: Unvalidated redirect
 // ==========================================================================
 
 func TestGO009_HTTPRedirect_UserInput(t *testing.T) {
@@ -443,7 +443,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, r.URL.Query().Get("redirect"), http.StatusFound)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-009")
+	testutil.MustFindRule(t, result, "BATOU-GO-009")
 }
 
 func TestGO009_GinRedirect_UserInput(t *testing.T) {
@@ -453,7 +453,7 @@ func loginHandler(c *gin.Context) {
 	c.Redirect(302, c.Query("redirect_url"))
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-009")
+	testutil.MustFindRule(t, result, "BATOU-GO-009")
 }
 
 func TestGO009_EchoRedirect_UserInput(t *testing.T) {
@@ -463,7 +463,7 @@ func loginHandler(c echo.Context) error {
 	return c.Redirect(302, c.QueryParam("next"))
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-009")
+	testutil.MustFindRule(t, result, "BATOU-GO-009")
 }
 
 func TestGO009_StaticRedirect_Safe(t *testing.T) {
@@ -475,11 +475,11 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/dashboard", http.StatusFound)
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-009")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-009")
 }
 
 // ==========================================================================
-// GTSS-GO-010: Missing CSRF
+// BATOU-GO-010: Missing CSRF
 // ==========================================================================
 
 func TestGO010_HandleFunc_FormParse_NoCSRF(t *testing.T) {
@@ -495,7 +495,7 @@ func main() {
 	})
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-010")
+	testutil.MustFindRule(t, result, "BATOU-GO-010")
 }
 
 func TestGO010_HandleFunc_NoFormParse_Safe(t *testing.T) {
@@ -509,7 +509,7 @@ func main() {
 	})
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-010")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-010")
 }
 
 func TestGO010_GinPost_NoCSRF(t *testing.T) {
@@ -524,7 +524,7 @@ func main() {
 	})
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-010")
+	testutil.MustFindRule(t, result, "BATOU-GO-010")
 }
 
 func TestGO010_WithCSRFMiddleware_Safe(t *testing.T) {
@@ -542,11 +542,11 @@ func main() {
 	})
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-010")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-010")
 }
 
 // ==========================================================================
-// GTSS-GO-011: Hardcoded JWT Secret
+// BATOU-GO-011: Hardcoded JWT Secret
 // ==========================================================================
 
 func TestGO011_JWT_HardcodedSigningKey(t *testing.T) {
@@ -561,7 +561,7 @@ func createToken(userID int) (string, error) {
 	return token.SignedString([]byte("my-super-secret-key"))
 }`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-011")
+	testutil.MustFindRule(t, result, "BATOU-GO-011")
 }
 
 func TestGO011_JWT_HardcodedVariable(t *testing.T) {
@@ -574,7 +574,7 @@ func createToken() {
 	return token.SignedString([]byte(jwtSecret))
 }`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-011")
+	testutil.MustFindRule(t, result, "BATOU-GO-011")
 }
 
 func TestGO011_JWT_EnvVar_Safe(t *testing.T) {
@@ -593,11 +593,11 @@ func createToken(userID int) (string, error) {
 	return token.SignedString([]byte(secret))
 }`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-011")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-011")
 }
 
 // ==========================================================================
-// GTSS-GO-012: Permissive file mode
+// BATOU-GO-012: Permissive file mode
 // ==========================================================================
 
 func TestGO012_MkdirAll_0777(t *testing.T) {
@@ -609,7 +609,7 @@ func setup() {
 	os.MkdirAll("/var/data/uploads", 0777)
 }`
 	result := testutil.ScanContent(t, "/app/setup.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-012")
+	testutil.MustFindRule(t, result, "BATOU-GO-012")
 }
 
 func TestGO012_WriteFile_0777(t *testing.T) {
@@ -621,7 +621,7 @@ func save(data []byte) {
 	os.WriteFile("/tmp/data.txt", data, 0777)
 }`
 	result := testutil.ScanContent(t, "/app/save.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-012")
+	testutil.MustFindRule(t, result, "BATOU-GO-012")
 }
 
 func TestGO012_MkdirAll_0750_Safe(t *testing.T) {
@@ -633,11 +633,11 @@ func setup() {
 	os.MkdirAll("/var/data/uploads", 0750)
 }`
 	result := testutil.ScanContent(t, "/app/setup.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-012")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-012")
 }
 
 // ==========================================================================
-// GTSS-GO-013: Trusted proxy misconfiguration
+// BATOU-GO-013: Trusted proxy misconfiguration
 // ==========================================================================
 
 func TestGO013_GinTrustAllProxies(t *testing.T) {
@@ -651,7 +651,7 @@ func main() {
 	r.GET("/", handler)
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-013")
+	testutil.MustFindRule(t, result, "BATOU-GO-013")
 }
 
 func TestGO013_EchoIPFromXFF(t *testing.T) {
@@ -665,7 +665,7 @@ func main() {
 	e.GET("/", handler)
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-013")
+	testutil.MustFindRule(t, result, "BATOU-GO-013")
 }
 
 func TestGO013_GinTrustedProxies_Explicit_Safe(t *testing.T) {
@@ -679,11 +679,11 @@ func main() {
 	r.GET("/", handler)
 }`
 	result := testutil.ScanContent(t, "/app/main.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-013")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-013")
 }
 
 // ==========================================================================
-// GTSS-GO-014: Unsafe HTTP response
+// BATOU-GO-014: Unsafe HTTP response
 // ==========================================================================
 
 func TestGO014_WriteUserInput_NoContentType(t *testing.T) {
@@ -696,7 +696,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(r.URL.Query().Get("name")))
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-014")
+	testutil.MustFindRule(t, result, "BATOU-GO-014")
 }
 
 func TestGO014_FprintfUserInput_NoContentType(t *testing.T) {
@@ -711,7 +711,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, r.FormValue("input"))
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "GTSS-GO-014")
+	testutil.MustFindRule(t, result, "BATOU-GO-014")
 }
 
 func TestGO014_WriteUserInput_WithContentType_Safe(t *testing.T) {
@@ -724,7 +724,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(r.URL.Query().Get("name")))
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-014")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-014")
 }
 
 func TestGO014_StaticResponse_Safe(t *testing.T) {
@@ -736,5 +736,5 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello, World!"))
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "GTSS-GO-014")
+	testutil.MustNotFindRule(t, result, "BATOU-GO-014")
 }

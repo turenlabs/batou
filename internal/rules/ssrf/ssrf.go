@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-SSRF-001: URL from User Input
+// BATOU-SSRF-001: URL from User Input
 var (
 	// Go: http.Get/Post/etc with variable
 	goHTTPGetVar      = regexp.MustCompile(`\bhttp\.(?:Get|Post|Head|PostForm)\s*\(\s*[a-zA-Z_]\w*`)
@@ -40,7 +40,7 @@ var (
 	phpFopen          = regexp.MustCompile(`\bfopen\s*\(\s*\$(?:_GET|_POST|_REQUEST|url|uri|link|input)`)
 )
 
-// GTSS-SSRF-002: Internal Network Access
+// BATOU-SSRF-002: Internal Network Access
 var (
 	// Patterns for internal/private IP ranges in URLs or strings
 	internalIPLiteral = regexp.MustCompile(`(?:https?://)?(?:` +
@@ -62,7 +62,7 @@ var (
 	cloudMetadata = regexp.MustCompile(`169\.254\.169\.254|metadata\.google\.internal|metadata\.azure\.com`)
 )
 
-// GTSS-SSRF-003: DNS Rebinding
+// BATOU-SSRF-003: DNS Rebinding
 var (
 	// Pattern: DNS resolution followed by separate HTTP request
 	goNetLookup  = regexp.MustCompile(`\bnet\.(?:LookupHost|LookupIP|LookupAddr|ResolveIPAddr|ResolveTCPAddr)\s*\(`)
@@ -70,7 +70,7 @@ var (
 	jsDNSResolve = regexp.MustCompile(`\bdns\.(?:resolve|lookup|resolve4|resolve6)\s*\(`)
 )
 
-// GTSS-SSRF-004: Redirect Following
+// BATOU-SSRF-004: Redirect Following
 var (
 	// Go: http.Client without CheckRedirect
 	goHTTPClient       = regexp.MustCompile(`&http\.Client\s*\{`)
@@ -88,11 +88,11 @@ func init() {
 	rules.Register(&RedirectFollowing{})
 }
 
-// --- GTSS-SSRF-001: URL From User Input ---
+// --- BATOU-SSRF-001: URL From User Input ---
 
 type URLFromUserInput struct{}
 
-func (r *URLFromUserInput) ID() string             { return "GTSS-SSRF-001" }
+func (r *URLFromUserInput) ID() string             { return "BATOU-SSRF-001" }
 func (r *URLFromUserInput) Name() string            { return "URLFromUserInput" }
 func (r *URLFromUserInput) DefaultSeverity() rules.Severity { return rules.High }
 func (r *URLFromUserInput) Languages() []rules.Language {
@@ -320,11 +320,11 @@ func hasURLValidation(lines []string, idx int) bool {
 	return false
 }
 
-// --- GTSS-SSRF-002: Internal Network Access ---
+// --- BATOU-SSRF-002: Internal Network Access ---
 
 type InternalNetworkAccess struct{}
 
-func (r *InternalNetworkAccess) ID() string             { return "GTSS-SSRF-002" }
+func (r *InternalNetworkAccess) ID() string             { return "BATOU-SSRF-002" }
 func (r *InternalNetworkAccess) Name() string            { return "InternalNetworkAccess" }
 func (r *InternalNetworkAccess) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InternalNetworkAccess) Languages() []rules.Language {
@@ -429,11 +429,11 @@ func isTestOrConfig(line string, lines []string, idx int) bool {
 	return false
 }
 
-// --- GTSS-SSRF-003: DNS Rebinding ---
+// --- BATOU-SSRF-003: DNS Rebinding ---
 
 type DNSRebinding struct{}
 
-func (r *DNSRebinding) ID() string             { return "GTSS-SSRF-003" }
+func (r *DNSRebinding) ID() string             { return "BATOU-SSRF-003" }
 func (r *DNSRebinding) Name() string            { return "DNSRebinding" }
 func (r *DNSRebinding) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DNSRebinding) Languages() []rules.Language {
@@ -509,11 +509,11 @@ func (r *DNSRebinding) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-SSRF-004: Redirect Following ---
+// --- BATOU-SSRF-004: Redirect Following ---
 
 type RedirectFollowing struct{}
 
-func (r *RedirectFollowing) ID() string             { return "GTSS-SSRF-004" }
+func (r *RedirectFollowing) ID() string             { return "BATOU-SSRF-004" }
 func (r *RedirectFollowing) Name() string            { return "RedirectFollowing" }
 func (r *RedirectFollowing) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RedirectFollowing) Languages() []rules.Language {

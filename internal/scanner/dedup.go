@@ -3,7 +3,7 @@ package scanner
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // Priority tiers for finding classification. Higher values win during
@@ -115,13 +115,13 @@ func findingTier(f *rules.Finding) int {
 // isASTRuleID returns true if the rule ID belongs to any AST analyzer.
 // All AST analyzers use rule IDs that contain "AST":
 //
-//	GTSS-AST-    (Go)         GTSS-PYAST-   (Python)
-//	GTSS-JSAST-  (JavaScript) GTSS-JAVAAST- (Java)
-//	GTSS-PHPAST- (PHP)        GTSS-RUBYAST- (Ruby)
-//	GTSS-CAST-   (C)          GTSS-CS-AST-  (C#)
-//	GTSS-KT-AST- (Kotlin)     GTSS-SWIFT-AST- (Swift)
-//	GTSS-RUST-AST- (Rust)     GTSS-LUA-AST- (Lua)
-//	GTSS-GVY-AST- (Groovy)
+//	BATOU-AST-    (Go)         BATOU-PYAST-   (Python)
+//	BATOU-JSAST-  (JavaScript) BATOU-JAVAAST- (Java)
+//	BATOU-PHPAST- (PHP)        BATOU-RUBYAST- (Ruby)
+//	BATOU-CAST-   (C)          BATOU-CS-AST-  (C#)
+//	BATOU-KT-AST- (Kotlin)     BATOU-SWIFT-AST- (Swift)
+//	BATOU-RUST-AST- (Rust)     BATOU-LUA-AST- (Lua)
+//	BATOU-GVY-AST- (Groovy)
 func isASTRuleID(ruleID string) bool {
 	return strings.Contains(ruleID, "AST")
 }
@@ -138,7 +138,14 @@ func beats(challenger, current rules.Finding) bool {
 		return challenger.Severity > current.Severity
 	}
 	// Same severity: higher confidence wins.
-	return confidenceRank(challenger.Confidence) > confidenceRank(current.Confidence)
+	cc := confidenceRank(challenger.Confidence)
+	wc := confidenceRank(current.Confidence)
+	if cc != wc {
+		return cc > wc
+	}
+	// Final tiebreaker: lower RuleID wins (deterministic regardless of
+	// goroutine scheduling order when rules run concurrently).
+	return challenger.RuleID < current.RuleID
 }
 
 // confidenceRank maps the confidence string to a numeric value for comparison.

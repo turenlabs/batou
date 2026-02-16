@@ -4,72 +4,72 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-CTR-001: Docker running as root
+// BATOU-CTR-001: Docker running as root
 var (
 	reDockerFROM      = regexp.MustCompile(`(?i)^FROM\s+`)
 	reDockerUSER      = regexp.MustCompile(`(?i)^USER\s+\S+`)
 	reDockerUserRoot  = regexp.MustCompile(`(?i)^USER\s+root\b`)
 )
 
-// GTSS-CTR-002: Docker COPY/ADD with wildcard
+// BATOU-CTR-002: Docker COPY/ADD with wildcard
 var (
 	reDockerCopyWild  = regexp.MustCompile(`(?i)^(?:COPY|ADD)\s+(?:\.\s|\.\/\s|\*\s|\.\.\s)`)
 	reDockerCopyDot   = regexp.MustCompile(`(?i)^(?:COPY|ADD)\s+\.\s+`)
 	reDockerCopyGlob  = regexp.MustCompile(`(?i)^(?:COPY|ADD)\s+\*`)
 )
 
-// GTSS-CTR-003: Docker latest tag
+// BATOU-CTR-003: Docker latest tag
 var (
 	reDockerFromLatest = regexp.MustCompile(`(?i)^FROM\s+\S+:latest\b`)
 	reDockerFromNoTag  = regexp.MustCompile(`(?i)^FROM\s+([a-z0-9._/-]+)\s*$`)
 	reDockerFromDigest = regexp.MustCompile(`(?i)^FROM\s+\S+@sha256:`)
 )
 
-// GTSS-CTR-004: Docker SSH port
+// BATOU-CTR-004: Docker SSH port
 var (
 	reDockerExposeSSH  = regexp.MustCompile(`(?i)^EXPOSE\s+.*\b22\b`)
 )
 
-// GTSS-CTR-005: Docker privileged mode
+// BATOU-CTR-005: Docker privileged mode
 var (
 	reDockerPrivileged = regexp.MustCompile(`(?i)--privileged`)
 	reDockerCapAdd     = regexp.MustCompile(`(?i)--cap-add\s*=?\s*(?:ALL|SYS_ADMIN|SYS_PTRACE|NET_ADMIN)`)
 )
 
-// GTSS-CTR-006: Docker secrets in ENV/ARG
+// BATOU-CTR-006: Docker secrets in ENV/ARG
 var (
 	reDockerEnvSecret = regexp.MustCompile(`(?i)^(?:ENV|ARG)\s+\S*(?:PASSWORD|SECRET|TOKEN|KEY|CREDENTIAL|API_KEY|PRIVATE_KEY|AWS_SECRET|DB_PASS)\s*=\s*\S+`)
 	reDockerEnvSecVar = regexp.MustCompile(`(?i)^(?:ENV|ARG)\s+\S*(?:PASSWORD|SECRET|TOKEN|KEY|CREDENTIAL|API_KEY|PRIVATE_KEY|AWS_SECRET|DB_PASS)\b`)
 )
 
-// GTSS-CTR-007: Kubernetes privileged container
+// BATOU-CTR-007: Kubernetes privileged container
 var (
 	reK8sPrivileged     = regexp.MustCompile(`(?i)privileged\s*:\s*true`)
 	reK8sAllowPrivEsc   = regexp.MustCompile(`(?i)allowPrivilegeEscalation\s*:\s*true`)
 )
 
-// GTSS-CTR-008: Kubernetes hostNetwork/hostPID
+// BATOU-CTR-008: Kubernetes hostNetwork/hostPID
 var (
 	reK8sHostNetwork    = regexp.MustCompile(`(?i)hostNetwork\s*:\s*true`)
 	reK8sHostPID        = regexp.MustCompile(`(?i)hostPID\s*:\s*true`)
 	reK8sHostIPC        = regexp.MustCompile(`(?i)hostIPC\s*:\s*true`)
 )
 
-// GTSS-CTR-009: Kubernetes no resource limits
+// BATOU-CTR-009: Kubernetes no resource limits
 var (
 	reK8sContainer      = regexp.MustCompile(`(?i)containers\s*:`)
 	reK8sResources      = regexp.MustCompile(`(?i)resources\s*:`)
 	reK8sLimits         = regexp.MustCompile(`(?i)limits\s*:`)
 )
 
-// GTSS-CTR-010: Terraform security group 0.0.0.0/0
+// BATOU-CTR-010: Terraform security group 0.0.0.0/0
 var (
 	reTFSecGroup       = regexp.MustCompile(`(?i)(?:resource\s+["']aws_security_group|ingress\s*\{)`)
 	reTFCIDRAll        = regexp.MustCompile(`(?i)(?:cidr_blocks|cidr_ipv6)\s*=\s*\[\s*["'](?:0\.0\.0\.0/0|::/0)["']`)
@@ -113,12 +113,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CTR-001: Dockerfile running as root
+// BATOU-CTR-001: Dockerfile running as root
 // ---------------------------------------------------------------------------
 
 type DockerRunAsRoot struct{}
 
-func (r *DockerRunAsRoot) ID() string                     { return "GTSS-CTR-001" }
+func (r *DockerRunAsRoot) ID() string                     { return "BATOU-CTR-001" }
 func (r *DockerRunAsRoot) Name() string                   { return "DockerRunAsRoot" }
 func (r *DockerRunAsRoot) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DockerRunAsRoot) Description() string {
@@ -188,12 +188,12 @@ func (r *DockerRunAsRoot) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CTR-002: Docker COPY/ADD with wildcard
+// BATOU-CTR-002: Docker COPY/ADD with wildcard
 // ---------------------------------------------------------------------------
 
 type DockerCopyWildcard struct{}
 
-func (r *DockerCopyWildcard) ID() string                     { return "GTSS-CTR-002" }
+func (r *DockerCopyWildcard) ID() string                     { return "BATOU-CTR-002" }
 func (r *DockerCopyWildcard) Name() string                   { return "DockerCopyWildcard" }
 func (r *DockerCopyWildcard) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DockerCopyWildcard) Description() string {
@@ -238,12 +238,12 @@ func (r *DockerCopyWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CTR-003: Docker using latest tag
+// BATOU-CTR-003: Docker using latest tag
 // ---------------------------------------------------------------------------
 
 type DockerLatestTag struct{}
 
-func (r *DockerLatestTag) ID() string                     { return "GTSS-CTR-003" }
+func (r *DockerLatestTag) ID() string                     { return "BATOU-CTR-003" }
 func (r *DockerLatestTag) Name() string                   { return "DockerLatestTag" }
 func (r *DockerLatestTag) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *DockerLatestTag) Description() string {
@@ -300,12 +300,12 @@ func (r *DockerLatestTag) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CTR-004: Docker exposing SSH port
+// BATOU-CTR-004: Docker exposing SSH port
 // ---------------------------------------------------------------------------
 
 type DockerExposeSSH struct{}
 
-func (r *DockerExposeSSH) ID() string                     { return "GTSS-CTR-004" }
+func (r *DockerExposeSSH) ID() string                     { return "BATOU-CTR-004" }
 func (r *DockerExposeSSH) Name() string                   { return "DockerExposeSSH" }
 func (r *DockerExposeSSH) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DockerExposeSSH) Description() string {
@@ -350,12 +350,12 @@ func (r *DockerExposeSSH) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CTR-005: Docker privileged mode
+// BATOU-CTR-005: Docker privileged mode
 // ---------------------------------------------------------------------------
 
 type DockerPrivileged struct{}
 
-func (r *DockerPrivileged) ID() string                     { return "GTSS-CTR-005" }
+func (r *DockerPrivileged) ID() string                     { return "BATOU-CTR-005" }
 func (r *DockerPrivileged) Name() string                   { return "DockerPrivileged" }
 func (r *DockerPrivileged) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DockerPrivileged) Description() string {
@@ -406,12 +406,12 @@ func (r *DockerPrivileged) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CTR-006: Docker secrets in ENV/ARG
+// BATOU-CTR-006: Docker secrets in ENV/ARG
 // ---------------------------------------------------------------------------
 
 type DockerSecretsInEnv struct{}
 
-func (r *DockerSecretsInEnv) ID() string                     { return "GTSS-CTR-006" }
+func (r *DockerSecretsInEnv) ID() string                     { return "BATOU-CTR-006" }
 func (r *DockerSecretsInEnv) Name() string                   { return "DockerSecretsInEnv" }
 func (r *DockerSecretsInEnv) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DockerSecretsInEnv) Description() string {
@@ -456,12 +456,12 @@ func (r *DockerSecretsInEnv) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CTR-007: Kubernetes privileged container
+// BATOU-CTR-007: Kubernetes privileged container
 // ---------------------------------------------------------------------------
 
 type K8sPrivilegedContainer struct{}
 
-func (r *K8sPrivilegedContainer) ID() string                     { return "GTSS-CTR-007" }
+func (r *K8sPrivilegedContainer) ID() string                     { return "BATOU-CTR-007" }
 func (r *K8sPrivilegedContainer) Name() string                   { return "K8sPrivilegedContainer" }
 func (r *K8sPrivilegedContainer) DefaultSeverity() rules.Severity { return rules.High }
 func (r *K8sPrivilegedContainer) Description() string {
@@ -517,12 +517,12 @@ func (r *K8sPrivilegedContainer) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CTR-008: Kubernetes hostNetwork/hostPID enabled
+// BATOU-CTR-008: Kubernetes hostNetwork/hostPID enabled
 // ---------------------------------------------------------------------------
 
 type K8sHostNamespace struct{}
 
-func (r *K8sHostNamespace) ID() string                     { return "GTSS-CTR-008" }
+func (r *K8sHostNamespace) ID() string                     { return "BATOU-CTR-008" }
 func (r *K8sHostNamespace) Name() string                   { return "K8sHostNamespace" }
 func (r *K8sHostNamespace) DefaultSeverity() rules.Severity { return rules.High }
 func (r *K8sHostNamespace) Description() string {
@@ -580,12 +580,12 @@ func (r *K8sHostNamespace) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CTR-009: Kubernetes no resource limits
+// BATOU-CTR-009: Kubernetes no resource limits
 // ---------------------------------------------------------------------------
 
 type K8sNoResourceLimits struct{}
 
-func (r *K8sNoResourceLimits) ID() string                     { return "GTSS-CTR-009" }
+func (r *K8sNoResourceLimits) ID() string                     { return "BATOU-CTR-009" }
 func (r *K8sNoResourceLimits) Name() string                   { return "K8sNoResourceLimits" }
 func (r *K8sNoResourceLimits) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *K8sNoResourceLimits) Description() string {
@@ -638,12 +638,12 @@ func (r *K8sNoResourceLimits) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-CTR-010: Terraform security group with 0.0.0.0/0 ingress
+// BATOU-CTR-010: Terraform security group with 0.0.0.0/0 ingress
 // ---------------------------------------------------------------------------
 
 type TerraformOpenIngress struct{}
 
-func (r *TerraformOpenIngress) ID() string                     { return "GTSS-CTR-010" }
+func (r *TerraformOpenIngress) ID() string                     { return "BATOU-CTR-010" }
 func (r *TerraformOpenIngress) Name() string                   { return "TerraformOpenIngress" }
 func (r *TerraformOpenIngress) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TerraformOpenIngress) Description() string {

@@ -1,6 +1,6 @@
 package tsflow
 
-import "github.com/turenio/gtss/internal/ast"
+import "github.com/turenlabs/batou/internal/ast"
 
 // nodeIsTainted checks whether a tree-sitter node references any tainted variable.
 // Walks into identifiers, attribute accesses, binary expressions, call arguments,

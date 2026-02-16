@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
@@ -151,7 +151,7 @@ func init() {
 
 type AndroidSQLInjection struct{}
 
-func (r *AndroidSQLInjection) ID() string                      { return "GTSS-KT-001" }
+func (r *AndroidSQLInjection) ID() string                      { return "BATOU-KT-001" }
 func (r *AndroidSQLInjection) Name() string                    { return "AndroidSQLInjection" }
 func (r *AndroidSQLInjection) Description() string             { return "Detects Android SQLite rawQuery/execSQL with string concatenation or template interpolation." }
 func (r *AndroidSQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -211,7 +211,7 @@ func (r *AndroidSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AndroidIntentInjection struct{}
 
-func (r *AndroidIntentInjection) ID() string                      { return "GTSS-KT-002" }
+func (r *AndroidIntentInjection) ID() string                      { return "BATOU-KT-002" }
 func (r *AndroidIntentInjection) Name() string                    { return "AndroidIntentInjection" }
 func (r *AndroidIntentInjection) Description() string             { return "Detects implicit intents with user-controlled data that could be intercepted by malicious apps." }
 func (r *AndroidIntentInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -290,7 +290,7 @@ func (r *AndroidIntentInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WebViewJSInjection struct{}
 
-func (r *WebViewJSInjection) ID() string                      { return "GTSS-KT-003" }
+func (r *WebViewJSInjection) ID() string                      { return "BATOU-KT-003" }
 func (r *WebViewJSInjection) Name() string                    { return "WebViewJSInjection" }
 func (r *WebViewJSInjection) Description() string             { return "Detects Android WebView JavaScript injection via loadUrl(\"javascript:\") and addJavascriptInterface." }
 func (r *WebViewJSInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -400,7 +400,7 @@ func (r *WebViewJSInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureSharedPreferences struct{}
 
-func (r *InsecureSharedPreferences) ID() string                      { return "GTSS-KT-004" }
+func (r *InsecureSharedPreferences) ID() string                      { return "BATOU-KT-004" }
 func (r *InsecureSharedPreferences) Name() string                    { return "InsecureSharedPreferences" }
 func (r *InsecureSharedPreferences) Description() string             { return "Detects storage of secrets in SharedPreferences without encryption." }
 func (r *InsecureSharedPreferences) DefaultSeverity() rules.Severity { return rules.High }
@@ -454,7 +454,7 @@ func (r *InsecureSharedPreferences) Scan(ctx *rules.ScanContext) []rules.Finding
 
 type ExportedComponents struct{}
 
-func (r *ExportedComponents) ID() string                      { return "GTSS-KT-005" }
+func (r *ExportedComponents) ID() string                      { return "BATOU-KT-005" }
 func (r *ExportedComponents) Name() string                    { return "ExportedComponents" }
 func (r *ExportedComponents) Description() string             { return "Detects Android components exported without permission protection in AndroidManifest.xml." }
 func (r *ExportedComponents) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -523,7 +523,7 @@ func (r *ExportedComponents) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KtorCORSMisconfig struct{}
 
-func (r *KtorCORSMisconfig) ID() string                      { return "GTSS-KT-006" }
+func (r *KtorCORSMisconfig) ID() string                      { return "BATOU-KT-006" }
 func (r *KtorCORSMisconfig) Name() string                    { return "KtorCORSMisconfig" }
 func (r *KtorCORSMisconfig) Description() string             { return "Detects Ktor CORS plugin misconfiguration with anyHost() and allowCredentials." }
 func (r *KtorCORSMisconfig) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -603,7 +603,7 @@ func (r *KtorCORSMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeCoroutineException struct{}
 
-func (r *UnsafeCoroutineException) ID() string                      { return "GTSS-KT-007" }
+func (r *UnsafeCoroutineException) ID() string                      { return "BATOU-KT-007" }
 func (r *UnsafeCoroutineException) Name() string                    { return "UnsafeCoroutineException" }
 func (r *UnsafeCoroutineException) Description() string             { return "Detects GlobalScope.launch/async without CoroutineExceptionHandler." }
 func (r *UnsafeCoroutineException) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -662,7 +662,7 @@ func (r *UnsafeCoroutineException) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type KotlinSerializationUntrusted struct{}
 
-func (r *KotlinSerializationUntrusted) ID() string                      { return "GTSS-KT-008" }
+func (r *KotlinSerializationUntrusted) ID() string                      { return "BATOU-KT-008" }
 func (r *KotlinSerializationUntrusted) Name() string                    { return "KotlinSerializationUntrusted" }
 func (r *KotlinSerializationUntrusted) Description() string             { return "Detects kotlinx.serialization Json.decodeFromString with potentially untrusted input." }
 func (r *KotlinSerializationUntrusted) DefaultSeverity() rules.Severity { return rules.High }
@@ -734,7 +734,7 @@ func (r *KotlinSerializationUntrusted) Scan(ctx *rules.ScanContext) []rules.Find
 
 type KotlinReflectionInjection struct{}
 
-func (r *KotlinReflectionInjection) ID() string                      { return "GTSS-KT-009" }
+func (r *KotlinReflectionInjection) ID() string                      { return "BATOU-KT-009" }
 func (r *KotlinReflectionInjection) Name() string                    { return "KotlinReflectionInjection" }
 func (r *KotlinReflectionInjection) Description() string             { return "Detects Class.forName() with user-controlled input enabling arbitrary class instantiation." }
 func (r *KotlinReflectionInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -781,7 +781,7 @@ func (r *KotlinReflectionInjection) Scan(ctx *rules.ScanContext) []rules.Finding
 
 type ContentProviderInjection struct{}
 
-func (r *ContentProviderInjection) ID() string                      { return "GTSS-KT-010" }
+func (r *ContentProviderInjection) ID() string                      { return "BATOU-KT-010" }
 func (r *ContentProviderInjection) Name() string                    { return "ContentProviderInjection" }
 func (r *ContentProviderInjection) Description() string             { return "Detects ContentResolver.query/insert/update/delete with user-controlled URIs enabling content provider injection." }
 func (r *ContentProviderInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -839,7 +839,7 @@ func (r *ContentProviderInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type DeepLinkInjection struct{}
 
-func (r *DeepLinkInjection) ID() string                      { return "GTSS-KT-011" }
+func (r *DeepLinkInjection) ID() string                      { return "BATOU-KT-011" }
 func (r *DeepLinkInjection) Name() string                    { return "DeepLinkInjection" }
 func (r *DeepLinkInjection) Description() string             { return "Detects intent.getData() usage without validation, enabling deep link injection attacks." }
 func (r *DeepLinkInjection) DefaultSeverity() rules.Severity { return rules.High }
@@ -894,7 +894,7 @@ func (r *DeepLinkInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureNetworkConfig struct{}
 
-func (r *InsecureNetworkConfig) ID() string                      { return "GTSS-KT-012" }
+func (r *InsecureNetworkConfig) ID() string                      { return "BATOU-KT-012" }
 func (r *InsecureNetworkConfig) Name() string                    { return "InsecureNetworkConfig" }
 func (r *InsecureNetworkConfig) Description() string             { return "Detects android:usesCleartextTraffic=\"true\" allowing unencrypted HTTP connections." }
 func (r *InsecureNetworkConfig) DefaultSeverity() rules.Severity { return rules.High }
@@ -937,7 +937,7 @@ func (r *InsecureNetworkConfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AndroidLoggingSensitive struct{}
 
-func (r *AndroidLoggingSensitive) ID() string                      { return "GTSS-KT-013" }
+func (r *AndroidLoggingSensitive) ID() string                      { return "BATOU-KT-013" }
 func (r *AndroidLoggingSensitive) Name() string                    { return "AndroidLoggingSensitive" }
 func (r *AndroidLoggingSensitive) Description() string             { return "Detects Android Log.d/Log.v/etc. calls that may log sensitive data like passwords and tokens." }
 func (r *AndroidLoggingSensitive) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -987,7 +987,7 @@ func (r *AndroidLoggingSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RoomRawQueryInjection struct{}
 
-func (r *RoomRawQueryInjection) ID() string                      { return "GTSS-KT-014" }
+func (r *RoomRawQueryInjection) ID() string                      { return "BATOU-KT-014" }
 func (r *RoomRawQueryInjection) Name() string                    { return "RoomRawQueryInjection" }
 func (r *RoomRawQueryInjection) Description() string             { return "Detects Room/SQLite raw queries with string concatenation or template interpolation." }
 func (r *RoomRawQueryInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -1040,7 +1040,7 @@ func (r *RoomRawQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KtorParameterInjection struct{}
 
-func (r *KtorParameterInjection) ID() string                      { return "GTSS-KT-015" }
+func (r *KtorParameterInjection) ID() string                      { return "BATOU-KT-015" }
 func (r *KtorParameterInjection) Name() string                    { return "KtorParameterInjection" }
 func (r *KtorParameterInjection) Description() string             { return "Detects Ktor call.parameters used in SQL queries without parameterized queries." }
 func (r *KtorParameterInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -1101,7 +1101,7 @@ func (r *KtorParameterInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type BroadcastReceiverNoPermission struct{}
 
-func (r *BroadcastReceiverNoPermission) ID() string                      { return "GTSS-KT-016" }
+func (r *BroadcastReceiverNoPermission) ID() string                      { return "BATOU-KT-016" }
 func (r *BroadcastReceiverNoPermission) Name() string                    { return "BroadcastReceiverNoPermission" }
 func (r *BroadcastReceiverNoPermission) Description() string             { return "Detects registerReceiver() without a broadcast permission, allowing any app to send broadcasts to the receiver." }
 func (r *BroadcastReceiverNoPermission) DefaultSeverity() rules.Severity { return rules.Medium }

@@ -1,5 +1,5 @@
 # Vulnerable: Log injection with unsanitized user input
-# Expected: GTSS-LOG-001 (UnsanitizedLogInput)
+# Expected: BATOU-LOG-001 (UnsanitizedLogInput)
 
 import logging
 from flask import Flask, request

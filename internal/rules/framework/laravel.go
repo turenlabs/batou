@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,41 +12,41 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-FW-LARAVEL-001: DB::raw() with user input
+	// BATOU-FW-LARAVEL-001: DB::raw() with user input
 	reLaravelDBRaw       = regexp.MustCompile(`DB::raw\s*\(\s*(?:\$|["'][^"']*\$)`)
 	reLaravelDBRawConcat = regexp.MustCompile(`DB::raw\s*\(\s*["'][^"']*["']\s*\.\s*\$`)
 	// DB::select/statement/insert/update/delete with raw SQL containing variables
 	reLaravelDBSelect = regexp.MustCompile(`DB::(?:select|statement|insert|update|delete)\s*\(\s*"[^"]*\$`)
 
-	// GTSS-FW-LARAVEL-002: Blade {!! !!} unescaped output
+	// BATOU-FW-LARAVEL-002: Blade {!! !!} unescaped output
 	reLaravelBladeUnescaped = regexp.MustCompile(`\{!!\s*\$`)
 
-	// GTSS-FW-LARAVEL-003: Mass assignment via $request->all()
+	// BATOU-FW-LARAVEL-003: Mass assignment via $request->all()
 	reLaravelCreateAll = regexp.MustCompile(`(?:::create|::update|::insert|::fill|::forceCreate)\s*\(\s*\$request->all\(\)`)
 	reLaravelNewAll    = regexp.MustCompile(`->(?:create|update|fill|forceFill)\s*\(\s*\$request->all\(\)`)
 
-	// GTSS-FW-LARAVEL-004: APP_DEBUG=true in env files
+	// BATOU-FW-LARAVEL-004: APP_DEBUG=true in env files
 	reLaravelAppDebug = regexp.MustCompile(`(?i)APP_DEBUG\s*=\s*true`)
 
-	// GTSS-FW-LARAVEL-005: APP_KEY hardcoded or default
+	// BATOU-FW-LARAVEL-005: APP_KEY hardcoded or default
 	reLaravelAppKeyDefault  = regexp.MustCompile(`(?i)APP_KEY\s*=\s*base64:`)
 	reLaravelAppKeyEmpty    = regexp.MustCompile(`(?i)APP_KEY\s*=\s*$`)
 	reLaravelAppKeyHardcode = regexp.MustCompile(`(?i)['"]APP_KEY['"]\s*=>\s*['"][^'"]+['"]`)
 
-	// GTSS-FW-LARAVEL-006: Unserialize with user input
+	// BATOU-FW-LARAVEL-006: Unserialize with user input
 	reLaravelUnserialize = regexp.MustCompile(`\bunserialize\s*\(\s*\$(?:_GET|_POST|_REQUEST|_COOKIE|request|input)`)
 
-	// GTSS-FW-LARAVEL-007: Storage/file operations with user input
+	// BATOU-FW-LARAVEL-007: Storage/file operations with user input
 	reLaravelStorageGet = regexp.MustCompile(`Storage::(?:get|read|download|url|path|exists|delete)\s*\(\s*\$request->`)
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-LARAVEL-001: DB::raw() SQL injection
+// BATOU-FW-LARAVEL-001: DB::raw() SQL injection
 // ---------------------------------------------------------------------------
 
 type LaravelDBRaw struct{}
 
-func (r *LaravelDBRaw) ID() string                      { return "GTSS-FW-LARAVEL-001" }
+func (r *LaravelDBRaw) ID() string                      { return "BATOU-FW-LARAVEL-001" }
 func (r *LaravelDBRaw) Name() string                    { return "LaravelDBRaw" }
 func (r *LaravelDBRaw) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *LaravelDBRaw) Description() string {
@@ -98,12 +98,12 @@ func (r *LaravelDBRaw) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-LARAVEL-002: Blade {!! !!} unescaped output
+// BATOU-FW-LARAVEL-002: Blade {!! !!} unescaped output
 // ---------------------------------------------------------------------------
 
 type LaravelBladeUnescaped struct{}
 
-func (r *LaravelBladeUnescaped) ID() string                      { return "GTSS-FW-LARAVEL-002" }
+func (r *LaravelBladeUnescaped) ID() string                      { return "BATOU-FW-LARAVEL-002" }
 func (r *LaravelBladeUnescaped) Name() string                    { return "LaravelBladeUnescaped" }
 func (r *LaravelBladeUnescaped) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LaravelBladeUnescaped) Description() string {
@@ -146,12 +146,12 @@ func (r *LaravelBladeUnescaped) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-LARAVEL-003: Mass assignment via $request->all()
+// BATOU-FW-LARAVEL-003: Mass assignment via $request->all()
 // ---------------------------------------------------------------------------
 
 type LaravelMassAssignment struct{}
 
-func (r *LaravelMassAssignment) ID() string                      { return "GTSS-FW-LARAVEL-003" }
+func (r *LaravelMassAssignment) ID() string                      { return "BATOU-FW-LARAVEL-003" }
 func (r *LaravelMassAssignment) Name() string                    { return "LaravelMassAssignment" }
 func (r *LaravelMassAssignment) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LaravelMassAssignment) Description() string {
@@ -194,12 +194,12 @@ func (r *LaravelMassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-LARAVEL-004: APP_DEBUG=true
+// BATOU-FW-LARAVEL-004: APP_DEBUG=true
 // ---------------------------------------------------------------------------
 
 type LaravelDebugMode struct{}
 
-func (r *LaravelDebugMode) ID() string                      { return "GTSS-FW-LARAVEL-004" }
+func (r *LaravelDebugMode) ID() string                      { return "BATOU-FW-LARAVEL-004" }
 func (r *LaravelDebugMode) Name() string                    { return "LaravelDebugMode" }
 func (r *LaravelDebugMode) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LaravelDebugMode) Description() string {
@@ -249,12 +249,12 @@ func (r *LaravelDebugMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-LARAVEL-005: APP_KEY exposure
+// BATOU-FW-LARAVEL-005: APP_KEY exposure
 // ---------------------------------------------------------------------------
 
 type LaravelAppKey struct{}
 
-func (r *LaravelAppKey) ID() string                      { return "GTSS-FW-LARAVEL-005" }
+func (r *LaravelAppKey) ID() string                      { return "BATOU-FW-LARAVEL-005" }
 func (r *LaravelAppKey) Name() string                    { return "LaravelAppKey" }
 func (r *LaravelAppKey) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *LaravelAppKey) Description() string {
@@ -311,12 +311,12 @@ func (r *LaravelAppKey) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-LARAVEL-006: Unserialize with user input
+// BATOU-FW-LARAVEL-006: Unserialize with user input
 // ---------------------------------------------------------------------------
 
 type LaravelUnserialize struct{}
 
-func (r *LaravelUnserialize) ID() string                      { return "GTSS-FW-LARAVEL-006" }
+func (r *LaravelUnserialize) ID() string                      { return "BATOU-FW-LARAVEL-006" }
 func (r *LaravelUnserialize) Name() string                    { return "LaravelUnserialize" }
 func (r *LaravelUnserialize) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *LaravelUnserialize) Description() string {
@@ -359,12 +359,12 @@ func (r *LaravelUnserialize) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-LARAVEL-007: Storage operations with user input
+// BATOU-FW-LARAVEL-007: Storage operations with user input
 // ---------------------------------------------------------------------------
 
 type LaravelStorageTraversal struct{}
 
-func (r *LaravelStorageTraversal) ID() string                      { return "GTSS-FW-LARAVEL-007" }
+func (r *LaravelStorageTraversal) ID() string                      { return "BATOU-FW-LARAVEL-007" }
 func (r *LaravelStorageTraversal) Name() string                    { return "LaravelStorageTraversal" }
 func (r *LaravelStorageTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LaravelStorageTraversal) Description() string {

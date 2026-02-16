@@ -1,8 +1,8 @@
-# C++ Language Support in GTSS
+# C++ Language Support in Batou
 
 ## Overview
 
-GTSS provides deep security scanning for C++ code across four analysis layers: regex-based rules (Layer 1), tree-sitter AST structural analysis (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). C++ coverage emphasizes memory safety, which is the dominant vulnerability class in C/C++ codebases, while also covering injection, cryptographic misuse, secrets exposure, and other categories through both C++-specific and language-agnostic rules.
+Batou provides deep security scanning for C++ code across four analysis layers: regex-based rules (Layer 1), tree-sitter AST structural analysis (Layer 2), taint source-to-sink tracking (Layer 3), and interprocedural call graph analysis (Layer 4). C++ coverage emphasizes memory safety, which is the dominant vulnerability class in C/C++ codebases, while also covering injection, cryptographic misuse, secrets exposure, and other categories through both C++-specific and language-agnostic rules.
 
 C++ taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through `init_declarator` assignments and call expressions by walking the parsed AST. The walker handles C++-specific patterns such as `pointer_declarator` wrapper nodes, `::` scope resolution in method names, and `compound_statement` function bodies.
 
@@ -302,12 +302,12 @@ These six rules target C/C++ exclusively and are the core of memory safety analy
 
 | Rule ID | Name | Severity | What It Detects |
 |---------|------|----------|-----------------|
-| `GTSS-MEM-001` | Banned Functions | Critical | `gets()`, `strcpy()`, `strcat()`, `sprintf()`, `vsprintf()`, `scanf` with `%s`, `atoi/atol` |
-| `GTSS-MEM-002` | Format String Vulnerability | Critical | `printf(var)`, `fprintf(fd, var)`, `syslog(pri, var)`, `snprintf(buf, sz, var)` |
-| `GTSS-MEM-003` | Buffer Overflow | High | `memcpy` with variable size, `strncpy(dst, src, strlen(src))`, `read/recv` into fixed buffer |
-| `GTSS-MEM-004` | Memory Management | High | Double free, use-after-free (tracks `free()`/`delete` then dereference) |
-| `GTSS-MEM-005` | Integer Overflow in Allocation | High | `malloc(n * sizeof(...))` overflow, `calloc` with variable count, `realloc` with arithmetic |
-| `GTSS-MEM-006` | Null Pointer Dereference | Medium | `malloc/calloc/realloc` return used without NULL check within 5 lines |
+| `BATOU-MEM-001` | Banned Functions | Critical | `gets()`, `strcpy()`, `strcat()`, `sprintf()`, `vsprintf()`, `scanf` with `%s`, `atoi/atol` |
+| `BATOU-MEM-002` | Format String Vulnerability | Critical | `printf(var)`, `fprintf(fd, var)`, `syslog(pri, var)`, `snprintf(buf, sz, var)` |
+| `BATOU-MEM-003` | Buffer Overflow | High | `memcpy` with variable size, `strncpy(dst, src, strlen(src))`, `read/recv` into fixed buffer |
+| `BATOU-MEM-004` | Memory Management | High | Double free, use-after-free (tracks `free()`/`delete` then dereference) |
+| `BATOU-MEM-005` | Integer Overflow in Allocation | High | `malloc(n * sizeof(...))` overflow, `calloc` with variable count, `realloc` with arithmetic |
+| `BATOU-MEM-006` | Null Pointer Dereference | Medium | `malloc/calloc/realloc` return used without NULL check within 5 lines |
 
 ### Cross-language rules that apply to C++
 
@@ -315,26 +315,26 @@ Rules with `LangAny` or explicit `LangCPP` in their language list:
 
 | Category | Rule ID | Name | Applies via |
 |----------|---------|------|-------------|
-| Crypto | `GTSS-CRY-003` | Weak Cipher | `LangAny` fallback |
-| Crypto | `GTSS-CRY-004` | Hardcoded IV | `LangAny` fallback |
-| Crypto | `GTSS-CRY-005` | Insecure TLS | `LangAny` fallback |
-| Crypto | `GTSS-CRY-006` | Weak Key Size | `LangAny` fallback |
-| Crypto | `GTSS-CRY-007` | Plaintext Protocol | `LangAny` |
-| Crypto | `GTSS-CRY-009` | Predictable Seed | Explicit `LangCPP` (detects `srand(time(NULL))`) |
-| Crypto | `GTSS-CRY-010` | Hardcoded Key | `LangAny` fallback |
-| Secrets | `GTSS-SEC-002` | API Key Exposure | `LangAny` |
-| Secrets | `GTSS-SEC-003` | Private Key in Code | `LangAny` |
-| Secrets | `GTSS-SEC-004` | Connection String | `LangAny` |
-| Secrets | `GTSS-SEC-006` | Environment Leak | `LangAny` |
-| Traversal | `GTSS-TRV-001` | Path Traversal | `LangAny` |
-| Traversal | `GTSS-TRV-003` | Archive Extraction | `LangAny` |
-| Traversal | `GTSS-TRV-007` | Null Byte File Path | `LangAny` |
-| SSRF | `GTSS-SSRF-001` | URL From User Input | `LangAny` |
-| SSRF | `GTSS-SSRF-002` | Internal Network Access | `LangAny` |
-| Auth | `GTSS-AUTH-007` | Privilege Escalation Patterns | `LangAny` |
-| Generic | `GTSS-GEN-012` | Insecure Download Patterns | `LangAny` |
-| Misconfig | `GTSS-MISC-003` | Missing Security Headers | `LangAny` |
-| Validation | `GTSS-VAL-005` | File Upload Hardening | `LangAny` |
+| Crypto | `BATOU-CRY-003` | Weak Cipher | `LangAny` fallback |
+| Crypto | `BATOU-CRY-004` | Hardcoded IV | `LangAny` fallback |
+| Crypto | `BATOU-CRY-005` | Insecure TLS | `LangAny` fallback |
+| Crypto | `BATOU-CRY-006` | Weak Key Size | `LangAny` fallback |
+| Crypto | `BATOU-CRY-007` | Plaintext Protocol | `LangAny` |
+| Crypto | `BATOU-CRY-009` | Predictable Seed | Explicit `LangCPP` (detects `srand(time(NULL))`) |
+| Crypto | `BATOU-CRY-010` | Hardcoded Key | `LangAny` fallback |
+| Secrets | `BATOU-SEC-002` | API Key Exposure | `LangAny` |
+| Secrets | `BATOU-SEC-003` | Private Key in Code | `LangAny` |
+| Secrets | `BATOU-SEC-004` | Connection String | `LangAny` |
+| Secrets | `BATOU-SEC-006` | Environment Leak | `LangAny` |
+| Traversal | `BATOU-TRV-001` | Path Traversal | `LangAny` |
+| Traversal | `BATOU-TRV-003` | Archive Extraction | `LangAny` |
+| Traversal | `BATOU-TRV-007` | Null Byte File Path | `LangAny` |
+| SSRF | `BATOU-SSRF-001` | URL From User Input | `LangAny` |
+| SSRF | `BATOU-SSRF-002` | Internal Network Access | `LangAny` |
+| Auth | `BATOU-AUTH-007` | Privilege Escalation Patterns | `LangAny` |
+| Generic | `BATOU-GEN-012` | Insecure Download Patterns | `LangAny` |
+| Misconfig | `BATOU-MISC-003` | Missing Security Headers | `LangAny` |
+| Validation | `BATOU-VAL-005` | File Upload Hardening | `LangAny` |
 
 ## Example Detections
 
@@ -345,12 +345,12 @@ Rules with `LangAny` or explicit `LangCPP` in their language list:
 
 void log_message(const char *message) {
     char buffer[128];
-    // GTSS-MEM-001: strcpy has no bounds checking
+    // BATOU-MEM-001: strcpy has no bounds checking
     strcpy(buffer, message);
 }
 ```
 
-GTSS flags `strcpy()` as a banned function (Critical severity) and suggests using `strlcpy()`, `strncpy()`, or `snprintf()`.
+Batou flags `strcpy()` as a banned function (Critical severity) and suggests using `strlcpy()`, `strncpy()`, or `snprintf()`.
 
 ### Use-after-free
 
@@ -358,12 +358,12 @@ GTSS flags `strcpy()` as a banned function (Critical severity) and suggests usin
 void process_logout(Session *session) {
     session->invalidate();
     delete session;
-    // GTSS-MEM-004: use-after-free on next line
+    // BATOU-MEM-004: use-after-free on next line
     session->print_info();
 }
 ```
 
-GTSS tracks the `delete session` call and flags subsequent use of `session` on the next line.
+Batou tracks the `delete session` call and flags subsequent use of `session` on the next line.
 
 ### Command injection via system()
 
@@ -443,11 +443,11 @@ Using `execve` with a separate argument array avoids shell interpretation. Combi
 
 2. **Header file classification.** Files with the `.h` extension are classified as C rather than C++. C++ header-only libraries using `.h` will be scanned under C rules (which share the same memory rules) but will not receive C++-specific taint catalog entries for modern frameworks like Boost.Asio or Qt.
 
-3. **Limited injection rule coverage.** The `GTSS-INJ-001` (SQL Injection) and `GTSS-INJ-002` (Command Injection) regex rules do not list C++ in their explicit language set. SQL injection and command injection in C++ are instead detected through the taint analysis engine (Layer 2) via the `cpp.sql.exec` and `cpp.system` sinks, which requires source-to-sink data flow to be visible within the scanned code fragment.
+3. **Limited injection rule coverage.** The `BATOU-INJ-001` (SQL Injection) and `BATOU-INJ-002` (Command Injection) regex rules do not list C++ in their explicit language set. SQL injection and command injection in C++ are instead detected through the taint analysis engine (Layer 2) via the `cpp.sql.exec` and `cpp.system` sinks, which requires source-to-sink data flow to be visible within the scanned code fragment.
 
-4. **No lifetime analysis.** The use-after-free detection (`GTSS-MEM-004`) uses a simplified heuristic that tracks `free()`/`delete` calls and subsequent pointer use within the same function scope. It cannot detect use-after-free across function boundaries, through move semantics, or via iterator invalidation.
+4. **No lifetime analysis.** The use-after-free detection (`BATOU-MEM-004`) uses a simplified heuristic that tracks `free()`/`delete` calls and subsequent pointer use within the same function scope. It cannot detect use-after-free across function boundaries, through move semantics, or via iterator invalidation.
 
-5. **No RAII completeness checking.** While GTSS recognizes smart pointers and RAII guards as sanitizers, it does not verify that all raw pointers in a translation unit are properly wrapped. A mix of raw and smart pointers in the same codebase may have gaps.
+5. **No RAII completeness checking.** While Batou recognizes smart pointers and RAII guards as sanitizers, it does not verify that all raw pointers in a translation unit are properly wrapped. A mix of raw and smart pointers in the same codebase may have gaps.
 
 6. **No template instantiation tracking.** Generic code using templates is not analyzed for all possible instantiations. Detection depends on whether the concrete call pattern matches a sink regex.
 

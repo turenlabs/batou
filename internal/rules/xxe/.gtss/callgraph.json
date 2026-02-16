@@ -1,0 +1,238 @@
+{
+  "nodes": {
+    "/app/Parser.cs:Parse": {
+      "id": "/app/Parser.cs:Parse",
+      "file_path": "/app/Parser.cs",
+      "name": "Parse",
+      "package": "",
+      "start_line": 1,
+      "end_line": 6,
+      "calls": [
+        "/app/Parser.cs:Parse"
+      ],
+      "called_by": [
+        "/app/Parser.cs:Parse"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "f1460ddf8c2a68cf",
+      "last_scan_at": "2026-02-16T15:25:44.681064-06:00",
+      "language": "csharp",
+      "finding_count": 0
+    },
+    "/app/SafeStaxHandler.java:parse": {
+      "id": "/app/SafeStaxHandler.java:parse",
+      "file_path": "/app/SafeStaxHandler.java",
+      "name": "parse",
+      "package": "",
+      "start_line": 2,
+      "end_line": 7,
+      "calls": [],
+      "called_by": [
+        "/app/SafeStaxHandler.java:parse"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "6a9b69a1845e968b",
+      "last_scan_at": "2026-02-13T10:19:46.374078-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/SafeTransformer.java:transform": {
+      "id": "/app/SafeTransformer.java:transform",
+      "file_path": "/app/SafeTransformer.java",
+      "name": "transform",
+      "package": "",
+      "start_line": 2,
+      "end_line": 6,
+      "calls": [],
+      "called_by": [
+        "/app/SafeTransformer.java:transform"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "e902c7af8a0d109e",
+      "last_scan_at": "2026-02-13T10:19:46.374805-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/SafeXmlHandler.java:parse": {
+      "id": "/app/SafeXmlHandler.java:parse",
+      "file_path": "/app/SafeXmlHandler.java",
+      "name": "parse",
+      "package": "",
+      "start_line": 2,
+      "end_line": 7,
+      "calls": [],
+      "called_by": [
+        "/app/SafeXmlHandler.java:parse"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "8d0ce3cc972231c8",
+      "last_scan_at": "2026-02-13T10:19:46.37325-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/SaxHandler.java:parse": {
+      "id": "/app/SaxHandler.java:parse",
+      "file_path": "/app/SaxHandler.java",
+      "name": "parse",
+      "package": "",
+      "start_line": 2,
+      "end_line": 6,
+      "calls": [],
+      "called_by": [
+        "/app/SaxHandler.java:parse"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "e4d65fc47844bbd5",
+      "last_scan_at": "2026-02-13T10:19:46.370183-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/StaxHandler.java:parse": {
+      "id": "/app/StaxHandler.java:parse",
+      "file_path": "/app/StaxHandler.java",
+      "name": "parse",
+      "package": "",
+      "start_line": 2,
+      "end_line": 5,
+      "calls": [],
+      "called_by": [
+        "/app/StaxHandler.java:parse"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "2c23b659a4028ba1",
+      "last_scan_at": "2026-02-13T10:19:46.371748-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/XmlHandler.java:parse": {
+      "id": "/app/XmlHandler.java:parse",
+      "file_path": "/app/XmlHandler.java",
+      "name": "parse",
+      "package": "",
+      "start_line": 2,
+      "end_line": 6,
+      "calls": [],
+      "called_by": [
+        "/app/XmlHandler.java:parse"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "22c364f43a8d9add",
+      "last_scan_at": "2026-02-13T10:19:46.357746-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/XslHandler.java:transform": {
+      "id": "/app/XslHandler.java:transform",
+      "file_path": "/app/XslHandler.java",
+      "name": "transform",
+      "package": "",
+      "start_line": 2,
+      "end_line": 5,
+      "calls": [],
+      "called_by": [
+        "/app/XslHandler.java:transform"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "fc45211cf299fca6",
+      "last_scan_at": "2026-02-13T10:19:46.372531-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/XxeBasic.java:doPost": {
+      "id": "/app/XxeBasic.java:doPost",
+      "file_path": "/app/XxeBasic.java",
+      "name": "doPost",
+      "package": "",
+      "start_line": 16,
+      "end_line": 31,
+      "calls": [],
+      "called_by": [
+        "/app/XxeBasic.java:doPost"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "61058c1c058a4174",
+      "last_scan_at": "2026-02-13T10:19:46.376496-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/xml_xxe.ts:parseXMLConfig": {
+      "id": "/app/xml_xxe.ts:parseXMLConfig",
+      "file_path": "/app/xml_xxe.ts",
+      "name": "parseXMLConfig",
+      "package": "",
+      "start_line": 20,
+      "end_line": 30,
+      "calls": [],
+      "called_by": [
+        "/app/xml_xxe.ts:parseXMLConfig"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "52044b1ad066bde7",
+      "last_scan_at": "2026-02-13T10:19:46.381033-06:00",
+      "language": "typescript",
+      "finding_count": 0
+    },
+    "/app/xml_xxe.ts:parseXMLOrder": {
+      "id": "/app/xml_xxe.ts:parseXMLOrder",
+      "file_path": "/app/xml_xxe.ts",
+      "name": "parseXMLOrder",
+      "package": "",
+      "start_line": 6,
+      "end_line": 17,
+      "calls": [],
+      "called_by": [
+        "/app/xml_xxe.ts:parseXMLOrder"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "e345e0d153fcd8ae",
+      "last_scan_at": "2026-02-13T10:19:46.380961-06:00",
+      "language": "typescript",
+      "finding_count": 0
+    },
+    "/app/xml_xxe.ts:renderTemplate": {
+      "id": "/app/xml_xxe.ts:renderTemplate",
+      "file_path": "/app/xml_xxe.ts",
+      "name": "renderTemplate",
+      "package": "",
+      "start_line": 35,
+      "end_line": 41,
+      "calls": [],
+      "called_by": [
+        "/app/xml_xxe.ts:renderTemplate"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "28c3de974c04c67c",
+      "last_scan_at": "2026-02-13T10:19:46.381075-06:00",
+      "language": "typescript",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/xxe",
+  "session_id": "",
+  "last_updated": "2026-02-16T15:25:44.681064-06:00",
+  "version": 1
+}

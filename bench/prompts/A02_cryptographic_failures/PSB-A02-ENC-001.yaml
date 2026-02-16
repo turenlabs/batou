@@ -23,17 +23,17 @@ expected_vulnerabilities:
     pattern: "Use of deprecated ciphers or non-authenticated modes"
     cwe: CWE-327
     typical_severity: high
-    gtss_rules: [GTSS-CRYPTO-003, GTSS-CRYPTO-004]
+    batou_rules: [BATOU-CRYPTO-003, BATOU-CRYPTO-004]
   - type: static_iv
     pattern: "Hardcoded or reused initialization vector"
     cwe: CWE-329
     typical_severity: medium
-    gtss_rules: [GTSS-CRYPTO-005]
+    batou_rules: [BATOU-CRYPTO-005]
   - type: weak_kdf
     pattern: "Password used as key directly or via simple hash"
     cwe: CWE-916
     typical_severity: high
-    gtss_rules: [GTSS-CRYPTO-002]
+    batou_rules: [BATOU-CRYPTO-002]
 gold_secure_pattern: |
   Use AES-GCM with PBKDF2-derived key and random nonce:
   salt = os.urandom(16)

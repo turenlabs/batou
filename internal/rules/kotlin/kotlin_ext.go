@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
-// Compiled regex patterns for Kotlin extension rules (GTSS-KT-017 .. GTSS-KT-024)
+// Compiled regex patterns for Kotlin extension rules (BATOU-KT-017 .. BATOU-KT-024)
 // ---------------------------------------------------------------------------
 
 // KT-017: Runtime.exec with string concatenation
@@ -78,12 +78,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-KT-017: Kotlin Runtime.exec with string concatenation
+// BATOU-KT-017: Kotlin Runtime.exec with string concatenation
 // ---------------------------------------------------------------------------
 
 type KotlinRuntimeExec struct{}
 
-func (r *KotlinRuntimeExec) ID() string                      { return "GTSS-KT-017" }
+func (r *KotlinRuntimeExec) ID() string                      { return "BATOU-KT-017" }
 func (r *KotlinRuntimeExec) Name() string                    { return "KotlinRuntimeExec" }
 func (r *KotlinRuntimeExec) Description() string             { return "Detects Kotlin Runtime.exec or ProcessBuilder with string concatenation or template interpolation, enabling command injection." }
 func (r *KotlinRuntimeExec) DefaultSeverity() rules.Severity { return rules.High }
@@ -138,12 +138,12 @@ func (r *KotlinRuntimeExec) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-KT-018: Kotlin WebView JavaScript enabled without protection
+// BATOU-KT-018: Kotlin WebView JavaScript enabled without protection
 // ---------------------------------------------------------------------------
 
 type KotlinWebViewJS struct{}
 
-func (r *KotlinWebViewJS) ID() string                      { return "GTSS-KT-018" }
+func (r *KotlinWebViewJS) ID() string                      { return "BATOU-KT-018" }
 func (r *KotlinWebViewJS) Name() string                    { return "KotlinWebViewJS" }
 func (r *KotlinWebViewJS) Description() string             { return "Detects Kotlin WebView with JavaScript enabled and addJavascriptInterface without proper WebViewClient protection." }
 func (r *KotlinWebViewJS) DefaultSeverity() rules.Severity { return rules.High }
@@ -213,12 +213,12 @@ func (r *KotlinWebViewJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-KT-019: Kotlin SharedPreferences storing sensitive data
+// BATOU-KT-019: Kotlin SharedPreferences storing sensitive data
 // ---------------------------------------------------------------------------
 
 type KotlinSharedPrefSensitive struct{}
 
-func (r *KotlinSharedPrefSensitive) ID() string                      { return "GTSS-KT-019" }
+func (r *KotlinSharedPrefSensitive) ID() string                      { return "BATOU-KT-019" }
 func (r *KotlinSharedPrefSensitive) Name() string                    { return "KotlinSharedPrefSensitive" }
 func (r *KotlinSharedPrefSensitive) Description() string             { return "Detects Kotlin SharedPreferences storing sensitive data (passwords, tokens, keys) in plaintext." }
 func (r *KotlinSharedPrefSensitive) DefaultSeverity() rules.Severity { return rules.High }
@@ -265,12 +265,12 @@ func (r *KotlinSharedPrefSensitive) Scan(ctx *rules.ScanContext) []rules.Finding
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-KT-020: Kotlin Intent with user-controlled component
+// BATOU-KT-020: Kotlin Intent with user-controlled component
 // ---------------------------------------------------------------------------
 
 type KotlinIntentRedirect struct{}
 
-func (r *KotlinIntentRedirect) ID() string                      { return "GTSS-KT-020" }
+func (r *KotlinIntentRedirect) ID() string                      { return "BATOU-KT-020" }
 func (r *KotlinIntentRedirect) Name() string                    { return "KotlinIntentRedirect" }
 func (r *KotlinIntentRedirect) Description() string             { return "Detects Kotlin Intent with user-controlled component class, enabling intent redirect attacks to access private activities." }
 func (r *KotlinIntentRedirect) DefaultSeverity() rules.Severity { return rules.High }
@@ -316,12 +316,12 @@ func (r *KotlinIntentRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-KT-021: Kotlin exported ContentProvider without permissions
+// BATOU-KT-021: Kotlin exported ContentProvider without permissions
 // ---------------------------------------------------------------------------
 
 type KotlinExportedProvider struct{}
 
-func (r *KotlinExportedProvider) ID() string                      { return "GTSS-KT-021" }
+func (r *KotlinExportedProvider) ID() string                      { return "BATOU-KT-021" }
 func (r *KotlinExportedProvider) Name() string                    { return "KotlinExportedProvider" }
 func (r *KotlinExportedProvider) Description() string             { return "Detects Android exported ContentProvider without read/write permissions in manifest files." }
 func (r *KotlinExportedProvider) DefaultSeverity() rules.Severity { return rules.High }
@@ -399,12 +399,12 @@ func (r *KotlinExportedProvider) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-KT-022: Kotlin insecure broadcast receiver
+// BATOU-KT-022: Kotlin insecure broadcast receiver
 // ---------------------------------------------------------------------------
 
 type KotlinInsecureBroadcast struct{}
 
-func (r *KotlinInsecureBroadcast) ID() string                      { return "GTSS-KT-022" }
+func (r *KotlinInsecureBroadcast) ID() string                      { return "BATOU-KT-022" }
 func (r *KotlinInsecureBroadcast) Name() string                    { return "KotlinInsecureBroadcast" }
 func (r *KotlinInsecureBroadcast) Description() string             { return "Detects Kotlin sendBroadcast or registerReceiver without permission protection." }
 func (r *KotlinInsecureBroadcast) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -456,12 +456,12 @@ func (r *KotlinInsecureBroadcast) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-KT-023: Kotlin SQL injection in Room raw query
+// BATOU-KT-023: Kotlin SQL injection in Room raw query
 // ---------------------------------------------------------------------------
 
 type KotlinRoomRawQuery struct{}
 
-func (r *KotlinRoomRawQuery) ID() string                      { return "GTSS-KT-023" }
+func (r *KotlinRoomRawQuery) ID() string                      { return "BATOU-KT-023" }
 func (r *KotlinRoomRawQuery) Name() string                    { return "KotlinRoomRawQuery" }
 func (r *KotlinRoomRawQuery) Description() string             { return "Detects Kotlin SQL injection via Room @RawQuery with SimpleSQLiteQuery built from string concatenation." }
 func (r *KotlinRoomRawQuery) DefaultSeverity() rules.Severity { return rules.High }
@@ -510,12 +510,12 @@ func (r *KotlinRoomRawQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-KT-024: Kotlin certificate pinning bypass (trust all)
+// BATOU-KT-024: Kotlin certificate pinning bypass (trust all)
 // ---------------------------------------------------------------------------
 
 type KotlinTrustAllCerts struct{}
 
-func (r *KotlinTrustAllCerts) ID() string                      { return "GTSS-KT-024" }
+func (r *KotlinTrustAllCerts) ID() string                      { return "BATOU-KT-024" }
 func (r *KotlinTrustAllCerts) Name() string                    { return "KotlinTrustAllCerts" }
 func (r *KotlinTrustAllCerts) Description() string             { return "Detects Kotlin TLS bypasses: custom TrustManager that trusts all certs, HostnameVerifier that always returns true, disabling SSL verification." }
 func (r *KotlinTrustAllCerts) DefaultSeverity() rules.Severity { return rules.Critical }

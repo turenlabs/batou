@@ -4,40 +4,40 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns -- Fiber
 // ---------------------------------------------------------------------------
 
-// GTSS-FW-FIBER-001: CORS with AllowOrigins *
+// BATOU-FW-FIBER-001: CORS with AllowOrigins *
 var reFiberCORSWildcard = regexp.MustCompile(`AllowOrigins\s*:\s*"\*"`)
 var reFiberCORSDefault = regexp.MustCompile(`cors\.New\s*\(\s*\)`)
 
-// GTSS-FW-FIBER-002: Static file serve with user path
+// BATOU-FW-FIBER-002: Static file serve with user path
 var reFiberStaticUser = regexp.MustCompile(`c\.(?:SendFile|Download)\s*\(\s*(?:c\.(?:Query|Params)|[a-zA-Z_]\w*\s*\+)`)
 
-// GTSS-FW-FIBER-003: BodyParser without validation
+// BATOU-FW-FIBER-003: BodyParser without validation
 var reFiberBodyParser = regexp.MustCompile(`c\.BodyParser\s*\(`)
 var reFiberValidation = regexp.MustCompile(`(?:Validate|validator|validate\.Struct|govalidator)`)
 
-// GTSS-FW-FIBER-004: Cookie without Secure flag
+// BATOU-FW-FIBER-004: Cookie without Secure flag
 var reFiberCookieInsecure = regexp.MustCompile(`(?:fiber\.Cookie\s*\{|&fiber\.Cookie\s*\{)`)
 var reFiberCookieSecure = regexp.MustCompile(`Secure\s*:\s*true`)
 
-// GTSS-FW-FIBER-005: JWT with weak secret
+// BATOU-FW-FIBER-005: JWT with weak secret
 var reFiberJWTSecret = regexp.MustCompile(`SigningKey\s*:\s*\[\s*\]\s*byte\s*\(\s*"[^"]{1,15}"`)
 var reFiberJWTHardcoded = regexp.MustCompile(`jwtware\.New\s*\(\s*jwtware\.Config\s*\{[^}]*SigningKey\s*:\s*\[\s*\]\s*byte\s*\(\s*"[^"]*"`)
 
-// GTSS-FW-FIBER-006: Rate limiter not configured
+// BATOU-FW-FIBER-006: Rate limiter not configured
 var reFiberLimiter = regexp.MustCompile(`(?:limiter\.New|limiter\.Config|app\.Use\s*\(\s*limiter)`)
 var reFiberApp = regexp.MustCompile(`fiber\.New\s*\(`)
 
-// GTSS-FW-FIBER-007: Template injection
+// BATOU-FW-FIBER-007: Template injection
 var reFiberTemplateInject = regexp.MustCompile(`c\.Render\s*\([^,]*,\s*(?:fiber\.Map\s*\{[^}]*c\.(?:Query|Params|FormValue)|c\.(?:Query|Params|FormValue))`)
 
-// GTSS-FW-FIBER-008: Helmet not used
+// BATOU-FW-FIBER-008: Helmet not used
 var reFiberHelmet = regexp.MustCompile(`(?:helmet\.New|app\.Use\s*\(\s*helmet)`)
 
 func init() {
@@ -52,12 +52,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FIBER-001: CORS with AllowOrigins *
+// BATOU-FW-FIBER-001: CORS with AllowOrigins *
 // ---------------------------------------------------------------------------
 
 type FiberCORSWildcard struct{}
 
-func (r *FiberCORSWildcard) ID() string                      { return "GTSS-FW-FIBER-001" }
+func (r *FiberCORSWildcard) ID() string                      { return "BATOU-FW-FIBER-001" }
 func (r *FiberCORSWildcard) Name() string                    { return "FiberCORSWildcard" }
 func (r *FiberCORSWildcard) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FiberCORSWildcard) Description() string {
@@ -107,12 +107,12 @@ func (r *FiberCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FIBER-002: Static file serve with user path
+// BATOU-FW-FIBER-002: Static file serve with user path
 // ---------------------------------------------------------------------------
 
 type FiberStaticTraversal struct{}
 
-func (r *FiberStaticTraversal) ID() string                      { return "GTSS-FW-FIBER-002" }
+func (r *FiberStaticTraversal) ID() string                      { return "BATOU-FW-FIBER-002" }
 func (r *FiberStaticTraversal) Name() string                    { return "FiberStaticTraversal" }
 func (r *FiberStaticTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FiberStaticTraversal) Description() string {
@@ -156,12 +156,12 @@ func (r *FiberStaticTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FIBER-003: BodyParser without validation
+// BATOU-FW-FIBER-003: BodyParser without validation
 // ---------------------------------------------------------------------------
 
 type FiberBodyNoValidation struct{}
 
-func (r *FiberBodyNoValidation) ID() string                      { return "GTSS-FW-FIBER-003" }
+func (r *FiberBodyNoValidation) ID() string                      { return "BATOU-FW-FIBER-003" }
 func (r *FiberBodyNoValidation) Name() string                    { return "FiberBodyNoValidation" }
 func (r *FiberBodyNoValidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FiberBodyNoValidation) Description() string {
@@ -211,12 +211,12 @@ func (r *FiberBodyNoValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FIBER-004: Cookie without Secure flag
+// BATOU-FW-FIBER-004: Cookie without Secure flag
 // ---------------------------------------------------------------------------
 
 type FiberCookieInsecure struct{}
 
-func (r *FiberCookieInsecure) ID() string                      { return "GTSS-FW-FIBER-004" }
+func (r *FiberCookieInsecure) ID() string                      { return "BATOU-FW-FIBER-004" }
 func (r *FiberCookieInsecure) Name() string                    { return "FiberCookieInsecure" }
 func (r *FiberCookieInsecure) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FiberCookieInsecure) Description() string {
@@ -272,12 +272,12 @@ func (r *FiberCookieInsecure) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FIBER-005: JWT middleware with weak secret
+// BATOU-FW-FIBER-005: JWT middleware with weak secret
 // ---------------------------------------------------------------------------
 
 type FiberJWTWeak struct{}
 
-func (r *FiberJWTWeak) ID() string                      { return "GTSS-FW-FIBER-005" }
+func (r *FiberJWTWeak) ID() string                      { return "BATOU-FW-FIBER-005" }
 func (r *FiberJWTWeak) Name() string                    { return "FiberJWTWeak" }
 func (r *FiberJWTWeak) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FiberJWTWeak) Description() string {
@@ -327,12 +327,12 @@ func (r *FiberJWTWeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FIBER-006: Rate limiter not configured
+// BATOU-FW-FIBER-006: Rate limiter not configured
 // ---------------------------------------------------------------------------
 
 type FiberNoRateLimit struct{}
 
-func (r *FiberNoRateLimit) ID() string                      { return "GTSS-FW-FIBER-006" }
+func (r *FiberNoRateLimit) ID() string                      { return "BATOU-FW-FIBER-006" }
 func (r *FiberNoRateLimit) Name() string                    { return "FiberNoRateLimit" }
 func (r *FiberNoRateLimit) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FiberNoRateLimit) Description() string {
@@ -383,12 +383,12 @@ func (r *FiberNoRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FIBER-007: Template injection via user input
+// BATOU-FW-FIBER-007: Template injection via user input
 // ---------------------------------------------------------------------------
 
 type FiberTemplateInjection struct{}
 
-func (r *FiberTemplateInjection) ID() string                      { return "GTSS-FW-FIBER-007" }
+func (r *FiberTemplateInjection) ID() string                      { return "BATOU-FW-FIBER-007" }
 func (r *FiberTemplateInjection) Name() string                    { return "FiberTemplateInjection" }
 func (r *FiberTemplateInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FiberTemplateInjection) Description() string {
@@ -432,12 +432,12 @@ func (r *FiberTemplateInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-FIBER-008: Helmet middleware not used
+// BATOU-FW-FIBER-008: Helmet middleware not used
 // ---------------------------------------------------------------------------
 
 type FiberNoHelmet struct{}
 
-func (r *FiberNoHelmet) ID() string                      { return "GTSS-FW-FIBER-008" }
+func (r *FiberNoHelmet) ID() string                      { return "BATOU-FW-FIBER-008" }
 func (r *FiberNoHelmet) Name() string                    { return "FiberNoHelmet" }
 func (r *FiberNoHelmet) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FiberNoHelmet) Description() string {

@@ -1,0 +1,63 @@
+{
+  "nodes": {
+    "/app/Controller.java:upload": {
+      "id": "/app/Controller.java:upload",
+      "file_path": "/app/Controller.java",
+      "name": "upload",
+      "package": "",
+      "start_line": 2,
+      "end_line": 5,
+      "calls": [],
+      "called_by": [
+        "/app/Controller.java:upload"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "ddd7abf61a677315",
+      "last_scan_at": "2026-02-13T19:52:10.41835-06:00",
+      "language": "java",
+      "finding_count": 0
+    },
+    "/app/upload.go:uploadHandler": {
+      "id": "/app/upload.go:uploadHandler",
+      "file_path": "/app/upload.go",
+      "name": "uploadHandler",
+      "package": "main",
+      "start_line": 3,
+      "end_line": 14,
+      "calls": null,
+      "called_by": null,
+      "taint_sig": {},
+      "content_hash": "6ee746ffd20d6604",
+      "last_scan_at": "2026-02-16T15:25:43.971747-06:00",
+      "language": "go",
+      "finding_count": 0
+    },
+    "/app/views.py:upload": {
+      "id": "/app/views.py:upload",
+      "file_path": "/app/views.py",
+      "name": "upload",
+      "package": "",
+      "start_line": 1,
+      "end_line": 5,
+      "calls": [
+        "/app/views.py:upload"
+      ],
+      "called_by": [
+        "/app/views.py:upload"
+      ],
+      "taint_sig": {
+        "is_pure": true
+      },
+      "content_hash": "1ba0ae51c3dc82f1",
+      "last_scan_at": "2026-02-16T15:25:43.973975-06:00",
+      "language": "python",
+      "finding_count": 0
+    }
+  },
+  "project_root": "/Users/tbowyer/turen/Code/turen-blogs/gtss/internal/rules/validation",
+  "session_id": "",
+  "last_updated": "2026-02-16T15:25:43.973976-06:00",
+  "version": 1
+}

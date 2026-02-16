@@ -4,26 +4,26 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended validation rules
 // ---------------------------------------------------------------------------
 
-// GTSS-VAL-006: Missing input length validation
+// BATOU-VAL-006: Missing input length validation
 var (
 	reAcceptBodyNoLimit = regexp.MustCompile(`(?i)(?:req\.body|request\.data|request\.POST|request\.json|request\.form|request\.args|r\.Body|request\.getParameter|params\[|FormValue)\b`)
 	reLimitPresent      = regexp.MustCompile(`(?i)(?:maxlength|max_length|maxLen|\.length\s*[<>]|len\s*\([^)]+\)\s*[<>]|\.size\s*[<>]|ContentLength|content.?length|max.?size|limit|truncate|\.slice\s*\(|\.substring\s*\(|[:=]\s*\d{1,4}\b)`)
 )
 
-// GTSS-VAL-007: ReDoS - catastrophic backtracking
+// BATOU-VAL-007: ReDoS - catastrophic backtracking
 var (
 	reRedosPattern = regexp.MustCompile(`(?:new\s+RegExp\s*\(|regexp\.MustCompile\s*\(|regexp\.Compile\s*\(|re\.compile\s*\(|/[^/\n]+/|Regex\s*\(|Pattern\.compile\s*\()`)
 	reNestedQuant  = regexp.MustCompile(`(?:\([^)]*[+*][^)]*\)\s*[+*]|\[[^\]]*\]\s*[+*]\s*[+*]|\.\*\.\*|(?:\w\+){2,}|\(\.\*\)\+|\([^)]+\+\)\+|\([^)]+\*\)\+|\([^)]+\+\)\*|\([^)]+\*\)\*)`)
 )
 
-// GTSS-VAL-008: Integer overflow from unchecked conversion
+// BATOU-VAL-008: Integer overflow from unchecked conversion
 var (
 	reStrToIntGo     = regexp.MustCompile(`strconv\.(?:Atoi|ParseInt|ParseUint)\s*\(`)
 	reStrToIntPy     = regexp.MustCompile(`\bint\s*\(\s*(?:request\.|input\(|sys\.argv|os\.environ)`)
@@ -32,46 +32,46 @@ var (
 	reOverflowCheck  = regexp.MustCompile(`(?i)(?:overflow|MaxInt|MinInt|MAX_VALUE|MIN_VALUE|max_value|min_value|Number\.MAX_SAFE_INTEGER|Number\.isSafeInteger|math\.MaxInt|math\.MinInt|int32|int16|bounds|range\s*check)`)
 )
 
-// GTSS-VAL-009: Email validation using regex only
+// BATOU-VAL-009: Email validation using regex only
 var (
 	reEmailRegex      = regexp.MustCompile(`(?i)(?:email|e_mail|mail).*(?:regex|regexp|pattern|match|test|re\.compile|MustCompile|Pattern\.compile)\s*[\(\[]?\s*['"\x60/]`)
 	reEmailRegexAlt   = regexp.MustCompile(`(?i)(?:regex|regexp|pattern|re\.compile|MustCompile|Pattern\.compile)\s*[\(\[]?\s*['"\x60/][^'"]*@[^'"]*['"\x60/]`)
 	reDomainValidation = regexp.MustCompile(`(?i)(?:dns\.lookup|dns\.resolve|checkdnsrr|getmxrr|MX\s*record|validate.*domain|domain.*valid|socket\.getaddrinfo|nslookup|dig\s+)`)
 )
 
-// GTSS-VAL-010: Missing null/undefined check before use
+// BATOU-VAL-010: Missing null/undefined check before use
 var (
 	reOptionalChainMissing = regexp.MustCompile(`(?:req\.body|req\.query|req\.params|request\.body)\.\w+\.\w+`)
 	reNullCheckPresent     = regexp.MustCompile(`(?:\?\.|!= null|!== null|!= undefined|!== undefined|!= nil|if\s*\(.*(?:req\.body|req\.query|req\.params)|typeof\s+\w+\s*[!=]==?\s*['"]undefined['"])`)
 )
 
-// GTSS-VAL-011: Trusting client-side validation only
+// BATOU-VAL-011: Trusting client-side validation only
 var (
 	reClientSideOnly = regexp.MustCompile(`(?i)(?:<!--\s*|//\s*|/\*\s*)(?:client.?side|front.?end|browser)\s+(?:only|validation)`)
 	reFormPattern    = regexp.MustCompile(`(?i)(?:pattern\s*=\s*['"][^'"]+['"]|required\s*[=>]|minlength\s*=|maxlength\s*=|type\s*=\s*['"]email['"])`)
 	reNoServerVal    = regexp.MustCompile(`(?i)//\s*(?:no\s+)?(?:server|backend)\s*(?:side)?\s*validation\s*(?:needed|required|necessary)?`)
 )
 
-// GTSS-VAL-012: Type confusion from unvalidated JSON parsing
+// BATOU-VAL-012: Type confusion from unvalidated JSON parsing
 var (
 	reJSONParseAccess = regexp.MustCompile(`JSON\.parse\s*\([^)]+\)\s*(?:\.\w+|\[['"])`)
 	reJSONParseDirect = regexp.MustCompile(`JSON\.parse\s*\(\s*(?:req\.body|request\.body|data|input|payload|body)\s*\)`)
 	reTypeCheckAfter  = regexp.MustCompile(`(?i)(?:typeof\s+|instanceof\s+|Array\.isArray\s*\(|Number\.isFinite\s*\(|Number\.isInteger\s*\(|\.constructor\s*===)`)
 )
 
-// GTSS-VAL-013: Missing array bounds check
+// BATOU-VAL-013: Missing array bounds check
 var (
 	reArrayIndexVar = regexp.MustCompile(`\w+\s*\[\s*(?:i|j|k|idx|index|n|pos|offset|count)\s*\]`)
 	reBoundsCheck   = regexp.MustCompile(`(?i)(?:\.length|\.size|len\s*\(|\.count|bounds|IndexOutOfBounds|ArrayIndexOutOf|index\s*[<>]=?\s*|[<>]=?\s*(?:len|\.length|\.size|\.count))`)
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-006: Missing Input Length Validation
+// BATOU-VAL-006: Missing Input Length Validation
 // ---------------------------------------------------------------------------
 
 type MissingInputLengthValidation struct{}
 
-func (r *MissingInputLengthValidation) ID() string                     { return "GTSS-VAL-006" }
+func (r *MissingInputLengthValidation) ID() string                     { return "BATOU-VAL-006" }
 func (r *MissingInputLengthValidation) Name() string                   { return "MissingInputLengthValidation" }
 func (r *MissingInputLengthValidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingInputLengthValidation) Description() string {
@@ -122,12 +122,12 @@ func (r *MissingInputLengthValidation) Scan(ctx *rules.ScanContext) []rules.Find
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-007: ReDoS - Catastrophic Backtracking
+// BATOU-VAL-007: ReDoS - Catastrophic Backtracking
 // ---------------------------------------------------------------------------
 
 type ReDoSPattern struct{}
 
-func (r *ReDoSPattern) ID() string                     { return "GTSS-VAL-007" }
+func (r *ReDoSPattern) ID() string                     { return "BATOU-VAL-007" }
 func (r *ReDoSPattern) Name() string                   { return "ReDoSPattern" }
 func (r *ReDoSPattern) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ReDoSPattern) Description() string {
@@ -175,12 +175,12 @@ func (r *ReDoSPattern) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-008: Integer Overflow from Unchecked String-to-Int
+// BATOU-VAL-008: Integer Overflow from Unchecked String-to-Int
 // ---------------------------------------------------------------------------
 
 type IntegerOverflowConversion struct{}
 
-func (r *IntegerOverflowConversion) ID() string                     { return "GTSS-VAL-008" }
+func (r *IntegerOverflowConversion) ID() string                     { return "BATOU-VAL-008" }
 func (r *IntegerOverflowConversion) Name() string                   { return "IntegerOverflowConversion" }
 func (r *IntegerOverflowConversion) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *IntegerOverflowConversion) Description() string {
@@ -245,12 +245,12 @@ func (r *IntegerOverflowConversion) Scan(ctx *rules.ScanContext) []rules.Finding
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-009: Email Validation Using Regex Only
+// BATOU-VAL-009: Email Validation Using Regex Only
 // ---------------------------------------------------------------------------
 
 type EmailRegexOnlyValidation struct{}
 
-func (r *EmailRegexOnlyValidation) ID() string                     { return "GTSS-VAL-009" }
+func (r *EmailRegexOnlyValidation) ID() string                     { return "BATOU-VAL-009" }
 func (r *EmailRegexOnlyValidation) Name() string                   { return "EmailRegexOnlyValidation" }
 func (r *EmailRegexOnlyValidation) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *EmailRegexOnlyValidation) Description() string {
@@ -304,12 +304,12 @@ func (r *EmailRegexOnlyValidation) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-010: Missing Null/Undefined Check Before Use
+// BATOU-VAL-010: Missing Null/Undefined Check Before Use
 // ---------------------------------------------------------------------------
 
 type MissingNullCheck struct{}
 
-func (r *MissingNullCheck) ID() string                     { return "GTSS-VAL-010" }
+func (r *MissingNullCheck) ID() string                     { return "BATOU-VAL-010" }
 func (r *MissingNullCheck) Name() string                   { return "MissingNullCheck" }
 func (r *MissingNullCheck) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingNullCheck) Description() string {
@@ -361,12 +361,12 @@ func (r *MissingNullCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-011: Trusting Client-Side Validation Only
+// BATOU-VAL-011: Trusting Client-Side Validation Only
 // ---------------------------------------------------------------------------
 
 type ClientSideValidationOnly struct{}
 
-func (r *ClientSideValidationOnly) ID() string                     { return "GTSS-VAL-011" }
+func (r *ClientSideValidationOnly) ID() string                     { return "BATOU-VAL-011" }
 func (r *ClientSideValidationOnly) Name() string                   { return "ClientSideValidationOnly" }
 func (r *ClientSideValidationOnly) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ClientSideValidationOnly) Description() string {
@@ -413,12 +413,12 @@ func (r *ClientSideValidationOnly) Scan(ctx *rules.ScanContext) []rules.Finding 
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-012: Type Confusion from Unvalidated JSON Parsing
+// BATOU-VAL-012: Type Confusion from Unvalidated JSON Parsing
 // ---------------------------------------------------------------------------
 
 type TypeConfusionJSON struct{}
 
-func (r *TypeConfusionJSON) ID() string                     { return "GTSS-VAL-012" }
+func (r *TypeConfusionJSON) ID() string                     { return "BATOU-VAL-012" }
 func (r *TypeConfusionJSON) Name() string                   { return "TypeConfusionJSON" }
 func (r *TypeConfusionJSON) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *TypeConfusionJSON) Description() string {
@@ -471,12 +471,12 @@ func (r *TypeConfusionJSON) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-VAL-013: Missing Array Bounds Check
+// BATOU-VAL-013: Missing Array Bounds Check
 // ---------------------------------------------------------------------------
 
 type MissingArrayBoundsCheck struct{}
 
-func (r *MissingArrayBoundsCheck) ID() string                     { return "GTSS-VAL-013" }
+func (r *MissingArrayBoundsCheck) ID() string                     { return "BATOU-VAL-013" }
 func (r *MissingArrayBoundsCheck) Name() string                   { return "MissingArrayBoundsCheck" }
 func (r *MissingArrayBoundsCheck) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingArrayBoundsCheck) Description() string {

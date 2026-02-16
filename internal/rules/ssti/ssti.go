@@ -4,27 +4,27 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-SSTI-001: Jinja2 render_template_string with user input
+// BATOU-SSTI-001: Jinja2 render_template_string with user input
 var (
 	reJinja2RenderStr = regexp.MustCompile(`(?i)\brender_template_string\s*\(\s*(?:request\.|user_input|param|data|args|form|f["']|["'][^"']*["']\s*[+%]|["'][^"']*["']\s*\.format\()`)
 	reJinja2RenderVar = regexp.MustCompile(`(?i)\brender_template_string\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
 )
 
-// GTSS-SSTI-002: Mako Template from string
+// BATOU-SSTI-002: Mako Template from string
 var (
 	reMakoTemplate     = regexp.MustCompile(`(?i)\bTemplate\s*\(\s*(?:request\.|user_input|param|data|f["']|["'][^"']*["']\s*[+%]|["'][^"']*["']\s*\.format\()`)
 	reMakoFromString   = regexp.MustCompile(`(?i)(?:mako|mako\.template)\s*\.\s*Template\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
 	reMakoTemplateLookup = regexp.MustCompile(`(?i)\bTemplateLookup\b.*\bget_template\s*\(\s*(?:request\.|user_input|param)`)
 )
 
-// GTSS-SSTI-003: Twig/Smarty user input in template string (PHP)
+// BATOU-SSTI-003: Twig/Smarty user input in template string (PHP)
 var (
 	reTwigCreateTemplate = regexp.MustCompile(`(?i)\$twig\s*->\s*createTemplate\s*\(\s*\$(?:_GET|_POST|_REQUEST|input|param|data|user)`)
 	reTwigRenderStr      = regexp.MustCompile(`(?i)\$twig\s*->\s*render\s*\(\s*\$(?:_GET|_POST|_REQUEST|input|param|data|user)`)
@@ -32,14 +32,14 @@ var (
 	reTwigFromString     = regexp.MustCompile(`(?i)createTemplate\s*\(\s*["']string:["']\s*\.\s*\$`)
 )
 
-// GTSS-SSTI-004: Velocity evaluate with user input
+// BATOU-SSTI-004: Velocity evaluate with user input
 var (
 	reVelocityEval = regexp.MustCompile(`(?i)\.evaluate\s*\(\s*[^,]*,\s*[^,]*,\s*[^,]*,\s*(?:request\.getParameter|input|param|userData|userInput)`)
 	reVelocityMerge = regexp.MustCompile(`(?i)Velocity\s*\.\s*(?:evaluate|mergeTemplate)\s*\(.*(?:request\.|getParameter|getQueryString)`)
 	reVelocityTemplate = regexp.MustCompile(`(?i)new\s+StringResourceLoader\b.*(?:request|param|input|user)`)
 )
 
-// GTSS-SSTI-005: Thymeleaf fragment expression injection
+// BATOU-SSTI-005: Thymeleaf fragment expression injection
 var (
 	reThymeleafFragment    = regexp.MustCompile(`(?i)(?:return|=)\s*["'][^"']*::.*["']\s*\+\s*(?:request\.getParameter|input|param|user)`)
 	reThymeleafExpression  = regexp.MustCompile(`(?i)(?:templateEngine|engine)\s*\.\s*process\s*\(\s*["'][^"']*\$\{.*\}[^"']*["']\s*\+`)
@@ -47,21 +47,21 @@ var (
 	reThymeleafViewReturn  = regexp.MustCompile(`(?i)(?:return|view\s*=)\s*["'][^"']*["']\s*\+\s*(?:request\.getParameter|getParam|userInput|input)\s*\(`)
 )
 
-// GTSS-SSTI-006: Pebble template from user string
+// BATOU-SSTI-006: Pebble template from user string
 var (
 	rePebbleLiteral   = regexp.MustCompile(`(?i)\bnew\s+PebbleEngine\b`)
 	rePebbleCompile   = regexp.MustCompile(`(?i)\.compileTemplate\s*\(\s*(?:request\.|input|param|user|new\s+StringReader\s*\(\s*(?:request|input|param|user))`)
 	rePebbleGetLiteral = regexp.MustCompile(`(?i)pebbleEngine\.getLiteralTemplate\s*\(\s*(?:request\.|input|param|user)`)
 )
 
-// GTSS-SSTI-007: Freemarker template from user string
+// BATOU-SSTI-007: Freemarker template from user string
 var (
 	reFreemarkerNew    = regexp.MustCompile(`(?i)\bnew\s+Template\s*\(\s*["'][^"']*["']\s*,\s*new\s+StringReader\s*\(\s*(?:request\.getParameter|input|param|user)`)
 	reFreemarkerParse  = regexp.MustCompile(`(?i)\.(?:putTemplate|getTemplate)\s*\(\s*["'][^"']*["']\s*,\s*(?:request\.|input|param|user)`)
 	reFreemarkerFromStr = regexp.MustCompile(`(?i)configuration\s*\.\s*getTemplate\s*\(\s*(?:request|input|param|user)`)
 )
 
-// GTSS-SSTI-008: ERB template new with user input (Ruby)
+// BATOU-SSTI-008: ERB template new with user input (Ruby)
 var (
 	reERBNew       = regexp.MustCompile(`(?i)\bERB\.new\s*\(\s*(?:params|request|input|user_input|data)`)
 	reERBNewConcat = regexp.MustCompile(`(?i)\bERB\.new\s*\(\s*["'][^"']*["']\s*\+`)
@@ -70,21 +70,21 @@ var (
 	reHamlEval     = regexp.MustCompile(`(?i)\bHaml::Engine\.new\.render\s*\(\s*(?:params|request|input)`)
 )
 
-// GTSS-SSTI-009: Handlebars.compile with user data
+// BATOU-SSTI-009: Handlebars.compile with user data
 var (
 	reHandlebarsCompile   = regexp.MustCompile(`(?i)\bHandlebars\.compile\s*\(\s*(?:req\.|request\.|user|input|param|data\b|body\b)`)
 	reHandlebarsPrecompile = regexp.MustCompile(`(?i)\bHandlebars\.precompile\s*\(\s*(?:req\.|request\.|user|input|param|data\b)`)
 	reHandlebarsTemplate  = regexp.MustCompile(`(?i)\bHandlebars\.template\s*\(\s*(?:req\.|request\.|user|input|param)`)
 )
 
-// GTSS-SSTI-010: Nunjucks renderString with user input
+// BATOU-SSTI-010: Nunjucks renderString with user input
 var (
 	reNunjucksRenderStr = regexp.MustCompile(`(?i)\bnunjucks\.renderString\s*\(\s*(?:req\.|request\.|user|input|param|data\b)`)
 	reNunjucksCompile   = regexp.MustCompile(`(?i)\bnunjucks\.compile\s*\(\s*(?:req\.|request\.|user|input|param|data\b)`)
 	reNunjucksFromStr   = regexp.MustCompile(`(?i)\bnew\s+nunjucks\.Environment\b`)
 )
 
-// GTSS-SSTI-011: Pug/Jade compile with user input
+// BATOU-SSTI-011: Pug/Jade compile with user input
 var (
 	rePugCompile   = regexp.MustCompile(`(?i)\bpug\.compile\s*\(\s*(?:req\.|request\.|user|input|param|data\b|body\b)`)
 	rePugRender    = regexp.MustCompile(`(?i)\bpug\.render\s*\(\s*(?:req\.|request\.|user|input|param|data\b|body\b)`)
@@ -92,7 +92,7 @@ var (
 	reJadeRender   = regexp.MustCompile(`(?i)\bjade\.render\s*\(\s*(?:req\.|request\.|user|input|param|data\b|body\b)`)
 )
 
-// GTSS-SSTI-012: Golang template.New().Parse with user input
+// BATOU-SSTI-012: Golang template.New().Parse with user input
 var (
 	reGoTemplateParse    = regexp.MustCompile(`(?i)template\.(?:New|Must)\s*\([^)]*\)\s*\.\s*Parse\s*\(\s*(?:r\.(?:FormValue|URL\.Query|Body|PostForm)|input|param|user|req\.)`)
 	reGoTemplateParseVar = regexp.MustCompile(`(?i)template\.(?:New|Must)\s*\([^)]*\)\s*\.\s*Parse\s*\(\s*[a-zA-Z_]\w*\s*\)`)
@@ -119,12 +119,12 @@ func truncate(s string, maxLen int) string {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-001: Jinja2 render_template_string with user input
+// BATOU-SSTI-001: Jinja2 render_template_string with user input
 // ---------------------------------------------------------------------------
 
 type Jinja2SSTI struct{}
 
-func (r *Jinja2SSTI) ID() string                     { return "GTSS-SSTI-001" }
+func (r *Jinja2SSTI) ID() string                     { return "BATOU-SSTI-001" }
 func (r *Jinja2SSTI) Name() string                   { return "Jinja2SSTI" }
 func (r *Jinja2SSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *Jinja2SSTI) Description() string {
@@ -168,12 +168,12 @@ func (r *Jinja2SSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-002: Mako template.Template from string
+// BATOU-SSTI-002: Mako template.Template from string
 // ---------------------------------------------------------------------------
 
 type MakoSSTI struct{}
 
-func (r *MakoSSTI) ID() string                     { return "GTSS-SSTI-002" }
+func (r *MakoSSTI) ID() string                     { return "BATOU-SSTI-002" }
 func (r *MakoSSTI) Name() string                   { return "MakoSSTI" }
 func (r *MakoSSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MakoSSTI) Description() string {
@@ -217,12 +217,12 @@ func (r *MakoSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-003: Twig/Smarty user input in template string (PHP)
+// BATOU-SSTI-003: Twig/Smarty user input in template string (PHP)
 // ---------------------------------------------------------------------------
 
 type TwigSmartySSTI struct{}
 
-func (r *TwigSmartySSTI) ID() string                     { return "GTSS-SSTI-003" }
+func (r *TwigSmartySSTI) ID() string                     { return "BATOU-SSTI-003" }
 func (r *TwigSmartySSTI) Name() string                   { return "TwigSmartySSTI" }
 func (r *TwigSmartySSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TwigSmartySSTI) Description() string {
@@ -266,12 +266,12 @@ func (r *TwigSmartySSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-004: Velocity evaluate with user input
+// BATOU-SSTI-004: Velocity evaluate with user input
 // ---------------------------------------------------------------------------
 
 type VelocitySSTI struct{}
 
-func (r *VelocitySSTI) ID() string                     { return "GTSS-SSTI-004" }
+func (r *VelocitySSTI) ID() string                     { return "BATOU-SSTI-004" }
 func (r *VelocitySSTI) Name() string                   { return "VelocitySSTI" }
 func (r *VelocitySSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *VelocitySSTI) Description() string {
@@ -315,12 +315,12 @@ func (r *VelocitySSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-005: Thymeleaf fragment expression injection
+// BATOU-SSTI-005: Thymeleaf fragment expression injection
 // ---------------------------------------------------------------------------
 
 type ThymeleafSSTI struct{}
 
-func (r *ThymeleafSSTI) ID() string                     { return "GTSS-SSTI-005" }
+func (r *ThymeleafSSTI) ID() string                     { return "BATOU-SSTI-005" }
 func (r *ThymeleafSSTI) Name() string                   { return "ThymeleafSSTI" }
 func (r *ThymeleafSSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ThymeleafSSTI) Description() string {
@@ -364,12 +364,12 @@ func (r *ThymeleafSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-006: Pebble template from user string
+// BATOU-SSTI-006: Pebble template from user string
 // ---------------------------------------------------------------------------
 
 type PebbleSSTI struct{}
 
-func (r *PebbleSSTI) ID() string                     { return "GTSS-SSTI-006" }
+func (r *PebbleSSTI) ID() string                     { return "BATOU-SSTI-006" }
 func (r *PebbleSSTI) Name() string                   { return "PebbleSSTI" }
 func (r *PebbleSSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PebbleSSTI) Description() string {
@@ -413,12 +413,12 @@ func (r *PebbleSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-007: Freemarker Template from user string
+// BATOU-SSTI-007: Freemarker Template from user string
 // ---------------------------------------------------------------------------
 
 type FreemarkerSSTI struct{}
 
-func (r *FreemarkerSSTI) ID() string                     { return "GTSS-SSTI-007" }
+func (r *FreemarkerSSTI) ID() string                     { return "BATOU-SSTI-007" }
 func (r *FreemarkerSSTI) Name() string                   { return "FreemarkerSSTI" }
 func (r *FreemarkerSSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FreemarkerSSTI) Description() string {
@@ -462,12 +462,12 @@ func (r *FreemarkerSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-008: ERB template new with user input (Ruby)
+// BATOU-SSTI-008: ERB template new with user input (Ruby)
 // ---------------------------------------------------------------------------
 
 type ERBSSTI struct{}
 
-func (r *ERBSSTI) ID() string                     { return "GTSS-SSTI-008" }
+func (r *ERBSSTI) ID() string                     { return "BATOU-SSTI-008" }
 func (r *ERBSSTI) Name() string                   { return "ERBSSTI" }
 func (r *ERBSSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ERBSSTI) Description() string {
@@ -511,12 +511,12 @@ func (r *ERBSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-009: Handlebars.compile with user data
+// BATOU-SSTI-009: Handlebars.compile with user data
 // ---------------------------------------------------------------------------
 
 type HandlebarsSSTI struct{}
 
-func (r *HandlebarsSSTI) ID() string                     { return "GTSS-SSTI-009" }
+func (r *HandlebarsSSTI) ID() string                     { return "BATOU-SSTI-009" }
 func (r *HandlebarsSSTI) Name() string                   { return "HandlebarsSSTI" }
 func (r *HandlebarsSSTI) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *HandlebarsSSTI) Description() string {
@@ -560,12 +560,12 @@ func (r *HandlebarsSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-010: Nunjucks renderString with user input
+// BATOU-SSTI-010: Nunjucks renderString with user input
 // ---------------------------------------------------------------------------
 
 type NunjucksSSTI struct{}
 
-func (r *NunjucksSSTI) ID() string                     { return "GTSS-SSTI-010" }
+func (r *NunjucksSSTI) ID() string                     { return "BATOU-SSTI-010" }
 func (r *NunjucksSSTI) Name() string                   { return "NunjucksSSTI" }
 func (r *NunjucksSSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NunjucksSSTI) Description() string {
@@ -609,12 +609,12 @@ func (r *NunjucksSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-011: Pug/Jade compile with user input
+// BATOU-SSTI-011: Pug/Jade compile with user input
 // ---------------------------------------------------------------------------
 
 type PugSSTI struct{}
 
-func (r *PugSSTI) ID() string                     { return "GTSS-SSTI-011" }
+func (r *PugSSTI) ID() string                     { return "BATOU-SSTI-011" }
 func (r *PugSSTI) Name() string                   { return "PugSSTI" }
 func (r *PugSSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PugSSTI) Description() string {
@@ -658,12 +658,12 @@ func (r *PugSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SSTI-012: Golang template.New().Parse with user input
+// BATOU-SSTI-012: Golang template.New().Parse with user input
 // ---------------------------------------------------------------------------
 
 type GoTemplateSSTI struct{}
 
-func (r *GoTemplateSSTI) ID() string                     { return "GTSS-SSTI-012" }
+func (r *GoTemplateSSTI) ID() string                     { return "BATOU-SSTI-012" }
 func (r *GoTemplateSSTI) Name() string                   { return "GoTemplateSSTI" }
 func (r *GoTemplateSSTI) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GoTemplateSSTI) Description() string {

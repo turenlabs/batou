@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
@@ -117,7 +117,7 @@ func truncate(s string, maxLen int) string {
 
 type InsecureURLSession struct{}
 
-func (r *InsecureURLSession) ID() string                      { return "GTSS-SWIFT-001" }
+func (r *InsecureURLSession) ID() string                      { return "BATOU-SWIFT-001" }
 func (r *InsecureURLSession) Name() string                    { return "InsecureURLSession" }
 func (r *InsecureURLSession) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureURLSession) Languages() []rules.Language {
@@ -200,7 +200,7 @@ func (r *InsecureURLSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ATSBypass struct{}
 
-func (r *ATSBypass) ID() string                      { return "GTSS-SWIFT-002" }
+func (r *ATSBypass) ID() string                      { return "BATOU-SWIFT-002" }
 func (r *ATSBypass) Name() string                    { return "ATSBypass" }
 func (r *ATSBypass) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ATSBypass) Languages() []rules.Language {
@@ -294,7 +294,7 @@ func (r *ATSBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureKeychain struct{}
 
-func (r *InsecureKeychain) ID() string                      { return "GTSS-SWIFT-003" }
+func (r *InsecureKeychain) ID() string                      { return "BATOU-SWIFT-003" }
 func (r *InsecureKeychain) Name() string                    { return "InsecureKeychain" }
 func (r *InsecureKeychain) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureKeychain) Languages() []rules.Language {
@@ -354,7 +354,7 @@ func (r *InsecureKeychain) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UIWebViewUsage struct{}
 
-func (r *UIWebViewUsage) ID() string                      { return "GTSS-SWIFT-004" }
+func (r *UIWebViewUsage) ID() string                      { return "BATOU-SWIFT-004" }
 func (r *UIWebViewUsage) Name() string                    { return "UIWebViewUsage" }
 func (r *UIWebViewUsage) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UIWebViewUsage) Languages() []rules.Language {
@@ -402,7 +402,7 @@ func (r *UIWebViewUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HardcodedSecrets struct{}
 
-func (r *HardcodedSecrets) ID() string                      { return "GTSS-SWIFT-005" }
+func (r *HardcodedSecrets) ID() string                      { return "BATOU-SWIFT-005" }
 func (r *HardcodedSecrets) Name() string                    { return "HardcodedSecrets" }
 func (r *HardcodedSecrets) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *HardcodedSecrets) Languages() []rules.Language {
@@ -480,7 +480,7 @@ func (r *HardcodedSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureRandom struct{}
 
-func (r *InsecureRandom) ID() string                      { return "GTSS-SWIFT-006" }
+func (r *InsecureRandom) ID() string                      { return "BATOU-SWIFT-006" }
 func (r *InsecureRandom) Name() string                    { return "InsecureRandom" }
 func (r *InsecureRandom) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureRandom) Languages() []rules.Language {
@@ -555,7 +555,7 @@ func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SQLiteInjection struct{}
 
-func (r *SQLiteInjection) ID() string                      { return "GTSS-SWIFT-007" }
+func (r *SQLiteInjection) ID() string                      { return "BATOU-SWIFT-007" }
 func (r *SQLiteInjection) Name() string                    { return "SQLiteInjection" }
 func (r *SQLiteInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *SQLiteInjection) Languages() []rules.Language {
@@ -623,7 +623,7 @@ func (r *SQLiteInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WKWebViewInjection struct{}
 
-func (r *WKWebViewInjection) ID() string                      { return "GTSS-SWIFT-008" }
+func (r *WKWebViewInjection) ID() string                      { return "BATOU-SWIFT-008" }
 func (r *WKWebViewInjection) Name() string                    { return "WKWebViewInjection" }
 func (r *WKWebViewInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WKWebViewInjection) Languages() []rules.Language {
@@ -683,7 +683,7 @@ func (r *WKWebViewInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureDataStorage struct{}
 
-func (r *InsecureDataStorage) ID() string                      { return "GTSS-SWIFT-009" }
+func (r *InsecureDataStorage) ID() string                      { return "BATOU-SWIFT-009" }
 func (r *InsecureDataStorage) Name() string                    { return "InsecureDataStorage" }
 func (r *InsecureDataStorage) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureDataStorage) Languages() []rules.Language {
@@ -743,7 +743,7 @@ func (r *InsecureDataStorage) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JailbreakDetectionBypass struct{}
 
-func (r *JailbreakDetectionBypass) ID() string                      { return "GTSS-SWIFT-010" }
+func (r *JailbreakDetectionBypass) ID() string                      { return "BATOU-SWIFT-010" }
 func (r *JailbreakDetectionBypass) Name() string                    { return "JailbreakDetectionBypass" }
 func (r *JailbreakDetectionBypass) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *JailbreakDetectionBypass) Languages() []rules.Language {

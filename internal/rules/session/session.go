@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
 // ---------------------------------------------------------------------------
 
-// GTSS-SESS-001: Session fixation - no regeneration after login
+// BATOU-SESS-001: Session fixation - no regeneration after login
 var (
 	reLoginNoRegenPy     = regexp.MustCompile(`(?i)(?:def\s+login|def\s+authenticate|def\s+sign_in)\s*\(`)
 	reSessionRegenPy     = regexp.MustCompile(`(?i)(?:request\.session\.cycle_key|session\.regenerate|request\.session\.flush|session_regenerate_id)`)
@@ -25,7 +25,7 @@ var (
 	reSessionRegenJS     = regexp.MustCompile(`(?i)(?:req\.session\.regenerate|session\.regenerate|req\.session\.destroy)`)
 )
 
-// GTSS-SESS-002: Session cookie without HttpOnly flag
+// BATOU-SESS-002: Session cookie without HttpOnly flag
 var (
 	reCookieNoHttpOnly    = regexp.MustCompile(`(?i)(?:Set-Cookie|cookie)\s*[=:]\s*["'][^"']*(?:;|$)`)
 	reCookieHttpOnlyFalse = regexp.MustCompile(`(?i)(?:httpOnly|http_only|httponly)\s*[=:]\s*(?:false|False|FALSE|0)`)
@@ -33,41 +33,41 @@ var (
 	rePHPIniNoHttpOnly    = regexp.MustCompile(`(?i)session\.cookie_httponly\s*=\s*(?:0|off|false|Off|False)`)
 )
 
-// GTSS-SESS-003: Session cookie without Secure flag
+// BATOU-SESS-003: Session cookie without Secure flag
 var (
 	reCookieSecureFalse    = regexp.MustCompile(`(?i)(?:secure)\s*[=:]\s*(?:false|False|FALSE|0)`)
 	reSessionCookieNoSecure = regexp.MustCompile(`(?i)(?:session\.cookie_secure|SESSION_COOKIE_SECURE|cookie_secure)\s*[=:]\s*(?:false|False|FALSE|0)`)
 	rePHPIniNoSecure       = regexp.MustCompile(`(?i)session\.cookie_secure\s*=\s*(?:0|off|false|Off|False)`)
 )
 
-// GTSS-SESS-004: Session cookie without SameSite
+// BATOU-SESS-004: Session cookie without SameSite
 var (
 	reCookieSameSiteNone = regexp.MustCompile(`(?i)(?:sameSite|same_site|samesite)\s*[=:]\s*["']?(?:none|None)["']?`)
 	reSessionNoSameSite  = regexp.MustCompile(`(?i)(?:SESSION_COOKIE_SAMESITE|session\.cookie_samesite)\s*[=:]\s*["']?(?:none|None|false|False)["']?`)
 )
 
-// GTSS-SESS-005: Session data in localStorage/sessionStorage
+// BATOU-SESS-005: Session data in localStorage/sessionStorage
 var (
 	reLocalStorageSession   = regexp.MustCompile(`(?i)localStorage\.setItem\s*\(\s*["'](?:session|sessionId|session_id|sid|PHPSESSID|JSESSIONID|connect\.sid)["']`)
 	reSessionStorageSession = regexp.MustCompile(`(?i)sessionStorage\.setItem\s*\(\s*["'](?:session|sessionId|session_id|sid|token|auth)["']`)
 	reLocalStorageDirect    = regexp.MustCompile(`(?i)localStorage\s*\[\s*["'](?:session|sessionId|session_id|sid)["']\s*\]\s*=`)
 )
 
-// GTSS-SESS-006: Session ID in URL/query parameter
+// BATOU-SESS-006: Session ID in URL/query parameter
 var (
 	reSessionInURL       = regexp.MustCompile(`(?i)(?:\?|&)(?:session|sessionId|session_id|sid|PHPSESSID|JSESSIONID|sessid)\s*=`)
 	reSessionURLParam    = regexp.MustCompile(`(?i)(?:req\.(?:query|params)|request\.(?:GET|args)|getParameter)\s*[\[(]\s*["'](?:session|sessionId|session_id|sid|PHPSESSID|JSESSIONID)["']`)
 	reSessionURLConcat   = regexp.MustCompile(`(?i)(?:url|uri|href|redirect)\s*[=+]\s*[^;]*[?&](?:session|sessionId|session_id|sid)=`)
 )
 
-// GTSS-SESS-007: Excessive session timeout (>24h)
+// BATOU-SESS-007: Excessive session timeout (>24h)
 var (
 	reSessionTimeoutLarge = regexp.MustCompile(`(?i)(?:session\.?(?:_)?(?:timeout|maxAge|max_age|lifetime|cookie_age|expire|expiry|maxInactiveInterval))\s*[=:]\s*(\d+)`)
 	reSessionMaxAge       = regexp.MustCompile(`(?i)(?:maxAge|max_age|expires|cookie_lifetime)\s*[=:]\s*(\d+)`)
 	rePHPSessionGC        = regexp.MustCompile(`(?i)session\.gc_maxlifetime\s*=\s*(\d+)`)
 )
 
-// GTSS-SESS-008: Session not invalidated on logout
+// BATOU-SESS-008: Session not invalidated on logout
 var (
 	reLogoutFuncPy    = regexp.MustCompile(`(?i)(?:def\s+logout|def\s+sign_out|def\s+log_out)\s*\(`)
 	reLogoutFuncJS    = regexp.MustCompile(`(?i)(?:(?:app|router)\.\s*(?:post|get|delete)\s*\(\s*["']/(?:logout|signout|sign-out)["']|function\s+logout|const\s+logout)`)
@@ -76,7 +76,7 @@ var (
 	reSessionDestroy  = regexp.MustCompile(`(?i)(?:session\.(?:destroy|invalidate|flush|clear|delete|remove|abandon)|session_destroy|session_unset|req\.session\.destroy|request\.session\.flush|logout\(|sign_out|SecurityContextHolder\.clearContext)`)
 )
 
-// GTSS-SESS-009: Predictable session ID generation
+// BATOU-SESS-009: Predictable session ID generation
 var (
 	rePredictableSessionMD5  = regexp.MustCompile(`(?i)(?:session_id|session|sid|sessionId)\s*=\s*(?:md5|sha1|hashlib\.md5|hashlib\.sha1|MessageDigest\.getInstance\s*\(\s*["']MD5["']\)|DigestUtils\.md5Hex)\s*\(`)
 	rePredictableSessionTime = regexp.MustCompile(`(?i)(?:session_id|session|sid|sessionId)\s*=\s*(?:str\s*\(\s*time\.|Date\.now|System\.currentTimeMillis|microtime|Time\.now)`)
@@ -84,7 +84,7 @@ var (
 	rePredictableSessionSeq  = regexp.MustCompile(`(?i)(?:session_id|session|sid|sessionId)\s*=\s*(?:str\s*\(\s*(?:counter|next_id|seq|auto_increment)|[a-zA-Z_]*(?:counter|seq|next)\s*\+\+)`)
 )
 
-// GTSS-SESS-010: Sensitive data stored in session cookie
+// BATOU-SESS-010: Sensitive data stored in session cookie
 var (
 	reSensitiveCookieData = regexp.MustCompile(`(?i)(?:(?:Set-Cookie|cookie|setCookie|set_cookie)\s*[=:(]\s*[^;]*(?:password|passwd|secret|credit.?card|ssn|social.?security|bank.?account|cvv|pin)\s*[=:])`)
 	reSessionStoreSensitive = regexp.MustCompile(`(?i)(?:session|req\.session|request\.session)\s*\[\s*["'](?:password|passwd|secret|credit_card|ssn|social_security|bank_account|cvv|pin)["']\s*\]\s*=`)
@@ -129,12 +129,12 @@ func hasNearbyPattern(lines []string, idx, before, after int, re *regexp.Regexp)
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SESS-001: Session fixation - no regeneration after login
+// BATOU-SESS-001: Session fixation - no regeneration after login
 // ---------------------------------------------------------------------------
 
 type SessionFixation struct{}
 
-func (r *SessionFixation) ID() string                     { return "GTSS-SESS-001" }
+func (r *SessionFixation) ID() string                     { return "BATOU-SESS-001" }
 func (r *SessionFixation) Name() string                   { return "SessionFixation" }
 func (r *SessionFixation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SessionFixation) Description() string {
@@ -202,12 +202,12 @@ func (r *SessionFixation) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SESS-002: Session cookie without HttpOnly flag
+// BATOU-SESS-002: Session cookie without HttpOnly flag
 // ---------------------------------------------------------------------------
 
 type SessionNoHttpOnly struct{}
 
-func (r *SessionNoHttpOnly) ID() string                     { return "GTSS-SESS-002" }
+func (r *SessionNoHttpOnly) ID() string                     { return "BATOU-SESS-002" }
 func (r *SessionNoHttpOnly) Name() string                   { return "SessionNoHttpOnly" }
 func (r *SessionNoHttpOnly) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SessionNoHttpOnly) Description() string {
@@ -251,12 +251,12 @@ func (r *SessionNoHttpOnly) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SESS-003: Session cookie without Secure flag
+// BATOU-SESS-003: Session cookie without Secure flag
 // ---------------------------------------------------------------------------
 
 type SessionNoSecure struct{}
 
-func (r *SessionNoSecure) ID() string                     { return "GTSS-SESS-003" }
+func (r *SessionNoSecure) ID() string                     { return "BATOU-SESS-003" }
 func (r *SessionNoSecure) Name() string                   { return "SessionNoSecure" }
 func (r *SessionNoSecure) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SessionNoSecure) Description() string {
@@ -300,12 +300,12 @@ func (r *SessionNoSecure) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SESS-004: Session cookie without SameSite
+// BATOU-SESS-004: Session cookie without SameSite
 // ---------------------------------------------------------------------------
 
 type SessionNoSameSite struct{}
 
-func (r *SessionNoSameSite) ID() string                     { return "GTSS-SESS-004" }
+func (r *SessionNoSameSite) ID() string                     { return "BATOU-SESS-004" }
 func (r *SessionNoSameSite) Name() string                   { return "SessionNoSameSite" }
 func (r *SessionNoSameSite) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SessionNoSameSite) Description() string {
@@ -349,12 +349,12 @@ func (r *SessionNoSameSite) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SESS-005: Session data in localStorage/sessionStorage
+// BATOU-SESS-005: Session data in localStorage/sessionStorage
 // ---------------------------------------------------------------------------
 
 type SessionInStorage struct{}
 
-func (r *SessionInStorage) ID() string                     { return "GTSS-SESS-005" }
+func (r *SessionInStorage) ID() string                     { return "BATOU-SESS-005" }
 func (r *SessionInStorage) Name() string                   { return "SessionInStorage" }
 func (r *SessionInStorage) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SessionInStorage) Description() string {
@@ -398,12 +398,12 @@ func (r *SessionInStorage) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SESS-006: Session ID in URL/query parameter
+// BATOU-SESS-006: Session ID in URL/query parameter
 // ---------------------------------------------------------------------------
 
 type SessionInURL struct{}
 
-func (r *SessionInURL) ID() string                     { return "GTSS-SESS-006" }
+func (r *SessionInURL) ID() string                     { return "BATOU-SESS-006" }
 func (r *SessionInURL) Name() string                   { return "SessionInURL" }
 func (r *SessionInURL) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SessionInURL) Description() string {
@@ -447,12 +447,12 @@ func (r *SessionInURL) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SESS-007: Excessive session timeout (>24h)
+// BATOU-SESS-007: Excessive session timeout (>24h)
 // ---------------------------------------------------------------------------
 
 type SessionExcessiveTimeout struct{}
 
-func (r *SessionExcessiveTimeout) ID() string                     { return "GTSS-SESS-007" }
+func (r *SessionExcessiveTimeout) ID() string                     { return "BATOU-SESS-007" }
 func (r *SessionExcessiveTimeout) Name() string                   { return "SessionExcessiveTimeout" }
 func (r *SessionExcessiveTimeout) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *SessionExcessiveTimeout) Description() string {
@@ -532,12 +532,12 @@ func (r *SessionExcessiveTimeout) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SESS-008: Session not invalidated on logout
+// BATOU-SESS-008: Session not invalidated on logout
 // ---------------------------------------------------------------------------
 
 type SessionNoLogoutInvalidation struct{}
 
-func (r *SessionNoLogoutInvalidation) ID() string                     { return "GTSS-SESS-008" }
+func (r *SessionNoLogoutInvalidation) ID() string                     { return "BATOU-SESS-008" }
 func (r *SessionNoLogoutInvalidation) Name() string                   { return "SessionNoLogoutInvalidation" }
 func (r *SessionNoLogoutInvalidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SessionNoLogoutInvalidation) Description() string {
@@ -595,12 +595,12 @@ func (r *SessionNoLogoutInvalidation) Scan(ctx *rules.ScanContext) []rules.Findi
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SESS-009: Predictable session ID generation
+// BATOU-SESS-009: Predictable session ID generation
 // ---------------------------------------------------------------------------
 
 type PredictableSessionID struct{}
 
-func (r *PredictableSessionID) ID() string                     { return "GTSS-SESS-009" }
+func (r *PredictableSessionID) ID() string                     { return "BATOU-SESS-009" }
 func (r *PredictableSessionID) Name() string                   { return "PredictableSessionID" }
 func (r *PredictableSessionID) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PredictableSessionID) Description() string {
@@ -644,12 +644,12 @@ func (r *PredictableSessionID) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-SESS-010: Sensitive data stored in session cookie
+// BATOU-SESS-010: Sensitive data stored in session cookie
 // ---------------------------------------------------------------------------
 
 type SensitiveSessionData struct{}
 
-func (r *SensitiveSessionData) ID() string                     { return "GTSS-SESS-010" }
+func (r *SensitiveSessionData) ID() string                     { return "BATOU-SESS-010" }
 func (r *SensitiveSessionData) Name() string                   { return "SensitiveSessionData" }
 func (r *SensitiveSessionData) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SensitiveSessionData) Description() string {

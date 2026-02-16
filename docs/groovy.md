@@ -2,7 +2,7 @@
 
 ## Overview
 
-GTSS provides comprehensive security scanning for Groovy code, covering Grails web applications, Jenkins pipeline scripts (Jenkinsfile), and general Groovy applications. Analysis includes four layers: regex-based pattern rules (348 rules, including 10 Groovy-specific rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
+Batou provides comprehensive security scanning for Groovy code, covering Grails web applications, Jenkins pipeline scripts (Jenkinsfile), and general Groovy applications. Analysis includes four layers: regex-based pattern rules (348 rules, including 10 Groovy-specific rules), tree-sitter AST structural analysis (comment-aware false positive filtering and structural code inspection via `internal/analyzer/`), intraprocedural taint tracking (source to sink with sanitizer recognition), and interprocedural call graph analysis.
 
 Groovy taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`) which provides accurate tracking through assignments, method calls, and property accesses by walking the parsed AST rather than relying on regex patterns.
 
@@ -25,7 +25,7 @@ The `DetectLanguage` function in `internal/analyzer/analyzer.go` maps these to t
 
 ## Rules (10)
 
-### GTSS-GVY-001: Command Injection (Critical)
+### BATOU-GVY-001: Command Injection (Critical)
 
 Detects command injection via Groovy's `String.execute()`, `Runtime.exec`, or `ProcessBuilder` with user-controlled input.
 
@@ -37,7 +37,7 @@ Detects command injection via Groovy's `String.execute()`, `Runtime.exec`, or `P
 
 **CWE:** CWE-78 (OS Command Injection)
 
-### GTSS-GVY-002: Code Injection (Critical)
+### BATOU-GVY-002: Code Injection (Critical)
 
 Detects code injection via `GroovyShell.evaluate`, `Eval.me`, and `GroovyScriptEngine` with user-controlled input.
 
@@ -49,7 +49,7 @@ Detects code injection via `GroovyShell.evaluate`, `Eval.me`, and `GroovyScriptE
 
 **CWE:** CWE-94 (Code Injection)
 
-### GTSS-GVY-003: SQL Injection (Critical)
+### BATOU-GVY-003: SQL Injection (Critical)
 
 Detects SQL injection via GString interpolation or string concatenation in Groovy SQL methods.
 
@@ -65,7 +65,7 @@ Detects SQL injection via GString interpolation or string concatenation in Groov
 
 **CWE:** CWE-89 (SQL Injection)
 
-### GTSS-GVY-004: Jenkins Pipeline Injection (Critical)
+### BATOU-GVY-004: Jenkins Pipeline Injection (Critical)
 
 Detects Jenkins pipeline script injection via GString interpolation in `sh`/`bat` steps or unsafe `load`.
 
@@ -79,7 +79,7 @@ Detects Jenkins pipeline script injection via GString interpolation in `sh`/`bat
 
 **CWE:** CWE-78 (OS Command Injection)
 
-### GTSS-GVY-005: GString Injection (High)
+### BATOU-GVY-005: GString Injection (High)
 
 Detects GString interpolation used in security-sensitive contexts like LDAP queries.
 
@@ -88,7 +88,7 @@ Detects GString interpolation used in security-sensitive contexts like LDAP quer
 
 **CWE:** CWE-74 (Injection)
 
-### GTSS-GVY-006: Grails Mass Assignment (High)
+### BATOU-GVY-006: Grails Mass Assignment (High)
 
 Detects Grails mass assignment via direct `params` binding without allowed fields or command objects.
 
@@ -103,7 +103,7 @@ Detects Grails mass assignment via direct `params` binding without allowed field
 
 **CWE:** CWE-915 (Improperly Controlled Modification of Dynamically-Determined Object Attributes)
 
-### GTSS-GVY-007: XXE via XmlSlurper/XmlParser (High)
+### BATOU-GVY-007: XXE via XmlSlurper/XmlParser (High)
 
 Detects XML parsing via `XmlSlurper` or `XmlParser` without disabling external entities.
 
@@ -113,7 +113,7 @@ Detects XML parsing via `XmlSlurper` or `XmlParser` without disabling external e
 
 **CWE:** CWE-611 (XXE)
 
-### GTSS-GVY-008: Insecure Deserialization (Critical)
+### BATOU-GVY-008: Insecure Deserialization (Critical)
 
 Detects insecure deserialization via `ObjectInputStream`, `XStream`, or `SnakeYAML` in Groovy context.
 
@@ -126,7 +126,7 @@ Detects insecure deserialization via `ObjectInputStream`, `XStream`, or `SnakeYA
 
 **CWE:** CWE-502 (Deserialization of Untrusted Data)
 
-### GTSS-GVY-009: Jenkins Credentials Leak (High)
+### BATOU-GVY-009: Jenkins Credentials Leak (High)
 
 Detects Jenkins credentials leaked via `sh`/`echo` steps or print statements in pipeline scripts.
 
@@ -139,7 +139,7 @@ Only triggers in files that use `withCredentials()` or `credentials()`.
 
 **CWE:** CWE-532 (Insertion of Sensitive Information into Log File)
 
-### GTSS-GVY-010: Grails XSS (High)
+### BATOU-GVY-010: Grails XSS (High)
 
 Detects XSS via unescaped output in Grails GSP views using `${}` without `encodeAsHTML` or `raw()`.
 
@@ -223,13 +223,13 @@ Rules with `LangAny` also apply to Groovy files:
 
 | Rule ID | Name | Severity | Description |
 |---------|------|----------|-------------|
-| GTSS-SEC-001 | HardcodedPassword | High | Hardcoded passwords and credentials |
-| GTSS-SEC-002 | APIKeyExposure | High | Hardcoded API keys from known providers |
-| GTSS-GEN-001 | DebugModeEnabled | Medium | Debug mode left enabled |
-| GTSS-AUTH-007 | PrivilegeEscalation | High | Privilege escalation patterns (CWE-269) |
-| GTSS-GEN-012 | InsecureDownload | High | Insecure download patterns (CWE-494) |
-| GTSS-MISC-003 | MissingSecurityHeaders | Medium | Missing security headers (CWE-1021, CWE-693) |
-| GTSS-VAL-005 | FileUploadHardening | High | File upload hardening (CWE-434) |
+| BATOU-SEC-001 | HardcodedPassword | High | Hardcoded passwords and credentials |
+| BATOU-SEC-002 | APIKeyExposure | High | Hardcoded API keys from known providers |
+| BATOU-GEN-001 | DebugModeEnabled | Medium | Debug mode left enabled |
+| BATOU-AUTH-007 | PrivilegeEscalation | High | Privilege escalation patterns (CWE-269) |
+| BATOU-GEN-012 | InsecureDownload | High | Insecure download patterns (CWE-494) |
+| BATOU-MISC-003 | MissingSecurityHeaders | Medium | Missing security headers (CWE-1021, CWE-693) |
+| BATOU-VAL-005 | FileUploadHardening | High | File upload hardening (CWE-434) |
 
 ## Test Coverage
 

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
-	"github.com/turenio/gtss/internal/taint/astflow"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
+	"github.com/turenlabs/batou/internal/taint/astflow"
 )
 
 // UpdateFile parses a file and updates the call graph with its function

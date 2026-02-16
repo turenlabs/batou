@@ -1,5 +1,5 @@
 // Source: CWE-78 - OS Command Injection in Go
-// Expected: GTSS-INJ-002 (Command Injection via exec.Command)
+// Expected: BATOU-INJ-002 (Command Injection via exec.Command)
 // OWASP: A03:2021 - Injection (OS Command Injection)
 
 package handler

@@ -7,7 +7,7 @@ import (
 )
 
 // SAFE: Path traversal prevention using filepath.Clean and strings.HasPrefix.
-// Should NOT trigger GTSS-TRV-001.
+// Should NOT trigger BATOU-TRV-001.
 
 const baseDir = "/var/www/static"
 

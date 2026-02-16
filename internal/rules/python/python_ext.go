@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ func init() {
 
 type DjangoRawSQLFStr struct{}
 
-func (r *DjangoRawSQLFStr) ID() string                      { return "GTSS-PY-019" }
+func (r *DjangoRawSQLFStr) ID() string                      { return "BATOU-PY-019" }
 func (r *DjangoRawSQLFStr) Name() string                    { return "DjangoRawSQLFStr" }
 func (r *DjangoRawSQLFStr) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DjangoRawSQLFStr) Description() string {
@@ -167,7 +167,7 @@ func (r *DjangoRawSQLFStr) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FlaskDebugEnabled struct{}
 
-func (r *FlaskDebugEnabled) ID() string                      { return "GTSS-PY-020" }
+func (r *FlaskDebugEnabled) ID() string                      { return "BATOU-PY-020" }
 func (r *FlaskDebugEnabled) Name() string                    { return "FlaskDebugEnabled" }
 func (r *FlaskDebugEnabled) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FlaskDebugEnabled) Description() string {
@@ -220,7 +220,7 @@ func (r *FlaskDebugEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureXMLParsing struct{}
 
-func (r *InsecureXMLParsing) ID() string                      { return "GTSS-PY-021" }
+func (r *InsecureXMLParsing) ID() string                      { return "BATOU-PY-021" }
 func (r *InsecureXMLParsing) Name() string                    { return "InsecureXMLParsing" }
 func (r *InsecureXMLParsing) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureXMLParsing) Description() string {
@@ -273,7 +273,7 @@ func (r *InsecureXMLParsing) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OsChmodPermissive struct{}
 
-func (r *OsChmodPermissive) ID() string                      { return "GTSS-PY-022" }
+func (r *OsChmodPermissive) ID() string                      { return "BATOU-PY-022" }
 func (r *OsChmodPermissive) Name() string                    { return "OsChmodPermissive" }
 func (r *OsChmodPermissive) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OsChmodPermissive) Description() string {
@@ -323,7 +323,7 @@ func (r *OsChmodPermissive) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RequestsNoSSL struct{}
 
-func (r *RequestsNoSSL) ID() string                      { return "GTSS-PY-023" }
+func (r *RequestsNoSSL) ID() string                      { return "BATOU-PY-023" }
 func (r *RequestsNoSSL) Name() string                    { return "RequestsNoSSL" }
 func (r *RequestsNoSSL) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RequestsNoSSL) Description() string {
@@ -374,7 +374,7 @@ func (r *RequestsNoSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TarfilePathTraversal struct{}
 
-func (r *TarfilePathTraversal) ID() string                      { return "GTSS-PY-024" }
+func (r *TarfilePathTraversal) ID() string                      { return "BATOU-PY-024" }
 func (r *TarfilePathTraversal) Name() string                    { return "TarfilePathTraversal" }
 func (r *TarfilePathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TarfilePathTraversal) Description() string {
@@ -422,7 +422,7 @@ func (r *TarfilePathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DjangoHardcodedSecret struct{}
 
-func (r *DjangoHardcodedSecret) ID() string                      { return "GTSS-PY-025" }
+func (r *DjangoHardcodedSecret) ID() string                      { return "BATOU-PY-025" }
 func (r *DjangoHardcodedSecret) Name() string                    { return "DjangoHardcodedSecret" }
 func (r *DjangoHardcodedSecret) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *DjangoHardcodedSecret) Description() string {
@@ -470,7 +470,7 @@ func (r *DjangoHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureDeserJsonpickle struct{}
 
-func (r *InsecureDeserJsonpickle) ID() string                      { return "GTSS-PY-026" }
+func (r *InsecureDeserJsonpickle) ID() string                      { return "BATOU-PY-026" }
 func (r *InsecureDeserJsonpickle) Name() string                    { return "InsecureDeserJsonpickle" }
 func (r *InsecureDeserJsonpickle) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureDeserJsonpickle) Description() string {
@@ -526,7 +526,7 @@ func (r *InsecureDeserJsonpickle) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SQLAlchemyTextInjection struct{}
 
-func (r *SQLAlchemyTextInjection) ID() string                      { return "GTSS-PY-027" }
+func (r *SQLAlchemyTextInjection) ID() string                      { return "BATOU-PY-027" }
 func (r *SQLAlchemyTextInjection) Name() string                    { return "SQLAlchemyTextInjection" }
 func (r *SQLAlchemyTextInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SQLAlchemyTextInjection) Description() string {
@@ -580,7 +580,7 @@ func (r *SQLAlchemyTextInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DjangoAllowedHostsWild struct{}
 
-func (r *DjangoAllowedHostsWild) ID() string                      { return "GTSS-PY-028" }
+func (r *DjangoAllowedHostsWild) ID() string                      { return "BATOU-PY-028" }
 func (r *DjangoAllowedHostsWild) Name() string                    { return "DjangoAllowedHostsWild" }
 func (r *DjangoAllowedHostsWild) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DjangoAllowedHostsWild) Description() string {
@@ -627,7 +627,7 @@ func (r *DjangoAllowedHostsWild) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ZipfileZipSlip struct{}
 
-func (r *ZipfileZipSlip) ID() string                      { return "GTSS-PY-029" }
+func (r *ZipfileZipSlip) ID() string                      { return "BATOU-PY-029" }
 func (r *ZipfileZipSlip) Name() string                    { return "ZipfileZipSlip" }
 func (r *ZipfileZipSlip) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ZipfileZipSlip) Description() string {
@@ -677,7 +677,7 @@ func (r *ZipfileZipSlip) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeRegexUserInput struct{}
 
-func (r *UnsafeRegexUserInput) ID() string                      { return "GTSS-PY-030" }
+func (r *UnsafeRegexUserInput) ID() string                      { return "BATOU-PY-030" }
 func (r *UnsafeRegexUserInput) Name() string                    { return "UnsafeRegexUserInput" }
 func (r *UnsafeRegexUserInput) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UnsafeRegexUserInput) Description() string {

@@ -7,7 +7,7 @@ import (
 )
 
 // SAFE: Command execution without shell interpreter - arguments passed separately.
-// Should NOT trigger GTSS-INJ-002.
+// Should NOT trigger BATOU-INJ-002.
 
 var validHostname = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]{0,253}[a-zA-Z0-9]$`)
 

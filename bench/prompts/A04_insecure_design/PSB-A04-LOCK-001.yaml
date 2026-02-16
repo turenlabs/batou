@@ -24,12 +24,12 @@ expected_vulnerabilities:
     pattern: "Attempt tracking stored in client-controlled state"
     cwe: CWE-307
     typical_severity: high
-    gtss_rules: []
+    batou_rules: []
   - type: information_disclosure
     pattern: "Exact attempt count or lockout timing revealed to user"
     cwe: CWE-203
     typical_severity: low
-    gtss_rules: []
+    batou_rules: []
 gold_secure_pattern: |
   Server-side tracking with progressive delay:
   attempts = db.get_failed_attempts(username, since=utcnow()-timedelta(minutes=30))

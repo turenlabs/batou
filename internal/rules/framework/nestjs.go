@@ -4,50 +4,50 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns -- NestJS
 // ---------------------------------------------------------------------------
 
-// GTSS-FW-NESTJS-001: Guard not applied
+// BATOU-FW-NESTJS-001: Guard not applied
 var reNestController = regexp.MustCompile(`@Controller\s*\(`)
 var reNestUseGuards = regexp.MustCompile(`@UseGuards\s*\(`)
 var reNestAuthGuard = regexp.MustCompile(`(?:AuthGuard|JwtAuthGuard|RolesGuard|CanActivate)`)
 
-// GTSS-FW-NESTJS-002: CORS wildcard
+// BATOU-FW-NESTJS-002: CORS wildcard
 var reNestCORSWildcard = regexp.MustCompile(`(?:enableCors|cors)\s*\(\s*\{[^}]*origin\s*:\s*(?:true|\[?\s*['"]?\*['"]?\s*\]?)`)
 var reNestCORSNoArgs = regexp.MustCompile(`\.enableCors\s*\(\s*\)`)
 
-// GTSS-FW-NESTJS-003: TypeORM raw query interpolation
+// BATOU-FW-NESTJS-003: TypeORM raw query interpolation
 var reNestTypeORMRaw = regexp.MustCompile(`(?:\.query|\.createQueryBuilder|getRepository|manager\.query)\s*\(\s*` + "`" + `[^` + "`" + `]*\$\{`)
 var reNestTypeORMConcat = regexp.MustCompile(`(?:\.query|manager\.query)\s*\(\s*(?:['"][^'"]*['"]\s*\+|[a-zA-Z_]\w*\s*\+)`)
 
-// GTSS-FW-NESTJS-004: @Body without ValidationPipe
+// BATOU-FW-NESTJS-004: @Body without ValidationPipe
 var reNestBodyDecorator = regexp.MustCompile(`@Body\s*\(\s*\)`)
 var reNestValidationPipe = regexp.MustCompile(`(?:ValidationPipe|ValidateNested|IsString|IsNumber|IsEmail|class-validator|IsNotEmpty)`)
 
-// GTSS-FW-NESTJS-005: JWT secret in source code
+// BATOU-FW-NESTJS-005: JWT secret in source code
 var reNestJWTSecret = regexp.MustCompile(`(?:secret|secretOrKey|secretKey)\s*:\s*['"][^'"]{4,}['"]`)
 var reNestJWTModule = regexp.MustCompile(`JwtModule\.register`)
 
-// GTSS-FW-NESTJS-006: GraphQL introspection
+// BATOU-FW-NESTJS-006: GraphQL introspection
 var reNestGraphQLIntrospection = regexp.MustCompile(`introspection\s*:\s*true`)
 var reNestGraphQLPlayground = regexp.MustCompile(`playground\s*:\s*true`)
 
-// GTSS-FW-NESTJS-007: Helmet not used
+// BATOU-FW-NESTJS-007: Helmet not used
 var reNestHelmetImport = regexp.MustCompile(`(?:require\s*\(\s*['"]helmet['"]\s*\)|import\s+.*helmet.*from\s+['"]helmet['"])`)
 var reNestAppUseHelmet = regexp.MustCompile(`app\.use\s*\(\s*helmet\s*\(`)
 
-// GTSS-FW-NESTJS-008: Rate limiting
+// BATOU-FW-NESTJS-008: Rate limiting
 var reNestThrottler = regexp.MustCompile(`(?:ThrottlerModule|ThrottlerGuard|@Throttle|@SkipThrottle|rateLimit)`)
 
-// GTSS-FW-NESTJS-009: File upload without filter
+// BATOU-FW-NESTJS-009: File upload without filter
 var reNestFileUpload = regexp.MustCompile(`@(?:UploadedFile|UploadedFiles)\s*\(`)
 var reNestFileFilter = regexp.MustCompile(`(?:fileFilter|FileInterceptor.*\{|FilesInterceptor.*\{|ParseFilePipe|FileValidator|FileTypeValidator|MaxFileSizeValidator)`)
 
-// GTSS-FW-NESTJS-010: Exception filter exposing internals
+// BATOU-FW-NESTJS-010: Exception filter exposing internals
 var reNestExceptionFilter = regexp.MustCompile(`(?:@Catch|ExceptionFilter|BaseExceptionFilter)`)
 var reNestExceptionExpose = regexp.MustCompile(`(?:exception\.stack|exception\.message|error\.stack|err\.stack|\.getResponse\s*\(\s*\)\s*\.(?:json|send)\s*\(\s*(?:exception|error|err))`)
 
@@ -65,12 +65,12 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NESTJS-001: Guard not applied to controller
+// BATOU-FW-NESTJS-001: Guard not applied to controller
 // ---------------------------------------------------------------------------
 
 type NestJSNoGuard struct{}
 
-func (r *NestJSNoGuard) ID() string                      { return "GTSS-FW-NESTJS-001" }
+func (r *NestJSNoGuard) ID() string                      { return "BATOU-FW-NESTJS-001" }
 func (r *NestJSNoGuard) Name() string                    { return "NestJSNoGuard" }
 func (r *NestJSNoGuard) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NestJSNoGuard) Description() string {
@@ -123,12 +123,12 @@ func (r *NestJSNoGuard) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NESTJS-002: CORS wildcard
+// BATOU-FW-NESTJS-002: CORS wildcard
 // ---------------------------------------------------------------------------
 
 type NestJSCORSWildcard struct{}
 
-func (r *NestJSCORSWildcard) ID() string                      { return "GTSS-FW-NESTJS-002" }
+func (r *NestJSCORSWildcard) ID() string                      { return "BATOU-FW-NESTJS-002" }
 func (r *NestJSCORSWildcard) Name() string                    { return "NestJSCORSWildcard" }
 func (r *NestJSCORSWildcard) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NestJSCORSWildcard) Description() string {
@@ -180,12 +180,12 @@ func (r *NestJSCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NESTJS-003: TypeORM raw query with interpolation
+// BATOU-FW-NESTJS-003: TypeORM raw query with interpolation
 // ---------------------------------------------------------------------------
 
 type NestJSRawQuery struct{}
 
-func (r *NestJSRawQuery) ID() string                      { return "GTSS-FW-NESTJS-003" }
+func (r *NestJSRawQuery) ID() string                      { return "BATOU-FW-NESTJS-003" }
 func (r *NestJSRawQuery) Name() string                    { return "NestJSRawQuery" }
 func (r *NestJSRawQuery) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NestJSRawQuery) Description() string {
@@ -237,12 +237,12 @@ func (r *NestJSRawQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NESTJS-004: @Body without ValidationPipe
+// BATOU-FW-NESTJS-004: @Body without ValidationPipe
 // ---------------------------------------------------------------------------
 
 type NestJSBodyNoValidation struct{}
 
-func (r *NestJSBodyNoValidation) ID() string                      { return "GTSS-FW-NESTJS-004" }
+func (r *NestJSBodyNoValidation) ID() string                      { return "BATOU-FW-NESTJS-004" }
 func (r *NestJSBodyNoValidation) Name() string                    { return "NestJSBodyNoValidation" }
 func (r *NestJSBodyNoValidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NestJSBodyNoValidation) Description() string {
@@ -294,12 +294,12 @@ func (r *NestJSBodyNoValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NESTJS-005: JWT secret in source code
+// BATOU-FW-NESTJS-005: JWT secret in source code
 // ---------------------------------------------------------------------------
 
 type NestJSJWTSecret struct{}
 
-func (r *NestJSJWTSecret) ID() string                      { return "GTSS-FW-NESTJS-005" }
+func (r *NestJSJWTSecret) ID() string                      { return "BATOU-FW-NESTJS-005" }
 func (r *NestJSJWTSecret) Name() string                    { return "NestJSJWTSecret" }
 func (r *NestJSJWTSecret) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NestJSJWTSecret) Description() string {
@@ -349,12 +349,12 @@ func (r *NestJSJWTSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NESTJS-006: GraphQL introspection in production
+// BATOU-FW-NESTJS-006: GraphQL introspection in production
 // ---------------------------------------------------------------------------
 
 type NestJSGraphQLIntrospection struct{}
 
-func (r *NestJSGraphQLIntrospection) ID() string                      { return "GTSS-FW-NESTJS-006" }
+func (r *NestJSGraphQLIntrospection) ID() string                      { return "BATOU-FW-NESTJS-006" }
 func (r *NestJSGraphQLIntrospection) Name() string                    { return "NestJSGraphQLIntrospection" }
 func (r *NestJSGraphQLIntrospection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NestJSGraphQLIntrospection) Description() string {
@@ -414,12 +414,12 @@ func (r *NestJSGraphQLIntrospection) Scan(ctx *rules.ScanContext) []rules.Findin
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NESTJS-007: Helmet not used
+// BATOU-FW-NESTJS-007: Helmet not used
 // ---------------------------------------------------------------------------
 
 type NestJSNoHelmet struct{}
 
-func (r *NestJSNoHelmet) ID() string                      { return "GTSS-FW-NESTJS-007" }
+func (r *NestJSNoHelmet) ID() string                      { return "BATOU-FW-NESTJS-007" }
 func (r *NestJSNoHelmet) Name() string                    { return "NestJSNoHelmet" }
 func (r *NestJSNoHelmet) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NestJSNoHelmet) Description() string {
@@ -473,12 +473,12 @@ func (r *NestJSNoHelmet) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NESTJS-008: Rate limiting not configured
+// BATOU-FW-NESTJS-008: Rate limiting not configured
 // ---------------------------------------------------------------------------
 
 type NestJSNoRateLimit struct{}
 
-func (r *NestJSNoRateLimit) ID() string                      { return "GTSS-FW-NESTJS-008" }
+func (r *NestJSNoRateLimit) ID() string                      { return "BATOU-FW-NESTJS-008" }
 func (r *NestJSNoRateLimit) Name() string                    { return "NestJSNoRateLimit" }
 func (r *NestJSNoRateLimit) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NestJSNoRateLimit) Description() string {
@@ -535,12 +535,12 @@ func (r *NestJSNoRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NESTJS-009: File upload without filter
+// BATOU-FW-NESTJS-009: File upload without filter
 // ---------------------------------------------------------------------------
 
 type NestJSFileUpload struct{}
 
-func (r *NestJSFileUpload) ID() string                      { return "GTSS-FW-NESTJS-009" }
+func (r *NestJSFileUpload) ID() string                      { return "BATOU-FW-NESTJS-009" }
 func (r *NestJSFileUpload) Name() string                    { return "NestJSFileUpload" }
 func (r *NestJSFileUpload) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NestJSFileUpload) Description() string {
@@ -592,12 +592,12 @@ func (r *NestJSFileUpload) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-FW-NESTJS-010: Exception filter exposing internal errors
+// BATOU-FW-NESTJS-010: Exception filter exposing internal errors
 // ---------------------------------------------------------------------------
 
 type NestJSExceptionExpose struct{}
 
-func (r *NestJSExceptionExpose) ID() string                      { return "GTSS-FW-NESTJS-010" }
+func (r *NestJSExceptionExpose) ID() string                      { return "BATOU-FW-NESTJS-010" }
 func (r *NestJSExceptionExpose) Name() string                    { return "NestJSExceptionExpose" }
 func (r *NestJSExceptionExpose) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NestJSExceptionExpose) Description() string {

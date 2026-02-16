@@ -24,8 +24,8 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
-	"github.com/turenio/gtss/internal/taint"
+	"github.com/turenlabs/batou/internal/rules"
+	"github.com/turenlabs/batou/internal/taint"
 )
 
 // GoFlowAnalyzer implements rules.Rule using Go AST taint analysis.
@@ -35,7 +35,7 @@ func init() {
 	rules.Register(&GoFlowAnalyzer{})
 }
 
-func (g *GoFlowAnalyzer) ID() string          { return "GTSS-FLOW" }
+func (g *GoFlowAnalyzer) ID() string          { return "BATOU-FLOW" }
 func (g *GoFlowAnalyzer) Name() string         { return "Go Taint Flow Analysis" }
 func (g *GoFlowAnalyzer) Description() string  { return "AST-based intraprocedural taint tracking for Go source code" }
 func (g *GoFlowAnalyzer) DefaultSeverity() rules.Severity { return rules.Critical }

@@ -25,7 +25,7 @@ expected_vulnerabilities:
     pattern: "HTTP request to user-registered URL without network restrictions"
     cwe: CWE-918
     typical_severity: high
-    gtss_rules: [GTSS-SSRF-001]
+    batou_rules: [BATOU-SSRF-001]
 gold_secure_pattern: |
   Validate destination at delivery time, not just registration:
   def deliver_webhook(url, payload):

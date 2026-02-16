@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,30 +12,30 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-XXE-005: XML parsing without disabling DTD (C#/.NET)
+	// BATOU-XXE-005: XML parsing without disabling DTD (C#/.NET)
 	reExtCSharpXmlDoc      = regexp.MustCompile(`\bnew\s+XmlDocument\s*\(`)
 	reExtCSharpXmlLoad     = regexp.MustCompile(`\.Load(?:Xml)?\s*\(`)
 	reExtCSharpDtdParse    = regexp.MustCompile(`DtdProcessing\s*=\s*DtdProcessing\.Parse`)
 	reExtCSharpProhibitDTD = regexp.MustCompile(`(?:DtdProcessing\s*=\s*DtdProcessing\.Prohibit|XmlResolver\s*=\s*null|ProhibitDtd\s*=\s*true)`)
 
-	// GTSS-XXE-006: XSLT processing with external entities
+	// BATOU-XXE-006: XSLT processing with external entities
 	reExtXSLTProcess    = regexp.MustCompile(`(?i)(?:XslCompiledTransform|XslTransform|TransformerFactory|newTransformer|xsltproc|lxml\.etree\.XSLT|XsltProcessor)\s*[\(.]`)
 	reExtXSLTSafe       = regexp.MustCompile(`(?i)(?:FEATURE_SECURE_PROCESSING|setFeature|ACCESS_EXTERNAL|resolve_entities\s*=\s*False)`)
 
-	// GTSS-XXE-007: XInclude processing enabled
+	// BATOU-XXE-007: XInclude processing enabled
 	reExtXInclude       = regexp.MustCompile(`(?i)(?:xinclude|xi:include|XIncludeAware|setXIncludeAware\s*\(\s*true|process_?xincludes|parse.*xinclude)`)
 	reExtXIncludeNS     = regexp.MustCompile(`xmlns:xi\s*=\s*["']http://www\.w3\.org/2001/XInclude["']`)
 
-	// GTSS-XXE-008: SOAP XML parsing without protection
+	// BATOU-XXE-008: SOAP XML parsing without protection
 	reExtSOAPParse      = regexp.MustCompile(`(?i)(?:SOAPMessage|SoapClient|suds|zeep|savon|MessageFactory\.newInstance|SOAPConnectionFactory|soap_client|SoapServer|nusoap)`)
 	reExtSOAPWithInput  = regexp.MustCompile(`(?i)(?:SOAPMessage|SoapClient|suds|zeep|savon|soap_client|SoapServer|nusoap).*(?:req\.|request\.|input|body|param|\$_)`)
 
-	// GTSS-XXE-009: XML parsing in mobile app (Android/iOS)
+	// BATOU-XXE-009: XML parsing in mobile app (Android/iOS)
 	reExtAndroidXML     = regexp.MustCompile(`(?i)(?:XmlPullParser|SAXParser|DocumentBuilder|XMLReader)\s*(?:\.|\.newInstance|\.newSAXParser)`)
 	reExtIOSXML         = regexp.MustCompile(`(?i)(?:XMLParser|NSXMLParser|NSXMLDocument)\s*(?:alloc|init|\.init)`)
 	reExtAndroidFactory = regexp.MustCompile(`(?i)(?:XmlPullParserFactory|SAXParserFactory|DocumentBuilderFactory)\.newInstance\s*\(`)
 
-	// GTSS-XXE-010: SVG/RSS/Atom feed XML parsing
+	// BATOU-XXE-010: SVG/RSS/Atom feed XML parsing
 	reExtFeedParse      = regexp.MustCompile(`(?i)(?:feedparser|rss|atom|svg).*(?:parse|read|load|from_?string)\s*\(`)
 	reExtSVGParse       = regexp.MustCompile(`(?i)(?:svg|image/svg).*(?:parse|render|load|process|convert|transform)\s*\(`)
 	reExtFeedLib        = regexp.MustCompile(`(?i)(?:feedparser|rss-parser|atom-parser|xml-rss|simplepie|rome|SyndFeedInput)`)
@@ -55,12 +55,12 @@ func init() {
 }
 
 // ========================================================================
-// GTSS-XXE-005: XML Parsing without Disabling DTD (C#/.NET)
+// BATOU-XXE-005: XML Parsing without Disabling DTD (C#/.NET)
 // ========================================================================
 
 type CSharpXMLDTD struct{}
 
-func (r *CSharpXMLDTD) ID() string                     { return "GTSS-XXE-005" }
+func (r *CSharpXMLDTD) ID() string                     { return "BATOU-XXE-005" }
 func (r *CSharpXMLDTD) Name() string                   { return "CSharpXMLDTD" }
 func (r *CSharpXMLDTD) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CSharpXMLDTD) Description() string {
@@ -110,12 +110,12 @@ func (r *CSharpXMLDTD) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-XXE-006: XSLT Processing with External Entities
+// BATOU-XXE-006: XSLT Processing with External Entities
 // ========================================================================
 
 type XSLTExtEntities struct{}
 
-func (r *XSLTExtEntities) ID() string                     { return "GTSS-XXE-006" }
+func (r *XSLTExtEntities) ID() string                     { return "BATOU-XXE-006" }
 func (r *XSLTExtEntities) Name() string                   { return "XSLTExtEntities" }
 func (r *XSLTExtEntities) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XSLTExtEntities) Description() string {
@@ -161,12 +161,12 @@ func (r *XSLTExtEntities) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-XXE-007: XInclude Processing Enabled
+// BATOU-XXE-007: XInclude Processing Enabled
 // ========================================================================
 
 type XIncludeProcessing struct{}
 
-func (r *XIncludeProcessing) ID() string                     { return "GTSS-XXE-007" }
+func (r *XIncludeProcessing) ID() string                     { return "BATOU-XXE-007" }
 func (r *XIncludeProcessing) Name() string                   { return "XIncludeProcessing" }
 func (r *XIncludeProcessing) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XIncludeProcessing) Description() string {
@@ -215,12 +215,12 @@ func (r *XIncludeProcessing) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-XXE-008: SOAP XML Parsing without Protection
+// BATOU-XXE-008: SOAP XML Parsing without Protection
 // ========================================================================
 
 type SOAPXMLParsing struct{}
 
-func (r *SOAPXMLParsing) ID() string                     { return "GTSS-XXE-008" }
+func (r *SOAPXMLParsing) ID() string                     { return "BATOU-XXE-008" }
 func (r *SOAPXMLParsing) Name() string                   { return "SOAPXMLParsing" }
 func (r *SOAPXMLParsing) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SOAPXMLParsing) Description() string {
@@ -267,12 +267,12 @@ func (r *SOAPXMLParsing) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-XXE-009: XML Parsing in Mobile App (Android/iOS)
+// BATOU-XXE-009: XML Parsing in Mobile App (Android/iOS)
 // ========================================================================
 
 type MobileXMLParsing struct{}
 
-func (r *MobileXMLParsing) ID() string                     { return "GTSS-XXE-009" }
+func (r *MobileXMLParsing) ID() string                     { return "BATOU-XXE-009" }
 func (r *MobileXMLParsing) Name() string                   { return "MobileXMLParsing" }
 func (r *MobileXMLParsing) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MobileXMLParsing) Description() string {
@@ -323,12 +323,12 @@ func (r *MobileXMLParsing) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-XXE-010: SVG/RSS/Atom Feed XML Parsing without Protection
+// BATOU-XXE-010: SVG/RSS/Atom Feed XML Parsing without Protection
 // ========================================================================
 
 type FeedXMLParsing struct{}
 
-func (r *FeedXMLParsing) ID() string                     { return "GTSS-XXE-010" }
+func (r *FeedXMLParsing) ID() string                     { return "BATOU-XXE-010" }
 func (r *FeedXMLParsing) Name() string                   { return "FeedXMLParsing" }
 func (r *FeedXMLParsing) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FeedXMLParsing) Description() string {

@@ -23,7 +23,7 @@ expected_vulnerabilities:
     pattern: "User input passed to shell execution without sanitization"
     cwe: CWE-78
     typical_severity: critical
-    gtss_rules: [GTSS-INJ-005, GTSS-INJ-006]
+    batou_rules: [BATOU-INJ-005, BATOU-INJ-006]
 gold_secure_pattern: |
   Use allowlist and avoid shell invocation:
   ALLOWED_SERVICES = {"api", "web", "worker"}

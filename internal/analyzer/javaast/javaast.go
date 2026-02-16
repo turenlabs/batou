@@ -3,8 +3,8 @@ package javaast
 import (
 	"strings"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // JavaASTAnalyzer performs AST-based security analysis of Java source code.
@@ -14,7 +14,7 @@ func init() {
 	rules.Register(&JavaASTAnalyzer{})
 }
 
-func (j *JavaASTAnalyzer) ID() string                        { return "GTSS-JAVAAST" }
+func (j *JavaASTAnalyzer) ID() string                        { return "BATOU-JAVAAST" }
 func (j *JavaASTAnalyzer) Name() string                      { return "Java AST Security Analyzer" }
 func (j *JavaASTAnalyzer) DefaultSeverity() rules.Severity   { return rules.Critical }
 func (j *JavaASTAnalyzer) Languages() []rules.Language       { return []rules.Language{rules.LangJava} }
@@ -103,7 +103,7 @@ func (c *javaChecker) checkObjectCreation(n *ast.Node) {
 		if child.Type() == "type_identifier" && child.Text() == "ObjectInputStream" {
 			line := int(n.StartRow()) + 1
 			c.findings = append(c.findings, rules.Finding{
-				RuleID:        "GTSS-JAVAAST-003",
+				RuleID:        "BATOU-JAVAAST-003",
 				Severity:      rules.High,
 				SeverityLabel: rules.High.String(),
 				Title:         "Unsafe deserialization: ObjectInputStream created",
@@ -138,7 +138,7 @@ func (c *javaChecker) checkSQLConcat(n *ast.Node, methodName string) {
 		if containsSQLKeyword(text) {
 			line := int(n.StartRow()) + 1
 			c.findings = append(c.findings, rules.Finding{
-				RuleID:        "GTSS-JAVAAST-001",
+				RuleID:        "BATOU-JAVAAST-001",
 				Severity:      rules.Critical,
 				SeverityLabel: rules.Critical.String(),
 				Title:         "SQL injection via string concatenation in " + methodName + "()",
@@ -169,7 +169,7 @@ func (c *javaChecker) checkRuntimeExec(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-JAVAAST-002",
+		RuleID:        "BATOU-JAVAAST-002",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "Command injection via Runtime.exec()",
@@ -190,7 +190,7 @@ func (c *javaChecker) checkRuntimeExec(n *ast.Node) {
 func (c *javaChecker) checkDeserialization(n *ast.Node) {
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-JAVAAST-003",
+		RuleID:        "BATOU-JAVAAST-003",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "Unsafe deserialization via readObject()",
@@ -219,7 +219,7 @@ func (c *javaChecker) checkJNDILookup(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-JAVAAST-004",
+		RuleID:        "BATOU-JAVAAST-004",
 		Severity:      rules.Critical,
 		SeverityLabel: rules.Critical.String(),
 		Title:         "JNDI injection via lookup() with variable name",
@@ -248,7 +248,7 @@ func (c *javaChecker) checkUnsafeReflection(n *ast.Node) {
 	}
 	line := int(n.StartRow()) + 1
 	c.findings = append(c.findings, rules.Finding{
-		RuleID:        "GTSS-JAVAAST-005",
+		RuleID:        "BATOU-JAVAAST-005",
 		Severity:      rules.High,
 		SeverityLabel: rules.High.String(),
 		Title:         "Unsafe reflection via Class.forName() with variable",

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenio/gtss/internal/ast"
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/ast"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 func scanGvy(t *testing.T, code string) []rules.Finding {
@@ -32,7 +32,7 @@ class Foo {
 	findings := scanGvy(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-GVY-AST-001" && f.Severity == rules.Critical {
+		if f.RuleID == "BATOU-GVY-AST-001" && f.Severity == rules.Critical {
 			found = true
 			break
 		}
@@ -54,7 +54,7 @@ class Foo {
 	findings := scanGvy(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-GVY-AST-001" {
+		if f.RuleID == "BATOU-GVY-AST-001" {
 			found = true
 			break
 		}
@@ -75,7 +75,7 @@ class Foo {
 	findings := scanGvy(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-GVY-AST-002" {
+		if f.RuleID == "BATOU-GVY-AST-002" {
 			found = true
 			if f.Severity != rules.Critical {
 				t.Errorf("expected Critical, got %s", f.Severity)
@@ -99,7 +99,7 @@ class Foo {
 	findings := scanGvy(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-GVY-AST-003" {
+		if f.RuleID == "BATOU-GVY-AST-003" {
 			found = true
 			if f.Severity != rules.Critical {
 				t.Errorf("expected Critical, got %s", f.Severity)
@@ -123,7 +123,7 @@ class Foo {
 	findings := scanGvy(t, code)
 	found := false
 	for _, f := range findings {
-		if f.RuleID == "GTSS-GVY-AST-005" && strings.Contains(f.Title, "variable") {
+		if f.RuleID == "BATOU-GVY-AST-005" && strings.Contains(f.Title, "variable") {
 			found = true
 			break
 		}
@@ -143,7 +143,7 @@ class Foo {
 `
 	findings := scanGvy(t, code)
 	for _, f := range findings {
-		if f.RuleID == "GTSS-GVY-AST-005" {
+		if f.RuleID == "BATOU-GVY-AST-005" {
 			t.Error("unexpected SQL injection finding for safe query without interpolation")
 		}
 	}

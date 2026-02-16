@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,36 +12,36 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	// GTSS-SEC-007: Google API key (AIza...)
+	// BATOU-SEC-007: Google API key (AIza...)
 	reExtGoogleAPIKey = regexp.MustCompile(`(?:^|[^A-Za-z0-9])(AIza[0-9A-Za-z\-_]{35})(?:[^A-Za-z0-9]|$)`)
 
-	// GTSS-SEC-008: Slack webhook URL
+	// BATOU-SEC-008: Slack webhook URL
 	reExtSlackWebhook = regexp.MustCompile(`https://hooks\.slack\.com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[A-Za-z0-9]{20,}`)
 
-	// GTSS-SEC-009: Twilio API key or Account SID
+	// BATOU-SEC-009: Twilio API key or Account SID
 	reExtTwilioSID = regexp.MustCompile(`(?:^|[^A-Za-z0-9])((?:AC|SK)[0-9a-fA-F]{32})(?:[^A-Za-z0-9]|$)`)
 	reExtTwilioAuth = regexp.MustCompile(`(?i)twilio.*(?:auth_token|authtoken|api_?secret)\s*[:=]\s*["']([A-Za-z0-9]{32})["']`)
 
-	// GTSS-SEC-010: SendGrid API key (SG...)
+	// BATOU-SEC-010: SendGrid API key (SG...)
 	reExtSendGridKey = regexp.MustCompile(`(?:^|[^A-Za-z0-9])(SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43})(?:[^A-Za-z0-9]|$)`)
 
-	// GTSS-SEC-011: Mailgun API key
+	// BATOU-SEC-011: Mailgun API key
 	reExtMailgunKey = regexp.MustCompile(`(?i)(?:mailgun|mg).*(?:api[_-]?key|secret)\s*[:=]\s*["']?(key-[A-Za-z0-9]{32})["']?`)
 
-	// GTSS-SEC-012: Database connection string with embedded password
+	// BATOU-SEC-012: Database connection string with embedded password
 	reExtDBConnString = regexp.MustCompile(`(?i)(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp|mssql|mariadb)://[^\s:]+:[^\s@]{3,}@[^\s]+`)
 
-	// GTSS-SEC-013: Private key in source (BEGIN PRIVATE KEY block)
+	// BATOU-SEC-013: Private key in source (BEGIN PRIVATE KEY block)
 	reExtPrivateKeyBlock = regexp.MustCompile(`-----BEGIN\s+(?:RSA |EC |DSA |OPENSSH |ED25519 |ENCRYPTED )?PRIVATE KEY-----`)
 
-	// GTSS-SEC-014: Azure storage account key
+	// BATOU-SEC-014: Azure storage account key
 	reExtAzureStorageKey = regexp.MustCompile(`(?i)(?:AccountKey|azure[_-]?storage[_-]?key|AZURE_STORAGE_KEY)\s*[=:]\s*["']?([A-Za-z0-9+/]{86}==)["']?`)
 
-	// GTSS-SEC-015: GCP service account JSON key
+	// BATOU-SEC-015: GCP service account JSON key
 	reExtGCPServiceAccount = regexp.MustCompile(`"type"\s*:\s*"service_account"`)
 	reExtGCPPrivateKeyID   = regexp.MustCompile(`"private_key_id"\s*:\s*"[A-Fa-f0-9]{40}"`)
 
-	// GTSS-SEC-016: Generic high-entropy string in secret variable
+	// BATOU-SEC-016: Generic high-entropy string in secret variable
 	reExtSecretAssignment = regexp.MustCompile(`(?i)(?:secret|private[_-]?key|signing[_-]?key|encryption[_-]?key|master[_-]?key|api[_-]?token|auth[_-]?secret)\s*[:=]=?\s*["']([A-Za-z0-9+/=_\-]{16,})["']`)
 )
 
@@ -63,12 +63,12 @@ func init() {
 }
 
 // ========================================================================
-// GTSS-SEC-007: Google API Key Pattern
+// BATOU-SEC-007: Google API Key Pattern
 // ========================================================================
 
 type GoogleAPIKeyRule struct{}
 
-func (r *GoogleAPIKeyRule) ID() string                     { return "GTSS-SEC-007" }
+func (r *GoogleAPIKeyRule) ID() string                     { return "BATOU-SEC-007" }
 func (r *GoogleAPIKeyRule) Name() string                   { return "GoogleAPIKey" }
 func (r *GoogleAPIKeyRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GoogleAPIKeyRule) Description() string {
@@ -114,12 +114,12 @@ func (r *GoogleAPIKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SEC-008: Slack Webhook URL
+// BATOU-SEC-008: Slack Webhook URL
 // ========================================================================
 
 type SlackWebhookRule struct{}
 
-func (r *SlackWebhookRule) ID() string                     { return "GTSS-SEC-008" }
+func (r *SlackWebhookRule) ID() string                     { return "BATOU-SEC-008" }
 func (r *SlackWebhookRule) Name() string                   { return "SlackWebhookURL" }
 func (r *SlackWebhookRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SlackWebhookRule) Description() string {
@@ -166,12 +166,12 @@ func (r *SlackWebhookRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SEC-009: Twilio API Key/SID
+// BATOU-SEC-009: Twilio API Key/SID
 // ========================================================================
 
 type TwilioKeyRule struct{}
 
-func (r *TwilioKeyRule) ID() string                     { return "GTSS-SEC-009" }
+func (r *TwilioKeyRule) ID() string                     { return "BATOU-SEC-009" }
 func (r *TwilioKeyRule) Name() string                   { return "TwilioAPIKey" }
 func (r *TwilioKeyRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TwilioKeyRule) Description() string {
@@ -237,12 +237,12 @@ func (r *TwilioKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SEC-010: SendGrid API Key
+// BATOU-SEC-010: SendGrid API Key
 // ========================================================================
 
 type SendGridKeyRule struct{}
 
-func (r *SendGridKeyRule) ID() string                     { return "GTSS-SEC-010" }
+func (r *SendGridKeyRule) ID() string                     { return "BATOU-SEC-010" }
 func (r *SendGridKeyRule) Name() string                   { return "SendGridAPIKey" }
 func (r *SendGridKeyRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SendGridKeyRule) Description() string {
@@ -285,12 +285,12 @@ func (r *SendGridKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SEC-011: Mailgun API Key
+// BATOU-SEC-011: Mailgun API Key
 // ========================================================================
 
 type MailgunKeyRule struct{}
 
-func (r *MailgunKeyRule) ID() string                     { return "GTSS-SEC-011" }
+func (r *MailgunKeyRule) ID() string                     { return "BATOU-SEC-011" }
 func (r *MailgunKeyRule) Name() string                   { return "MailgunAPIKey" }
 func (r *MailgunKeyRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MailgunKeyRule) Description() string {
@@ -333,12 +333,12 @@ func (r *MailgunKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SEC-012: Database Connection String with Password
+// BATOU-SEC-012: Database Connection String with Password
 // ========================================================================
 
 type DBConnStringExtRule struct{}
 
-func (r *DBConnStringExtRule) ID() string                     { return "GTSS-SEC-012" }
+func (r *DBConnStringExtRule) ID() string                     { return "BATOU-SEC-012" }
 func (r *DBConnStringExtRule) Name() string                   { return "DBConnectionStringExt" }
 func (r *DBConnStringExtRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DBConnStringExtRule) Description() string {
@@ -395,12 +395,12 @@ func (r *DBConnStringExtRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SEC-013: Private Key in Source (PEM Format)
+// BATOU-SEC-013: Private Key in Source (PEM Format)
 // ========================================================================
 
 type PrivateKeyBlockRule struct{}
 
-func (r *PrivateKeyBlockRule) ID() string                     { return "GTSS-SEC-013" }
+func (r *PrivateKeyBlockRule) ID() string                     { return "BATOU-SEC-013" }
 func (r *PrivateKeyBlockRule) Name() string                   { return "PrivateKeyBlock" }
 func (r *PrivateKeyBlockRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PrivateKeyBlockRule) Description() string {
@@ -438,12 +438,12 @@ func (r *PrivateKeyBlockRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SEC-014: Azure Storage Account Key
+// BATOU-SEC-014: Azure Storage Account Key
 // ========================================================================
 
 type AzureStorageKeyRule struct{}
 
-func (r *AzureStorageKeyRule) ID() string                     { return "GTSS-SEC-014" }
+func (r *AzureStorageKeyRule) ID() string                     { return "BATOU-SEC-014" }
 func (r *AzureStorageKeyRule) Name() string                   { return "AzureStorageKey" }
 func (r *AzureStorageKeyRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AzureStorageKeyRule) Description() string {
@@ -489,12 +489,12 @@ func (r *AzureStorageKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SEC-015: GCP Service Account JSON Key
+// BATOU-SEC-015: GCP Service Account JSON Key
 // ========================================================================
 
 type GCPServiceAccountRule struct{}
 
-func (r *GCPServiceAccountRule) ID() string                     { return "GTSS-SEC-015" }
+func (r *GCPServiceAccountRule) ID() string                     { return "BATOU-SEC-015" }
 func (r *GCPServiceAccountRule) Name() string                   { return "GCPServiceAccountKey" }
 func (r *GCPServiceAccountRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GCPServiceAccountRule) Description() string {
@@ -539,12 +539,12 @@ func (r *GCPServiceAccountRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ========================================================================
-// GTSS-SEC-016: Generic High-Entropy String in Secret Variable
+// BATOU-SEC-016: Generic High-Entropy String in Secret Variable
 // ========================================================================
 
 type HighEntropySecretRule struct{}
 
-func (r *HighEntropySecretRule) ID() string                     { return "GTSS-SEC-016" }
+func (r *HighEntropySecretRule) ID() string                     { return "BATOU-SEC-016" }
 func (r *HighEntropySecretRule) Name() string                   { return "HighEntropySecret" }
 func (r *HighEntropySecretRule) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *HighEntropySecretRule) Description() string {

@@ -25,7 +25,7 @@ expected_vulnerabilities:
     pattern: "Webhook payload processed without signature validation"
     cwe: CWE-345
     typical_severity: critical
-    gtss_rules: [GTSS-VAL-002]
+    batou_rules: [BATOU-VAL-002]
 gold_secure_pattern: |
   Verify signature before processing:
   sig = request.headers.get("Stripe-Signature")

@@ -1,6 +1,6 @@
 # PSB-A03-XSS-001: Comment display
 # CWE: CWE-79
-# Expected: GTSS-XSS-001, GTSS-XSS-002
+# Expected: BATOU-XSS-001, BATOU-XSS-002
 from flask import Flask, g
 import sqlite3
 

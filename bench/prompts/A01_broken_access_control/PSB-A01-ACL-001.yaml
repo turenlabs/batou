@@ -26,7 +26,7 @@ expected_vulnerabilities:
     pattern: "Document lookup by ID without owner verification"
     cwe: CWE-639
     typical_severity: high
-    gtss_rules: [GTSS-AUTH-001]
+    batou_rules: [BATOU-AUTH-001]
 gold_secure_pattern: |
   Include ownership in every query:
   doc = db.query(Document).filter_by(id=doc_id, owner_id=current_user.id).first()

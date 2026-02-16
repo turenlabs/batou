@@ -4,14 +4,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for extended misconfig rules
 // ---------------------------------------------------------------------------
 
-// GTSS-MISC-004: Debug mode enabled in production
+// BATOU-MISC-004: Debug mode enabled in production
 var (
 	reExtDebugProd   = regexp.MustCompile(`(?i)\bdebug\s*[:=]\s*(?:true|1|['"]true['"]|['"]1['"]|['"]yes['"])`)
 	reExtDevMode     = regexp.MustCompile(`(?i)(?:development|dev[_-]mode|devMode)\s*[:=]\s*(?:true|1|['"]true['"])`)
@@ -19,55 +19,55 @@ var (
 	reExtEnvGuard    = regexp.MustCompile(`(?i)(?:process\.env|os\.environ|System\.getenv|ENV\[|getenv|os\.Getenv|NODE_ENV|RAILS_ENV)`)
 )
 
-// GTSS-MISC-005: Default/example configuration
+// BATOU-MISC-005: Default/example configuration
 var (
 	reDefaultConfig    = regexp.MustCompile(`(?i)(?:example\.com|changeme|change_me|CHANGE_ME|default_?password|default_?secret|todo.?change|replace.?this|your.?secret.?here|your.?password.?here|enter.?your|set.?your|UPDATE_?ME|FIXME.?secret)`)
 	reSecretContext    = regexp.MustCompile(`(?i)(?:secret|password|key|token|credential|api_key|auth|database_url|connection_string)`)
 )
 
-// GTSS-MISC-006: Verbose error messages
+// BATOU-MISC-006: Verbose error messages
 var (
 	reVerboseError       = regexp.MustCompile(`(?i)(?:res\.(?:send|json|status\s*\([^)]*\)\.(?:send|json))|response\.(?:write|body|send)|HttpResponse|JsonResponse|jsonify|render|echo)\s*\([^)]*(?:\.stack|\.message|\.toString\(\)|traceback|stackTrace|getStackTrace|\.getMessage\(\)|str\s*\(\s*(?:e|err|error|exception)\s*\)|format_exc)`)
 )
 
-// GTSS-MISC-007: Admin interface exposed
+// BATOU-MISC-007: Admin interface exposed
 var (
 	reAdminRoute         = regexp.MustCompile(`(?i)(?:['"/]admin['"/]|admin_?panel|admin_?dashboard|admin_?interface|/admin\b)`)
 	reAdminAuthCheck     = regexp.MustCompile(`(?i)(?:isAdmin|is_admin|admin_?only|requireAdmin|require_admin|@admin_required|role\s*===?\s*['"]admin['"]|hasRole\s*\(\s*['"]admin['"])`)
 	reIPRestriction      = regexp.MustCompile(`(?i)(?:ip_?whitelist|ip_?allowlist|allowed_?ips|ip_?restrict|RemoteAddr|X-Forwarded-For|ipFilter|ip_filter|\.allow\s*\()`)
 )
 
-// GTSS-MISC-008: HTTPS redirect not enforced
+// BATOU-MISC-008: HTTPS redirect not enforced
 var (
 	reHTTPServer         = regexp.MustCompile(`(?i)(?:http\.createServer|http\.ListenAndServe|app\.listen|app\.run|server\.listen)\s*\(`)
 	reHTTPSRedirect      = regexp.MustCompile(`(?i)(?:https?.*redirect|forceSSL|force_ssl|requireHTTPS|require_https|SECURE_SSL_REDIRECT|HSTS|https_redirect|ssl_required|\.redirect.*https)`)
 	reHTTPSSetup         = regexp.MustCompile(`(?i)(?:https\.createServer|tls\.Listen|ListenAndServeTLS|ssl_context|SSLContext|\.useSSL|https_only)`)
 )
 
-// GTSS-MISC-009: Directory listing enabled
+// BATOU-MISC-009: Directory listing enabled
 var (
 	reDirectoryListing   = regexp.MustCompile(`(?i)(?:autoindex\s+on|Options\s+\+?Indexes|directory\s+listing|serveIndex|express\.static.*index\s*:\s*false|DirectoryIndex\s+disabled|enable_listing\s*[:=]\s*true|list_directory\s*[:=]\s*True)`)
 )
 
-// GTSS-MISC-010: Insecure default permissions
+// BATOU-MISC-010: Insecure default permissions
 var (
 	reWorldReadWrite     = regexp.MustCompile(`(?i)(?:0o?777|0o?666|0o?776|0o?767|permissions?\s*[:=]\s*0o?777|chmod\s+(?:777|666)|os\.chmod\s*\([^,]+,\s*0o?777|os\.FileMode\s*\(\s*0o?777|stat\.S_IRWXO)`)
 	reOpenPerms          = regexp.MustCompile(`(?i)(?:umask\s*\(\s*0o?0+\s*\)|world.?(?:readable|writable)|others?.?(?:read|write))`)
 )
 
-// GTSS-MISC-011: Stack traces in error responses
+// BATOU-MISC-011: Stack traces in error responses
 var (
 	reStackTraceEnabled  = regexp.MustCompile(`(?i)(?:includeStackTrace|include_stack_trace|showStackTrace|show_stack_trace|stackTrace\s*[:=]\s*true|stack_trace\s*[:=]\s*True|displayErrors\s*[:=]\s*true|display_errors\s*[:=]\s*true)`)
 	reFullStackResponse  = regexp.MustCompile(`(?i)(?:err|error|exception|e)\.(?:stack|stackTrace|getStackTrace|backtrace|format_exc|traceback)\b`)
 )
 
 // ---------------------------------------------------------------------------
-// GTSS-MISC-004: Debug Mode Enabled in Production
+// BATOU-MISC-004: Debug Mode Enabled in Production
 // ---------------------------------------------------------------------------
 
 type DebugModeProd struct{}
 
-func (r *DebugModeProd) ID() string                     { return "GTSS-MISC-004" }
+func (r *DebugModeProd) ID() string                     { return "BATOU-MISC-004" }
 func (r *DebugModeProd) Name() string                   { return "DebugModeProd" }
 func (r *DebugModeProd) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DebugModeProd) Description() string {
@@ -127,12 +127,12 @@ func (r *DebugModeProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MISC-005: Default/Example Configuration in Production
+// BATOU-MISC-005: Default/Example Configuration in Production
 // ---------------------------------------------------------------------------
 
 type DefaultConfig struct{}
 
-func (r *DefaultConfig) ID() string                     { return "GTSS-MISC-005" }
+func (r *DefaultConfig) ID() string                     { return "BATOU-MISC-005" }
 func (r *DefaultConfig) Name() string                   { return "DefaultConfig" }
 func (r *DefaultConfig) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DefaultConfig) Description() string {
@@ -178,12 +178,12 @@ func (r *DefaultConfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MISC-006: Verbose Error Messages Exposed to Users
+// BATOU-MISC-006: Verbose Error Messages Exposed to Users
 // ---------------------------------------------------------------------------
 
 type VerboseErrorExposed struct{}
 
-func (r *VerboseErrorExposed) ID() string                     { return "GTSS-MISC-006" }
+func (r *VerboseErrorExposed) ID() string                     { return "BATOU-MISC-006" }
 func (r *VerboseErrorExposed) Name() string                   { return "VerboseErrorExposed" }
 func (r *VerboseErrorExposed) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *VerboseErrorExposed) Description() string {
@@ -229,12 +229,12 @@ func (r *VerboseErrorExposed) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MISC-007: Admin Interface Exposed Without IP Restriction
+// BATOU-MISC-007: Admin Interface Exposed Without IP Restriction
 // ---------------------------------------------------------------------------
 
 type AdminExposedNoIPRestriction struct{}
 
-func (r *AdminExposedNoIPRestriction) ID() string                     { return "GTSS-MISC-007" }
+func (r *AdminExposedNoIPRestriction) ID() string                     { return "BATOU-MISC-007" }
 func (r *AdminExposedNoIPRestriction) Name() string                   { return "AdminExposedNoIPRestriction" }
 func (r *AdminExposedNoIPRestriction) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AdminExposedNoIPRestriction) Description() string {
@@ -287,12 +287,12 @@ func (r *AdminExposedNoIPRestriction) Scan(ctx *rules.ScanContext) []rules.Findi
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MISC-008: HTTPS Redirect Not Enforced
+// BATOU-MISC-008: HTTPS Redirect Not Enforced
 // ---------------------------------------------------------------------------
 
 type HTTPSNotEnforced struct{}
 
-func (r *HTTPSNotEnforced) ID() string                     { return "GTSS-MISC-008" }
+func (r *HTTPSNotEnforced) ID() string                     { return "BATOU-MISC-008" }
 func (r *HTTPSNotEnforced) Name() string                   { return "HTTPSNotEnforced" }
 func (r *HTTPSNotEnforced) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *HTTPSNotEnforced) Description() string {
@@ -340,12 +340,12 @@ func (r *HTTPSNotEnforced) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MISC-009: Directory Listing Enabled
+// BATOU-MISC-009: Directory Listing Enabled
 // ---------------------------------------------------------------------------
 
 type DirectoryListingEnabled struct{}
 
-func (r *DirectoryListingEnabled) ID() string                     { return "GTSS-MISC-009" }
+func (r *DirectoryListingEnabled) ID() string                     { return "BATOU-MISC-009" }
 func (r *DirectoryListingEnabled) Name() string                   { return "DirectoryListingEnabled" }
 func (r *DirectoryListingEnabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DirectoryListingEnabled) Description() string {
@@ -387,12 +387,12 @@ func (r *DirectoryListingEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MISC-010: Insecure Default Permissions
+// BATOU-MISC-010: Insecure Default Permissions
 // ---------------------------------------------------------------------------
 
 type InsecurePermissions struct{}
 
-func (r *InsecurePermissions) ID() string                     { return "GTSS-MISC-010" }
+func (r *InsecurePermissions) ID() string                     { return "BATOU-MISC-010" }
 func (r *InsecurePermissions) Name() string                   { return "InsecurePermissions" }
 func (r *InsecurePermissions) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecurePermissions) Description() string {
@@ -440,12 +440,12 @@ func (r *InsecurePermissions) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
-// GTSS-MISC-011: Stack Traces Enabled in Error Responses
+// BATOU-MISC-011: Stack Traces Enabled in Error Responses
 // ---------------------------------------------------------------------------
 
 type StackTracesEnabled struct{}
 
-func (r *StackTracesEnabled) ID() string                     { return "GTSS-MISC-011" }
+func (r *StackTracesEnabled) ID() string                     { return "BATOU-MISC-011" }
 func (r *StackTracesEnabled) Name() string                   { return "StackTracesEnabled" }
 func (r *StackTracesEnabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *StackTracesEnabled) Description() string {

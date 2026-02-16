@@ -4,12 +4,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenlabs/batou/internal/rules"
 )
 
 // --- Compiled patterns ---
 
-// GTSS-FW-SPRING-001: CSRF Disabled
+// BATOU-FW-SPRING-001: CSRF Disabled
 var (
 	// Legacy: http.csrf().disable()
 	csrfDisableLegacy = regexp.MustCompile(`\.csrf\s*\(\s*\)\s*\.\s*disable\s*\(`)
@@ -19,7 +19,7 @@ var (
 	csrfDisableKotlin = regexp.MustCompile(`\.csrf\s*\{[^}]*disable\s*\(`)
 )
 
-// GTSS-FW-SPRING-002: Overly Permissive Access (permitAll on wide paths)
+// BATOU-FW-SPRING-002: Overly Permissive Access (permitAll on wide paths)
 var (
 	// antMatchers("/**").permitAll() or requestMatchers("/**").permitAll()
 	permitAllWildcard = regexp.MustCompile(`(?:antMatchers|requestMatchers|mvcMatchers)\s*\(\s*"\/\*\*"\s*\)\s*\.\s*permitAll\s*\(`)
@@ -27,7 +27,7 @@ var (
 	anyRequestPermitAll = regexp.MustCompile(`\.anyRequest\s*\(\s*\)\s*\.\s*permitAll\s*\(`)
 )
 
-// GTSS-FW-SPRING-003: Insecure CORS Configuration
+// BATOU-FW-SPRING-003: Insecure CORS Configuration
 var (
 	// setAllowedOrigins(Arrays.asList("*")) or addAllowedOrigin("*")
 	corsAllowAllOrigins    = regexp.MustCompile(`(?:setAllowedOrigins|addAllowedOrigin)\s*\([^)]*"\s*\*\s*"`)
@@ -37,7 +37,7 @@ var (
 	crossOriginNoArgs      = regexp.MustCompile(`@CrossOrigin\s*$`)
 )
 
-// GTSS-FW-SPRING-004: Actuator Exposure
+// BATOU-FW-SPRING-004: Actuator Exposure
 var (
 	// permitAll() on actuator paths
 	actuatorPermitAll = regexp.MustCompile(`(?:antMatchers|requestMatchers|mvcMatchers)\s*\([^)]*(?:\/actuator|actuator)[^)]*\)\s*\.\s*permitAll\s*\(`)
@@ -47,7 +47,7 @@ var (
 	actuatorSecurityOff = regexp.MustCompile(`management\.security\.enabled\s*[=:]\s*false`)
 )
 
-// GTSS-FW-SPRING-005: Native Query Injection
+// BATOU-FW-SPRING-005: Native Query Injection
 var (
 	// @Query with nativeQuery=true and string concat/interpolation
 	nativeQueryAnnotation = regexp.MustCompile(`@Query\s*\([^)]*nativeQuery\s*=\s*true`)
@@ -60,7 +60,7 @@ var (
 	emCreateQueryConcat = regexp.MustCompile(`(?:entityManager|em|session)\s*\.\s*create(?:Query|SQLQuery)\s*\(\s*(?:"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+)`)
 )
 
-// GTSS-FW-SPRING-006: Mass Assignment via @ModelAttribute
+// BATOU-FW-SPRING-006: Mass Assignment via @ModelAttribute
 var (
 	modelAttributeAnnotation = regexp.MustCompile(`@ModelAttribute`)
 	initBinderAnnotation     = regexp.MustCompile(`@InitBinder`)
@@ -68,7 +68,7 @@ var (
 	binderFieldRestriction = regexp.MustCompile(`(?:setAllowedFields|setDisallowedFields)\s*\(`)
 )
 
-// GTSS-FW-SPRING-007: Insecure Cookie Configuration
+// BATOU-FW-SPRING-007: Insecure Cookie Configuration
 var (
 	cookieHttpOnlyFalse = regexp.MustCompile(`\.setHttpOnly\s*\(\s*false\s*\)`)
 	cookieSecureFalse   = regexp.MustCompile(`\.setSecure\s*\(\s*false\s*\)`)
@@ -76,7 +76,7 @@ var (
 	newCookie = regexp.MustCompile(`new\s+Cookie\s*\(`)
 )
 
-// GTSS-FW-SPRING-008: Frame Options Disabled (clickjacking)
+// BATOU-FW-SPRING-008: Frame Options Disabled (clickjacking)
 var (
 	frameOptionsDisable  = regexp.MustCompile(`\.frameOptions\s*\(\s*\)\s*\.\s*disable\s*\(`)
 	frameOptionsLambda   = regexp.MustCompile(`\.frameOptions\s*\(\s*\w+\s*->\s*\w+\s*\.\s*disable`)
@@ -84,14 +84,14 @@ var (
 	headersLambdaDisable = regexp.MustCompile(`\.headers\s*\(\s*\w+\s*->\s*\w+\s*\.\s*disable`)
 )
 
-// GTSS-FW-SPRING-009: Request Dispatcher Forward with User Input
+// BATOU-FW-SPRING-009: Request Dispatcher Forward with User Input
 var (
 	dispatcherForward = regexp.MustCompile(`getRequestDispatcher\s*\(\s*[a-zA-Z_]\w*\s*\)\s*\.\s*forward\s*\(`)
 	// ModelAndView with user input in view name
 	modelAndViewUserInput = regexp.MustCompile(`new\s+ModelAndView\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
 )
 
-// GTSS-FW-SPRING-010: Session Fixation
+// BATOU-FW-SPRING-010: Session Fixation
 var (
 	sessionFixationNone = regexp.MustCompile(`\.sessionFixation\s*\(\s*\)\s*\.\s*none\s*\(`)
 	sessionFixationLambda = regexp.MustCompile(`\.sessionFixation\s*\(\s*\w+\s*->\s*\w+\s*\.\s*none`)
@@ -110,11 +110,11 @@ func init() {
 	rules.Register(&SessionFixation{})
 }
 
-// --- GTSS-FW-SPRING-001: CSRF Disabled ---
+// --- BATOU-FW-SPRING-001: CSRF Disabled ---
 
 type CSRFDisabled struct{}
 
-func (r *CSRFDisabled) ID() string                      { return "GTSS-FW-SPRING-001" }
+func (r *CSRFDisabled) ID() string                      { return "BATOU-FW-SPRING-001" }
 func (r *CSRFDisabled) Name() string                    { return "CSRFDisabled" }
 func (r *CSRFDisabled) Description() string             { return "Detects Spring Security configurations that disable CSRF protection." }
 func (r *CSRFDisabled) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -169,11 +169,11 @@ func (r *CSRFDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-SPRING-002: Overly Permissive Access ---
+// --- BATOU-FW-SPRING-002: Overly Permissive Access ---
 
 type OverlyPermissiveAccess struct{}
 
-func (r *OverlyPermissiveAccess) ID() string                      { return "GTSS-FW-SPRING-002" }
+func (r *OverlyPermissiveAccess) ID() string                      { return "BATOU-FW-SPRING-002" }
 func (r *OverlyPermissiveAccess) Name() string                    { return "OverlyPermissiveAccess" }
 func (r *OverlyPermissiveAccess) Description() string             { return "Detects overly broad permitAll() rules that bypass authentication on all endpoints." }
 func (r *OverlyPermissiveAccess) DefaultSeverity() rules.Severity { return rules.High }
@@ -223,11 +223,11 @@ func (r *OverlyPermissiveAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-SPRING-003: Insecure CORS Configuration ---
+// --- BATOU-FW-SPRING-003: Insecure CORS Configuration ---
 
 type InsecureCORS struct{}
 
-func (r *InsecureCORS) ID() string                      { return "GTSS-FW-SPRING-003" }
+func (r *InsecureCORS) ID() string                      { return "BATOU-FW-SPRING-003" }
 func (r *InsecureCORS) Name() string                    { return "InsecureCORS" }
 func (r *InsecureCORS) Description() string             { return "Detects insecure CORS configurations that allow all origins with credentials." }
 func (r *InsecureCORS) DefaultSeverity() rules.Severity { return rules.High }
@@ -343,11 +343,11 @@ func (r *InsecureCORS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-SPRING-004: Actuator Exposure ---
+// --- BATOU-FW-SPRING-004: Actuator Exposure ---
 
 type ActuatorExposure struct{}
 
-func (r *ActuatorExposure) ID() string                      { return "GTSS-FW-SPRING-004" }
+func (r *ActuatorExposure) ID() string                      { return "BATOU-FW-SPRING-004" }
 func (r *ActuatorExposure) Name() string                    { return "ActuatorExposure" }
 func (r *ActuatorExposure) Description() string             { return "Detects exposed Spring Boot Actuator endpoints without authentication." }
 func (r *ActuatorExposure) DefaultSeverity() rules.Severity { return rules.High }
@@ -426,11 +426,11 @@ func (r *ActuatorExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-SPRING-005: Native Query Injection ---
+// --- BATOU-FW-SPRING-005: Native Query Injection ---
 
 type NativeQueryInjection struct{}
 
-func (r *NativeQueryInjection) ID() string                      { return "GTSS-FW-SPRING-005" }
+func (r *NativeQueryInjection) ID() string                      { return "BATOU-FW-SPRING-005" }
 func (r *NativeQueryInjection) Name() string                    { return "NativeQueryInjection" }
 func (r *NativeQueryInjection) Description() string             { return "Detects SQL injection via native JPA queries with string concatenation." }
 func (r *NativeQueryInjection) DefaultSeverity() rules.Severity { return rules.Critical }
@@ -539,11 +539,11 @@ func (r *NativeQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-SPRING-006: Mass Assignment ---
+// --- BATOU-FW-SPRING-006: Mass Assignment ---
 
 type MassAssignment struct{}
 
-func (r *MassAssignment) ID() string                      { return "GTSS-FW-SPRING-006" }
+func (r *MassAssignment) ID() string                      { return "BATOU-FW-SPRING-006" }
 func (r *MassAssignment) Name() string                    { return "MassAssignment" }
 func (r *MassAssignment) Description() string             { return "Detects @ModelAttribute usage without field binding restrictions." }
 func (r *MassAssignment) DefaultSeverity() rules.Severity { return rules.High }
@@ -599,11 +599,11 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-SPRING-007: Insecure Cookie Configuration ---
+// --- BATOU-FW-SPRING-007: Insecure Cookie Configuration ---
 
 type InsecureCookie struct{}
 
-func (r *InsecureCookie) ID() string                      { return "GTSS-FW-SPRING-007" }
+func (r *InsecureCookie) ID() string                      { return "BATOU-FW-SPRING-007" }
 func (r *InsecureCookie) Name() string                    { return "InsecureCookie" }
 func (r *InsecureCookie) Description() string             { return "Detects cookies created without HttpOnly or Secure flags." }
 func (r *InsecureCookie) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -661,11 +661,11 @@ func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-SPRING-008: Frame Options Disabled ---
+// --- BATOU-FW-SPRING-008: Frame Options Disabled ---
 
 type FrameOptionsDisabled struct{}
 
-func (r *FrameOptionsDisabled) ID() string                      { return "GTSS-FW-SPRING-008" }
+func (r *FrameOptionsDisabled) ID() string                      { return "BATOU-FW-SPRING-008" }
 func (r *FrameOptionsDisabled) Name() string                    { return "FrameOptionsDisabled" }
 func (r *FrameOptionsDisabled) Description() string             { return "Detects disabled X-Frame-Options header allowing clickjacking attacks." }
 func (r *FrameOptionsDisabled) DefaultSeverity() rules.Severity { return rules.Medium }
@@ -748,11 +748,11 @@ func (r *FrameOptionsDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-SPRING-009: Dispatcher Forward with User Input ---
+// --- BATOU-FW-SPRING-009: Dispatcher Forward with User Input ---
 
 type DispatcherForward struct{}
 
-func (r *DispatcherForward) ID() string                      { return "GTSS-FW-SPRING-009" }
+func (r *DispatcherForward) ID() string                      { return "BATOU-FW-SPRING-009" }
 func (r *DispatcherForward) Name() string                    { return "DispatcherForward" }
 func (r *DispatcherForward) Description() string             { return "Detects request dispatcher forward and ModelAndView with user-controlled paths." }
 func (r *DispatcherForward) DefaultSeverity() rules.Severity { return rules.High }
@@ -818,11 +818,11 @@ func (r *DispatcherForward) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// --- GTSS-FW-SPRING-010: Session Fixation ---
+// --- BATOU-FW-SPRING-010: Session Fixation ---
 
 type SessionFixation struct{}
 
-func (r *SessionFixation) ID() string                      { return "GTSS-FW-SPRING-010" }
+func (r *SessionFixation) ID() string                      { return "BATOU-FW-SPRING-010" }
 func (r *SessionFixation) Name() string                    { return "SessionFixation" }
 func (r *SessionFixation) Description() string             { return "Detects Spring Security session fixation protection being disabled." }
 func (r *SessionFixation) DefaultSeverity() rules.Severity { return rules.High }
