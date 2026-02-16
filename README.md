@@ -1,6 +1,6 @@
 # GTSS - Generation Time Security Scanning
 
-[![Architecture](https://img.shields.io/badge/architecture-excalidraw-6965db)](https://excalidraw.com/#json=-ZHO93c7GboWdEyvo4DO2,UUmiK3UFeyQD3gp7HUQQ3Q)
+[![Architecture](https://img.shields.io/badge/architecture-excalidraw-6965db)](https://excalidraw.com/#json=Y_aI4C8JAMHOkHY9T5ojj,94pBf-Q-VasP2l606DwPvQ)
 
 A security scanner that catches vulnerabilities in real-time as AI writes code. Built as a [Claude Code hook](https://docs.anthropic.com/en/docs/claude-code/hooks), GTSS analyzes every file write for security issues across 16 programming languages using a four-layer analysis pipeline.
 
