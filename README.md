@@ -17,13 +17,32 @@ Claude writes code → GTSS intercepts → 4-layer scan → Block critical vulns
 
 ## Four-Layer Analysis Pipeline
 
-Each layer builds on the previous one. Every file write passes through all four layers in sequence, and findings from earlier layers inform later ones.
+Each layer builds on the previous one. Every file write passes through all four layers in sequence. Parsed trees and taint flows are shared across layers — each file is parsed once per parser type, and Layer 3's precise dataflow results feed directly into Layer 4's interprocedural analysis.
+
+```
+                         ┌─────────────────────────────────────────────┐
+                         │              Shared Parse Cache             │
+                         │                                             │
+                         │  tree-sitter tree ──→ Layer 2 + tsflow (L3) │
+                         │  go/ast parse ──────→ astflow (L3) + L4     │
+                         └─────────────────────────────────────────────┘
+                                          │
+  ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+  │ Layer 1   │────→│ Layer 2   │────→│ Layer 3   │────→│ Layer 4   │
+  │ Regex     │     │ AST       │     │ Taint     │     │ Call Graph│
+  │           │     │           │     │           │     │           │
+  │ 862 rules │     │ 15 langs  │     │ 3 engines │     │ Interproc │
+  │ 44 cats   │     │ filter +  │     │ 1,631     │     │ cross-fn  │
+  │           │     │ structure │     │ entries   │     │ cross-file│
+  └──────────┘     └──────────┘     └──────────┘     └──────────┘
+   findings[]        filtered[]    + taint flows ────→ precise sigs
+```
 
 ### Layer 1: Regex Pattern Matching (862 rules, 44 categories)
 
 Fast first pass that matches known vulnerability signatures against source code. Rules are compiled `regexp.MustCompile` patterns organized by category (injection, xss, crypto, secrets, etc.) and by language (Go, Python, Java, etc.). Multi-line preprocessing joins backslash continuations and normalizes CRLF before matching.
 
-**What it catches:** Known vulnerability patterns with high confidence - SQL injection via string concatenation, hardcoded secrets, dangerous function calls, disabled security features, insecure crypto configurations, framework misconfigurations.
+**What it catches:** Known vulnerability patterns with high confidence — SQL injection via string concatenation, hardcoded secrets, dangerous function calls, disabled security features, insecure crypto configurations, framework misconfigurations.
 
 **What it misses:** Context-dependent vulnerabilities where a pattern appears in comments or non-executable code, and dataflow vulnerabilities where tainted data passes through multiple variables before reaching a sink.
 
@@ -31,34 +50,40 @@ Fast first pass that matches known vulnerability signatures against source code.
 
 Parses every file into a full abstract syntax tree using tree-sitter grammars compiled into the binary via CGo. The AST serves two purposes:
 
-1. **False positive suppression** - Regex findings that land inside comment AST nodes are filtered out. Findings in string literals are intentionally kept (SQL/XSS patterns in strings are often real vulnerabilities).
-2. **Structural inspection** - 13 language-specific analyzers (Go, Python, Java, JS/TS, PHP, Ruby, C/C++, Kotlin, Swift, Rust, C#, Lua, Groovy, Perl) examine AST structure for patterns that regex cannot express.
+1. **False positive suppression** — Regex findings that land inside comment AST nodes are filtered out. Findings in string literals are intentionally kept (SQL/XSS patterns in strings are often real vulnerabilities).
+2. **Structural inspection** — 13 language-specific analyzers (Go, Python, Java, JS/TS, PHP, Ruby, C/C++, Kotlin, Swift, Rust, C#, Lua, Groovy, Perl) examine AST structure for patterns that regex cannot express.
 
-**What it catches:** Security-relevant code structure that regex patterns can't distinguish - e.g., a function call pattern that only matters when it's actually executed code vs. appearing in a comment.
+**What it catches:** Security-relevant code structure that regex patterns can't distinguish — e.g., a function call pattern that only matters when it's actually executed code vs. appearing in a comment.
 
-**What it enables:** The parsed AST trees are passed to Layer 3 and Layer 4 for dataflow analysis, avoiding re-parsing.
+**Shared trees:** The tree-sitter tree parsed here is cached and reused by Layer 3's `tsflow` engine (Python, JS, Java, and 12 other languages), eliminating a redundant re-parse. For Go files, a separate `go/ast` parse is performed once and shared between Layer 3's `astflow` engine and Layer 4's call graph builder.
 
 ### Layer 3: Taint Analysis (1,631 catalog entries, 3 engines)
 
 Source-to-sink dataflow tracking. Identifies where user-controlled input (sources) flows through the program into dangerous operations (sinks), accounting for sanitization along the way. Three specialized engines handle different languages:
 
-| Engine | Languages | How it works |
-|--------|-----------|-------------|
-| **astflow** | Go | Uses `go/ast` for precise tracking through goroutines, channels, select statements, and Go-specific idioms |
-| **tsflow** | Python, JS/TS, Java, PHP, Ruby, C, C++, Kotlin, Swift, Rust, C#, Perl, Lua, Groovy | Generic tree-sitter walker with per-language config tables for each of 15 languages |
-| **regex fallback** | Others | Pattern-based approximation for languages without tree-sitter support |
+| Engine | Languages | Shared tree | How it works |
+|--------|-----------|-------------|-------------|
+| **astflow** | Go | `go/ast` (shared with L4) | Uses `go/ast` for precise tracking through goroutines, channels, select statements, and Go-specific idioms |
+| **tsflow** | Python, JS/TS, Java, PHP, Ruby, C, C++, Kotlin, Swift, Rust, C#, Perl, Lua, Groovy | tree-sitter (shared from L2) | Generic tree-sitter walker with per-language config tables for each of 15 languages |
+| **regex fallback** | Others | none | Pattern-based approximation for languages without tree-sitter support |
 
 Each language has a **taint catalog** defining sources (user input entry points), sinks (dangerous functions), and sanitizers (functions that neutralize taint). The scanner routes automatically: Go code goes to `astflow`, languages supported by `tsflow` go there, everything else falls back to regex.
 
-Unknown function calls propagate taint with 0.8x confidence decay - if data passes through a function not in the catalog, it's still tracked but at reduced confidence.
+Unknown function calls propagate taint with 0.8x confidence decay — if data passes through a function not in the catalog, it's still tracked but at reduced confidence.
 
-**What it catches:** Vulnerabilities where user input flows through variable assignments, function parameters, and return values before reaching a dangerous operation - even when no single line of code looks vulnerable on its own.
+**What it catches:** Vulnerabilities where user input flows through variable assignments, function parameters, and return values before reaching a dangerous operation — even when no single line of code looks vulnerable on its own.
+
+**What it passes forward:** The precise `TaintFlow` objects (source, sink, intermediate steps, confidence) are cached and passed directly to Layer 4, so interprocedural analysis uses exact dataflow paths rather than re-deriving them from regex.
 
 ### Layer 4: Call Graph (Interprocedural Analysis)
 
-Persistent cross-function taint tracking that survives across file writes within a Claude Code session. When Layer 3 finds that a function receives tainted input, the call graph records this. On subsequent file writes, if another function calls the tainted function, the taint propagates across the call boundary.
+Persistent cross-function and cross-file taint tracking that survives across file writes within a Claude Code session. When Layer 3 finds that a function receives tainted input, the call graph records this. On subsequent file writes, if another function calls the tainted function, the taint propagates across the call boundary.
 
-**What it catches:** Vulnerabilities split across multiple functions or files - e.g., a handler function that reads user input and passes it to a utility function that eventually writes to a database. Neither function looks vulnerable alone, but the call chain creates a taint flow.
+**Precise taint signatures:** Layer 4 receives the exact `TaintFlow` objects from Layer 3 to build function taint signatures. When flows overlap a function's line range, the signature uses precise source parameters, sink calls, and sanitizer presence from the actual dataflow analysis. When flows aren't available (e.g., regex fallback languages), it falls back to regex-based signature derivation.
+
+**Cross-file analysis:** When a caller lives in a different file than the one being edited, Layer 4 loads that file from disk (with a 2MB size limit and caching) to analyze the call site. This means taint propagation works across file boundaries, not just within the currently-edited file.
+
+**What it catches:** Vulnerabilities split across multiple functions or files — e.g., a handler function that reads user input and passes it to a utility function that eventually writes to a database. Neither function looks vulnerable alone, but the call chain creates a taint flow.
 
 **What it tracks:** Function signatures, parameter taint state, return value taint state, and call edges between functions. The graph persists for the duration of the Claude Code session.
 

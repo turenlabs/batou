@@ -9,9 +9,9 @@ GTSS is a security scanner that runs as a Claude Code hook, analyzing code for v
 ```
 cmd/gtss/main.go           Entry point - reads hook JSON from stdin, runs scanner, outputs hints
 internal/scanner/           Core scan orchestrator (concurrent rule execution + preprocessing)
-internal/rules/             34 rule categories (348 regex-based rules)
+internal/rules/             44 rule categories (862 regex-based rules)
 internal/ast/               Tree-sitter AST parsing (parser, query, filter, context)
-internal/analyzer/          Language detection + 13 AST security analyzers
+internal/analyzer/          Language detection + 15 AST security analyzers
 internal/taint/             Taint analysis engine (source -> sink tracking with sanitizers)
 internal/taint/astflow/     Go-specific AST taint walker (uses go/ast, tracks channels/goroutines)
 internal/taint/tsflow/      Tree-sitter taint walker for 15 languages (Python, JS/TS, Java, Perl, etc.)
@@ -27,14 +27,18 @@ bench/eval/                 Vulnerability app benchmarks (WebGoat, Juice Shop, D
 
 ## Key Concepts
 
-- **Four-layer analysis**:
-  - Layer 1: Regex rules (348 pattern-matching rules across 34 categories)
-  - Layer 2: AST analysis (tree-sitter structural analysis for 14 languages)
-  - Layer 3: Taint analysis (source-to-sink dataflow with 1,631 entries across three engines)
-  - Layer 4: Call graph (persistent interprocedural taint tracking across function boundaries)
+- **Four-layer analysis** (layers share parsed trees and taint flows — no redundant re-parsing):
+  - Layer 1: Regex rules (862 pattern-matching rules across 44 categories)
+  - Layer 2: AST analysis (tree-sitter structural analysis for 15 languages). Tree-sitter tree is cached and shared with Layer 3's tsflow engine.
+  - Layer 3: Taint analysis (source-to-sink dataflow with 1,631 entries across three engines). TaintFlow objects are cached and passed to Layer 4 for precise interprocedural signatures.
+  - Layer 4: Call graph (persistent interprocedural taint tracking across function boundaries, cross-file caller loading from disk)
+- **Shared parse cache** (each file parsed once per parser type):
+  - tree-sitter tree: parsed in Layer 2 → reused by tsflow (Layer 3) via `AnalyzeWithTree()`
+  - go/ast parse: parsed once → shared between astflow (Layer 3) via `AnalyzeGoWithAST()` and call graph builder (Layer 4) via `UpdateFileWithAST()`. Cached in `ScanContext.GoASTFile`.
+  - Layer 3 `TaintFlow` objects → passed to Layer 4's `ComputeTaintSig()` for precise signature derivation (falls back to regex when flows are nil)
 - **Three taint engines** (scanner routes automatically by language):
-  - `astflow`: Go-specific, uses `go/ast` for precise tracking through channels, select, goroutines, and Go idioms
-  - `tsflow`: Generic tree-sitter walker for 15 languages (Python, JS, TS, Java, PHP, Ruby, C, C++, C#, Kotlin, Rust, Swift, Lua, Groovy, Perl) with per-language config tables
+  - `astflow`: Go-specific, uses `go/ast` for precise tracking through channels, select, goroutines, and Go idioms. Accepts pre-parsed `GoParseResult` via `AnalyzeGoWithAST()`.
+  - `tsflow`: Generic tree-sitter walker for 15 languages (Python, JS, TS, Java, PHP, Ruby, C, C++, C#, Kotlin, Rust, Swift, Lua, Groovy, Perl) with per-language config tables. Accepts pre-parsed tree via `AnalyzeWithTree()`.
   - `taint.Analyze`: Regex-based fallback for languages without tree-sitter support
 - **Preprocessing**: CRLF normalization, multi-line continuation joining (backslash + implicit), unicode identifier support
 - **AST false-positive filter**: Suppresses regex findings inside comment AST nodes (not strings — SQL/XSS patterns in strings are intentional)
@@ -87,7 +91,8 @@ Note: Tree-sitter requires CGo. The Makefile sets `CGO_ENABLED=1` automatically.
 - Taint catalogs register via `init()` functions
 - New rules: create file in `internal/rules/{category}/`, add blank import in `cmd/gtss/main.go`
 - New language: create 4 files in `internal/taint/languages/` (catalog, sources, sinks, sanitizers), then add a `langConfig` in `internal/taint/tsflow/langconfig.go`
-- `ScanContext.Tree` is `interface{}` — rules call `ast.TreeFromContext(sctx)` to get typed `*ast.Tree`
+- `ScanContext.Tree` is `interface{}` — rules call `ast.TreeFromContext(sctx)` to get typed `*ast.Tree` (tree-sitter)
+- `ScanContext.GoASTFile` is `interface{}` — caches `*astflow.GoParseResult` (`*token.FileSet` + `*ast.File`) for sharing between astflow and call graph builder
 
 ## Important Notes
 
@@ -95,7 +100,9 @@ Note: Tree-sitter requires CGo. The Makefile sets `CGO_ENABLED=1` automatically.
 - Stdin is limited to 50MB to prevent OOM
 - `BlockWrite` runs AFTER `OutputPreTool` so Claude always gets hints
 - Taint analysis uses 0.8x confidence decay for unknown function propagation (applies to all three engines)
-- Scanner routes taint analysis: Go → `astflow.AnalyzeGo`, `tsflow.Supports(lang)` → `tsflow.Analyze` (15 languages including Perl), else → `taint.Analyze` (regex fallback)
+- Scanner routes taint analysis: Go → `astflow.AnalyzeGoWithAST` (reuses cached `go/ast`), `tsflow.Supports(lang)` → `tsflow.AnalyzeWithTree` (reuses cached tree-sitter tree, 15 languages including Perl), else → `taint.Analyze` (regex fallback)
+- Layer 3 taint flows are cached in `sctx.TaintFlows` and passed to Layer 4's `PropagateInterproc()` for precise interprocedural signatures
+- Layer 4 loads cross-file callers from disk (2MB limit, cached) when they aren't in the current file contents
 - Test file paths matter - use non-test paths like `/app/handler.go` to avoid `isTestFile()` exclusion
 - CRLF normalization happens early in scan pipeline (before regex rules)
 - Multi-line preprocessing (`JoinContinuationLines`) is applied for Python, Shell, C/C++ before regex scanning; original content is preserved for AST parsing
