@@ -69,7 +69,7 @@ import (
 	_ "github.com/turenio/gtss/internal/analyzer/gvyast"
 
 	// Taint analysis engine and language catalogs
-	_ "github.com/turenio/gtss/internal/taint"
+	_ "github.com/turenio/gtss/internal/taintrule"
 	_ "github.com/turenio/gtss/internal/taint/languages"
 	_ "github.com/turenio/gtss/internal/taint/goflow"
 )

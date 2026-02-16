@@ -1,9 +1,10 @@
-package taint
+package taintrule
 
 import (
 	"time"
 
 	"github.com/turenio/gtss/internal/rules"
+	"github.com/turenio/gtss/internal/taint"
 	"github.com/turenio/gtss/internal/taint/astflow"
 	"github.com/turenio/gtss/internal/taint/tsflow"
 )
@@ -36,13 +37,13 @@ func (t *TaintRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 	// Route to the best taint engine for the language, matching the
 	// logic in scanner.go Phase 3.
-	var flows []TaintFlow
+	var flows []taint.TaintFlow
 	if ctx.Language == rules.LangGo {
 		flows = astflow.AnalyzeGo(ctx.Content, ctx.FilePath)
 	} else if tsflow.Supports(ctx.Language) {
 		flows = tsflow.Analyze(ctx.Content, ctx.FilePath, ctx.Language)
 	} else {
-		flows = Analyze(ctx.Content, ctx.FilePath, ctx.Language)
+		flows = taint.Analyze(ctx.Content, ctx.FilePath, ctx.Language)
 	}
 
 	// Cache flows on the ScanContext so scanner.go Phase 3 can reuse
@@ -64,7 +65,7 @@ func (t *TaintRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 	// Also add the formatted taint report as context in the last finding
 	elapsed := time.Since(start).Milliseconds()
-	report := FormatFlowsReport(flows, ctx.FilePath, ctx.Language, elapsed)
+	report := taint.FormatFlowsReport(flows, ctx.FilePath, ctx.Language, elapsed)
 	if len(findings) > 0 && report != "" {
 		// Append the visual flow report to the last finding's description
 		findings[len(findings)-1].Description += "\n\n" + report

@@ -69,7 +69,7 @@ var (
 // GTSS-GEN-021: Insecure temporary file creation
 var (
 	reTmpFilePath    = regexp.MustCompile(`(?i)(?:['"/]tmp/|['"/]temp/|tempfile|tmpfile|os\.path\.join\s*\(\s*['"](?:/tmp|/temp))[^'"]*(?:\.(?:txt|log|json|xml|csv|dat|db|sql|key|pem|conf|cfg|ini|yaml|yml))?['"]?`)
-	reTmpInsecure    = regexp.MustCompile(`(?i)(?:mktemp\s+(?!-d)|tmpnam|tempnam|os\.tmpnam|tmpfile\(\)|tempfile\.mktemp)\b`)
+	reTmpInsecure    = regexp.MustCompile(`(?i)(?:mktemp\s+[^-]|mktemp\s*$|tmpnam|tempnam|os\.tmpnam|tmpfile\(\)|tempfile\.mktemp)\b`)
 	reTmpSecure      = regexp.MustCompile(`(?i)(?:tempfile\.mkstemp|tempfile\.NamedTemporaryFile|tempfile\.mkdtemp|os\.CreateTemp|ioutil\.TempFile|os\.MkdirTemp|File\.createTempFile|fs\.mkdtemp|mkstemp)\b`)
 )
 

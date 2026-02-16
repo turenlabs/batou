@@ -42,7 +42,7 @@ var (
 // GTSS-VAL-010: Missing null/undefined check before use
 var (
 	reOptionalChainMissing = regexp.MustCompile(`(?:req\.body|req\.query|req\.params|request\.body)\.\w+\.\w+`)
-	reNullCheckPresent     = regexp.MustCompile(`(?:\?\.|!= null|!== null|!= undefined|!== undefined|!= nil|if\s*\(.*(?:req\.body|req\.query|req\.params)|typeof\s+\w+\s*[!=]==?\s*['"]undefined['"]))`)
+	reNullCheckPresent     = regexp.MustCompile(`(?:\?\.|!= null|!== null|!= undefined|!== undefined|!= nil|if\s*\(.*(?:req\.body|req\.query|req\.params)|typeof\s+\w+\s*[!=]==?\s*['"]undefined['"])`)
 )
 
 // GTSS-VAL-011: Trusting client-side validation only
