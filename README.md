@@ -1,7 +1,5 @@
 # Batou - Runtime SAST For Claude Code
 
-[![Architecture](https://img.shields.io/badge/architecture-excalidraw-6965db)](https://excalidraw.com/#json=Y_aI4C8JAMHOkHY9T5ojj,94pBf-Q-VasP2l606DwPvQ)
-
 <img width="512" height="512" alt="logo_2" src="https://github.com/user-attachments/assets/a3157fb7-68cb-40af-878f-02dc54f62df9" />
 
 
