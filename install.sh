@@ -3,11 +3,12 @@
 # Batou - Code guard for your AI agents
 # Installation Script
 #
-# Installs the Batou binary and configures Claude Code hooks
-# for a target project.
+# Downloads the latest Batou binary from GitHub releases and optionally
+# configures Claude Code hooks for a target project.
 #
 # Usage:
-#   ./install.sh                    # Build and install Batou binary
+#   curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash
+#   ./install.sh                    # Download and install latest binary
 #   ./install.sh --setup /path/to   # Also configure hooks in a project
 #   ./install.sh --global           # Install hooks in ~/.claude/settings.json
 #
@@ -23,7 +24,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 BOLD='\033[1m'
 
-BATOU_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO="turenlabs/batou"
 INSTALL_DIR="$HOME/.batou"
 BIN_DIR="$INSTALL_DIR/bin"
 
@@ -49,45 +50,89 @@ success() { echo -e "${GREEN}[OK]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error()   { echo -e "${RED}[ERROR]${NC} $*"; }
 
-check_deps() {
-    info "Checking dependencies..."
+detect_platform() {
+    local os arch
 
-    if ! command -v go &>/dev/null; then
-        error "Go is not installed. Please install Go 1.21+ from https://go.dev"
+    os="$(uname -s)"
+    arch="$(uname -m)"
+
+    case "$os" in
+        Darwin) os="darwin" ;;
+        Linux)  os="linux" ;;
+        *)
+            error "Unsupported OS: $os"
+            exit 1
+            ;;
+    esac
+
+    case "$arch" in
+        x86_64|amd64)  arch="amd64" ;;
+        arm64|aarch64) arch="arm64" ;;
+        *)
+            error "Unsupported architecture: $arch"
+            exit 1
+            ;;
+    esac
+
+    echo "${os}-${arch}"
+}
+
+get_latest_version() {
+    local url="https://api.github.com/repos/${REPO}/releases/latest"
+    local version
+
+    if command -v curl &>/dev/null; then
+        version=$(curl -fsSL "$url" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    elif command -v wget &>/dev/null; then
+        version=$(wget -qO- "$url" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    else
+        error "curl or wget is required"
         exit 1
     fi
 
-    GO_VERSION=$(go version | grep -oP 'go\K[0-9]+\.[0-9]+')
-    info "Go version: $GO_VERSION"
-    success "Dependencies satisfied"
-}
-
-build_batou() {
-    info "Building Batou..."
-    cd "$BATOU_DIR"
-
-    mkdir -p bin
-    go build -trimpath -ldflags "-s -w" -o bin/batou ./cmd/batou
-
-    if [[ ! -x bin/batou ]]; then
-        error "Build failed"
+    if [[ -z "$version" ]]; then
+        error "Failed to fetch latest version from GitHub"
         exit 1
     fi
 
-    success "Batou binary built: $BATOU_DIR/bin/batou"
+    echo "$version"
 }
 
-install_binary() {
-    info "Installing Batou to $BIN_DIR..."
+download_binary() {
+    local version="$1"
+    local platform="$2"
+    local artifact="batou-${platform}"
+    local url="https://github.com/${REPO}/releases/download/${version}/${artifact}"
+
+    info "Downloading Batou ${version} for ${platform}..."
 
     mkdir -p "$BIN_DIR"
-    cp "$BATOU_DIR/bin/batou" "$BIN_DIR/batou"
+    local tmp_file
+    tmp_file=$(mktemp)
+
+    if command -v curl &>/dev/null; then
+        if ! curl -fSL --progress-bar -o "$tmp_file" "$url"; then
+            rm -f "$tmp_file"
+            error "Download failed. Check that a release exists for ${platform}"
+            error "URL: $url"
+            exit 1
+        fi
+    elif command -v wget &>/dev/null; then
+        if ! wget -q --show-progress -O "$tmp_file" "$url"; then
+            rm -f "$tmp_file"
+            error "Download failed. Check that a release exists for ${platform}"
+            error "URL: $url"
+            exit 1
+        fi
+    fi
+
+    mv "$tmp_file" "$BIN_DIR/batou"
     chmod +x "$BIN_DIR/batou"
 
     # Create ledger directory
     mkdir -p "$INSTALL_DIR/ledger"
 
-    success "Batou installed to $BIN_DIR/batou"
+    success "Batou ${version} installed to $BIN_DIR/batou"
 
     # Check if on PATH
     if ! echo "$PATH" | tr ':' '\n' | grep -q "$BIN_DIR"; then
@@ -102,49 +147,81 @@ setup_hooks() {
 
     info "Setting up Batou hooks in $project_dir..."
 
-    # Create .claude/hooks directory
     mkdir -p "$project_dir/.claude/hooks"
 
-    # Copy hook script
-    cp "$BATOU_DIR/.claude/hooks/batou-hook.sh" "$project_dir/.claude/hooks/batou-hook.sh"
+    # Write the hook script directly (no need for a source repo checkout)
+    cat > "$project_dir/.claude/hooks/batou-hook.sh" << 'HOOKEOF'
+#!/usr/bin/env bash
+set -euo pipefail
+BATOU_BIN=""
+if [[ -x "$HOME/.batou/bin/batou" ]]; then
+    BATOU_BIN="$HOME/.batou/bin/batou"
+elif command -v batou &>/dev/null; then
+    BATOU_BIN="$(command -v batou)"
+fi
+if [[ -z "$BATOU_BIN" ]]; then
+    exit 0
+fi
+exec "$BATOU_BIN"
+HOOKEOF
     chmod +x "$project_dir/.claude/hooks/batou-hook.sh"
 
     # Handle settings.json
     local settings_file="$project_dir/.claude/settings.json"
+    local hook_config
+    hook_config=$(cat << 'JSONEOF'
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/batou-hook.sh",
+            "timeout": 30,
+            "statusMessage": "Batou: Scanning for vulnerabilities..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/batou-hook.sh",
+            "timeout": 30,
+            "statusMessage": "Batou: Deep security scan..."
+          }
+        ]
+      }
+    ]
+  }
+}
+JSONEOF
+)
 
     if [[ -f "$settings_file" ]]; then
-        # Check if Batou hooks already configured
         if grep -q "batou-hook" "$settings_file" 2>/dev/null; then
             success "Batou hooks already configured in $settings_file"
             return
         fi
 
-        warn "$settings_file exists. Merging Batou hooks..."
-
-        # Use a temp file for safe merge
-        local tmp_file
-        tmp_file=$(mktemp)
-
-        # Merge using Go's json capabilities or jq if available
+        warn "$settings_file exists."
         if command -v jq &>/dev/null; then
-            jq -s '
-                def merge_hooks:
-                    .[0].hooks as $existing |
-                    .[1].hooks as $new |
-                    ($existing // {}) as $e |
-                    ($new // {}) as $n |
-                    {hooks: ($e * $n)} + (.[0] | del(.hooks));
-                merge_hooks
-            ' "$settings_file" "$BATOU_DIR/.claude/settings.json" > "$tmp_file"
+            local tmp_file
+            tmp_file=$(mktemp)
+            echo "$hook_config" | jq -s '.[0] * .[1]' "$settings_file" - > "$tmp_file"
             mv "$tmp_file" "$settings_file"
             success "Merged Batou hooks into existing settings"
         else
-            warn "jq not found. Please manually merge hooks from:"
-            echo "  $BATOU_DIR/.claude/settings.json"
-            echo "  into: $settings_file"
+            warn "jq not found. Please manually add Batou hooks to $settings_file"
+            echo "$hook_config"
         fi
     else
-        cp "$BATOU_DIR/.claude/settings.json" "$settings_file"
+        echo "$hook_config" > "$settings_file"
         success "Batou hooks installed in $settings_file"
     fi
 }
@@ -155,7 +232,6 @@ setup_global() {
     local settings_file="$HOME/.claude/settings.json"
     mkdir -p "$HOME/.claude"
 
-    # For global install, the hook script path needs to reference ~/.batou
     local hook_script="$INSTALL_DIR/hooks/batou-hook.sh"
     mkdir -p "$INSTALL_DIR/hooks"
 
@@ -170,7 +246,6 @@ exit 0
 HOOKEOF
     chmod +x "$hook_script"
 
-    # Create or merge settings
     local batou_hooks
     batou_hooks=$(cat << JSONEOF
 {
@@ -254,9 +329,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-check_deps
-build_batou
-install_binary
+PLATFORM=$(detect_platform)
+VERSION=$(get_latest_version)
+
+info "Detected platform: $PLATFORM"
+info "Latest version: $VERSION"
+
+download_binary "$VERSION" "$PLATFORM"
 
 case "$MODE" in
     setup)

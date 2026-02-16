@@ -20,7 +20,26 @@ Claude writes code → Batou intercepts → 4-layer scan → Block critical vuln
 
 Each layer builds on the previous one. Every file write passes through all four layers in sequence. Parsed trees and taint flows are shared across layers — each file is parsed once per parser type, and Layer 3's precise dataflow results feed directly into Layer 4's interprocedural analysis.
 
-### Layer 1: Regex Pattern Matching (862 rules, 44 categories)
+```
+                         ┌─────────────────────────────────────────────┐
+                         │              Shared Parse Cache             │
+                         │                                             │
+                         │  tree-sitter tree ──→ Layer 2 + tsflow (L3) │
+                         │  go/ast parse ──────→ astflow (L3) + L4     │
+                         └─────────────────────────────────────────────┘
+                                          │
+  ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+  │ Layer 1   │────→│ Layer 2   │────→│ Layer 3   │────→│ Layer 4   │
+  │ Regex     │     │ AST       │     │ Taint     │     │ Call Graph│
+  │           │     │           │     │           │     │           │
+  │ 676 rules │     │ 15 langs  │     │ 3 engines │     │ Interproc │
+  │ 43 cats   │     │ filter +  │     │ 1,069     │     │ cross-fn  │
+  │           │     │ structure │     │ entries   │     │ cross-file│
+  └──────────┘     └──────────┘     └──────────┘     └──────────┘
+   findings[]        filtered[]    + taint flows ────→ precise sigs
+```
+
+### Layer 1: Regex Pattern Matching (676 rules, 43 categories)
 
 Fast first pass that matches known vulnerability signatures against source code. Rules are compiled `regexp.MustCompile` patterns organized by category (injection, xss, crypto, secrets, etc.) and by language (Go, Python, Java, etc.). Multi-line preprocessing joins backslash continuations and normalizes CRLF before matching.
 
@@ -39,7 +58,7 @@ Parses every file into a full abstract syntax tree using tree-sitter grammars co
 
 **Shared trees:** The tree-sitter tree parsed here is cached and reused by Layer 3's `tsflow` engine (Python, JS, Java, and 12 other languages), eliminating a redundant re-parse. For Go files, a separate `go/ast` parse is performed once and shared between Layer 3's `astflow` engine and Layer 4's call graph builder.
 
-### Layer 3: Taint Analysis (1,631 catalog entries, 3 engines)
+### Layer 3: Taint Analysis (1,069 catalog entries, 3 engines)
 
 Source-to-sink dataflow tracking. Identifies where user-controlled input (sources) flows through the program into dangerous operations (sinks), accounting for sanitization along the way. Three specialized engines handle different languages:
 
@@ -71,7 +90,7 @@ Persistent cross-function and cross-file taint tracking that survives across fil
 
 ## What It Detects
 
-**862 rules across 44 categories:**
+**676 rules across 43 categories:**
 
 | Category | Examples |
 |----------|---------|
@@ -107,41 +126,29 @@ Persistent cross-function and cross-file taint tracking that survives across fil
 
 ## Installation
 
-### Prerequisites
-
-- Go 1.21+ with CGo support (for tree-sitter AST parsing)
-- C compiler (gcc or clang)
-- Claude Code CLI
-
 ### Quick Install
 
 ```bash
-git clone https://github.com/turenlabs/batou.git
-cd batou
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash
 ```
 
 ### Install with Project Setup
 
 ```bash
-# Install binary + configure hooks for a specific project
-./install.sh --setup /path/to/your/project
+# Download install script and configure hooks for a specific project
+curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash -s -- --setup /path/to/your/project
 
 # Or install globally for all Claude Code sessions
-./install.sh --global
+curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash -s -- --global
 ```
 
-### Manual Install
+### Build from Source
 
 ```bash
-# Build
-make build
-
-# Install binary
-make install
-
-# Setup hooks in a project
-make setup PROJECT=/path/to/your/project
+# Requires Go 1.21+ with CGo and a C compiler (gcc or clang)
+git clone https://github.com/turenlabs/batou.git
+cd batou
+make build && make install
 ```
 
 ## Configuration
@@ -209,11 +216,11 @@ Go test files:      82
 Total Go lines:     ~132,000
 Binary size:        ~4 MB
 External deps:      1 (tree-sitter, compiled into binary)
-Regex rules:        862
+Regex rules:        676
 AST analyzers:      15 languages
-Rule categories:    44
+Rule categories:    43
 Languages:          16
-Taint entries:      1,631
+Taint entries:      1,069
 Taint engines:      3 (astflow, tsflow, regex)
 File extensions:    50+
 Test fixtures:      430+

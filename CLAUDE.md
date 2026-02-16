@@ -9,7 +9,7 @@ Batou is a security scanner that runs as a Claude Code hook, analyzing code for 
 ```
 cmd/batou/main.go          Entry point - reads hook JSON from stdin, runs scanner, outputs hints
 internal/scanner/           Core scan orchestrator (concurrent rule execution + preprocessing)
-internal/rules/             44 rule categories (862 regex-based rules)
+internal/rules/             43 rule categories (676 regex-based rules)
 internal/ast/               Tree-sitter AST parsing (parser, query, filter, context)
 internal/analyzer/          Language detection + 15 AST security analyzers
 internal/taint/             Taint analysis engine (source -> sink tracking with sanitizers)
@@ -28,9 +28,9 @@ bench/eval/                 Vulnerability app benchmarks (WebGoat, Juice Shop, D
 ## Key Concepts
 
 - **Four-layer analysis** (layers share parsed trees and taint flows — no redundant re-parsing):
-  - Layer 1: Regex rules (862 pattern-matching rules across 44 categories)
+  - Layer 1: Regex rules (676 pattern-matching rules across 43 categories)
   - Layer 2: AST analysis (tree-sitter structural analysis for 15 languages). Tree-sitter tree is cached and shared with Layer 3's tsflow engine.
-  - Layer 3: Taint analysis (source-to-sink dataflow with 1,631 entries across three engines). TaintFlow objects are cached and passed to Layer 4 for precise interprocedural signatures.
+  - Layer 3: Taint analysis (source-to-sink dataflow with 1,069 entries across three engines). TaintFlow objects are cached and passed to Layer 4 for precise interprocedural signatures.
   - Layer 4: Call graph (persistent interprocedural taint tracking across function boundaries, cross-file caller loading from disk)
 - **Shared parse cache** (each file parsed once per parser type):
   - tree-sitter tree: parsed in Layer 2 → reused by tsflow (Layer 3) via `AnalyzeWithTree()`
