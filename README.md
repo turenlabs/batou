@@ -20,25 +20,6 @@ Claude writes code → Batou intercepts → 4-layer scan → Block critical vuln
 
 Each layer builds on the previous one. Every file write passes through all four layers in sequence. Parsed trees and taint flows are shared across layers — each file is parsed once per parser type, and Layer 3's precise dataflow results feed directly into Layer 4's interprocedural analysis.
 
-```
-                         ┌─────────────────────────────────────────────┐
-                         │              Shared Parse Cache             │
-                         │                                             │
-                         │  tree-sitter tree ──→ Layer 2 + tsflow (L3) │
-                         │  go/ast parse ──────→ astflow (L3) + L4     │
-                         └─────────────────────────────────────────────┘
-                                          │
-  ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-  │ Layer 1   │────→│ Layer 2   │────→│ Layer 3   │────→│ Layer 4   │
-  │ Regex     │     │ AST       │     │ Taint     │     │ Call Graph│
-  │           │     │           │     │           │     │           │
-  │ 676 rules │     │ 15 langs  │     │ 3 engines │     │ Interproc │
-  │ 43 cats   │     │ filter +  │     │ 1,069     │     │ cross-fn  │
-  │           │     │ structure │     │ entries   │     │ cross-file│
-  └──────────┘     └──────────┘     └──────────┘     └──────────┘
-   findings[]        filtered[]    + taint flows ────→ precise sigs
-```
-
 ### Layer 1: Regex Pattern Matching (676 rules, 43 categories)
 
 Fast first pass that matches known vulnerability signatures against source code. Rules are compiled `regexp.MustCompile` patterns organized by category (injection, xss, crypto, secrets, etc.) and by language (Go, Python, Java, etc.). Multi-line preprocessing joins backslash continuations and normalizes CRLF before matching.
