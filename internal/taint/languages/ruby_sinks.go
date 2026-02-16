@@ -316,5 +316,95 @@ func (rubyCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-113",
 			OWASPCategory: "A03:2021-Injection",
 		},
+
+		// --- ActiveRecord find_by_sql already exists, add connection.execute ---
+		{
+			ID:            "ruby.activerecord.connection.select_all",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangRuby,
+			Pattern:       `connection\.select_all\s*\(|connection\.select_one\s*\(`,
+			ObjectType:    "ActiveRecord::Base",
+			MethodName:    "select_all/select_one",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "ActiveRecord connection select with potentially tainted SQL",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- File.read with tainted path (CWE-22) ---
+		{
+			ID:            "ruby.file.read.sink",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangRuby,
+			Pattern:       `File\.read\s*\(`,
+			ObjectType:    "File",
+			MethodName:    "read",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "File read with potentially tainted path (arbitrary file read)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- File.delete (CWE-22) ---
+		{
+			ID:            "ruby.file.delete",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangRuby,
+			Pattern:       `File\.delete\s*\(|FileUtils\.rm\s*\(|FileUtils\.rm_rf\s*\(`,
+			ObjectType:    "File",
+			MethodName:    "delete/rm/rm_rf",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "File deletion with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- open-uri open() SSRF (CWE-918) ---
+		{
+			ID:            "ruby.open_uri.open.generic",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangRuby,
+			Pattern:       `\bopen\s*\(.*#\{`,
+			ObjectType:    "OpenURI",
+			MethodName:    "open",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via open() with interpolated URL",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- Net::HTTP.get with user URL (CWE-918) ---
+		{
+			ID:            "ruby.net.http.post",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangRuby,
+			Pattern:       `Net::HTTP\.post\s*\(|Net::HTTP\.post_form\s*\(`,
+			ObjectType:    "Net::HTTP",
+			MethodName:    "post/post_form",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via Net::HTTP.post with tainted URL",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- ActionMailer mail to: (CWE-93) ---
+		{
+			ID:            "ruby.actionmailer.mail.to",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangRuby,
+			Pattern:       `mail\s*\(\s*to\s*:`,
+			ObjectType:    "ActionMailer::Base",
+			MethodName:    "mail(to:)",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "ActionMailer recipient set with potentially tainted address",
+			CWEID:         "CWE-93",
+			OWASPCategory: "A03:2021-Injection",
+		},
 	}
 }

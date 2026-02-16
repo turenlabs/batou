@@ -378,5 +378,65 @@ func (c *RustCatalog) Sources() []taint.SourceDef {
 			Description: "Serde JSON deserialization from potentially untrusted data",
 			Assigns:     "return",
 		},
+
+		// --- Hyper body ---
+		{
+			ID:          "rust.hyper.body.to_bytes",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `hyper::body::to_bytes\s*\(|body::to_bytes\s*\(`,
+			ObjectType:  "hyper",
+			MethodName:  "body::to_bytes",
+			Description: "Hyper HTTP request body bytes",
+			Assigns:     "return",
+		},
+
+		// --- Rocket FromForm ---
+		{
+			ID:          "rust.rocket.fromform",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `#\[derive\(.*FromForm`,
+			ObjectType:  "rocket",
+			MethodName:  "FromForm derive",
+			Description: "Rocket framework form data via FromForm derive",
+			Assigns:     "return",
+		},
+
+		// --- Warp filter query ---
+		{
+			ID:          "rust.warp.filter.query",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `warp::filters::query::query`,
+			ObjectType:  "warp",
+			MethodName:  "filters::query::query",
+			Description: "Warp query filter extraction",
+			Assigns:     "return",
+		},
+
+		// --- Axum multipart ---
+		{
+			ID:          "rust.axum.multipart",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRust,
+			Pattern:     `extract::Multipart|axum::extract::Multipart`,
+			ObjectType:  "axum",
+			MethodName:  "extract::Multipart",
+			Description: "Axum multipart form data extraction",
+			Assigns:     "return",
+		},
+
+		// --- std::env::args_os ---
+		{
+			ID:          "rust.std.env.args_os",
+			Category:    taint.SrcCLIArg,
+			Language:    rules.LangRust,
+			Pattern:     `std::env::args_os\s*\(|env::args_os\s*\(`,
+			ObjectType:  "",
+			MethodName:  "std::env::args_os",
+			Description: "Command-line arguments as OsString iterator",
+			Assigns:     "return",
+		},
 	}
 }

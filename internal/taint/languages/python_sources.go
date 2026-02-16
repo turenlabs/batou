@@ -419,5 +419,165 @@ func (c *PythonCatalog) Sources() []taint.SourceDef {
 			Description: "File contents via pathlib Path",
 			Assigns:     "return",
 		},
+
+		// --- Django REST Framework ---
+		{
+			ID:          "py.drf.request.data",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.data`,
+			ObjectType:  "rest_framework.request.Request",
+			MethodName:  "data",
+			Description: "Django REST Framework parsed request data",
+			Assigns:     "return",
+		},
+		{
+			ID:          "py.drf.request.query_params",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.query_params`,
+			ObjectType:  "rest_framework.request.Request",
+			MethodName:  "query_params",
+			Description: "Django REST Framework query parameters",
+			Assigns:     "return",
+		},
+
+		// --- FastAPI additional dependency sources ---
+		{
+			ID:          "py.fastapi.file.upload",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `UploadFile`,
+			ObjectType:  "fastapi",
+			MethodName:  "UploadFile",
+			Description: "FastAPI file upload dependency",
+			Assigns:     "return",
+		},
+		{
+			ID:          "py.fastapi.depends",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `Depends\(`,
+			ObjectType:  "fastapi",
+			MethodName:  "Depends",
+			Description: "FastAPI dependency injection (may carry user input)",
+			Assigns:     "return",
+		},
+
+		// --- Flask additional ---
+		{
+			ID:          "py.flask.request.content_type",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.content_type`,
+			ObjectType:  "flask.Request",
+			MethodName:  "content_type",
+			Description: "Flask request content type header",
+			Assigns:     "return",
+		},
+
+		// --- Starlette additional ---
+		{
+			ID:          "py.starlette.request.body",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `await\s+request\.body\(`,
+			ObjectType:  "starlette.requests.Request",
+			MethodName:  "body",
+			Description: "Starlette raw request body bytes",
+			Assigns:     "return",
+		},
+		{
+			ID:          "py.starlette.request.headers",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.headers`,
+			ObjectType:  "starlette.requests.Request",
+			MethodName:  "headers",
+			Description: "Starlette request headers",
+			Assigns:     "return",
+		},
+
+		// --- aiohttp additional ---
+		{
+			ID:          "py.aiohttp.request.match_info",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.match_info`,
+			ObjectType:  "aiohttp.web.Request",
+			MethodName:  "match_info",
+			Description: "aiohttp route match info parameters",
+			Assigns:     "return",
+		},
+		{
+			ID:          "py.aiohttp.request.headers",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.headers`,
+			ObjectType:  "aiohttp.web.Request",
+			MethodName:  "headers",
+			Description: "aiohttp request headers",
+			Assigns:     "return",
+		},
+
+		// --- Django FILES ---
+		{
+			ID:          "py.django.request.files",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.FILES`,
+			ObjectType:  "django.http.HttpRequest",
+			MethodName:  "FILES",
+			Description: "Django uploaded files",
+			Assigns:     "return",
+		},
+
+		// --- Django COOKIES ---
+		{
+			ID:          "py.django.request.cookies",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.COOKIES`,
+			ObjectType:  "django.http.HttpRequest",
+			MethodName:  "COOKIES",
+			Description: "Django request cookies",
+			Assigns:     "return",
+		},
+
+		// --- Database sources ---
+		{
+			ID:          "py.cursor.fetchone",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangPython,
+			Pattern:     `\.fetchone\(|\.fetchall\(|\.fetchmany\(`,
+			ObjectType:  "cursor",
+			MethodName:  "fetchone/fetchall/fetchmany",
+			Description: "Database cursor fetch results",
+			Assigns:     "return",
+		},
+
+		// --- Redis data source ---
+		{
+			ID:          "py.redis.get",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangPython,
+			Pattern:     `redis_client\.get\(|\.hgetall\(|\.lrange\(`,
+			ObjectType:  "redis.Redis",
+			MethodName:  "get/hgetall/lrange",
+			Description: "Redis data retrieval (potentially untrusted content)",
+			Assigns:     "return",
+		},
+
+		// --- Deserialized data ---
+		{
+			ID:          "py.json.loads",
+			Category:    taint.SrcDeserialized,
+			Language:    rules.LangPython,
+			Pattern:     `json\.loads\(|json\.load\(`,
+			ObjectType:  "",
+			MethodName:  "json.loads/load",
+			Description: "JSON deserialized data from potentially untrusted source",
+			Assigns:     "return",
+		},
 	}
 }

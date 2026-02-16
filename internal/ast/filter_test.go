@@ -159,7 +159,7 @@ func main() {
 		},
 	}
 
-	filtered := FilterFindings(tree, findings)
+	filtered := FilterFindings(tree, "/app/main.go", findings)
 	if len(filtered) != 1 {
 		t.Fatalf("expected 1 finding after filtering, got %d", len(filtered))
 	}
@@ -172,7 +172,7 @@ func TestFilterFindings_NilTree(t *testing.T) {
 	findings := []rules.Finding{
 		{RuleID: "test", LineNumber: 1},
 	}
-	result := FilterFindings(nil, findings)
+	result := FilterFindings(nil, "/app/main.go", findings)
 	if len(result) != 1 {
 		t.Errorf("nil tree should return findings unchanged, got %d", len(result))
 	}
@@ -181,7 +181,7 @@ func TestFilterFindings_NilTree(t *testing.T) {
 func TestFilterFindings_EmptyFindings(t *testing.T) {
 	src := []byte(`package main`)
 	tree := Parse(src, rules.LangGo)
-	result := FilterFindings(tree, nil)
+	result := FilterFindings(tree, "/app/main.go", nil)
 	if result != nil {
 		t.Errorf("nil findings should return nil, got %v", result)
 	}
@@ -210,7 +210,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	filtered := FilterFindings(tree, findings)
+	filtered := FilterFindings(tree, "/app/main.go", findings)
 	if len(filtered) != 1 {
 		t.Fatalf("expected 1 finding preserved, got %d", len(filtered))
 	}
@@ -240,7 +240,7 @@ func TestFilterFindings_PreservesStringFindings(t *testing.T) {
 		},
 	}
 
-	filtered := FilterFindings(tree, findings)
+	filtered := FilterFindings(tree, "/app/main.go", findings)
 	if len(filtered) != 1 {
 		t.Fatalf("string-based SQL injection finding must NOT be suppressed, got %d findings", len(filtered))
 	}
@@ -277,6 +277,37 @@ func TestTreeFromContext(t *testing.T) {
 	sctx3 := &rules.ScanContext{FilePath: "/app/main.go", Tree: "not a tree"}
 	if TreeFromContext(sctx3) != nil {
 		t.Error("TreeFromContext with wrong type should return nil")
+	}
+}
+
+func TestFilterFindings_SkipsCrossFileFindings(t *testing.T) {
+	// Interprocedural findings reference other files. The AST tree only
+	// covers the current file, so the filter must not suppress findings
+	// whose FilePath differs from the tree's source file.
+	src := []byte(`package main
+
+// this comment is on line 3
+func main() {}
+`)
+	tree := Parse(src, rules.LangGo)
+	if tree == nil {
+		t.Fatal("expected non-nil tree")
+	}
+
+	findings := []rules.Finding{
+		{
+			RuleID:      "GTSS-INTERPROC-001",
+			Title:       "Cross-file finding on comment line",
+			LineNumber:  3, // coincides with comment in current file
+			MatchedText: "this comment",
+			FilePath:    "/app/handlers.go", // different file
+			Severity:    rules.High,
+		},
+	}
+
+	filtered := FilterFindings(tree, "/app/main.go", findings)
+	if len(filtered) != 1 {
+		t.Fatalf("cross-file finding must NOT be suppressed, got %d findings", len(filtered))
 	}
 }
 

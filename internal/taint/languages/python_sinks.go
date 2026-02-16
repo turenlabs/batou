@@ -899,5 +899,230 @@ func (c *PythonCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-918",
 			OWASPCategory: "A10:2021-Server-Side Request Forgery",
 		},
+
+		// --- Jinja2 from_string (CWE-1336) ---
+		{
+			ID:            "py.jinja2.from_string",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPython,
+			Pattern:       `\.from_string\(`,
+			ObjectType:    "jinja2.Environment",
+			MethodName:    "from_string",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Jinja2 Environment.from_string with user-controlled template (SSTI)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- subprocess.Popen (CWE-78) ---
+		{
+			ID:            "py.subprocess.popen",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPython,
+			Pattern:       `subprocess\.Popen\(`,
+			ObjectType:    "",
+			MethodName:    "subprocess.Popen",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Subprocess Popen with potentially tainted command",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- paramiko exec_command (CWE-78) ---
+		{
+			ID:            "py.paramiko.exec_command",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPython,
+			Pattern:       `\.exec_command\(`,
+			ObjectType:    "paramiko.SSHClient",
+			MethodName:    "exec_command",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "SSH command execution via paramiko with potentially tainted input",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- fabric run (CWE-78) ---
+		{
+			ID:            "py.fabric.run",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPython,
+			Pattern:       `fabric\..*\.run\(|c\.run\(|conn\.run\(`,
+			ObjectType:    "fabric.Connection",
+			MethodName:    "run",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Remote command execution via Fabric with tainted input",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Django render_to_string XSS (CWE-79) ---
+		{
+			ID:            "py.django.render_to_string",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangPython,
+			Pattern:       `render_to_string\(`,
+			ObjectType:    "django.template.loader",
+			MethodName:    "render_to_string",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Django render_to_string with user-controlled template name or context",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- os.remove/unlink (CWE-22) ---
+		{
+			ID:            "py.os.remove",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPython,
+			Pattern:       `os\.remove\(|os\.unlink\(`,
+			ObjectType:    "",
+			MethodName:    "os.remove/unlink",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "File deletion with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- pickle.load (CWE-502) ---
+		{
+			ID:            "py.pickle.load",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangPython,
+			Pattern:       `pickle\.load\(`,
+			ObjectType:    "",
+			MethodName:    "pickle.load",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Pickle deserialization from file with potentially tainted data",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+
+		// --- yaml.unsafe_load (CWE-502) ---
+		{
+			ID:            "py.yaml.unsafe_load",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangPython,
+			Pattern:       `yaml\.unsafe_load\(|yaml\.full_load\(`,
+			ObjectType:    "",
+			MethodName:    "yaml.unsafe_load/full_load",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "YAML deserialization with unsafe loader allowing arbitrary objects",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+
+		// --- aiohttp SSRF (CWE-918) ---
+		{
+			ID:            "py.aiohttp.clientsession.get",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPython,
+			Pattern:       `session\.get\(|aiohttp\.ClientSession\(\)\.get\(`,
+			ObjectType:    "aiohttp.ClientSession",
+			MethodName:    "get",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "aiohttp client request with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- httpx SSRF (CWE-918) ---
+		{
+			ID:            "py.httpx.get",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPython,
+			Pattern:       `httpx\.get\(|httpx\.post\(|httpx\.AsyncClient\(\)\.get\(`,
+			ObjectType:    "httpx",
+			MethodName:    "get/post",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "httpx HTTP request with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- Django JsonResponse XSS (CWE-79) ---
+		{
+			ID:            "py.django.jsonresponse",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangPython,
+			Pattern:       `JsonResponse\(`,
+			ObjectType:    "django.http",
+			MethodName:    "JsonResponse",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Django JsonResponse with potentially tainted data",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Django Header injection via StreamingHttpResponse (CWE-113) ---
+		{
+			ID:            "py.django.streaminghttpresponse",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangPython,
+			Pattern:       `StreamingHttpResponse\(`,
+			ObjectType:    "django.http",
+			MethodName:    "StreamingHttpResponse",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Django StreamingHttpResponse with potentially tainted streaming content",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- hashlib with user-controlled key (CWE-328) ---
+		{
+			ID:            "py.hashlib.new",
+			Category:      taint.SnkCrypto,
+			Language:      rules.LangPython,
+			Pattern:       `hashlib\.new\(`,
+			ObjectType:    "hashlib",
+			MethodName:    "new",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Dynamic hash algorithm selection with potentially tainted algorithm name",
+			CWEID:         "CWE-328",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+		},
+
+		// --- Mako template injection (CWE-1336) ---
+		{
+			ID:            "py.mako.template",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPython,
+			Pattern:       `mako\.template\.Template\(|Template\(.*text\s*=`,
+			ObjectType:    "mako.template",
+			MethodName:    "Template",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Mako template with user-controlled template string (SSTI)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Django cursor.execute (CWE-89) ---
+		{
+			ID:            "py.django.cursor.execute",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangPython,
+			Pattern:       `cursor\.execute\(`,
+			ObjectType:    "django.db.connection",
+			MethodName:    "cursor.execute",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Django raw cursor.execute with potentially tainted SQL",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
 	}
 }

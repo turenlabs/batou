@@ -320,5 +320,104 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
 			Description: "Float conversion (restricts to numeric values)",
 		},
+
+		// --- Django escape ---
+		{
+			ID:          "py.django.escape",
+			Language:    rules.LangPython,
+			Pattern:     `django\.utils\.html\.escape\(`,
+			ObjectType:  "django.utils.html",
+			MethodName:  "escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "Django HTML escaping function",
+		},
+
+		// --- DRF serializer.is_valid ---
+		{
+			ID:          "py.drf.serializer.is_valid",
+			Language:    rules.LangPython,
+			Pattern:     `serializer\.is_valid\(`,
+			ObjectType:  "rest_framework.serializers",
+			MethodName:  "is_valid",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
+			Description: "Django REST Framework serializer validation",
+		},
+
+		// --- Pydantic model_validate / validator ---
+		{
+			ID:          "py.pydantic.validator",
+			Language:    rules.LangPython,
+			Pattern:     `@validator\(|@field_validator\(`,
+			ObjectType:  "pydantic",
+			MethodName:  "validator/field_validator",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput, taint.SnkFileWrite},
+			Description: "Pydantic field validator decorator",
+		},
+
+		// --- re.match for whitelist validation ---
+		{
+			ID:          "py.re.match.whitelist",
+			Language:    rules.LangPython,
+			Pattern:     `re\.match\(.*\^\[`,
+			ObjectType:  "",
+			MethodName:  "re.match (whitelist)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite},
+			Description: "Regex whitelist match validation",
+		},
+
+		// --- os.path.normpath ---
+		{
+			ID:          "py.os.path.normpath",
+			Language:    rules.LangPython,
+			Pattern:     `os\.path\.normpath\(`,
+			ObjectType:  "",
+			MethodName:  "os.path.normpath",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Path normalization (resolves double dots and slashes)",
+		},
+
+		// --- werkzeug secure_filename ---
+		{
+			ID:          "py.werkzeug.secure_filename",
+			Language:    rules.LangPython,
+			Pattern:     `secure_filename\(`,
+			ObjectType:  "werkzeug.utils",
+			MethodName:  "secure_filename",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Werkzeug secure filename sanitization (strips path separators)",
+		},
+
+		// --- urllib.parse.quote ---
+		{
+			ID:          "py.urllib.parse.quote",
+			Language:    rules.LangPython,
+			Pattern:     `urllib\.parse\.quote\(`,
+			ObjectType:  "",
+			MethodName:  "urllib.parse.quote",
+			Neutralizes: []taint.SinkCategory{taint.SnkRedirect, taint.SnkHTMLOutput, taint.SnkURLFetch},
+			Description: "URL percent-encoding for safe URL construction",
+		},
+
+		// --- str() conversion ---
+		{
+			ID:          "py.str",
+			Language:    rules.LangPython,
+			Pattern:     `str\(`,
+			ObjectType:  "",
+			MethodName:  "str",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "String conversion (may limit injection in numeric contexts)",
+		},
+
+		// --- nh3 sanitizer ---
+		{
+			ID:          "py.nh3.clean",
+			Language:    rules.LangPython,
+			Pattern:     `nh3\.clean\(`,
+			ObjectType:  "nh3",
+			MethodName:  "clean",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "nh3 HTML sanitizer (Rust-based, successor to bleach)",
+		},
 	}
 }

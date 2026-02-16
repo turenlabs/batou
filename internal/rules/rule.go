@@ -158,6 +158,12 @@ type ScanContext struct {
 	// typed *ast.Tree.  May be nil when AST parsing is unavailable or
 	// failed.
 	Tree interface{}
+
+	// TaintFlows caches the []taint.TaintFlow results from taint
+	// analysis so that downstream phases (e.g. hint generation) can
+	// reuse them without re-running the engine.  It is an interface{}
+	// to avoid import cycles (same pattern as Tree).
+	TaintFlows interface{}
 }
 
 // Rule is the interface all vulnerability detection rules must implement.
