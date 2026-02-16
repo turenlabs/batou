@@ -25,11 +25,10 @@ jobs:
             goos: linux
             goarch: amd64
             artifact: batou-linux-amd64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04-arm
             goos: linux
             goarch: arm64
             artifact: batou-linux-arm64
-            cc: aarch64-linux-gnu-gcc
 
     runs-on: ${{ matrix.os }}
 
@@ -40,16 +39,11 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Install cross-compiler
-        if: matrix.cc != ''
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
-
       - name: Build
         env:
           CGO_ENABLED: '1'
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CC: ${{ matrix.cc || '' }}
         run: |
           VERSION="${GITHUB_REF_NAME}"
           go build -trimpath -ldflags "-s -w -X 'main.version=${VERSION}'" -o ${{ matrix.artifact }} ./cmd/batou
