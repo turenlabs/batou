@@ -22,6 +22,11 @@ var (
 	reExtURLParseJava   = regexp.MustCompile(`\bnew\s+(?:java\.net\.)?URL\s*\(`)
 	reExtURLParseSecond = regexp.MustCompile(`(?i)(?:urllib|requests|http\.get|fetch|axios|\.openConnection|HttpClient)\s*[.(]`)
 
+	// Same-library patterns: parse + HTTP client from same ecosystem → no confusion
+	reSameLibGo     = regexp.MustCompile(`\bhttp\.(?:Get|Post|Head|Do|NewRequest)\s*\(`)
+	reSameLibPython = regexp.MustCompile(`\burllib\.request\.urlopen\s*\(`)
+	reSameLibJS     = regexp.MustCompile(`\bfetch\s*\(`)
+
 	// BATOU-SSRF-007: Cloud metadata endpoint access
 	reExtCloudMetadata = regexp.MustCompile(`(?:169\.254\.169\.254|metadata\.google\.internal|metadata\.azure\.com|100\.100\.100\.200)`)
 
@@ -182,30 +187,48 @@ func (r *URLParserConfusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if end > len(lines) {
 			end = len(lines)
 		}
+		found := false
 		for _, subsequent := range lines[i+1 : end] {
-			if reExtURLParseSecond.MatchString(subsequent) {
-				matched := parseMatch
-				if len(matched) > 120 {
-					matched = matched[:120] + "..."
-				}
-				findings = append(findings, rules.Finding{
-					RuleID:        r.ID(),
-					Severity:      r.DefaultSeverity(),
-					SeverityLabel: r.DefaultSeverity().String(),
-					Title:         "URL parsed and used by different libraries (parser confusion risk)",
-					Description:   "A URL is parsed by one library and then used by another HTTP client. Different URL parsers can disagree on the hostname, allowing SSRF bypass via URL parsing ambiguity.",
-					FilePath:      ctx.FilePath,
-					LineNumber:    i + 1,
-					MatchedText:   matched,
-					Suggestion:    "Use the same library for both URL parsing and HTTP requests. Validate the URL after parsing and before making the request using the same parser.",
-					CWEID:         "CWE-918",
-					OWASPCategory: "A10:2021-SSRF",
-					Language:      ctx.Language,
-					Confidence:    "low",
-					Tags:          []string{"ssrf", "url-parser", "parser-confusion"},
-				})
-				break
+			if !reExtURLParseSecond.MatchString(subsequent) {
+				continue
 			}
+			// Skip same-library matches (same parser + HTTP client = no confusion)
+			skip := false
+			switch ctx.Language {
+			case rules.LangGo:
+				skip = reSameLibGo.MatchString(subsequent)
+			case rules.LangPython:
+				skip = reSameLibPython.MatchString(subsequent)
+			case rules.LangJavaScript, rules.LangTypeScript:
+				skip = reSameLibJS.MatchString(subsequent)
+			}
+			if skip {
+				continue
+			}
+			found = true
+			break
+		}
+		if found {
+			matched := parseMatch
+			if len(matched) > 120 {
+				matched = matched[:120] + "..."
+			}
+			findings = append(findings, rules.Finding{
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				SeverityLabel: r.DefaultSeverity().String(),
+				Title:         "URL parsed and used by different libraries (parser confusion risk)",
+				Description:   "A URL is parsed by one library and then used by another HTTP client. Different URL parsers can disagree on the hostname, allowing SSRF bypass via URL parsing ambiguity.",
+				FilePath:      ctx.FilePath,
+				LineNumber:    i + 1,
+				MatchedText:   matched,
+				Suggestion:    "Use the same library for both URL parsing and HTTP requests. Validate the URL after parsing and before making the request using the same parser.",
+				CWEID:         "CWE-918",
+				OWASPCategory: "A10:2021-SSRF",
+				Language:      ctx.Language,
+				Confidence:    "low",
+				Tags:          []string{"ssrf", "url-parser", "parser-confusion"},
+			})
 		}
 	}
 	return findings

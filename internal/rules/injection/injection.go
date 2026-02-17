@@ -82,6 +82,7 @@ var (
 	// Safe patterns to exclude
 	reCodeSafeAstLiteral = regexp.MustCompile(`(?i)\bast\.literal_eval\b`)
 	reCodeSafeJsonParse  = regexp.MustCompile(`(?i)\bJSON\.parse\b`)
+	reCodeSafeCompile    = regexp.MustCompile(`(?i)(?:re\.compile|regex\.compile|pattern\.compile|\.compile\s*\()`)
 )
 
 // LDAP Injection patterns (BATOU-INJ-004)
@@ -431,6 +432,10 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if loc := p.re.FindStringIndex(line); loc != nil {
 				// Additional filter: skip JSON.parse inside eval detection
 				if p.re == reCodeEval && reCodeSafeJsonParse.MatchString(line) {
+					continue
+				}
+				// Skip re.compile/regex.compile/pattern.compile — regex compilation, not code execution
+				if p.re == reCodeCompile && reCodeSafeCompile.MatchString(line) {
 					continue
 				}
 				matched := truncate(line[loc[0]:loc[1]], 120)

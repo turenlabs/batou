@@ -25,6 +25,7 @@ var (
 	reCheckThenActMap   = regexp.MustCompile(`(?i)(?:if\s+.*\b(?:in|contains|containsKey|has|hasKey|get|include\?)\s*\(|if\s+\w+\s*\[\s*\w+\s*\]\s*(?:!=|==))`)
 	reCheckThenActNull  = regexp.MustCompile(`(?i)(?:if\s*\(\s*\w+\s*(?:!=|==)\s*(?:null|nil|None|undefined)\s*\)\s*\{?\s*$)`)
 	reLockNearby        = regexp.MustCompile(`(?i)(?:\.Lock\(\)|\.lock\(\)|synchronized|mutex|Monitor\.Enter|lock\s*\(|threading\.Lock|RLock|Semaphore|\.acquire\(\)|ReentrantLock)`)
+	reAsyncioContext    = regexp.MustCompile(`(?i)(?:import\s+asyncio|from\s+asyncio|async\s+def\s|await\s|asyncio\.run|asyncio\.gather|asyncio\.create_task|aiohttp|asgiref)`)
 )
 
 // BATOU-RACE-003: Race condition in balance/counter update
@@ -212,6 +213,12 @@ func (r *CheckThenAct) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 				if ctx.Language == rules.LangJava || ctx.Language == rules.LangCSharp {
 					if !hasNearbyPattern(lines, i, 50, 50, reJavaThreadStart) {
+						continue
+					}
+				}
+				if ctx.Language == rules.LangPython {
+					// asyncio is single-threaded; check-then-act is safe
+					if hasNearbyPattern(lines, i, 50, 50, reAsyncioContext) {
 						continue
 					}
 				}

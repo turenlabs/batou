@@ -26,8 +26,9 @@ var (
 
 // BATOU-GQL-005: GraphQL field-level authorization missing
 var (
-	reGQLResolverFunc = regexp.MustCompile(`(?i)(?:resolve\s*[:=]\s*(?:async\s+)?(?:function|\()|\w+\s*:\s*\{\s*(?:type|resolve)|def\s+resolve_\w+|@ResolveField|func\s+\(\w+\s+\*\w+Resolver\))`)
-	reGQLAuthCheck    = regexp.MustCompile(`(?i)(?:authorize|auth|permission|isAuthenticated|currentUser|context\.user|ctx\.user|@Authorized|@PreAuthorize|@Secured|requireAuth|checkAuth|hasPermission|@login_required|@permission_required|authenticate)`)
+	reGQLResolverFunc     = regexp.MustCompile(`(?i)(?:resolve\s*[:=]\s*(?:async\s+)?(?:function|\()|\w+\s*:\s*\{\s*(?:type|resolve)|def\s+resolve_\w+|@ResolveField|func\s+\(\w+\s+\*\w+Resolver\))`)
+	reGQLAuthCheck        = regexp.MustCompile(`(?i)(?:authorize|auth|permission|isAuthenticated|currentUser|context\.user|ctx\.user|@Authorized|@PreAuthorize|@Secured|requireAuth|checkAuth|hasPermission|@login_required|@permission_required|authenticate)`)
+	reGQLLibraryEvidence  = regexp.MustCompile(`(?i)(?:graphql|graphene|ariadne|strawberry|apollo|gqlgen|@Query|@Mutation|@Resolver|@ObjectType|type\s+Query|type\s+Mutation|schema\s*\{)`)
 )
 
 // BATOU-GQL-006: GraphQL batch query attack
@@ -188,6 +189,11 @@ func (r *GQLFieldAuthMissing) Languages() []rules.Language {
 
 func (r *GQLFieldAuthMissing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
+
+	// Only flag in files with actual GraphQL library usage
+	if !reGQLLibraryEvidence.MatchString(ctx.Content) {
+		return nil
+	}
 
 	// Skip if file has auth patterns globally
 	if reGQLAuthCheck.MatchString(ctx.Content) {

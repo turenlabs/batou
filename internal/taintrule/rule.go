@@ -72,6 +72,10 @@ func (t *TaintRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Convert flows to findings
 	findings := make([]rules.Finding, 0, len(flows))
 	for i := range flows {
+		// Skip benign env_var → log flows (operator-controlled, not user input)
+		if flows[i].Source.Category == taint.SrcEnvVar && flows[i].Sink.Category == taint.SnkLog {
+			continue
+		}
 		finding := flows[i].ToFinding()
 		finding.Language = ctx.Language
 		finding.FilePath = ctx.FilePath

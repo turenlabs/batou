@@ -409,6 +409,45 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	testutil.MustFindRule(t, result, "BATOU-GO-008")
 }
 
+func TestGO008_FuncParam_Map_Safe(t *testing.T) {
+	content := `package main
+
+import "net/http"
+
+func handler(w http.ResponseWriter, r *http.Request, cache map[string]int) {
+	id := r.URL.Query().Get("id")
+	cache[id] = 1
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustNotFindRule(t, result, "BATOU-GO-008")
+}
+
+func TestGO008_LocalVar_Map_Safe(t *testing.T) {
+	content := `package main
+
+import "net/http"
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	data := make(map[string]interface{})
+	data["processed"] = true
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustNotFindRule(t, result, "BATOU-GO-008")
+}
+
+func TestGO008_PackageLevelMap_StillTriggers(t *testing.T) {
+	content := `package main
+
+import "net/http"
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	cache[id] = time.Now()
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustFindRule(t, result, "BATOU-GO-008")
+}
+
 func TestGO008_SharedMap_WithMutex_Safe(t *testing.T) {
 	content := `package main
 

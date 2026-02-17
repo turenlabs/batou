@@ -90,9 +90,28 @@ var (
 	reCRLFPHPHeader    = regexp.MustCompile(`(?i)\bheader\s*\(\s*["'][^"']*:\s*["']\s*\.\s*\$(?:_GET|_POST|_REQUEST|_SERVER|input)`)
 )
 
+// Middleware-based security header management (file-level evidence)
+var reSecurityMiddleware = regexp.MustCompile(`(?i)(?:helmet\s*\(|app\.use\s*\(\s*helmet|secure_headers|SecureHeaders|SecurityMiddleware|django\.middleware\.security|rack-protection|Spring\s*Security|@EnableWebSecurity)`)
+
+// Route-only file patterns (no server setup)
+var reRouteHandlerOnly = regexp.MustCompile(`(?i)(?:router\.(?:get|post|put|delete|patch|use|route)|app\.(?:get|post|put|delete|patch)\s*\(|@app\.route|@blueprint\.route|module\.exports\s*=\s*router|export\s+default\s+router|export\s*\{\s*router)`)
+var reServerSetup = regexp.MustCompile(`(?i)(?:\.listen\s*\(|createServer|http\.ListenAndServe|app\.run\s*\(|if\s+__name__|uvicorn\.run|gunicorn|\.CreateBuilder)`)
+
 // ---------------------------------------------------------------------------
 // Helpers (package-scoped)
 // ---------------------------------------------------------------------------
+
+// isRouteHandlerFile returns true if the file defines routes/handlers
+// but does NOT set up the server — meaning middleware handles security headers.
+func isRouteHandlerFile(content string) bool {
+	if reSecurityMiddleware.MatchString(content) {
+		return true
+	}
+	if reRouteHandlerOnly.MatchString(content) && !reServerSetup.MatchString(content) {
+		return true
+	}
+	return false
+}
 
 func isComment(line string) bool {
 	return strings.HasPrefix(line, "//") ||
@@ -163,6 +182,9 @@ func (r *MissingCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !isHTTPHandlerFile(ctx.Content) {
 		return nil
 	}
+	if isRouteHandlerFile(ctx.Content) {
+		return nil
+	}
 	// Check if any response headers are being set
 	if !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
@@ -221,6 +243,9 @@ func (r *MissingXFrameOptions) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
 	}
+	if isRouteHandlerFile(ctx.Content) {
+		return nil
+	}
 	if reXFrameHeader.MatchString(ctx.Content) || reHelmetFrame.MatchString(ctx.Content) || reCSPFrameAnc.MatchString(ctx.Content) {
 		return nil
 	}
@@ -271,6 +296,9 @@ func (r *MissingXContentTypeOptions) Languages() []rules.Language {
 
 func (r *MissingXContentTypeOptions) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
+		return nil
+	}
+	if isRouteHandlerFile(ctx.Content) {
 		return nil
 	}
 	if reXCTOHeader.MatchString(ctx.Content) || reHelmetXCTO.MatchString(ctx.Content) {
@@ -325,6 +353,9 @@ func (r *MissingHSTS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
 	}
+	if isRouteHandlerFile(ctx.Content) {
+		return nil
+	}
 	if reHSTSHeader.MatchString(ctx.Content) || reHelmetHSTS.MatchString(ctx.Content) {
 		return nil
 	}
@@ -374,6 +405,9 @@ func (r *PermissiveCSP) Languages() []rules.Language {
 }
 
 func (r *PermissiveCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isRouteHandlerFile(ctx.Content) {
+		return nil
+	}
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -429,6 +463,9 @@ func (r *MissingXXSSProtection) Languages() []rules.Language {
 
 func (r *MissingXXSSProtection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
+		return nil
+	}
+	if isRouteHandlerFile(ctx.Content) {
 		return nil
 	}
 	if reXXSSHeader.MatchString(ctx.Content) {
@@ -487,6 +524,9 @@ func (r *MissingReferrerPolicy) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
 	}
+	if isRouteHandlerFile(ctx.Content) {
+		return nil
+	}
 	if reReferrerHeader.MatchString(ctx.Content) || reHelmetReferrer.MatchString(ctx.Content) {
 		return nil
 	}
@@ -539,6 +579,9 @@ func (r *MissingPermissionsPolicy) Scan(ctx *rules.ScanContext) []rules.Finding 
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
 	}
+	if isRouteHandlerFile(ctx.Content) {
+		return nil
+	}
 	if rePermPolicyHeader.MatchString(ctx.Content) || reFeaturePolicyH.MatchString(ctx.Content) || reHelmetPermPolicy.MatchString(ctx.Content) {
 		return nil
 	}
@@ -588,6 +631,9 @@ func (r *CacheControlSensitive) Languages() []rules.Language {
 }
 
 func (r *CacheControlSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isRouteHandlerFile(ctx.Content) {
+		return nil
+	}
 	// Only flag in files that handle sensitive routes
 	if !reSensitivePath.MatchString(ctx.FilePath) && !reSensitivePath.MatchString(ctx.Content) {
 		return nil
