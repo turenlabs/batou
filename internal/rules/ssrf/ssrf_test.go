@@ -218,6 +218,60 @@ func TestSSRF001_Java_Fixture(t *testing.T) {
 	testutil.MustFindRule(t, result, "BATOU-SSRF-001")
 }
 
+// --- BATOU-SSRF-006: URL Parser Confusion (same-library exclusion) ---
+
+func TestSSRF006_Go_SameLib_StdlibParsePlusHTTPGet_Safe(t *testing.T) {
+	content := `package main
+
+import (
+	"net/http"
+	"net/url"
+)
+
+func fetch(rawURL string) {
+	u, _ := url.Parse(rawURL)
+	resp, _ := http.Get(u.String())
+	defer resp.Body.Close()
+}`
+	result := testutil.ScanContent(t, "/app/fetcher.go", content)
+	testutil.MustNotFindRule(t, result, "BATOU-SSRF-006")
+}
+
+func TestSSRF006_Go_CrossLib_ParsePlusRequests_Triggers(t *testing.T) {
+	content := `package main
+
+import "net/url"
+
+func fetch(rawURL string) {
+	u, _ := url.Parse(rawURL)
+	resp := requests.Get(u.String())
+}`
+	result := testutil.ScanContent(t, "/app/fetcher.go", content)
+	testutil.MustFindRule(t, result, "BATOU-SSRF-006")
+}
+
+func TestSSRF006_Python_SameLib_Urllib_Safe(t *testing.T) {
+	content := `from urllib.parse import urlparse
+import urllib.request
+
+def fetch(raw_url):
+    parsed = urlparse(raw_url)
+    resp = urllib.request.urlopen(parsed.geturl())
+    return resp.read()`
+	result := testutil.ScanContent(t, "/app/fetcher.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-SSRF-006")
+}
+
+func TestSSRF006_JS_SameLib_FetchPlusNewURL_Safe(t *testing.T) {
+	content := `async function fetchData(rawUrl) {
+    const url = new URL(rawUrl);
+    const resp = await fetch(url.toString());
+    return resp.json();
+}`
+	result := testutil.ScanContent(t, "/app/fetcher.js", content)
+	testutil.MustNotFindRule(t, result, "BATOU-SSRF-006")
+}
+
 // --- Safe fixture tests ---
 
 func TestSSRF_Safe_Go(t *testing.T) {

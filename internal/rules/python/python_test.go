@@ -665,3 +665,47 @@ async def run_command(arg):
 	result := testutil.ScanContent(t, "/app/runner.py", content)
 	testutil.MustNotFindRule(t, result, "BATOU-PY-018")
 }
+
+// ==========================================================================
+// BATOU-PY-012: ReDoS — String Literal False Positive Suppression
+// ==========================================================================
+
+func TestPY012_ReCompile_StringLiteral_InFileWithRequest_Safe(t *testing.T) {
+	content := `import re
+from flask import request
+
+DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+def handler():
+    date = request.args.get("date")
+    if DATE_PATTERN.match(date):
+        return "ok"
+`
+	result := testutil.ScanContent(t, "/app/validators.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-PY-012")
+}
+
+func TestPY012_ReSearch_StringLiteral_Safe(t *testing.T) {
+	content := `import re
+from flask import request
+
+def search_handler():
+    query = request.args.get("q")
+    if re.search("^[a-z]+$", query):
+        return do_search(query)
+`
+	result := testutil.ScanContent(t, "/app/search.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-PY-012")
+}
+
+func TestPY012_ReCompile_UserVariable_StillTriggers(t *testing.T) {
+	content := `import re
+from flask import request
+
+def search_handler():
+    user_pattern = request.args.get("pattern")
+    results = re.compile(user_pattern)
+`
+	result := testutil.ScanContent(t, "/app/search.py", content)
+	testutil.MustFindRule(t, result, "BATOU-PY-012")
+}

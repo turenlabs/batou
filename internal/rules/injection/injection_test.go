@@ -426,3 +426,32 @@ func TestINJ009_Safe_JS(t *testing.T) {
 	result := testutil.ScanContent(t, "/app/routes/api.ts", content)
 	testutil.MustNotFindRule(t, result, "BATOU-INJ-009")
 }
+
+// --- BATOU-INJ-003: Code Injection — re.compile False Positive Suppression ---
+
+func TestINJ003_Safe_ReCompile(t *testing.T) {
+	content := `import re
+import json
+
+def fetch_json(url):
+    return json.loads(requests.get(url).text)
+
+pattern = re.compile(fetch_json(url))
+`
+	result := testutil.ScanContent(t, "/app/parser.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-INJ-003")
+}
+
+func TestINJ003_Safe_PatternCompile(t *testing.T) {
+	content := `Pattern p = Pattern.compile(something);`
+	result := testutil.ScanContent(t, "/app/Validator.java", content)
+	testutil.MustNotFindRule(t, result, "BATOU-INJ-003")
+}
+
+func TestINJ003_Compile_CodeExec_StillTriggers(t *testing.T) {
+	content := `user_code = request.form["code"]
+code_obj = compile(user_code, "<string>", "exec")
+`
+	result := testutil.ScanContent(t, "/app/evaluate.py", content)
+	testutil.MustFindRule(t, result, "BATOU-INJ-003")
+}

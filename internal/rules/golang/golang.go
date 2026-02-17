@@ -187,6 +187,30 @@ func isInHTTPHandler(content string) bool {
 	return reHTTPHandlerSig.MatchString(content)
 }
 
+// isLocalOrParamVar checks if varName is a function parameter or local variable
+// by scanning backward from lineIdx to find the enclosing function.
+func isLocalOrParamVar(lines []string, lineIdx int, varName string) bool {
+	for j := lineIdx; j >= 0; j-- {
+		line := lines[j]
+		// Found function signature — check if varName is a parameter
+		if strings.Contains(line, "func ") || strings.Contains(line, "func(") {
+			if strings.Contains(line, varName) {
+				return true
+			}
+			break
+		}
+		// Check for local declaration of this variable
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, varName+" :=") ||
+			strings.HasPrefix(trimmed, varName+" = make(") ||
+			strings.HasPrefix(trimmed, "var "+varName+" ") ||
+			(strings.Contains(trimmed, "json.Unmarshal") && strings.Contains(trimmed, varName)) {
+			return true
+		}
+	}
+	return false
+}
+
 // --- GO-001: GORM Raw SQL Injection ---
 
 type GORMSQLInjection struct{}
@@ -586,6 +610,12 @@ func (r *RaceConditionHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		if loc := reGlobalMapAccess.FindStringIndex(line); loc != nil {
+			// Extract matched variable name and skip if it's a function parameter or local variable
+			if match := reGlobalMapAccess.FindStringSubmatch(line); len(match) > 1 {
+				if isLocalOrParamVar(lines, i, match[1]) {
+					continue
+				}
+			}
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

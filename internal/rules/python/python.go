@@ -88,7 +88,8 @@ var (
 
 // PY-012: ReDoS via re.compile with user input
 var (
-	reCompileUserInput = regexp.MustCompile(`re\.(?:compile|match|search|findall|sub|split)\s*\(`)
+	reCompileUserInput      = regexp.MustCompile(`re\.(?:compile|match|search|findall|sub|split)\s*\(`)
+	reRegexStringLiteralArg = regexp.MustCompile(`re\.(?:compile|match|search|findall|sub|split)\s*\(\s*(?:r?["']|r?""")`)
 )
 
 // PY-013: tarfile/zipfile extraction without filter
@@ -809,6 +810,10 @@ func (r *ReDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if reCompileUserInput.MatchString(line) {
+			// Skip if the regex pattern argument is a string literal (hardcoded)
+			if reRegexStringLiteralArg.MatchString(line) {
+				continue
+			}
 			// Check if user-controlled variable is passed as the pattern
 			context := surroundingContext(lines, i, 3)
 			if containsUserVariable(context) && !strings.Contains(context, "re.escape") {

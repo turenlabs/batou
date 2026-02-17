@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/turenlabs/batou/internal/findings"
 	"github.com/turenlabs/batou/internal/hook"
 	"github.com/turenlabs/batou/internal/ledger"
 	"github.com/turenlabs/batou/internal/reporter"
@@ -75,6 +76,11 @@ import (
 )
 
 func main() {
+	// Subcommand routing: `batou findings [flags]`
+	if len(os.Args) > 1 && os.Args[1] == "findings" {
+		os.Exit(findings.RunCLI(os.Args[2:]))
+	}
+
 	input, err := hook.ReadInput()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Batou: failed to read input: %v\n", err)
@@ -86,6 +92,9 @@ func main() {
 	// Record to ledger synchronously — it's a single JSON line append, very fast.
 	// A fire-and-forget goroutine would be killed on os.Exit, losing blocked-write records.
 	ledger.Record(input.SessionID, result)
+
+	// Persist findings to project-local .batou/findings.json
+	persistFindings(result)
 
 	// ALWAYS output hints as additionalContext — this is the key innovation.
 	// Even clean code gets a "looks good" message so Claude knows Batou is active.
@@ -112,5 +121,40 @@ func main() {
 		if context != "" {
 			hook.OutputPostTool(context)
 		}
+	}
+}
+
+// persistFindings saves scan results to the project-local findings store.
+// Errors are logged but do not affect hook output — findings are best-effort.
+func persistFindings(result *reporter.ScanResult) {
+	batouDir, err := findings.FindRoot()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Batou: findings store: %v\n", err)
+		return
+	}
+
+	store, err := findings.Open(batouDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Batou: findings store: %v\n", err)
+		return
+	}
+
+	seenKeys := make(map[string]bool)
+	for _, f := range result.Findings {
+		store.Upsert(f)
+		seenKeys[findings.DedupKey(f)] = true
+	}
+	for _, f := range result.SuppressedFindings {
+		store.UpsertSuppressed(f, "batou:ignore")
+		seenKeys[findings.DedupKey(f)] = true
+	}
+
+	// Mark findings for this file that weren't seen in this scan as resolved
+	if result.FilePath != "" {
+		store.MarkResolved(result.FilePath, seenKeys)
+	}
+
+	if err := store.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Batou: findings store: %v\n", err)
 	}
 }
