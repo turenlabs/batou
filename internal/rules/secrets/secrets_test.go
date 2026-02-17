@@ -67,6 +67,32 @@ func TestSEC001_Fixture_JS(t *testing.T) {
 	}
 }
 
+// --- BATOU-SEC-001: Bare "secret" entropy gate ---
+
+func TestSEC001_BareSecret_LowEntropy_NoTrigger(t *testing.T) {
+	content := `var secret = "this-is-a-config-value"`
+	result := testutil.ScanContent(t, "/app/config.go", content)
+	testutil.MustNotFindRule(t, result, "BATOU-SEC-001")
+}
+
+func TestSEC001_BareSecret_HighEntropy_Triggers(t *testing.T) {
+	content := `var secret = "Xk9!mP2#vL7@nQ5wR"`
+	result := testutil.ScanContent(t, "/app/config.go", content)
+	testutil.MustFindRule(t, result, "BATOU-SEC-001")
+}
+
+func TestSEC001_Password_LowEntropy_StillTriggers(t *testing.T) {
+	content := `password = "hunter2"`
+	result := testutil.ScanContent(t, "/app/config.py", content)
+	testutil.MustFindRule(t, result, "BATOU-SEC-001")
+}
+
+func TestSEC001_ApiKey_HighEntropy_Triggers(t *testing.T) {
+	content := `var api_key = "abc123XYZ!@#def456"`
+	result := testutil.ScanContent(t, "/app/config.go", content)
+	testutil.MustFindRule(t, result, "BATOU-SEC-001")
+}
+
 // --- BATOU-SEC-002: API Key Exposure ---
 
 func TestSEC002_AWSAccessKey(t *testing.T) {

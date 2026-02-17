@@ -46,6 +46,17 @@ internal/testutil/          Test framework helpers
 - **Taint catalogs**: Each language has sources (user input), sinks (dangerous functions), and sanitizers
 - **AI feedback loop**: Hints include language-specific fix examples, CWE/OWASP references, and architectural advice
 
+## False Positive Suppression (`batou:ignore`)
+
+Developers and Claude can suppress findings with inline directives in code comments:
+
+- **Single-line**: `// batou:ignore <target> [-- reason]` — suppresses the next code line
+- **Block**: `// batou:ignore-start <target>` ... `// batou:ignore-end` — suppresses all lines in between
+- **Targets**: exact rule ID (`BATOU-INJ-001`), category name (`injection`), or `all`
+- **Comment styles**: `//`, `#`, `--`, `/*`, `<!--`, `rem` — any prefix works, parsed via regex (no AST dependency)
+- **Pipeline position**: Parsed early in the scan pipeline (`internal/suppress/parse.go`), applied after all rules run via `suppress.Apply()`. Suppressed findings are partitioned out but still logged for audit.
+- **Multiple targets**: `batou:ignore BATOU-INJ-001 secrets -- reason here`
+
 ## Rule Categories
 
 injection, xss, traversal, crypto, secrets, ssrf, auth, generic, logging, validation, memory, xxe, nosql, deser, prototype, massassign, cors, graphql, misconfig, redirect, kotlin, swift, rust, csharp, perl, lua, groovy, golang, java, jsts, python, php, ruby, framework (spring, express, django, flask, rails, laravel, react, tauri)
