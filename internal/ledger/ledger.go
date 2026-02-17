@@ -13,17 +13,19 @@ import (
 
 // Entry represents a single scan event in the audit ledger.
 type Entry struct {
-	Timestamp   string          `json:"timestamp"`
-	SessionID   string          `json:"session_id"`
-	Event       string          `json:"event"`
-	FilePath    string          `json:"file_path"`
-	Language    rules.Language  `json:"language"`
-	FindingCount int            `json:"finding_count"`
-	MaxSeverity string          `json:"max_severity"`
-	Blocked     bool            `json:"blocked"`
-	Findings    []rules.Finding `json:"findings,omitempty"`
-	RulesRun    int             `json:"rules_run"`
-	ScanTimeMs  int64           `json:"scan_time_ms"`
+	Timestamp       string          `json:"timestamp"`
+	SessionID       string          `json:"session_id"`
+	Event           string          `json:"event"`
+	FilePath        string          `json:"file_path"`
+	Language        rules.Language  `json:"language"`
+	FindingCount    int             `json:"finding_count"`
+	SuppressedCount int             `json:"suppressed_count,omitempty"`
+	SuppressedRules []string        `json:"suppressed_rules,omitempty"`
+	MaxSeverity     string          `json:"max_severity"`
+	Blocked         bool            `json:"blocked"`
+	Findings        []rules.Finding `json:"findings,omitempty"`
+	RulesRun        int             `json:"rules_run"`
+	ScanTimeMs      int64           `json:"scan_time_ms"`
 }
 
 // ledgerDir returns the directory for Batou ledger files.
@@ -42,18 +44,26 @@ func Record(sessionID string, result *reporter.ScanResult) error {
 		return fmt.Errorf("creating ledger dir: %w", err)
 	}
 
+	// Collect suppressed rule IDs for the audit log.
+	var suppressedRules []string
+	for _, f := range result.SuppressedFindings {
+		suppressedRules = append(suppressedRules, f.RuleID)
+	}
+
 	entry := Entry{
-		Timestamp:    time.Now().UTC().Format(time.RFC3339),
-		SessionID:    sessionID,
-		Event:        result.Event,
-		FilePath:     result.FilePath,
-		Language:     result.Language,
-		FindingCount: len(result.Findings),
-		MaxSeverity:  result.MaxSeverity().String(),
-		Blocked:      result.ShouldBlock(),
-		Findings:     result.Findings,
-		RulesRun:     result.RulesRun,
-		ScanTimeMs:   result.ScanTimeMs,
+		Timestamp:       time.Now().UTC().Format(time.RFC3339),
+		SessionID:       sessionID,
+		Event:           result.Event,
+		FilePath:        result.FilePath,
+		Language:        result.Language,
+		FindingCount:    len(result.Findings),
+		SuppressedCount: result.SuppressedCount,
+		SuppressedRules: suppressedRules,
+		MaxSeverity:     result.MaxSeverity().String(),
+		Blocked:         result.ShouldBlock(),
+		Findings:        result.Findings,
+		RulesRun:        result.RulesRun,
+		ScanTimeMs:      result.ScanTimeMs,
 	}
 
 	// Write to daily ledger file

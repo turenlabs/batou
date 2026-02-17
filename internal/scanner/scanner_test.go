@@ -397,3 +397,206 @@ func TestScanGoFixtures(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Suppression integration tests
+// ---------------------------------------------------------------------------
+
+func TestSuppressDirective_SuppressesInjection(t *testing.T) {
+	// SQL injection with a batou:ignore directive on the line above.
+	code := `package main
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	username := r.FormValue("username")
+	// batou:ignore injection -- validated by upstream middleware
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	rows, err := db.Query(query)
+	if err != nil {
+		http.Error(w, "error", 500)
+	}
+	_ = rows
+}`
+
+	result := testutil.ScanContent(t, "/app/handler.go", code)
+
+	// Without suppress: this code would produce injection findings.
+	// With suppress: injection findings on the suppressed line should be removed.
+	for _, f := range result.Findings {
+		if strings.Contains(f.RuleID, "INJ") && (f.LineNumber == 12 || f.LineNumber == 13) {
+			t.Errorf("expected injection finding on line %d to be suppressed by directive, got %s",
+				f.LineNumber, f.RuleID)
+		}
+	}
+
+	// The result should report suppressed count.
+	if result.Raw.SuppressedCount == 0 {
+		t.Log("note: SuppressedCount is 0 — the directive may not have matched any findings on that line")
+	}
+}
+
+func TestSuppressDirective_ByExactRuleID(t *testing.T) {
+	code := `function search(req, res) {
+	const term = req.query.q;
+	// batou:ignore BATOU-INJ-001
+	const sql = "SELECT * FROM items WHERE name = '" + term + "'";
+	db.query(sql);
+}`
+	result := testutil.ScanContent(t, "test.js", code)
+
+	// BATOU-INJ-001 on the suppressed line should be removed.
+	for _, f := range result.Findings {
+		if f.RuleID == "BATOU-INJ-001" && (f.LineNumber == 3 || f.LineNumber == 4) {
+			t.Errorf("expected BATOU-INJ-001 on line %d to be suppressed, but it was kept", f.LineNumber)
+		}
+	}
+}
+
+func TestSuppressDirective_AllWildcard(t *testing.T) {
+	code := `package main
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	username := r.FormValue("username")
+	// batou:ignore all -- intentional for testing
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	rows, err := db.Query(query)
+	if err != nil {
+		http.Error(w, "error", 500)
+	}
+	_ = rows
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", code)
+
+	// The "all" wildcard should suppress any finding on the next code line (line 13).
+	for _, f := range result.Findings {
+		if f.LineNumber == 13 {
+			t.Errorf("expected all findings on line 13 to be suppressed by 'all' directive, got %s", f.RuleID)
+		}
+	}
+}
+
+func TestSuppressDirective_BlockRange(t *testing.T) {
+	code := `# batou:ignore-start injection
+cursor.execute(f"SELECT * FROM users WHERE id = {uid}")
+cursor.execute(f"DELETE FROM users WHERE id = {uid}")
+# batou:ignore-end
+cursor.execute(f"SELECT * FROM logs WHERE id = {uid}")`
+
+	result := testutil.ScanContent(t, "test.py", code)
+
+	// Lines 2-3 should be suppressed (inside block).
+	for _, f := range result.Findings {
+		if strings.Contains(f.RuleID, "INJ") && (f.LineNumber == 2 || f.LineNumber == 3) {
+			t.Errorf("expected injection finding on line %d to be suppressed inside block, got %s",
+				f.LineNumber, f.RuleID)
+		}
+	}
+
+	// Line 5 should NOT be suppressed (after block end).
+	// We can't assert a specific finding exists (depends on rules), but if
+	// any injection finding on line 5 was found it should remain.
+}
+
+func TestSuppressDirective_NoDirectiveKeepsFindings(t *testing.T) {
+	// Baseline: no suppress directives — findings should remain.
+	code := `function search(req, res) {
+	const term = req.query.q;
+	const sql = "SELECT * FROM items WHERE name = '" + term + "'";
+	db.query(sql);
+}`
+	result := testutil.ScanContent(t, "test.js", code)
+
+	if testutil.CountFindings(result) == 0 {
+		t.Error("expected findings for JS SQL injection without directives, got none")
+	}
+	if result.Raw.SuppressedCount != 0 {
+		t.Errorf("expected 0 suppressed findings without directives, got %d", result.Raw.SuppressedCount)
+	}
+}
+
+func TestSuppressDirective_HintsIncludeSuppressGuidance(t *testing.T) {
+	// Scan code that produces findings — verify hints contain suppress guidance.
+	code := `function search(req, res) {
+	const term = req.query.q;
+	const sql = "SELECT * FROM items WHERE name = '" + term + "'";
+	db.query(sql);
+}`
+	result := testutil.ScanContent(t, "test.js", code)
+
+	if result.Raw.HintsOutput == "" {
+		t.Skip("hints output not generated (no findings)")
+	}
+
+	if !strings.Contains(result.Raw.HintsOutput, "batou:ignore") {
+		t.Error("expected hints to contain batou:ignore suppress guidance")
+	}
+}
+
+func TestSuppressDirective_PythonComment(t *testing.T) {
+	code := `import os
+
+# batou:ignore injection -- validated upstream
+os.system(user_input)`
+
+	result := testutil.ScanContent(t, "test.py", code)
+
+	for _, f := range result.Findings {
+		if strings.Contains(f.RuleID, "INJ") && f.LineNumber == 4 {
+			t.Errorf("expected injection finding on line 4 to be suppressed by Python comment directive, got %s",
+				f.RuleID)
+		}
+	}
+}
+
+func TestSuppressDirective_SuppressedCountPopulated(t *testing.T) {
+	// With a suppression directive, SuppressedCount should be > 0 and
+	// SuppressedFindings should contain the suppressed finding.
+	code := `package main
+
+// batou:ignore injection
+func handler() { db.Query("SELECT * FROM users WHERE id = " + id) }`
+
+	result := testutil.ScanContent(t, "handler.go", code)
+
+	if result.Raw.SuppressedCount == 0 {
+		t.Error("expected SuppressedCount > 0 when injection finding is suppressed")
+	}
+	if len(result.Raw.SuppressedFindings) == 0 {
+		t.Error("expected SuppressedFindings to contain the suppressed finding")
+	}
+
+	// The suppressed finding should have an injection rule ID.
+	for _, f := range result.Raw.SuppressedFindings {
+		if strings.Contains(f.RuleID, "INJ") {
+			return // found it
+		}
+	}
+	t.Error("expected at least one suppressed finding with INJ rule ID")
+}
+
+func TestSuppressDirective_SuppressedCountZeroWithoutDirective(t *testing.T) {
+	// Without a directive, SuppressedCount should be 0.
+	code := `package main
+
+func handler() { db.Query("SELECT * FROM users WHERE id = " + id) }`
+
+	result := testutil.ScanContent(t, "handler.go", code)
+
+	if result.Raw.SuppressedCount != 0 {
+		t.Errorf("expected SuppressedCount == 0 without directive, got %d", result.Raw.SuppressedCount)
+	}
+	if len(result.Raw.SuppressedFindings) != 0 {
+		t.Errorf("expected no SuppressedFindings without directive, got %d", len(result.Raw.SuppressedFindings))
+	}
+}

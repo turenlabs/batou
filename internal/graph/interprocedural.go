@@ -164,7 +164,11 @@ var sanitizerPatterns = []struct {
 //
 // When flows (from Layer 3 taint analysis) are provided, ComputeTaintSig
 // uses them for precise signature computation instead of regex heuristics.
-func PropagateInterproc(cg *CallGraph, changedFuncIDs []string, fileContents map[string]string, flows []taint.TaintFlow) []rules.Finding {
+//
+// suppressedLines, when non-nil, contains line numbers with active
+// batou:ignore directives. Sinks on those lines are moved to
+// SuppressedSinks so callers don't generate phantom findings.
+func PropagateInterproc(cg *CallGraph, changedFuncIDs []string, fileContents map[string]string, flows []taint.TaintFlow, suppressedLines map[int]bool) []rules.Finding {
 	var findings []rules.Finding
 
 	for _, funcID := range changedFuncIDs {
@@ -180,7 +184,7 @@ func PropagateInterproc(cg *CallGraph, changedFuncIDs []string, fileContents map
 
 		// Compute the new taint signature for this changed function.
 		// Pass Layer 3 flows for precise analysis when available.
-		newSig := ComputeTaintSig(node, content, node.Language, flows)
+		newSig := ComputeTaintSig(node, content, node.Language, flows, suppressedLines)
 
 		// Compare with the old signature.
 		oldSig := node.TaintSig
@@ -219,7 +223,10 @@ func PropagateInterproc(cg *CallGraph, changedFuncIDs []string, fileContents map
 // populated from precise dataflow results instead of regex heuristics.
 // Flows are filtered to those within this function's line range. The regex
 // fallback is used when flows is nil or empty.
-func ComputeTaintSig(node *FuncNode, content string, lang rules.Language, flows []taint.TaintFlow) TaintSignature {
+//
+// suppressedLines contains lines with active batou:ignore directives.
+// Sinks on those lines are moved to SuppressedSinks instead of SinkCalls.
+func ComputeTaintSig(node *FuncNode, content string, lang rules.Language, flows []taint.TaintFlow, suppressedLines map[int]bool) TaintSignature {
 	sig := TaintSignature{
 		TaintedParams:  make(map[int][]taint.SourceCategory),
 		TaintedReturns: make(map[int][]taint.SourceCategory),
@@ -239,7 +246,8 @@ func ComputeTaintSig(node *FuncNode, content string, lang rules.Language, flows 
 	// When Layer 3 taint flows are available, use them for precise
 	// signature computation instead of regex heuristics.
 	if len(funcFlows) > 0 {
-		return computeSigFromFlows(node, funcFlows, body)
+		flowSig := computeSigFromFlows(node, funcFlows, body)
+		return filterSuppressedSinks(flowSig, suppressedLines)
 	}
 
 	// --- Regex fallback (no Layer 3 flows available) ---
@@ -326,6 +334,9 @@ func ComputeTaintSig(node *FuncNode, content string, lang rules.Language, flows 
 			}
 		}
 	}
+
+	// Move suppressed sinks to SuppressedSinks so callers skip them.
+	sig = filterSuppressedSinks(sig, suppressedLines)
 
 	// A function is pure if it has no source params, no sinks, and no tainted returns.
 	sig.IsPure = len(sig.SourceParams) == 0 &&
@@ -1088,6 +1099,25 @@ func isArgTaintedInCaller(argExpr string, callerLines []string, callLineIdx int)
 	}
 
 	return false
+}
+
+// filterSuppressedSinks moves sinks on suppressed lines from SinkCalls
+// to SuppressedSinks. This prevents callers from generating interprocedural
+// findings for sinks that the developer has explicitly marked as safe.
+func filterSuppressedSinks(sig TaintSignature, suppressedLines map[int]bool) TaintSignature {
+	if len(suppressedLines) == 0 || len(sig.SinkCalls) == 0 {
+		return sig
+	}
+	var kept []SinkRef
+	for _, sink := range sig.SinkCalls {
+		if suppressedLines[sink.Line] {
+			sig.SuppressedSinks = append(sig.SuppressedSinks, sink)
+		} else {
+			kept = append(kept, sink)
+		}
+	}
+	sig.SinkCalls = kept
+	return sig
 }
 
 // extractArgList extracts a list of argument expressions from a string
