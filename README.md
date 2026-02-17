@@ -169,6 +169,52 @@ Batou hooks are configured in `.claude/settings.json`:
 }
 ```
 
+## False Positive Suppression
+
+If Batou flags code you know is safe, you can suppress findings with inline `batou:ignore` directives. Use the comment syntax for your language (`//`, `#`, `--`, etc.).
+
+### Single-line suppression
+
+Place the directive on the line above the flagged code:
+
+```go
+// batou:ignore BATOU-INJ-001 -- query uses parameterized input
+db.Query("SELECT * FROM users WHERE id = " + id)
+```
+
+```python
+# batou:ignore secrets -- test fixture, not a real credential
+password = "test-password-for-ci"
+```
+
+```javascript
+// batou:ignore all -- this entire line is a known false positive
+eval(trustedExpression);
+```
+
+### Block suppression
+
+Suppress all findings within a range of lines:
+
+```go
+// batou:ignore-start injection
+rows := db.Query(dynamicSQL)
+process(rows)
+// batou:ignore-end
+```
+
+### Supported targets
+
+| Target | Example | What it suppresses |
+|--------|---------|--------------------|
+| Rule ID | `BATOU-INJ-001` | That specific rule only |
+| Category | `injection` | All rules in the category |
+| `all` | `all` | Every Batou rule |
+
+Multiple targets can be listed on one directive: `batou:ignore BATOU-INJ-001 secrets -- reason`.
+
+An optional reason after `--` is recommended for auditability.
+
 ## Testing
 
 ```bash

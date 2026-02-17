@@ -29,7 +29,7 @@ var (
 	reStrToIntPy     = regexp.MustCompile(`\bint\s*\(\s*(?:request\.|input\(|sys\.argv|os\.environ)`)
 	reStrToIntJS     = regexp.MustCompile(`(?:parseInt|Number)\s*\(\s*(?:req\.|request\.|params|query|body|process\.argv)`)
 	reStrToIntJava   = regexp.MustCompile(`(?:Integer\.parseInt|Long\.parseLong|Short\.parseShort)\s*\(\s*(?:request\.getParameter|args\[)`)
-	reOverflowCheck  = regexp.MustCompile(`(?i)(?:overflow|MaxInt|MinInt|MAX_VALUE|MIN_VALUE|max_value|min_value|Number\.MAX_SAFE_INTEGER|Number\.isSafeInteger|math\.MaxInt|math\.MinInt|int32|int16|bounds|range\s*check)`)
+	reOverflowCheck  = regexp.MustCompile(`(?i)(?:overflow|MaxInt|MinInt|MAX_VALUE|MIN_VALUE|max_value|min_value|Number\.MAX_SAFE_INTEGER|Number\.isSafeInteger|Number\.isFinite|Number\.isNaN|Number\.isInteger|isFinite|isNaN|math\.MaxInt|math\.MinInt|int32|int16|bounds|range\s*check|>\s*0|<\s*\d|>=\s*\d|<=\s*\d)`)
 )
 
 // BATOU-VAL-009: Email validation using regex only

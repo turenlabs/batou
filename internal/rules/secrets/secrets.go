@@ -280,6 +280,14 @@ func (r *HardcodedPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 				continue
 			}
 
+			// Bare "secret" variable name requires higher confidence — the value
+			// must look like an actual credential (high entropy + char diversity).
+			if strings.EqualFold(varName, "secret") {
+				if !hasHighEntropy(value, 3.0) || !hasCharacterDiversity(value) {
+					continue
+				}
+			}
+
 			seen[lineNum+1] = true
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),

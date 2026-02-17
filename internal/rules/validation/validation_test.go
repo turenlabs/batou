@@ -162,6 +162,65 @@ const value = data[req.query.field];`
 
 // --- BATOU-VAL-005: File Upload Hardening ---
 
+// --- BATOU-VAL-008: Integer Overflow from Unchecked Conversion ---
+
+func TestVAL008_JS_NumberParseInt_NoCheck(t *testing.T) {
+	content := `const val = Number(req.query.id);
+const user = await db.findOne({ id: val });`
+	result := testutil.ScanContent(t, "/app/routes.ts", content)
+	testutil.MustFindRule(t, result, "BATOU-VAL-008")
+}
+
+func TestVAL008_JS_NumberIsFinite_Suppresses(t *testing.T) {
+	content := `const val = Number(req.query.id);
+if (!Number.isFinite(val)) return res.status(400).send('Invalid');
+const user = await db.findOne({ id: val });`
+	result := testutil.ScanContent(t, "/app/routes.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-VAL-008")
+}
+
+func TestVAL008_JS_IsNaN_Suppresses(t *testing.T) {
+	content := `const val = parseInt(req.query.id);
+if (isNaN(val)) return res.status(400).send('Invalid');
+const user = await db.findOne({ id: val });`
+	result := testutil.ScanContent(t, "/app/routes.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-VAL-008")
+}
+
+func TestVAL008_JS_RangeCheck_Suppresses(t *testing.T) {
+	content := `const val = Number(req.query.id);
+if (val > 0 && val < 100) {
+  const user = await db.findOne({ id: val });
+}`
+	result := testutil.ScanContent(t, "/app/routes.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-VAL-008")
+}
+
+func TestVAL008_Go_StrconvAtoi_Vulnerable(t *testing.T) {
+	content := `package main
+import "strconv"
+func handler() {
+	val, _ := strconv.Atoi(input)
+	items[val] = true
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustFindRule(t, result, "BATOU-VAL-008")
+}
+
+func TestVAL008_Go_StrconvAtoi_Safe(t *testing.T) {
+	content := `package main
+import ("strconv"; "math")
+func handler() {
+	val, err := strconv.Atoi(input)
+	if err != nil || val > math.MaxInt32 { return }
+	items[val] = true
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", content)
+	testutil.MustNotFindRule(t, result, "BATOU-VAL-008")
+}
+
+// --- BATOU-VAL-005: File Upload Hardening ---
+
 func TestVAL005_Go_FormFileNoContentCheck(t *testing.T) {
 	content := `package main
 import "net/http"
