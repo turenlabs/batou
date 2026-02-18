@@ -1,4 +1,4 @@
-// WebGoat XSS - Reflected and Stored patterns
+// XSS - Reflected and Stored patterns
 // Expected: GTSS-XSS-011, GTSS-XSS-014, GTSS-XSS-015
 // CWE-79, OWASP A03
 package com.webgoat.lessons;
@@ -15,7 +15,7 @@ public class CrossSiteScriptingLesson extends HttpServlet {
         String name = request.getParameter("name");
         PrintWriter out = response.getWriter();
 
-        // VULNERABLE: WebGoat reflected XSS via response writer
+        // VULNERABLE: Reflected XSS via response writer
         out.println("<html><body>");
         out.println("Hello " + name);
         out.println("</body></html>");

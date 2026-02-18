@@ -11,8 +11,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/turenlabs/batou/internal/graph"
 	"github.com/turenlabs/batou/internal/hook"
 	"github.com/turenlabs/batou/internal/reporter"
 	"github.com/turenlabs/batou/internal/rules"
@@ -336,6 +338,64 @@ func FindingRuleIDs(result *ScanResult) []string {
 		}
 	}
 	return ids
+}
+
+// ScanContentWithGraph scans content through the full pipeline with a
+// pre-populated call graph, enabling Layer 4 (interprocedural) analysis.
+// The call graph is saved to a temp dir so the scanner can load it.
+func ScanContentWithGraph(t *testing.T, filePath string, content string, cg *graph.CallGraph) *ScanResult {
+	t.Helper()
+	tmpDir := t.TempDir()
+	cg.ProjectRoot = tmpDir
+	if cg.SessionID == "" {
+		cg.SessionID = "test-session"
+	}
+	if err := graph.SaveGraph(cg); err != nil {
+		t.Fatalf("failed to save call graph: %v", err)
+	}
+
+	input := &hook.Input{
+		HookEventName: "PreToolUse",
+		ToolName:      "Write",
+		SessionID:     cg.SessionID,
+		Cwd:           tmpDir,
+		ToolInput: hook.ToolInput{
+			FilePath: filePath,
+			Content:  content,
+		},
+	}
+	result := scanner.Scan(input)
+	return fromReporter(result)
+}
+
+// FindingsByTag returns all findings that contain the given tag.
+func FindingsByTag(result *ScanResult, tag string) []rules.Finding {
+	var out []rules.Finding
+	for _, f := range result.Findings {
+		for _, t := range f.Tags {
+			if t == tag {
+				out = append(out, f)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// HasFindingWithTag returns true if any finding contains the given tag.
+func HasFindingWithTag(result *ScanResult, tag string) bool {
+	return len(FindingsByTag(result, tag)) > 0
+}
+
+// FindingsByRulePrefix returns all findings whose RuleID starts with prefix.
+func FindingsByRulePrefix(result *ScanResult, prefix string) []rules.Finding {
+	var out []rules.Finding
+	for _, f := range result.Findings {
+		if strings.HasPrefix(f.RuleID, prefix) {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // --- internal helpers ---

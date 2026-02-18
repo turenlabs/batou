@@ -1,4 +1,4 @@
-// WebGoat Insecure Deserialization
+// Insecure Deserialization
 // Expected: GTSS-GEN-002, GTSS-DESER-001
 // CWE-502, OWASP A08
 package com.webgoat.lessons;
@@ -14,7 +14,7 @@ public class InsecureDeserializationLesson {
         String token = request.getParameter("token");
         byte[] data = Base64.getDecoder().decode(token);
 
-        // VULNERABLE: WebGoat insecure deserialization - ObjectInputStream.readObject()
+        // VULNERABLE: Insecure deserialization - ObjectInputStream.readObject()
         ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(data));
         Object obj = ois.readObject();
         ois.close();

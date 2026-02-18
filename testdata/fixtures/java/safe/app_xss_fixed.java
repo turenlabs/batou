@@ -1,4 +1,4 @@
-// WebGoat XSS - Fixed with proper escaping
+// XSS - Fixed with proper escaping
 package com.webgoat.lessons.fixed;
 
 import java.io.IOException;

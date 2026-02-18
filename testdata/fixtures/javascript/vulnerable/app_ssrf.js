@@ -1,4 +1,4 @@
-// Juice Shop SSRF
+// SSRF via user-controlled URL
 // Expected: GTSS-SSRF-001
 // CWE-918, OWASP A10
 const express = require('express');
@@ -9,7 +9,7 @@ const app = express();
 app.get('/api/proxy', (req, res) => {
   const targetUrl = req.query.url;
 
-  // VULNERABLE: Juice Shop SSRF - fetching user-controlled URL
+  // VULNERABLE: SSRF - fetching user-controlled URL
   axios.get(targetUrl).then(response => {
     res.json(response.data);
   }).catch(err => {

@@ -1,4 +1,4 @@
-// WebGoat SQL Injection - Fixed with PreparedStatement
+// SQL Injection - Fixed with PreparedStatement
 package com.webgoat.lessons.fixed;
 
 import java.sql.Connection;

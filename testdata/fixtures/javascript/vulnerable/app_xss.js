@@ -1,4 +1,4 @@
-// Juice Shop XSS
+// Reflected and DOM XSS
 // Expected: GTSS-XSS-001, GTSS-XSS-003, GTSS-XSS-005
 // CWE-79, OWASP A03
 const express = require('express');
@@ -7,7 +7,7 @@ const app = express();
 app.get('/search', (req, res) => {
   const query = req.query.q;
 
-  // VULNERABLE: Juice Shop reflected XSS via document.write
+  // VULNERABLE: Reflected XSS via document.write
   res.send(`
     <html>
     <body>

@@ -1,4 +1,4 @@
-// WebGoat Path Traversal
+// Path Traversal
 // Expected: GTSS-TRV-001 (Path Traversal)
 // CWE-22, OWASP A01
 package com.webgoat.lessons;
@@ -14,7 +14,7 @@ public class PathTraversalLesson {
     public void downloadFile(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String filename = request.getParameter("filename");
 
-        // VULNERABLE: WebGoat path traversal - direct user input in file path
+        // VULNERABLE: Path traversal - direct user input in file path
         File file = new File("/var/uploads/" + filename);
         FileInputStream fis = new FileInputStream(file);
 
