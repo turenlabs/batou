@@ -1,4 +1,4 @@
-// Juice Shop Directory Traversal
+// Directory Traversal
 // Expected: GTSS-TRV-001, GTSS-JSTS-011
 // CWE-22, OWASP A01
 const express = require('express');
@@ -9,7 +9,7 @@ const app = express();
 app.get('/rest/ftp/:file', (req, res) => {
   const filename = req.params.file;
 
-  // VULNERABLE: Juice Shop directory traversal - path.join doesn't prevent ../
+  // VULNERABLE: Directory traversal - path.join doesn't prevent ../
   const filePath = path.join(__dirname, 'ftp', filename);
   res.sendFile(filePath);
 });

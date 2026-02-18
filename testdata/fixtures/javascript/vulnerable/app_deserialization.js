@@ -1,4 +1,4 @@
-// Juice Shop Insecure Deserialization
+// Insecure Deserialization
 // Expected: GTSS-GEN-002 (Unsafe Deserialization)
 // CWE-502, OWASP A08
 const express = require('express');
@@ -8,7 +8,7 @@ const app = express();
 app.post('/api/basket/coupon', (req, res) => {
   const couponData = req.body.coupon;
 
-  // VULNERABLE: Juice Shop insecure deserialization via node-serialize
+  // VULNERABLE: Insecure deserialization via node-serialize
   const coupon = serialize.unserialize(couponData);
 
   if (coupon && coupon.valid) {

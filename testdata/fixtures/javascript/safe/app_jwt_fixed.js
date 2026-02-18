@@ -1,4 +1,4 @@
-// Juice Shop JWT - Fixed with algorithm restriction
+// JWT - Fixed with algorithm restriction
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const app = express();

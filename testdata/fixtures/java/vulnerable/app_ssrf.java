@@ -1,4 +1,4 @@
-// WebGoat SSRF
+// SSRF via user-controlled URL
 // Expected: GTSS-SSRF-001, GTSS-JAVA-016
 // CWE-918, OWASP A10
 package com.webgoat.lessons;
@@ -14,7 +14,7 @@ public class SSRFLesson {
     public String fetchURL(HttpServletRequest request) throws Exception {
         String targetUrl = request.getParameter("url");
 
-        // VULNERABLE: WebGoat SSRF - opening user-controlled URL
+        // VULNERABLE: SSRF - opening user-controlled URL
         URL url = new URL(targetUrl);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));

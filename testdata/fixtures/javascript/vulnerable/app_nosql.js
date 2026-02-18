@@ -1,4 +1,4 @@
-// Juice Shop NoSQL Injection
+// NoSQL Injection
 // Expected: GTSS-NOSQL-001, GTSS-NOSQL-002, GTSS-INJ-007
 // CWE-943, OWASP A03
 const express = require('express');
@@ -6,7 +6,7 @@ const User = require('./models/user');
 const app = express();
 
 app.post('/rest/user/login', (req, res) => {
-  // VULNERABLE: Juice Shop NoSQL injection - passing user input directly to query
+  // VULNERABLE: NoSQL injection - passing user input directly to query
   User.find({
     email: req.body.email,
     password: req.body.password

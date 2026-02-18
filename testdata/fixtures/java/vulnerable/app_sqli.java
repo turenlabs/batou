@@ -1,4 +1,4 @@
-// WebGoat SQL Injection - String concatenation pattern
+// SQL Injection - String concatenation pattern
 // Expected: GTSS-INJ-001 (SQL Injection)
 // CWE-89, OWASP A03
 package com.webgoat.lessons;
@@ -13,7 +13,7 @@ public class SqlInjectionLesson {
     public String executeQuery(HttpServletRequest request, Connection connection) throws Exception {
         String accountName = request.getParameter("account_name");
 
-        // VULNERABLE: WebGoat classic string concatenation SQL injection
+        // VULNERABLE: Classic string concatenation SQL injection
         Statement statement = connection.createStatement();
         ResultSet results = statement.executeQuery(
             "SELECT * FROM user_data WHERE last_name = '" + accountName + "'");
@@ -28,7 +28,7 @@ public class SqlInjectionLesson {
     public String orderByInjection(HttpServletRequest request, Connection connection) throws Exception {
         String column = request.getParameter("column");
 
-        // VULNERABLE: WebGoat ORDER BY injection
+        // VULNERABLE: ORDER BY injection
         Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery(
             "SELECT * FROM employees ORDER BY " + column);

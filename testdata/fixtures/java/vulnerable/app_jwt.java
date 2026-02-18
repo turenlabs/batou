@@ -1,4 +1,4 @@
-// WebGoat JWT Flaws - hardcoded weak secret
+// JWT Flaws - hardcoded weak secret
 // Expected: GTSS-SEC-005 (JWT Secret), GTSS-SEC-001 (Hardcoded Password)
 // CWE-347, OWASP A02
 package com.webgoat.lessons;
@@ -8,7 +8,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 
 public class JWTLesson {
 
-    // VULNERABLE: WebGoat hardcoded JWT signing key
+    // VULNERABLE: Hardcoded JWT signing key
     private static final String SECRET_KEY = "qwertyuiopasdfghjklzxcvbnm123456";
     private String jwtSecret = "s3cr3t_jwt_key_webgoat";
 

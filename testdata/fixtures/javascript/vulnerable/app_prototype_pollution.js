@@ -1,4 +1,4 @@
-// Juice Shop Prototype Pollution
+// Prototype Pollution
 // Expected: GTSS-PROTO-001, GTSS-PROTO-002
 // CWE-1321, OWASP A03
 const express = require('express');
@@ -11,7 +11,7 @@ let serverConfig = {
 };
 
 app.post('/api/config', (req, res) => {
-  // VULNERABLE: Juice Shop prototype pollution via lodash merge
+  // VULNERABLE: Prototype pollution via lodash merge
   _.merge(serverConfig, req.body);
   res.json(serverConfig);
 });

@@ -1,11 +1,11 @@
-// Juice Shop JWT None Algorithm Attack
+// JWT None Algorithm Attack
 // Expected: GTSS-JSTS-006 (JWT Verify No Algorithm)
 // CWE-347, OWASP A02
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const app = express();
 
-// VULNERABLE: Juice Shop JWT none algorithm - no algorithm restriction
+// VULNERABLE: JWT none algorithm - no algorithm restriction
 const SECRET = 'juice-shop-secret';
 
 app.get('/rest/user/whoami', (req, res) => {

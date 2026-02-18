@@ -1,4 +1,4 @@
-// WebGoat XXE - XML External Entity Processing
+// XXE - XML External Entity Processing
 // Expected: GTSS-XXE-001 (Java XXE)
 // CWE-611, OWASP A05
 package com.webgoat.lessons;
@@ -14,7 +14,7 @@ public class XXELesson {
     public String parseXML(HttpServletRequest request) throws Exception {
         String xmlInput = request.getParameter("xml");
 
-        // VULNERABLE: WebGoat XXE - parsing user XML without disabling external entities
+        // VULNERABLE: XXE - parsing user XML without disabling external entities
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
         org.w3c.dom.Document doc = builder.parse(new InputSource(new StringReader(xmlInput)));

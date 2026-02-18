@@ -1,4 +1,4 @@
-// Juice Shop - Fixed with parameterized queries
+// SQL Injection - Fixed with parameterized queries
 const express = require('express');
 const { QueryTypes } = require('sequelize');
 const sequelize = require('./models').sequelize;
