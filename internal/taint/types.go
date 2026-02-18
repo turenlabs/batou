@@ -162,19 +162,20 @@ func (tf *TaintFlow) ToFinding() rules.Finding {
 	}
 
 	return rules.Finding{
-		RuleID:        "BATOU-TAINT-" + string(tf.Sink.Category),
-		Severity:      tf.Sink.Severity,
-		SeverityLabel: tf.Sink.Severity.String(),
-		Title:         title,
-		Description:   desc,
-		FilePath:      tf.FilePath,
-		LineNumber:    tf.SinkLine,
-		MatchedText:   matched,
-		Suggestion:    suggestion,
-		CWEID:         tf.Sink.CWEID,
-		OWASPCategory: tf.Sink.OWASPCategory,
-		Confidence:    conf,
-		Tags:          []string{"taint-analysis", "dataflow", string(tf.Source.Category), string(tf.Sink.Category)},
+		RuleID:          "BATOU-TAINT-" + string(tf.Sink.Category),
+		Severity:        tf.Sink.Severity,
+		SeverityLabel:   tf.Sink.Severity.String(),
+		Title:           title,
+		Description:     desc,
+		FilePath:        tf.FilePath,
+		LineNumber:      tf.SinkLine,
+		MatchedText:     matched,
+		Suggestion:      suggestion,
+		CWEID:           tf.Sink.CWEID,
+		OWASPCategory:   tf.Sink.OWASPCategory,
+		Confidence:      conf,
+		ConfidenceScore: tf.Confidence,
+		Tags:            []string{"taint-analysis", "dataflow", string(tf.Source.Category), string(tf.Sink.Category)},
 	}
 }
 

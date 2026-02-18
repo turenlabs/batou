@@ -37,8 +37,14 @@ func (r *ScanResult) HasFindings() bool {
 }
 
 // ShouldBlock returns true if any finding warrants blocking the write.
+// Requires both Critical severity and high confidence (>= 0.7).
 func (r *ScanResult) ShouldBlock() bool {
-	return r.MaxSeverity().ShouldBlock()
+	for _, f := range r.Findings {
+		if f.ShouldBlock() {
+			return true
+		}
+	}
+	return false
 }
 
 // CountBySeverity returns the count of findings at each severity level.
@@ -83,7 +89,7 @@ func FormatForClaude(result *ScanResult) string {
 	}
 
 	if result.ShouldBlock() {
-		b.WriteString("\nACTION REQUIRED: Critical vulnerability detected. This write was BLOCKED.\n")
+		b.WriteString("\nACTION REQUIRED: Critical high-confidence vulnerability detected. This write was BLOCKED.\n")
 		b.WriteString("Please fix the vulnerability before writing this file.\n")
 	} else if result.MaxSeverity().ShouldWarn() {
 		b.WriteString("\nWARNING: High-severity vulnerability detected. Please review and fix.\n")
@@ -106,7 +112,7 @@ func FormatBlockMessage(result *ScanResult) string {
 	b.WriteString("Batou BLOCKED WRITE: Critical security vulnerability detected\n\n")
 
 	for _, f := range result.Findings {
-		if f.Severity >= rules.Critical {
+		if f.ShouldBlock() {
 			b.WriteString(fmt.Sprintf("[%s] %s: %s\n", f.Severity, f.RuleID, f.Title))
 			if f.FilePath != "" {
 				loc := f.FilePath
@@ -125,6 +131,9 @@ func FormatBlockMessage(result *ScanResult) string {
 			b.WriteString(fmt.Sprintf("  Why: %s\n", f.Description))
 			if f.Suggestion != "" {
 				b.WriteString(fmt.Sprintf("  Fix: %s\n", f.Suggestion))
+			}
+			if f.ConfidenceScore > 0 {
+				b.WriteString(fmt.Sprintf("  Confidence: %.0f%%\n", f.ConfidenceScore*100))
 			}
 			if f.CWEID != "" {
 				b.WriteString(fmt.Sprintf("  Reference: %s", f.CWEID))

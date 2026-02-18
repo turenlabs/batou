@@ -102,8 +102,9 @@ type Finding struct {
 	CWEID         string   `json:"cwe_id,omitempty"`
 	OWASPCategory string   `json:"owasp_category,omitempty"`
 	Language      Language `json:"language,omitempty"`
-	Confidence    string   `json:"confidence"` // high, medium, low
-	Tags          []string `json:"tags,omitempty"`
+	Confidence      string   `json:"confidence"`                  // high, medium, low
+	ConfidenceScore float64  `json:"confidence_score"`            // 0.0-1.0, computed by pipeline
+	Tags            []string `json:"tags,omitempty"`
 }
 
 // FormatShort returns a one-line summary of the finding.
@@ -140,7 +141,29 @@ func (f Finding) FormatDetail() string {
 	if f.OWASPCategory != "" {
 		result += fmt.Sprintf("  OWASP: %s\n", f.OWASPCategory)
 	}
+	if f.ConfidenceScore > 0 {
+		result += fmt.Sprintf("  Confidence: %.0f%%\n", f.ConfidenceScore*100)
+	}
 	return result
+}
+
+// ShouldBlock returns true if this individual finding warrants blocking a write.
+// Requires both Critical severity and high confidence (>= 0.7).
+func (f Finding) ShouldBlock() bool {
+	return f.Severity >= Critical && f.ConfidenceScore >= 0.7
+}
+
+// SyncConfidenceString updates the Confidence string label to match
+// the computed ConfidenceScore.
+func (f *Finding) SyncConfidenceString() {
+	switch {
+	case f.ConfidenceScore >= 0.7:
+		f.Confidence = "high"
+	case f.ConfidenceScore >= 0.4:
+		f.Confidence = "medium"
+	default:
+		f.Confidence = "low"
+	}
 }
 
 // ScanContext provides all context needed for a rule to analyze code.

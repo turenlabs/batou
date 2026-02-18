@@ -40,8 +40,9 @@ type Record struct {
 	Title         string         `json:"title"`
 	Severity      rules.Severity `json:"severity"`
 	SeverityLabel string         `json:"severity_label"`
-	Confidence    string         `json:"confidence,omitempty"`
-	CWEID         string         `json:"cwe_id,omitempty"`
+	Confidence      string         `json:"confidence,omitempty"`
+	ConfidenceScore float64        `json:"confidence_score,omitempty"`
+	CWEID           string         `json:"cwe_id,omitempty"`
 	OWASPCategory string         `json:"owasp_category,omitempty"`
 	MatchedText   string         `json:"matched_text,omitempty"`
 	Suggestion    string         `json:"suggestion,omitempty"`
@@ -144,6 +145,7 @@ func (s *Store) Upsert(f rules.Finding) bool {
 		existing.LineNumber = f.LineNumber
 		existing.Title = f.Title
 		existing.MatchedText = f.MatchedText
+		existing.ConfidenceScore = f.ConfidenceScore
 		if existing.Status == StatusResolved {
 			existing.Status = StatusActive
 		}
@@ -151,22 +153,23 @@ func (s *Store) Upsert(f rules.Finding) bool {
 	}
 
 	s.records[key] = &Record{
-		Key:           key,
-		RuleID:        f.RuleID,
-		FilePath:      f.FilePath,
-		LineNumber:    f.LineNumber,
-		Title:         f.Title,
-		Severity:      f.Severity,
-		SeverityLabel: f.Severity.String(),
-		Confidence:    f.Confidence,
-		CWEID:         f.CWEID,
-		OWASPCategory: f.OWASPCategory,
-		MatchedText:   f.MatchedText,
-		Suggestion:    f.Suggestion,
-		Status:        StatusActive,
-		FirstSeen:     now,
-		LastSeen:      now,
-		Count:         1,
+		Key:             key,
+		RuleID:          f.RuleID,
+		FilePath:        f.FilePath,
+		LineNumber:      f.LineNumber,
+		Title:           f.Title,
+		Severity:        f.Severity,
+		SeverityLabel:   f.Severity.String(),
+		Confidence:      f.Confidence,
+		ConfidenceScore: f.ConfidenceScore,
+		CWEID:           f.CWEID,
+		OWASPCategory:   f.OWASPCategory,
+		MatchedText:     f.MatchedText,
+		Suggestion:      f.Suggestion,
+		Status:          StatusActive,
+		FirstSeen:       now,
+		LastSeen:        now,
+		Count:           1,
 	}
 	return true
 }
@@ -185,23 +188,24 @@ func (s *Store) UpsertSuppressed(f rules.Finding, reason string) {
 	}
 
 	s.records[key] = &Record{
-		Key:            key,
-		RuleID:         f.RuleID,
-		FilePath:       f.FilePath,
-		LineNumber:     f.LineNumber,
-		Title:          f.Title,
-		Severity:       f.Severity,
-		SeverityLabel:  f.Severity.String(),
-		Confidence:     f.Confidence,
-		CWEID:          f.CWEID,
-		OWASPCategory:  f.OWASPCategory,
-		MatchedText:    f.MatchedText,
-		Suggestion:     f.Suggestion,
-		Status:         StatusSuppressed,
-		FirstSeen:      now,
-		LastSeen:       now,
-		Count:          1,
-		SuppressReason: reason,
+		Key:             key,
+		RuleID:          f.RuleID,
+		FilePath:        f.FilePath,
+		LineNumber:      f.LineNumber,
+		Title:           f.Title,
+		Severity:        f.Severity,
+		SeverityLabel:   f.Severity.String(),
+		Confidence:      f.Confidence,
+		ConfidenceScore: f.ConfidenceScore,
+		CWEID:           f.CWEID,
+		OWASPCategory:   f.OWASPCategory,
+		MatchedText:     f.MatchedText,
+		Suggestion:      f.Suggestion,
+		Status:          StatusSuppressed,
+		FirstSeen:       now,
+		LastSeen:        now,
+		Count:           1,
+		SuppressReason:  reason,
 	}
 }
 

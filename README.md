@@ -3,17 +3,19 @@
 <img width="512" height="512" alt="logo_2" src="https://github.com/user-attachments/assets/a3157fb7-68cb-40af-878f-02dc54f62df9" />
 
 
-A security scanner that catches vulnerabilities in real-time as AI writes code. Built as a [Claude Code hook](https://docs.anthropic.com/en/docs/claude-code/hooks), Batou analyzes every file write for security issues across 16 programming languages using a four-layer analysis pipeline.
+A security scanner that catches vulnerabilities in real-time as AI writes code. Built as a [Claude Code hook](https://docs.anthropic.com/en/docs/claude-code/hooks), Batou analyzes every file write for security issues across 16 programming languages using a four-layer analysis pipeline: regex pattern matching, AST structural analysis, taint dataflow tracking, and interprocedural call graph analysis.
+
+Batou uses confidence scoring to decide what to do with each finding. Findings confirmed by multiple analysis layers (e.g., both regex and taint analysis flag the same SQL injection) get high confidence and block the write. Findings from a single regex pattern match get lower confidence and produce hints instead — Claude sees the security advice without being interrupted by false positives.
 
 ## How It Works
 
 Batou hooks into Claude Code's `Write`, `Edit`, and `NotebookEdit` operations:
 
-- **PreToolUse**: Scans code before it's written. Blocks critical vulnerabilities (exit code 2) and provides fix guidance.
+- **PreToolUse**: Scans code before it's written. Blocks high-confidence critical vulnerabilities (exit code 2) and provides fix guidance. Lower-confidence findings produce hints without blocking.
 - **PostToolUse**: Performs deep analysis after writes, giving Claude detailed hints to improve code security.
 
 ```
-Claude writes code → Batou intercepts → 4-layer scan → Block critical vulns / Hint fixes to Claude
+Claude writes code → Batou intercepts → 4-layer scan → Confidence scoring → Block / Hint
 ```
 
 ## Four-Layer Analysis Pipeline
@@ -171,11 +173,17 @@ Batou hooks are configured in `.claude/settings.json`:
 
 ## False Positive Suppression
 
-If Batou flags code you know is safe, you can suppress findings with inline `batou:ignore` directives. Use the comment syntax for your language (`//`, `#`, `--`, etc.).
+Batou's confidence scoring already reduces false-positive blocks — regex-only findings produce hints instead of blocking writes. But when Batou does flag code you know is safe, you can suppress findings with inline `batou:ignore` directives.
+
+### When to suppress vs. when to fix
+
+- **Confidence < 0.7 (hint only):** Batou already won't block. You can ignore the hint or suppress it if it's noisy.
+- **Confidence >= 0.7 (blocked):** Batou is fairly confident. Check the finding first — if it's genuinely safe, suppress with a reason.
+- **Taint-confirmed findings:** These have high confidence because dataflow analysis traced user input to a dangerous sink. Suppressing these should be rare and well-justified.
 
 ### Single-line suppression
 
-Place the directive on the line above the flagged code:
+Place the directive on the line **above** the flagged code. Use your language's comment syntax (`//`, `#`, `--`, `/*`, `<!--`, `rem`):
 
 ```go
 // batou:ignore BATOU-INJ-001 -- query uses parameterized input
@@ -192,9 +200,19 @@ password = "test-password-for-ci"
 eval(trustedExpression);
 ```
 
+```lua
+-- batou:ignore BATOU-LUA-001 -- sandboxed environment
+loadstring(code)()
+```
+
+```sql
+-- batou:ignore injection -- stored procedure, no user input
+EXECUTE sp_executesql @sql;
+```
+
 ### Block suppression
 
-Suppress all findings within a range of lines:
+Suppress findings across multiple lines with start/end markers:
 
 ```go
 // batou:ignore-start injection
@@ -203,17 +221,30 @@ process(rows)
 // batou:ignore-end
 ```
 
+```python
+# batou:ignore-start all -- generated migration, not hand-written
+cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+cursor.execute(f"UPDATE {table} SET {col} = DEFAULT")
+# batou:ignore-end
+```
+
 ### Supported targets
 
 | Target | Example | What it suppresses |
 |--------|---------|--------------------|
 | Rule ID | `BATOU-INJ-001` | That specific rule only |
-| Category | `injection` | All rules in the category |
+| Category | `injection`, `secrets`, `xss` | All rules in the category |
 | `all` | `all` | Every Batou rule |
 
-Multiple targets can be listed on one directive: `batou:ignore BATOU-INJ-001 secrets -- reason`.
+Multiple targets on one line: `batou:ignore BATOU-INJ-001 secrets -- reason here`.
 
-An optional reason after `--` is recommended for auditability.
+### Tips
+
+- Always include a reason after `--` for auditability
+- Prefer specific rule IDs (`BATOU-INJ-001`) over broad targets (`all`)
+- Block suppression covers both regex findings on the source line and taint findings on the sink line
+- Suppressed findings are still logged in the audit ledger — suppression hides them from output but doesn't erase them
+- Batou's output includes a suppression hint with the exact directive to copy-paste
 
 ## Testing
 
@@ -252,6 +283,24 @@ File extensions:    50+
 Test fixtures:      430+
 Test cases:         2,000+
 ```
+
+## Confidence Scoring
+
+Not all findings are created equal. Batou assigns each finding a confidence score (0.0–1.0) based on which analysis layers confirmed it. This score determines whether a Critical finding blocks the write or just shows a hint.
+
+| Scenario | Score | Result |
+|----------|-------|--------|
+| Regex-only Critical | 0.3–0.5 | Hint only (not blocked) |
+| AST-confirmed Critical | 0.7 | Blocked |
+| Taint-confirmed Critical | ~0.85–0.95 | Blocked |
+| Regex + Taint same line | ~0.95 | Blocked |
+| All 4 layers confirm | 1.0 | Blocked |
+
+**Blocking threshold:** `Severity >= Critical AND ConfidenceScore >= 0.7`
+
+This means regex-only pattern matches — the most common source of false positives — produce helpful hints to Claude without interrupting the workflow. When taint analysis or AST analysis independently confirms the same vulnerability, the confidence score crosses the threshold and Batou blocks the write.
+
+Multi-layer agreement boosts confidence further: each additional analysis tier confirming the same finding adds +0.1 to the score. A finding confirmed by regex, AST, and taint analysis scores higher than one confirmed by taint alone.
 
 ## How It Improves AI Code
 

@@ -90,14 +90,15 @@ func Scan(input *hook.Input) *reporter.ScanResult {
 	case <-ctx.Done():
 		result.ScanTimeMs = time.Since(start).Milliseconds()
 		result.Findings = append(result.Findings, rules.Finding{
-			RuleID:        "BATOU-TIMEOUT",
-			Severity:      rules.Medium,
-			SeverityLabel: rules.Medium.String(),
-			Title:         "Scan timed out",
-			Description:   fmt.Sprintf("Security scan exceeded %s timeout. Partial results may be available. This can happen with very large files.", scanTimeout),
-			FilePath:      filePath,
-			Confidence:    "low",
-			Tags:          []string{"timeout", "performance"},
+			RuleID:          "BATOU-TIMEOUT",
+			Severity:        rules.Medium,
+			SeverityLabel:   rules.Medium.String(),
+			Title:           "Scan timed out",
+			Description:     fmt.Sprintf("Security scan exceeded %s timeout. Partial results may be available. This can happen with very large files.", scanTimeout),
+			FilePath:        filePath,
+			Confidence:      "low",
+			ConfidenceScore: 0.2,
+			Tags:            []string{"timeout", "performance"},
 		})
 		return result
 	}
@@ -153,13 +154,14 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 					// A rule panicked — don't crash the whole scan.
 					mu.Lock()
 					findings = append(findings, rules.Finding{
-						RuleID:      "BATOU-PANIC",
-						Severity:    rules.Medium,
-						Title:       fmt.Sprintf("Rule %s panicked: %v", rule.ID(), rec),
-						Description: "A scan rule panicked during analysis. This finding is informational and indicates a bug in the rule implementation.",
-						FilePath:    filePath,
-						Confidence:  "low",
-						Tags:        []string{"internal", "panic"},
+						RuleID:          "BATOU-PANIC",
+						Severity:        rules.Medium,
+						Title:           fmt.Sprintf("Rule %s panicked: %v", rule.ID(), rec),
+						Description:     "A scan rule panicked during analysis. This finding is informational and indicates a bug in the rule implementation.",
+						FilePath:        filePath,
+						Confidence:      "low",
+						ConfidenceScore: 0.2,
+						Tags:            []string{"internal", "panic"},
 					})
 					mu.Unlock()
 				}
@@ -239,6 +241,12 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 	// entirely within comments or string literals in the parsed AST.
 	findings = ast.FilterFindings(tree, filePath, findings)
 
+	// Assign base confidence scores before dedup so the multi-layer
+	// boost in DeduplicateFindings can work with meaningful values.
+	for i := range findings {
+		AssignBaseConfidenceScore(&findings[i])
+	}
+
 	// Deduplicate findings that share the same (line, CWE) — keep the
 	// highest-fidelity finding (taint > AST > interprocedural > regex)
 	// and merge tags from suppressed duplicates into the winner.
@@ -258,6 +266,17 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 			}
 			findings[i].Tags = appendUnique(findings[i].Tags, "test-file")
 		}
+	}
+
+	// Edge-case confidence adjustments and sync string labels.
+	for i := range findings {
+		if findings[i].RuleID == "BATOU-TIMEOUT" || findings[i].RuleID == "BATOU-PANIC" {
+			findings[i].ConfidenceScore = 0.2
+		}
+		if fpfilter.IsTestFile(filePath) && findings[i].ConfidenceScore > 0.3 {
+			findings[i].ConfidenceScore = 0.3
+		}
+		findings[i].SyncConfidenceString()
 	}
 
 	// Populate severity labels and file paths

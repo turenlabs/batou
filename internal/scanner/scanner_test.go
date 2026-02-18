@@ -23,6 +23,7 @@ import (
 	// Taint analysis engine and language catalogs.
 	_ "github.com/turenlabs/batou/internal/taint"
 	_ "github.com/turenlabs/batou/internal/taint/languages"
+	_ "github.com/turenlabs/batou/internal/taintrule"
 )
 
 // ---------------------------------------------------------------------------
@@ -118,6 +119,63 @@ func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	if !hasCritical {
 		t.Error("expected at least one Critical severity finding")
 	}
+	testutil.AssertBlocked(t, result)
+}
+
+// ---------------------------------------------------------------------------
+// Confidence scoring integration: regex-only Critical should NOT block
+// ---------------------------------------------------------------------------
+
+func TestScanRegexOnlyCritical_NoBlock(t *testing.T) {
+	// JavaScript regex-only injection — no taint rule fires for this snippet
+	// because there's no source-to-sink flow (just a dangerous pattern).
+	code := `const q = "DELETE FROM users WHERE id=" + id;
+db.query(q);`
+	result := testutil.ScanContent(t, "handler.js", code)
+
+	hasCritical := false
+	for _, f := range result.Findings {
+		if f.Severity >= rules.Critical {
+			hasCritical = true
+		}
+	}
+	if !hasCritical {
+		t.Skip("no Critical finding produced — regex rules may have changed")
+	}
+
+	// Key behavioral change: regex-only Critical should NOT block because
+	// confidence score (0.3-0.5) is below the 0.7 threshold.
+	testutil.AssertNotBlocked(t, result)
+}
+
+// ---------------------------------------------------------------------------
+// Confidence scoring integration: taint-confirmed Critical SHOULD block
+// ---------------------------------------------------------------------------
+
+func TestScanTaintCritical_Blocks(t *testing.T) {
+	// Go code with a clear taint flow: FormValue → Sprintf → db.Query.
+	// The taint engine (via taintrule) produces a high-confidence finding.
+	code := `package main
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	username := r.FormValue("username")
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	rows, err := db.Query(query)
+	if err != nil {
+		http.Error(w, "error", 500)
+		return
+	}
+	defer rows.Close()
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", code)
+
+	// The taint-confirmed finding should have ConfidenceScore >= 0.7 and block.
 	testutil.AssertBlocked(t, result)
 }
 
@@ -468,9 +526,10 @@ import (
 
 func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	username := r.FormValue("username")
-	// batou:ignore all -- intentional for testing
+	// batou:ignore-start all -- intentional for testing
 	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
 	rows, err := db.Query(query)
+	// batou:ignore-end
 	if err != nil {
 		http.Error(w, "error", 500)
 	}
@@ -478,10 +537,11 @@ func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", code)
 
-	// The "all" wildcard should suppress any finding on the next code line (line 13).
+	// The "all" block directive should suppress findings on lines 12-13
+	// (the Sprintf line and the db.Query sink line).
 	for _, f := range result.Findings {
-		if f.LineNumber == 13 {
-			t.Errorf("expected all findings on line 13 to be suppressed by 'all' directive, got %s", f.RuleID)
+		if f.LineNumber == 12 || f.LineNumber == 13 {
+			t.Errorf("expected findings on lines 12-13 to be suppressed by 'all' block directive, got %s on line %d", f.RuleID, f.LineNumber)
 		}
 	}
 }

@@ -357,6 +357,61 @@ func TestDedup_RuleIDTiebreaker(t *testing.T) {
 	}
 }
 
+func TestDedup_MultiLayerBoost(t *testing.T) {
+	// Regex + taint on the same line/CWE — winner should get a boost.
+	regex := regexFinding(10, "CWE-89", rules.High, "high")
+	regex.ConfidenceScore = 0.5
+	tf := taintFinding(10, "CWE-89", rules.High, "high")
+	tf.ConfidenceScore = 0.85
+
+	got := DeduplicateFindings([]rules.Finding{regex, tf})
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(got))
+	}
+	// Winner is taint (0.85) + 0.1 boost (2 distinct tiers) = 0.95
+	if got[0].ConfidenceScore != 0.95 {
+		t.Errorf("expected boosted score 0.95, got %.2f", got[0].ConfidenceScore)
+	}
+}
+
+func TestDedup_ThreeLayerBoost(t *testing.T) {
+	regex := regexFinding(10, "CWE-89", rules.High, "medium")
+	regex.ConfidenceScore = 0.4
+	ast := astFinding(10, "CWE-89", rules.High, "high")
+	ast.ConfidenceScore = 0.7
+	tf := taintFinding(10, "CWE-89", rules.High, "high")
+	tf.ConfidenceScore = 0.85
+
+	got := DeduplicateFindings([]rules.Finding{regex, ast, tf})
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(got))
+	}
+	// Winner is taint (0.85) + 0.2 boost (3 tiers) = 1.0 (capped)
+	if got[0].ConfidenceScore != 1.0 {
+		t.Errorf("expected capped score 1.0, got %.2f", got[0].ConfidenceScore)
+	}
+}
+
+func TestDedup_NoCWE_NoBoost(t *testing.T) {
+	// Findings without CWE are never grouped, so no boost.
+	regex := regexFinding(10, "", rules.High, "high")
+	regex.ConfidenceScore = 0.5
+	tf := taintFinding(10, "", rules.High, "high")
+	tf.ConfidenceScore = 0.85
+
+	got := DeduplicateFindings([]rules.Finding{regex, tf})
+	if len(got) != 2 {
+		t.Fatalf("expected 2 findings (no CWE), got %d", len(got))
+	}
+	// Scores should be unchanged.
+	if got[0].ConfidenceScore != 0.5 {
+		t.Errorf("regex score should be unchanged: got %.2f", got[0].ConfidenceScore)
+	}
+	if got[1].ConfidenceScore != 0.85 {
+		t.Errorf("taint score should be unchanged: got %.2f", got[1].ConfidenceScore)
+	}
+}
+
 func TestDedup_EmptyAndSingleInput(t *testing.T) {
 	// Empty slice returns empty.
 	got := DeduplicateFindings(nil)
