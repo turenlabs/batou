@@ -89,6 +89,10 @@ func DeduplicateFindings(findings []rules.Finding) []rules.Finding {
 			}
 		}
 
+		// Boost confidence when multiple analysis tiers confirmed the same issue.
+		distinctTiers := countDistinctTiers(g.members, findings)
+		BoostConfidenceForMultiLayer(&winner, distinctTiers)
+
 		result = append(result, winner)
 	}
 
@@ -170,6 +174,17 @@ func hasTag(tags []string, tag string) bool {
 		}
 	}
 	return false
+}
+
+// countDistinctTiers returns how many unique analysis tiers are represented
+// in a dedup group. Used to compute multi-layer confidence boosts.
+func countDistinctTiers(memberIndices []int, findings []rules.Finding) int {
+	seen := make(map[int]bool)
+	for _, idx := range memberIndices {
+		tier := findingTier(&findings[idx])
+		seen[tier] = true
+	}
+	return len(seen)
 }
 
 // mergeUniqueTags appends any tags from src that are not already in dst.

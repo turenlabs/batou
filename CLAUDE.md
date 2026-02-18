@@ -31,6 +31,7 @@ internal/testutil/          Test framework helpers
   - Layer 2: AST analysis (tree-sitter structural analysis for 15 languages). Tree-sitter tree is cached and shared with Layer 3's tsflow engine.
   - Layer 3: Taint analysis (source-to-sink dataflow with 1,069 entries across three engines). TaintFlow objects are cached and passed to Layer 4 for precise interprocedural signatures.
   - Layer 4: Call graph (persistent interprocedural taint tracking across function boundaries, cross-file caller loading from disk)
+- **Confidence scoring**: Each finding gets a computed `ConfidenceScore` (0.0–1.0) reflecting which analysis layers confirmed it. Blocking requires both `Severity >= Critical` AND `ConfidenceScore >= 0.7`. This means regex-only Critical findings (score 0.3–0.5) become hints instead of blocks, while multi-layer-confirmed findings still block.
 - **Shared parse cache** (each file parsed once per parser type):
   - tree-sitter tree: parsed in Layer 2 → reused by tsflow (Layer 3) via `AnalyzeWithTree()`
   - go/ast parse: parsed once → shared between astflow (Layer 3) via `AnalyzeGoWithAST()` and call graph builder (Layer 4) via `UpdateFileWithAST()`. Cached in `ScanContext.GoASTFile`.
@@ -45,6 +46,45 @@ internal/testutil/          Test framework helpers
 - **One dependency**: `github.com/smacker/go-tree-sitter` (compiled into binary via CGo). Core is pure Go stdlib.
 - **Taint catalogs**: Each language has sources (user input), sinks (dangerous functions), and sanitizers
 - **AI feedback loop**: Hints include language-specific fix examples, CWE/OWASP references, and architectural advice
+
+## Confidence Scoring
+
+Each finding carries a `ConfidenceScore float64` (0.0–1.0) computed by the pipeline. The score determines whether a Critical finding blocks the write or just produces a hint.
+
+### Base Scores by Analysis Tier
+
+| Tier | Base Score | Constant |
+|------|-----------|----------|
+| Regex (low conf) | 0.3 | `ConfBaseRegexLow` |
+| Regex (medium conf) | 0.4 | `ConfBaseRegexMedium` |
+| Regex (high conf) | 0.5 | `ConfBaseRegexHigh` |
+| AST | 0.7 | `ConfBaseAST` |
+| Taint | flow's float64 | preserved from `TaintFlow.Confidence` |
+| Interprocedural | 0.8 | `ConfBaseInterproc` |
+
+### Multi-layer Boost
+
+When dedup groups findings by (line, CWE), the winner gets `+0.1` per additional confirming tier (`ConfMultiLayerBoost`). Example: regex (0.5) + taint (0.85) on the same line → taint wins, boosted to 0.95.
+
+### Blocking Threshold
+
+`Severity >= Critical AND ConfidenceScore >= 0.7` (`ConfBlockThreshold`)
+
+### Pipeline Order
+
+1. Rules run concurrently → findings collected
+2. `AssignBaseConfidenceScore()` — sets base score per tier (preserves taint/interproc pre-set scores)
+3. `DeduplicateFindings()` — groups by (line, CWE), boosts winner for multi-layer agreement
+4. Suppress directives applied
+5. Edge-case adjustments: BATOU-TIMEOUT/BATOU-PANIC → 0.2, test files cap at 0.3
+6. `SyncConfidenceString()` — syncs float64 back to "high"/"medium"/"low" string label
+
+### Key Files
+
+- `internal/scanner/confidence.go` — constants, `AssignBaseConfidenceScore()`, `BoostConfidenceForMultiLayer()`
+- `internal/scanner/dedup.go` — `countDistinctTiers()`, multi-layer boost during dedup
+- `internal/rules/rule.go` — `Finding.ConfidenceScore`, `Finding.ShouldBlock()`, `Finding.SyncConfidenceString()`
+- `internal/reporter/reporter.go` — `ScanResult.ShouldBlock()` iterates findings using `f.ShouldBlock()`
 
 ## False Positive Suppression (`batou:ignore`)
 
@@ -149,3 +189,7 @@ Run after adding new rules to verify no accidental ID collisions or numbering ga
 - CRLF normalization happens early in scan pipeline (before regex rules)
 - Multi-line preprocessing (`JoinContinuationLines`) is applied for Python, Shell, C/C++ before regex scanning; original content is preserved for AST parsing
 - AST filter runs after rule execution to suppress false positives in comments
+- Blocking requires `Severity >= Critical AND ConfidenceScore >= 0.7` — regex-only Critical findings (score 0.3–0.5) produce hints, not blocks
+- Taint findings preserve their flow's float64 confidence; `AssignBaseConfidenceScore` only sets a fallback (0.6) when the score is zero
+- Scanner tests must import `_ "github.com/turenlabs/batou/internal/taintrule"` for taint findings to appear in the pipeline
+- `Finding.SyncConfidenceString()` must be called after all score adjustments to keep the string label in sync

@@ -41,6 +41,7 @@ type HintContext struct {
 type Hint struct {
 	Priority          int            // 1 = most urgent
 	Severity          rules.Severity // Matches the finding severity
+	ConfidenceScore   float64        // 0.0-1.0, propagated from finding/flow
 	Category          string         // e.g., "taint_flow", "pattern", "architecture", "positive"
 	Title             string         // Short summary
 	Explanation       string         // Why this matters
@@ -139,7 +140,11 @@ func FormatForClaude(ctx *HintContext, hints []Hint) string {
 			continue
 		}
 
-		b.WriteString(fmt.Sprintf("--- Hint %d [%s] ---\n", i+1, h.Severity))
+		if h.ConfidenceScore > 0 {
+			b.WriteString(fmt.Sprintf("--- Hint %d [%s | Confidence: %.0f%%] ---\n", i+1, h.Severity, h.ConfidenceScore*100))
+		} else {
+			b.WriteString(fmt.Sprintf("--- Hint %d [%s] ---\n", i+1, h.Severity))
+		}
 		b.WriteString(fmt.Sprintf("%s\n", h.Title))
 		b.WriteString(fmt.Sprintf("\nWhy: %s\n", h.Explanation))
 
@@ -184,9 +189,10 @@ func hintFromTaintFlow(flow taint.TaintFlow, ctx *HintContext) Hint {
 	path += " → " + flow.Sink.MethodName
 
 	h := Hint{
-		Priority: severityToPriority(flow.Sink.Severity),
-		Severity: flow.Sink.Severity,
-		Category: "taint_flow",
+		Priority:        severityToPriority(flow.Sink.Severity),
+		Severity:        flow.Sink.Severity,
+		ConfidenceScore: flow.Confidence,
+		Category:        "taint_flow",
 		Title: fmt.Sprintf("Tainted data flows from %s to %s (line %d → %d)",
 			flow.Source.Category, flow.Sink.Category, flow.SourceLine, flow.SinkLine),
 		Explanation: fmt.Sprintf(
@@ -227,6 +233,7 @@ func hintFromFinding(f rules.Finding, ctx *HintContext) Hint {
 	h := Hint{
 		Priority:          severityToPriority(f.Severity),
 		Severity:          f.Severity,
+		ConfidenceScore:   f.ConfidenceScore,
 		Category:          "finding",
 		Title:             fmt.Sprintf("[%s] %s (line %d)", f.RuleID, f.Title, f.LineNumber),
 		Explanation:       f.Description,

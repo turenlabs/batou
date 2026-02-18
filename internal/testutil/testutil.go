@@ -102,23 +102,17 @@ func ScanRules(t *testing.T, filePath string, content string, lang rules.Languag
 		findings = append(findings, r.Scan(ctx)...)
 	}
 
-	blocked := false
-	for _, f := range findings {
-		if f.Severity >= rules.Critical {
-			blocked = true
-			break
-		}
+	raw := &reporter.ScanResult{
+		FilePath: filePath,
+		Language: lang,
+		Findings: findings,
+		RulesRun: len(applicable),
 	}
 
 	return &ScanResult{
 		Findings: findings,
-		Blocked:  blocked,
-		Raw: &reporter.ScanResult{
-			FilePath: filePath,
-			Language: lang,
-			Findings: findings,
-			RulesRun: len(applicable),
-		},
+		Blocked:  raw.ShouldBlock(),
+		Raw:      raw,
 	}
 }
 

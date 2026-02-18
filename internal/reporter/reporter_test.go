@@ -56,26 +56,54 @@ func TestHasFindings(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestShouldBlock(t *testing.T) {
-	critical := &reporter.ScanResult{
+	criticalHighConf := &reporter.ScanResult{
 		Findings: []rules.Finding{
-			{RuleID: "R1", Severity: rules.Critical},
+			{RuleID: "R1", Severity: rules.Critical, ConfidenceScore: 0.8},
+		},
+	}
+	criticalLowConf := &reporter.ScanResult{
+		Findings: []rules.Finding{
+			{RuleID: "R1", Severity: rules.Critical, ConfidenceScore: 0.5},
 		},
 	}
 	high := &reporter.ScanResult{
 		Findings: []rules.Finding{
-			{RuleID: "R1", Severity: rules.High},
+			{RuleID: "R1", Severity: rules.High, ConfidenceScore: 0.9},
 		},
 	}
 	none := &reporter.ScanResult{}
 
-	if !critical.ShouldBlock() {
-		t.Error("ShouldBlock() should be true for Critical findings")
+	if !criticalHighConf.ShouldBlock() {
+		t.Error("ShouldBlock() should be true for Critical+high-confidence findings")
+	}
+	if criticalLowConf.ShouldBlock() {
+		t.Error("ShouldBlock() should be false for Critical+low-confidence findings (the key behavioral change)")
 	}
 	if high.ShouldBlock() {
-		t.Error("ShouldBlock() should be false for High findings (only Critical blocks)")
+		t.Error("ShouldBlock() should be false for High findings even with high confidence")
 	}
 	if none.ShouldBlock() {
 		t.Error("ShouldBlock() should be false for no findings")
+	}
+}
+
+func TestShouldBlock_CriticalAtThreshold(t *testing.T) {
+	atThreshold := &reporter.ScanResult{
+		Findings: []rules.Finding{
+			{RuleID: "R1", Severity: rules.Critical, ConfidenceScore: 0.7},
+		},
+	}
+	belowThreshold := &reporter.ScanResult{
+		Findings: []rules.Finding{
+			{RuleID: "R1", Severity: rules.Critical, ConfidenceScore: 0.69},
+		},
+	}
+
+	if !atThreshold.ShouldBlock() {
+		t.Error("ShouldBlock() should be true at exactly 0.7 threshold")
+	}
+	if belowThreshold.ShouldBlock() {
+		t.Error("ShouldBlock() should be false just below 0.7 threshold")
 	}
 }
 
@@ -190,17 +218,40 @@ func TestFormatForClaudeBlockedMessage(t *testing.T) {
 		FilePath: "/app/handler.go",
 		Language: rules.LangGo,
 		Findings: []rules.Finding{
-			{Severity: rules.Critical, RuleID: "R1", Title: "Critical vuln"},
+			{Severity: rules.Critical, RuleID: "R1", Title: "Critical vuln", ConfidenceScore: 0.8},
 		},
 	}
 
 	output := reporter.FormatForClaude(result)
 
 	if !strings.Contains(output, "ACTION REQUIRED") {
-		t.Error("expected ACTION REQUIRED for critical findings")
+		t.Error("expected ACTION REQUIRED for critical high-confidence findings")
 	}
 	if !strings.Contains(output, "BLOCKED") {
-		t.Error("expected BLOCKED for critical findings")
+		t.Error("expected BLOCKED for critical high-confidence findings")
+	}
+}
+
+func TestFormatForClaude_CriticalLowConfNotBlocked(t *testing.T) {
+	result := &reporter.ScanResult{
+		FilePath: "/app/handler.go",
+		Language: rules.LangGo,
+		Findings: []rules.Finding{
+			{Severity: rules.Critical, RuleID: "R1", Title: "Critical vuln", ConfidenceScore: 0.4},
+		},
+	}
+
+	output := reporter.FormatForClaude(result)
+
+	if strings.Contains(output, "ACTION REQUIRED") {
+		t.Error("low-confidence Critical should NOT show ACTION REQUIRED")
+	}
+	if strings.Contains(output, "BLOCKED") {
+		t.Error("low-confidence Critical should NOT show BLOCKED")
+	}
+	// Should still show a warning since severity is high enough.
+	if !strings.Contains(output, "WARNING") {
+		t.Error("expected WARNING for low-confidence Critical (severity >= High)")
 	}
 }
 
@@ -265,8 +316,8 @@ func TestFormatBlockMessage(t *testing.T) {
 		FilePath: "/app/handler.go",
 		Language: rules.LangGo,
 		Findings: []rules.Finding{
-			{Severity: rules.Critical, RuleID: "R1", Title: "SQL Injection", Description: "bad"},
-			{Severity: rules.High, RuleID: "R2", Title: "XSS", Description: "also bad"},
+			{Severity: rules.Critical, RuleID: "R1", Title: "SQL Injection", Description: "bad", ConfidenceScore: 0.8},
+			{Severity: rules.High, RuleID: "R2", Title: "XSS", Description: "also bad", ConfidenceScore: 0.8},
 		},
 	}
 
@@ -284,8 +335,8 @@ func TestFormatBlockMessage(t *testing.T) {
 func TestFormatBlockMessageExcludesNonCritical(t *testing.T) {
 	result := &reporter.ScanResult{
 		Findings: []rules.Finding{
-			{Severity: rules.Critical, RuleID: "R1", Title: "Critical"},
-			{Severity: rules.High, RuleID: "R2", Title: "HighOnly"},
+			{Severity: rules.Critical, RuleID: "R1", Title: "Critical", ConfidenceScore: 0.8},
+			{Severity: rules.High, RuleID: "R2", Title: "HighOnly", ConfidenceScore: 0.8},
 		},
 	}
 
@@ -343,7 +394,7 @@ func TestFormatBlockMessage_IncludesSuppressGuidance(t *testing.T) {
 		FilePath: "/app/handler.go",
 		Language: rules.LangGo,
 		Findings: []rules.Finding{
-			{Severity: rules.Critical, RuleID: "R1", Title: "SQL Injection", Description: "bad"},
+			{Severity: rules.Critical, RuleID: "R1", Title: "SQL Injection", Description: "bad", ConfidenceScore: 0.8},
 		},
 	}
 
@@ -359,7 +410,7 @@ func TestFormatBlockMessage_LuaCommentPrefix(t *testing.T) {
 		FilePath: "/app/script.lua",
 		Language: rules.LangLua,
 		Findings: []rules.Finding{
-			{Severity: rules.Critical, RuleID: "R1", Title: "Issue", Description: "bad"},
+			{Severity: rules.Critical, RuleID: "R1", Title: "Issue", Description: "bad", ConfidenceScore: 0.8},
 		},
 	}
 

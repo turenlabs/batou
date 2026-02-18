@@ -906,10 +906,11 @@ func checkCallerPassesTaintToCallee(
 				"Sanitize '%s' before passing it to %s(), or add sanitization inside %s() before the %s call.",
 				arg, calleeNode.Name, calleeNode.Name, matchedSink.MethodName,
 			),
-			CWEID:         cwe,
-			OWASPCategory: owasp,
-			Confidence:    "high",
-			Tags:          []string{"interprocedural", "taint-analysis", "cross-function", string(matchedSink.SinkCategory)},
+			CWEID:           cwe,
+			OWASPCategory:   owasp,
+			Confidence:      "high",
+			ConfidenceScore: 0.8,
+			Tags:            []string{"interprocedural", "taint-analysis", "cross-function", string(matchedSink.SinkCategory)},
 		}
 
 		findings = append(findings, finding)
@@ -1041,10 +1042,11 @@ func checkCallerUsesTaintedReturn(
 					"Sanitize '%s' (returned by %s()) before passing it to %s.",
 					returnVar, calleeNode.Name, sp.method,
 				),
-				CWEID:         cwe,
-				OWASPCategory: owasp,
-				Confidence:    "high",
-				Tags:          []string{"interprocedural", "taint-analysis", "cross-function", "return-taint", string(sp.category)},
+				CWEID:           cwe,
+				OWASPCategory:   owasp,
+				Confidence:      "high",
+				ConfidenceScore: 0.8,
+				Tags:            []string{"interprocedural", "taint-analysis", "cross-function", "return-taint", string(sp.category)},
 			}
 
 			findings = append(findings, finding)

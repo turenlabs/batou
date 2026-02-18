@@ -100,9 +100,10 @@ func TestRecordWritesJSONL(t *testing.T) {
 		ScanTimeMs: 25,
 		Findings: []rules.Finding{
 			{
-				RuleID:   "BATOU-INJ-001",
-				Severity: rules.Critical,
-				Title:    "SQL Injection",
+				RuleID:          "BATOU-INJ-001",
+				Severity:        rules.Critical,
+				Title:           "SQL Injection",
+				ConfidenceScore: 0.8,
 			},
 		},
 	}
