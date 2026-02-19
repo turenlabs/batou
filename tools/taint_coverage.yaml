@@ -1,0 +1,181 @@
+# Taint catalog coverage gaps - generated entries for sparse languages.
+#
+# Usage:
+#   python tools/generate_rules.py tools/taint_coverage.yaml
+
+taint_entries:
+  # --- PHP gaps ---
+  - language: "php"
+    sinks:
+      # SnkTemplate sinks (0 entries previously)
+      - id: "php.smarty.display"
+        category: "template_render"
+        pattern: '->display\s*\('
+        object_type: "Smarty"
+        method_name: "display"
+        dangerous_args: [0]
+        severity: "high"
+        description: "Smarty template rendering with potentially tainted template name"
+        cwe: "CWE-1336"
+        owasp: "A03:2021-Injection"
+      - id: "php.smarty.fetch"
+        category: "template_render"
+        pattern: '->fetch\s*\('
+        object_type: "Smarty"
+        method_name: "fetch"
+        dangerous_args: [0]
+        severity: "high"
+        description: "Smarty template fetch with potentially tainted template name"
+        cwe: "CWE-1336"
+        owasp: "A03:2021-Injection"
+      - id: "php.twig.render"
+        category: "template_render"
+        pattern: '->render\s*\('
+        object_type: "Twig\\Environment"
+        method_name: "render"
+        dangerous_args: [0]
+        severity: "high"
+        description: "Twig template rendering with potentially tainted template name"
+        cwe: "CWE-1336"
+        owasp: "A03:2021-Injection"
+      - id: "php.blade.render"
+        category: "template_render"
+        pattern: 'Blade::render\s*\(|view\s*\('
+        object_type: "Blade"
+        method_name: "Blade::render/view"
+        dangerous_args: [0]
+        severity: "high"
+        description: "Laravel Blade template rendering with potentially tainted template name"
+        cwe: "CWE-1336"
+        owasp: "A03:2021-Injection"
+      # SnkXPath sinks (0 entries previously)
+      - id: "php.domxpath.query"
+        category: "xpath_query"
+        pattern: 'DOMXPath.*->query\s*\('
+        object_type: "DOMXPath"
+        method_name: "query"
+        dangerous_args: [0]
+        severity: "high"
+        description: "XPath query with potentially tainted expression"
+        cwe: "CWE-643"
+        owasp: "A03:2021-Injection"
+      - id: "php.domxpath.evaluate"
+        category: "xpath_query"
+        pattern: 'DOMXPath.*->evaluate\s*\('
+        object_type: "DOMXPath"
+        method_name: "evaluate"
+        dangerous_args: [0]
+        severity: "high"
+        description: "XPath evaluation with potentially tainted expression"
+        cwe: "CWE-643"
+        owasp: "A03:2021-Injection"
+      - id: "php.simplexml.xpath"
+        category: "xpath_query"
+        pattern: '->xpath\s*\('
+        object_type: "SimpleXMLElement"
+        method_name: "xpath"
+        dangerous_args: [0]
+        severity: "high"
+        description: "SimpleXML XPath query with potentially tainted expression"
+        cwe: "CWE-643"
+        owasp: "A03:2021-Injection"
+
+  # --- Python gaps ---
+  - language: "python"
+    sources:
+      # Sanic framework sources
+      - id: "py.sanic.request.args"
+        category: "user_input"
+        pattern: 'request\.args'
+        object_type: "sanic.Request"
+        method_name: "args"
+        description: "Sanic query parameters"
+        assigns: "return"
+      - id: "py.sanic.request.json"
+        category: "user_input"
+        pattern: 'request\.json'
+        object_type: "sanic.Request"
+        method_name: "json"
+        description: "Sanic JSON request body"
+        assigns: "return"
+      - id: "py.sanic.request.form"
+        category: "user_input"
+        pattern: 'request\.form'
+        object_type: "sanic.Request"
+        method_name: "form"
+        description: "Sanic form data"
+        assigns: "return"
+      - id: "py.sanic.request.body"
+        category: "user_input"
+        pattern: 'request\.body'
+        object_type: "sanic.Request"
+        method_name: "body"
+        description: "Sanic raw request body"
+        assigns: "return"
+    sinks:
+      # SnkXPath sinks (0 entries previously)
+      - id: "py.lxml.etree.xpath"
+        category: "xpath_query"
+        pattern: 'lxml\.etree\.XPath\(|\.xpath\('
+        object_type: "lxml.etree"
+        method_name: "XPath/xpath"
+        dangerous_args: [0]
+        severity: "high"
+        description: "lxml XPath evaluation with potentially tainted expression"
+        cwe: "CWE-643"
+        owasp: "A03:2021-Injection"
+      - id: "py.xml.etree.findall"
+        category: "xpath_query"
+        pattern: '\.findall\s*\('
+        object_type: "xml.etree.ElementTree"
+        method_name: "findall"
+        dangerous_args: [0]
+        severity: "high"
+        description: "ElementTree findall with potentially tainted XPath pattern"
+        cwe: "CWE-643"
+        owasp: "A03:2021-Injection"
+      - id: "py.xml.etree.find"
+        category: "xpath_query"
+        pattern: '\.find\s*\('
+        object_type: "xml.etree.ElementTree"
+        method_name: "find"
+        dangerous_args: [0]
+        severity: "high"
+        description: "ElementTree find with potentially tainted XPath pattern"
+        cwe: "CWE-643"
+        owasp: "A03:2021-Injection"
+
+  # --- Go gaps ---
+  - language: "go"
+    sinks:
+      # SnkTemplate sinks - template.JS() and template.CSS() bypass auto-escaping
+      - id: "go.template.js"
+        category: "template_render"
+        pattern: 'template\.JS\('
+        object_type: ""
+        method_name: "JS"
+        dangerous_args: [0]
+        severity: "high"
+        description: "template.JS() type conversion bypasses auto-escaping in JavaScript contexts"
+        cwe: "CWE-79"
+        owasp: "A03:2021-Injection"
+      - id: "go.template.css"
+        category: "template_render"
+        pattern: 'template\.CSS\('
+        object_type: ""
+        method_name: "CSS"
+        dangerous_args: [0]
+        severity: "high"
+        description: "template.CSS() type conversion bypasses auto-escaping in CSS contexts"
+        cwe: "CWE-79"
+        owasp: "A03:2021-Injection"
+      - id: "go.template.htmlattr"
+        category: "template_render"
+        pattern: 'template\.HTMLAttr\('
+        object_type: ""
+        method_name: "HTMLAttr"
+        dangerous_args: [0]
+        severity: "high"
+        description: "template.HTMLAttr() type conversion bypasses auto-escaping in HTML attribute contexts"
+        cwe: "CWE-79"
+        owasp: "A03:2021-Injection"

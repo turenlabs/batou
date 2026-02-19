@@ -164,4 +164,14 @@ var jsSinks = []taint.SinkDef{
 
 	// Deprecated crypto
 	{ID: "js.crypto.createcipher", Category: taint.SnkCrypto, Pattern: `crypto\.createCipher\s*\(`, ObjectType: "crypto", MethodName: "createCipher", DangerousArgs: []int{0}, Severity: rules.High, Description: "Deprecated crypto.createCipher without IV (use createCipheriv)", CWEID: "CWE-327", OWASPCategory: "A02:2021-Cryptographic Failures"},
+
+	// LDAP Injection (CWE-90)
+	{ID: "js.ldapjs.search", Category: taint.SnkLDAP, Pattern: `client\.search\s*\(`, ObjectType: "ldapjs.Client", MethodName: "search", DangerousArgs: []int{1}, Severity: rules.High, Description: "LDAP search with potentially tainted filter via ldapjs", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+	{ID: "js.ldapjs.bind", Category: taint.SnkLDAP, Pattern: `client\.bind\s*\(`, ObjectType: "ldapjs.Client", MethodName: "bind", DangerousArgs: []int{0}, Severity: rules.High, Description: "LDAP bind with potentially tainted DN via ldapjs", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+	{ID: "js.ldapjs.modify", Category: taint.SnkLDAP, Pattern: `client\.modify\s*\(`, ObjectType: "ldapjs.Client", MethodName: "modify", DangerousArgs: []int{0, 1}, Severity: rules.High, Description: "LDAP modify with potentially tainted DN/changes via ldapjs", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+
+	// XPath Injection (CWE-643)
+	{ID: "js.xpath.select", Category: taint.SnkXPath, Pattern: `xpath\.select\s*\(`, ObjectType: "xpath", MethodName: "select", DangerousArgs: []int{0}, Severity: rules.High, Description: "XPath query with potentially tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+	{ID: "js.xpath.evaluate", Category: taint.SnkXPath, Pattern: `xpath\.evaluate\s*\(`, ObjectType: "xpath", MethodName: "evaluate", DangerousArgs: []int{0}, Severity: rules.High, Description: "XPath evaluation with potentially tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+	{ID: "js.xpath.select1", Category: taint.SnkXPath, Pattern: `xpath\.select1\s*\(`, ObjectType: "xpath", MethodName: "select1", DangerousArgs: []int{0}, Severity: rules.High, Description: "XPath select1 with potentially tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
 }

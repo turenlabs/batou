@@ -579,5 +579,47 @@ func (c *PythonCatalog) Sources() []taint.SourceDef {
 			Description: "JSON deserialized data from potentially untrusted source",
 			Assigns:     "return",
 		},
+
+		// --- Sanic framework ---
+		{
+			ID:          "py.sanic.request.args",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.args`,
+			ObjectType:  "sanic.Request",
+			MethodName:  "args",
+			Description: "Sanic query parameters",
+			Assigns:     "return",
+		},
+		{
+			ID:          "py.sanic.request.json",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.json`,
+			ObjectType:  "sanic.Request",
+			MethodName:  "json",
+			Description: "Sanic JSON request body",
+			Assigns:     "return",
+		},
+		{
+			ID:          "py.sanic.request.form",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.form`,
+			ObjectType:  "sanic.Request",
+			MethodName:  "form",
+			Description: "Sanic form data",
+			Assigns:     "return",
+		},
+		{
+			ID:          "py.sanic.request.body",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.body`,
+			ObjectType:  "sanic.Request",
+			MethodName:  "body",
+			Description: "Sanic raw request body",
+			Assigns:     "return",
+		},
 	}
 }
