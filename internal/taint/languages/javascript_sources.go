@@ -142,4 +142,8 @@ var jsSources = []taint.SourceDef{
 
 	// Express req.file (multer)
 	{ID: "js.express.req.file", Category: taint.SrcUserInput, Pattern: `req\.file\b|req\.files\b`, ObjectType: "Request", MethodName: "file/files", Description: "Express file upload via multer middleware", Assigns: "return"},
+
+	// IP-based trust bypass sources
+	{ID: "js.express.req.headers.xforwardedfor", Category: taint.SrcUserInput, Pattern: `req\.headers\s*\[\s*['"]x-forwarded-for['"]\s*\]`, ObjectType: "Request", MethodName: "headers['x-forwarded-for']", Description: "X-Forwarded-For header (client-controlled, IP spoofing)", Assigns: "return"},
+	{ID: "js.express.req.socket.remoteaddress", Category: taint.SrcUserInput, Pattern: `req\.socket\.remoteAddress|req\.connection\.remoteAddress`, ObjectType: "Request", MethodName: "socket.remoteAddress", Description: "Client IP address from socket (spoofable via proxy)", Assigns: "return"},
 }
