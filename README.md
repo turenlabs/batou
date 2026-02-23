@@ -79,6 +79,10 @@ process(rows)
 
 **Targets:** specific rule ID (`BATOU-INJ-001`), category (`injection`), or `all`. Always include a reason after `--`.
 
+## Adding Batou to Your Project's CLAUDE.md
+
+Copy the snippet from [`docs/claude-md-snippet.md`](docs/claude-md-snippet.md) into your project's `CLAUDE.md` so Claude understands how Batou works and can respond to its findings correctly.
+
 ## Testing
 
 ```bash
