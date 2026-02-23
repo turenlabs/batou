@@ -82,6 +82,7 @@ const (
 	LangJSON       Language = "json"
 	LangPerl       Language = "perl"
 	LangLua        Language = "lua"
+	LangZig        Language = "zig"
 	LangDocker     Language = "dockerfile"
 	LangTerraform  Language = "terraform"
 	LangAny        Language = "*"

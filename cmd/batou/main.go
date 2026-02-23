@@ -49,6 +49,7 @@ import (
 	_ "github.com/turenlabs/batou/internal/rules/swift"
 	_ "github.com/turenlabs/batou/internal/rules/csharp"
 	_ "github.com/turenlabs/batou/internal/rules/rust"
+	_ "github.com/turenlabs/batou/internal/rules/zig"
 	_ "github.com/turenlabs/batou/internal/rules/php"
 	_ "github.com/turenlabs/batou/internal/rules/ruby"
 	_ "github.com/turenlabs/batou/internal/rules/python"

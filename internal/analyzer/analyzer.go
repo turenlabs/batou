@@ -50,6 +50,7 @@ var extToLanguage = map[string]rules.Language{
 	".pm":          rules.LangPerl,
 	".cgi":         rules.LangPerl,
 	".lua":         rules.LangLua,
+	".zig":         rules.LangZig,
 	".sh":          rules.LangShell,
 	".bash":        rules.LangShell,
 	".zsh":         rules.LangShell,

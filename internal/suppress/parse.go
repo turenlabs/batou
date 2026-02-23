@@ -13,7 +13,7 @@
 //	... suppressed code ...
 //	batou:ignore-end
 //
-// Parsing is regex-based (no AST dependency) so it works across all 16 languages.
+// Parsing is regex-based (no AST dependency) so it works across all 17 languages.
 package suppress
 
 import (
