@@ -1,6 +1,6 @@
 <?php
 // Source: OWASP DVWA - File Inclusion
-// Expected: GTSS-TRV-002 (File Inclusion via include/require with user input)
+// Expected: BATOU-PHP-003 (File Inclusion), BATOU-TRV-002, BATOU-VAL-001, BATOU-XSS-011
 // OWASP: A01:2021 - Broken Access Control (Local/Remote File Inclusion)
 
 function loadPage() {

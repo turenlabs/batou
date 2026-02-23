@@ -1,5 +1,5 @@
 // Source: OWASP Juice Shop - Basket access without authorization
-// Expected: GTSS-VAL-001 (Direct Request Parameter Usage), GTSS-TRV-001 or taint finding
+// Expected: BATOU-INJ-007 (NoSQL Injection), BATOU-VAL-001 (Direct Request Parameter Usage)
 // OWASP: A01:2021 - Broken Access Control (IDOR)
 
 import { Request, Response } from 'express';

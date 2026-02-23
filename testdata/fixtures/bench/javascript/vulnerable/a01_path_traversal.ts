@@ -1,5 +1,5 @@
 // Source: OWASP Juice Shop - File download with path traversal
-// Expected: GTSS-TRV-007 (Express sendFile with variable path)
+// Expected: BATOU-TRV-007 (Express sendFile with variable path)
 // OWASP: A01:2021 - Broken Access Control (Path Traversal)
 
 import { Request, Response } from 'express';

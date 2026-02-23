@@ -1,5 +1,5 @@
 // Source: OWASP WebGoat - Reflected XSS in search
-// Expected: GTSS-XSS-010 (Reflected XSS via direct response write)
+// Expected: BATOU-XSS-010 (Reflected XSS via direct response write)
 // OWASP: A03:2021 - Injection (Reflected XSS)
 
 package com.example.vulnerable;

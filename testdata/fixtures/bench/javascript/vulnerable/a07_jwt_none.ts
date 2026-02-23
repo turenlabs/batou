@@ -1,5 +1,5 @@
 // Source: OWASP Juice Shop - JWT "none" algorithm attack
-// Expected: GTSS-AUTH-001 (Hardcoded Credentials) or GTSS-CRY-001 (Weak Hashing)
+// Expected: BATOU-AUTH-001 (Hardcoded Credentials), BATOU-SEC-005, BATOU-JWT-002 (JWT none algorithm)
 // OWASP: A07:2021 - Identification and Authentication Failures
 
 import jwt from 'jsonwebtoken';

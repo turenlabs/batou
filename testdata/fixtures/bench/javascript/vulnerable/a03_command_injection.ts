@@ -1,5 +1,5 @@
 // Source: CVE-2019-10758 - mongo-express remote code execution
-// Expected: GTSS-INJ-002 (Command Injection via exec/spawn)
+// Expected: BATOU-INJ-002 (Command Injection via exec/spawn)
 // OWASP: A03:2021 - Injection (OS Command Injection)
 
 import { Request, Response } from 'express';

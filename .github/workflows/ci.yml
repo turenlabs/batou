@@ -41,10 +41,7 @@ jobs:
       - name: Run tests
         env:
           CGO_ENABLED: '1'
-        run: >-
-          go test -race -count=1
-          -skip 'TestDetectionBench|TestSource_FormValue|TestSource_URLQueryGet|TestSink_ExecCommand|TestSink_FprintfResponseWriter|TestPropagation_StringConcat|TestPropagation_MultiStep|TestInputParamName'
-          ./...
+        run: go test -race -count=1 ./...
 
       - name: Build
         env:

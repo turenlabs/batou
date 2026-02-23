@@ -1,5 +1,5 @@
 // Source: CWE-327 - Use of broken cryptographic algorithm
-// Expected: GTSS-CRY-001 (Weak Hashing - MD5), GTSS-CRY-003 (Weak Cipher - DES)
+// Expected: BATOU-CRY-001 (Weak Hashing - MD5), BATOU-CRY-003 (Weak Cipher - DES)
 // OWASP: A02:2021 - Cryptographic Failures
 
 package com.example.vulnerable;

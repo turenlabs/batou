@@ -1,6 +1,6 @@
 <?php
 // Source: OWASP DVWA - Reflected XSS
-// Expected: GTSS-XSS-010 (Reflected XSS via echo of user input)
+// Expected: BATOU-XSS-010 (Reflected XSS via echo of user input)
 // OWASP: A03:2021 - Injection (Reflected XSS)
 
 function displaySearch() {

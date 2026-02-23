@@ -1,5 +1,5 @@
 // Source: OWASP Juice Shop - SSRF via profile image URL
-// Expected: GTSS-SSRF-001 (URL from User Input)
+// Expected: BATOU-SSRF-001 (URL from User Input)
 // OWASP: A10:2021 - Server-Side Request Forgery
 
 import { Request, Response } from 'express';

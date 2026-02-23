@@ -1,5 +1,5 @@
 # Source: CVE-2013-0156 - Rails mass assignment vulnerability
-# Expected: GTSS-GEN-007 (Mass Assignment), GTSS-VAL-001 (Direct Request Parameter Usage)
+# Expected: BATOU-MASS-003 (Mass Assignment), BATOU-VAL-001 (Direct Request Parameter Usage), BATOU-FW-RAILS-004
 # OWASP: A07:2021 - Identification and Authentication Failures
 
 class UsersController < ApplicationController

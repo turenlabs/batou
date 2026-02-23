@@ -1,5 +1,5 @@
 // Source: OWASP NodeGoat - NoSQL injection in user search
-// Expected: GTSS-INJ-007 (NoSQL Injection)
+// Expected: BATOU-INJ-007 (NoSQL Injection)
 // OWASP: A03:2021 - Injection (NoSQL Injection)
 
 import { Request, Response } from 'express';

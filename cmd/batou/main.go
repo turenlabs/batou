@@ -73,7 +73,6 @@ import (
 	// Taint analysis engine and language catalogs
 	_ "github.com/turenlabs/batou/internal/taintrule"
 	_ "github.com/turenlabs/batou/internal/taint/languages"
-	_ "github.com/turenlabs/batou/internal/taint/goflow"
 )
 
 func main() {

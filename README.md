@@ -90,8 +90,6 @@ make test          # Run all tests with race detector
 make test-cover    # Run with coverage
 ```
 
-2,000+ tests, 430+ fixtures across 17 languages.
-
 ## License
 
 MIT

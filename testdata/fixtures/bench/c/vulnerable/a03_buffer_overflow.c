@@ -1,5 +1,5 @@
 // Source: CWE-120/CWE-787 - Classic buffer overflow patterns
-// Expected: GTSS-MEM-001 (Banned Function - gets/strcpy/sprintf), GTSS-MEM-003 (Buffer Overflow)
+// Expected: BATOU-MEM-001 (Banned Function - gets/strcpy/sprintf), BATOU-MEM-003 (Buffer Overflow)
 // OWASP: A03:2021 - Injection (Buffer Overflow leading to code execution)
 
 #include <stdio.h>

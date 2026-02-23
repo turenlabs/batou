@@ -1,5 +1,5 @@
 # Source: CWE-502 - Unsafe deserialization in Ruby via YAML/Marshal
-# Expected: GTSS-GEN-002 (Unsafe Deserialization - YAML.load/Marshal.load)
+# Expected: BATOU-GEN-002 (Unsafe Deserialization - YAML.load/Marshal.load), BATOU-RB-003
 # OWASP: A08:2021 - Software and Data Integrity Failures
 
 require 'yaml'

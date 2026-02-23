@@ -1,5 +1,5 @@
 // Source: CWE-78 - OS Command Injection in Go
-// Expected: BATOU-INJ-002 (Command Injection via exec.Command)
+// Expected: BATOU-TAINT-command_exec (Command Injection via exec.Command), BATOU-VAL-001, BATOU-MISC-003
 // OWASP: A03:2021 - Injection (OS Command Injection)
 
 package handler

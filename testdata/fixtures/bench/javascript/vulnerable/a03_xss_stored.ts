@@ -1,5 +1,5 @@
 // Source: OWASP Juice Shop - Stored XSS in product reviews
-// Expected: GTSS-XSS-001 (innerHTML assignment) or GTSS-XSS-003 (document.write)
+// Expected: BATOU-XSS-001 (innerHTML assignment) or BATOU-XSS-003 (document.write)
 // OWASP: A03:2021 - Injection (Stored XSS)
 
 import { Request, Response } from 'express';
