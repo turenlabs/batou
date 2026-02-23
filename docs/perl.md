@@ -4,7 +4,7 @@
 
 Batou provides comprehensive security scanning for Perl code, covering CGI.pm, PSGI/Plack, Mojolicious, Dancer2, Catalyst, and DBI-based applications. Analysis spans all four layers: regex-based pattern matching (348 rules, Layer 1), tree-sitter AST structural analysis (Layer 2), taint source-to-sink tracking via the tree-sitter AST walker (Layer 3), and interprocedural call graph analysis (Layer 4). Perl coverage includes 25 taint sources across 6 frameworks, 27 sinks spanning 12 vulnerability categories, and 16 sanitizer recognitions to reduce false positives.
 
-Perl taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`), the same engine used by the other 14 supported languages. The tree-sitter-perl grammar (vendored from `github.com/tree-sitter-perl/tree-sitter-perl`, MIT license) provides structural AST parsing, enabling taint tracking through variable reassignment, complex expressions, and method call chains with higher precision than regex-based analysis.
+Perl taint analysis uses the tree-sitter AST walker (`internal/taint/tsflow/`), the same engine used by the other 15 supported languages. The tree-sitter-perl grammar (vendored from `github.com/tree-sitter-perl/tree-sitter-perl`, MIT license) provides structural AST parsing, enabling taint tracking through variable reassignment, complex expressions, and method call chains with higher precision than regex-based analysis.
 
 ## Detection
 

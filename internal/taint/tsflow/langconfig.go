@@ -63,6 +63,7 @@ var configs = map[rules.Language]*langConfig{
 	rules.LangLua:        luaConfig(),
 	rules.LangGroovy:     groovyConfig(),
 	rules.LangPerl:       perlConfig(),
+	rules.LangZig:        zigConfig(),
 }
 
 func getConfig(lang rules.Language) *langConfig {
@@ -1910,6 +1911,135 @@ func perlExtractParams(n *ast.Node) []string {
 		}
 		return true
 	})
+	return names
+}
+
+// ---------------------------------------------------------------------------
+// Zig
+// TODO: Exact node types should be verified against tree-sitter-zig grammar
+// once the binding is integrated. The types below are based on the
+// tree-sitter-zig grammar (maxxnino/tree-sitter-zig).
+// ---------------------------------------------------------------------------
+
+func zigConfig() *langConfig {
+	return &langConfig{
+		language:     rules.LangZig,
+		funcTypes:    map[string]bool{"function_declaration": true},
+		callTypes:    map[string]bool{"call_expression": true, "builtin_call_expression": true},
+		assignTypes:  map[string]bool{"assignment_expression": true},
+		varDeclTypes: map[string]bool{"variable_declaration": true},
+		identType:    "identifier",
+		attrTypes:    map[string]bool{"field_expression": true},
+		ifTypes:      map[string]bool{"if_expression": true},
+
+		extractCallName: func(n *ast.Node) string {
+			fn := n.ChildByFieldName("function")
+			if fn == nil {
+				// builtin_call_expression: look for builtin identifier (e.g., @ptrCast)
+				for i := 0; i < n.ChildCount(); i++ {
+					c := n.Child(i)
+					if c.Type() == "builtin_identifier" || c.Type() == "identifier" {
+						return c.Text()
+					}
+				}
+				return ""
+			}
+			switch fn.Type() {
+			case "identifier":
+				return fn.Text()
+			case "field_expression":
+				f := fn.ChildByFieldName("field")
+				if f != nil {
+					return f.Text()
+				}
+			}
+			return ""
+		},
+		extractCallReceiver: func(n *ast.Node) string {
+			fn := n.ChildByFieldName("function")
+			if fn != nil && fn.Type() == "field_expression" {
+				obj := fn.ChildByFieldName("operand")
+				if obj == nil {
+					// Fallback: try "value" field name used by some grammar versions
+					obj = fn.ChildByFieldName("value")
+				}
+				if obj != nil {
+					return obj.Text()
+				}
+			}
+			return ""
+		},
+		extractAssignLHS: func(n *ast.Node) string {
+			lhs := n.ChildByFieldName("left")
+			if lhs != nil && lhs.Type() == "identifier" {
+				return lhs.Text()
+			}
+			return ""
+		},
+		extractAssignRHS: func(n *ast.Node) *ast.Node {
+			return n.ChildByFieldName("right")
+		},
+		extractAttrName: func(n *ast.Node) string {
+			f := n.ChildByFieldName("field")
+			if f != nil {
+				return f.Text()
+			}
+			return ""
+		},
+		extractAttrReceiver: func(n *ast.Node) string {
+			obj := n.ChildByFieldName("operand")
+			if obj == nil {
+				obj = n.ChildByFieldName("value")
+			}
+			if obj != nil {
+				return obj.Text()
+			}
+			return ""
+		},
+		extractCallArgs: func(n *ast.Node) []*ast.Node {
+			args := n.ChildByFieldName("arguments")
+			if args == nil {
+				return nil
+			}
+			var out []*ast.Node
+			for i := 0; i < args.ChildCount(); i++ {
+				c := args.Child(i)
+				if c.IsNamed() {
+					out = append(out, c)
+				}
+			}
+			return out
+		},
+		extractFuncName: func(n *ast.Node) string {
+			name := n.ChildByFieldName("name")
+			if name != nil {
+				return name.Text()
+			}
+			return ""
+		},
+		extractFuncBody:      genericExtractFuncBody,
+		extractFuncParams:    zigExtractParams,
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
+	}
+}
+
+func zigExtractParams(n *ast.Node) []string {
+	params := n.ChildByFieldName("parameters")
+	if params == nil {
+		return nil
+	}
+	var names []string
+	for i := 0; i < params.ChildCount(); i++ {
+		p := params.Child(i)
+		if p.Type() == "parameter" || p.Type() == "parameter_declaration" {
+			name := p.ChildByFieldName("name")
+			if name != nil && name.Type() == "identifier" {
+				names = append(names, name.Text())
+			}
+		}
+	}
 	return names
 }
 
