@@ -1,5 +1,5 @@
 # Source: CWE-78 - OS Command Injection in Ruby
-# Expected: GTSS-INJ-002 (Command Injection via system/backticks)
+# Expected: BATOU-INJ-002 (Command Injection via system/backticks)
 # OWASP: A03:2021 - Injection (OS Command Injection)
 
 class ToolsController < ApplicationController

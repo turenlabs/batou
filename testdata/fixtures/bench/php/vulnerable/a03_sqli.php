@@ -1,6 +1,6 @@
 <?php
 // Source: OWASP Damn Vulnerable Web Application (DVWA) - SQL Injection
-// Expected: GTSS-INJ-001 (SQL Injection via string concatenation)
+// Expected: BATOU-INJ-001 (SQL Injection via string concatenation)
 // OWASP: A03:2021 - Injection (SQL Injection)
 
 function searchProducts($pdo, $searchTerm) {

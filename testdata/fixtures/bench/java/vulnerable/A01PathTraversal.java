@@ -1,5 +1,5 @@
 // Source: OWASP WebGoat - File upload path traversal
-// Expected: GTSS-TRV-001 (Path Traversal)
+// Expected: BATOU-TRV-001 (Path Traversal)
 // OWASP: A01:2021 - Broken Access Control (Path Traversal)
 
 package com.example.vulnerable;

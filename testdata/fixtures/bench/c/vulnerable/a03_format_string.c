@@ -1,5 +1,5 @@
 // Source: CWE-134 - Format string vulnerability
-// Expected: GTSS-MEM-002 (Format String Vulnerability)
+// Expected: BATOU-MEM-002 (Format String Vulnerability), BATOU-MEM-001 (Banned Function - sprintf)
 // OWASP: A03:2021 - Injection (Format String)
 
 #include <stdio.h>

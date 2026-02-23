@@ -1,5 +1,5 @@
 // Source: CWE-78 - OS Command Injection in C
-// Expected: GTSS-INJ-002 (Command Injection via system()), GTSS-MEM-001 (Banned Function)
+// Expected: BATOU-MEM-001 (Banned Function - sprintf), BATOU-MEM-011 (system with variable), BATOU-MEM-010 (popen with variable)
 // OWASP: A03:2021 - Injection (OS Command Injection)
 
 #include <stdio.h>

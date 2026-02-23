@@ -1,5 +1,5 @@
 // Source: CVE-2017-5941 - node-serialize RCE
-// Expected: GTSS-GEN-002 (Unsafe Deserialization)
+// Expected: BATOU-GEN-002 (Unsafe Deserialization)
 // OWASP: A08:2021 - Software and Data Integrity Failures
 
 import { Request, Response } from 'express';

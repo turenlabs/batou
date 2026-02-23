@@ -1,6 +1,6 @@
 <?php
 // Source: CWE-502 - Unsafe deserialization in PHP
-// Expected: GTSS-GEN-002 (Unsafe Deserialization - unserialize)
+// Expected: BATOU-TAINT-deserialize (Unsafe Deserialization - unserialize), BATOU-GEN-002, BATOU-VAL-001
 // OWASP: A08:2021 - Software and Data Integrity Failures
 
 function loadUserPrefs() {

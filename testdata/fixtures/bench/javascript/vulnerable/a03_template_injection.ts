@@ -1,5 +1,5 @@
 // Source: PayloadsAllTheThings - Server-Side Template Injection
-// Expected: GTSS-INJ-005 (Template Injection via compile/render with user input)
+// Expected: BATOU-INJ-005 (Template Injection via compile/render with user input)
 // OWASP: A03:2021 - Injection (Server-Side Template Injection)
 
 import { Request, Response } from 'express';

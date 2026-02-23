@@ -1,5 +1,5 @@
 // Source: CWE-611 - Improper restriction of XML external entity reference
-// Expected: GTSS-GEN-003 (XXE - XML External Entity)
+// Expected: BATOU-GEN-003 (XXE - XML External Entity), BATOU-XXE-001, BATOU-JAVA-013
 // OWASP: A03:2021 - Injection (XXE)
 
 package com.example.vulnerable;

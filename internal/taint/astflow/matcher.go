@@ -248,7 +248,7 @@ func (m *CatalogMatcher) matchesMethodCall(call *ast.CallExpr, objectType, metho
 		}
 	}
 
-	// Fallback: receiver name heuristic (from goflow).
+	// Fallback: receiver name heuristic.
 	if recvName != "" && matchesReceiverType(recvName, objectType) {
 		return true
 	}

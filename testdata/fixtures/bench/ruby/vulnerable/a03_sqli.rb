@@ -1,5 +1,5 @@
 # Source: OWASP Rails Goat - SQL injection in ActiveRecord
-# Expected: GTSS-INJ-001 (SQL Injection via string interpolation)
+# Expected: BATOU-INJ-001 (SQL Injection via string interpolation)
 # OWASP: A03:2021 - Injection (SQL Injection)
 
 class UsersController < ApplicationController
