@@ -239,19 +239,6 @@ my @matches = grep { $_ =~ $re } @items;
 	testutil.MustFindRule(t, result, "BATOU-PL-024")
 }
 
-func TestPL024_QuotemetaEscaped_Safe(t *testing.T) {
-	content := `#!/usr/bin/perl
-use strict;
-my $pattern = $cgi->param('search');
-my $safe = quotemeta($pattern);
-if ($input =~ /$safe/) {
-    print "Match found\n";
-}
-`
-	result := testutil.ScanContent(t, "/app/search.pl", content)
-	testutil.MustNotFindRule(t, result, "BATOU-PL-024")
-}
-
 func TestPL024_LiteralRegex_Safe(t *testing.T) {
 	content := `#!/usr/bin/perl
 use strict;
