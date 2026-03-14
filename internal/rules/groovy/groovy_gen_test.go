@@ -283,7 +283,7 @@ func TestGVY023_HttpRequestStaticURL_Safe(t *testing.T) {
 func TestGVY024_ExecuteUpdateGString(t *testing.T) {
 	content := `class UserService {
     void deactivateUser(String username) {
-        User.executeUpdate("UPDATE User SET active = false WHERE username = '${username}'")
+        User.executeUpdate("UPDATE User SET active = false WHERE username = ${username}")
     }
 }`
 	result := testutil.ScanContent(t, "/app/UserService.groovy", content)
