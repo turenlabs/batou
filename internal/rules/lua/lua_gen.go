@@ -13,14 +13,14 @@ import (
 
 // LUA-015: OpenResty args in SQL
 var (
-	reGenNgxArgsSQL  = regexp.MustCompile(`(?i)(?:ngx\.req\.get_uri_args|ngx\.req\.get_post_args|get_uri_args|get_post_args)`)
-	reGenSQLExec     = regexp.MustCompile(`(?i)(?:query|execute|prepare)\s*\(`)
+	reGenNgxArgsSQL = regexp.MustCompile(`(?i)ngx\.req\.(?:get_uri_args|get_post_args)`)
+	reGenSQLExec    = regexp.MustCompile(`(?i)(?:query|execute|prepare)\s*\(`)
 )
 
 // LUA-016: Redis injection
 var (
-	reGenRedisCall   = regexp.MustCompile(`redis[:\.](?:call|pcall|command)\s*\(|red:(?:get|set|del|hget|hset|lpush|rpush|sadd|zadd|eval)\s*\(`)
-	reGenNgxVarArgs  = regexp.MustCompile(`ngx\.var\.|args\[|ngx\.req\.get_uri_args`)
+	reGenRedisCall  = regexp.MustCompile(`redis[:\.](?:call|pcall|command)\s*\(|red:(?:get|set|del|hget|hset|lpush|rpush|sadd|zadd|eval)\s*\(`)
+	reGenNgxVarArgs = regexp.MustCompile(`ngx\.var\.|args\[|ngx\.req\.get_uri_args`)
 )
 
 // LUA-017: SSRF via ngx.location.capture
@@ -37,8 +37,8 @@ var (
 
 // LUA-019: JWT validation bypass
 var (
-	reGenJWTVerify  = regexp.MustCompile(`jwt[:\.]verify_jwt_obj\s*\(|jwt[:\.]verify\s*\(`)
-	reGenAlgCheck   = regexp.MustCompile(`(?i)(?:\.alg|algorithm|alg\s*==|alg\s*~=|check_alg|allowed_alg)`)
+	reGenJWTVerify = regexp.MustCompile(`jwt[:\.]verify_jwt_obj\s*\(|jwt[:\.]verify\s*\(`)
+	reGenAlgCheck  = regexp.MustCompile(`(?i)(?:\.alg|algorithm|alg\s*==|alg\s*~=|check_alg|allowed_alg)`)
 )
 
 // LUA-020: LuaJIT FFI unsafe pointer
@@ -61,8 +61,8 @@ var reGenNgxRedirectHTTP = regexp.MustCompile(`ngx\.redirect\s*\(\s*["']http://`
 
 // LUA-024: Insecure math.random
 var (
-	reGenMathRandom   = regexp.MustCompile(`math\.random\s*\(`)
-	reGenSecurityCtx  = regexp.MustCompile(`(?i)(?:auth|token|session|secret|key|nonce|salt|csrf|otp|password)`)
+	reGenMathRandom  = regexp.MustCompile(`math\.random\s*\(`)
+	reGenSecurityCtx = regexp.MustCompile(`(?i)(?:auth|token|session|secret|key|nonce|salt|csrf|otp|password)`)
 )
 
 // ---------------------------------------------------------------------------
@@ -71,15 +71,15 @@ var (
 
 type OpenRestyArgsSQL struct{}
 
-func (r OpenRestyArgsSQL) ID() string                      { return "BATOU-LUA-015" }
-func (r OpenRestyArgsSQL) Name() string                    { return "OpenResty Args in SQL" }
-func (r OpenRestyArgsSQL) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r OpenRestyArgsSQL) Description() string {
+func (r *OpenRestyArgsSQL) ID() string                      { return "BATOU-LUA-015" }
+func (r *OpenRestyArgsSQL) Name() string                    { return "OpenResty Args in SQL" }
+func (r *OpenRestyArgsSQL) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *OpenRestyArgsSQL) Description() string {
 	return "Detects OpenResty request arguments (ngx.req.get_uri_args) used near SQL query/execute calls, indicating potential SQL injection."
 }
-func (r OpenRestyArgsSQL) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
+func (r *OpenRestyArgsSQL) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
 
-func (r OpenRestyArgsSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *OpenRestyArgsSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	if !reGenNgxArgsSQL.MatchString(ctx.Content) || !reGenSQLExec.MatchString(ctx.Content) {
 		return findings
@@ -136,15 +136,15 @@ func (r OpenRestyArgsSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RedisInjection struct{}
 
-func (r RedisInjection) ID() string                      { return "BATOU-LUA-016" }
-func (r RedisInjection) Name() string                    { return "Redis Injection" }
-func (r RedisInjection) DefaultSeverity() rules.Severity { return rules.High }
-func (r RedisInjection) Description() string {
+func (r *RedisInjection) ID() string                      { return "BATOU-LUA-016" }
+func (r *RedisInjection) Name() string                    { return "Redis Injection" }
+func (r *RedisInjection) DefaultSeverity() rules.Severity { return rules.High }
+func (r *RedisInjection) Description() string {
 	return "Detects Redis commands with user-controlled input from ngx.var or request arguments, enabling Redis injection attacks."
 }
-func (r RedisInjection) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
+func (r *RedisInjection) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
 
-func (r RedisInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *RedisInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	if !reGenNgxVarArgs.MatchString(ctx.Content) {
 		return findings
@@ -183,15 +183,15 @@ func (r RedisInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SSRFNgxCapture struct{}
 
-func (r SSRFNgxCapture) ID() string                      { return "BATOU-LUA-017" }
-func (r SSRFNgxCapture) Name() string                    { return "SSRF via ngx.location.capture" }
-func (r SSRFNgxCapture) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r SSRFNgxCapture) Description() string {
+func (r *SSRFNgxCapture) ID() string                      { return "BATOU-LUA-017" }
+func (r *SSRFNgxCapture) Name() string                    { return "SSRF via ngx.location.capture" }
+func (r *SSRFNgxCapture) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *SSRFNgxCapture) Description() string {
 	return "Detects ngx.location.capture with user-controlled arguments, enabling server-side request forgery (SSRF) to access internal services."
 }
-func (r SSRFNgxCapture) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
+func (r *SSRFNgxCapture) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
 
-func (r SSRFNgxCapture) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *SSRFNgxCapture) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -247,15 +247,15 @@ func (r SSRFNgxCapture) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RedisSandboxEscape struct{}
 
-func (r RedisSandboxEscape) ID() string                      { return "BATOU-LUA-018" }
-func (r RedisSandboxEscape) Name() string                    { return "Redis Lua Sandbox Escape" }
-func (r RedisSandboxEscape) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r RedisSandboxEscape) Description() string {
+func (r *RedisSandboxEscape) ID() string                      { return "BATOU-LUA-018" }
+func (r *RedisSandboxEscape) Name() string                    { return "Redis Lua Sandbox Escape" }
+func (r *RedisSandboxEscape) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *RedisSandboxEscape) Description() string {
 	return "Detects redis.call combined with loadstring/load, which can break out of the Redis Lua sandbox and execute arbitrary code."
 }
-func (r RedisSandboxEscape) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
+func (r *RedisSandboxEscape) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
 
-func (r RedisSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *RedisSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	if !reGenRedisCallFn.MatchString(ctx.Content) {
 		return findings
@@ -294,15 +294,15 @@ func (r RedisSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JWTValidationBypass struct{}
 
-func (r JWTValidationBypass) ID() string                      { return "BATOU-LUA-019" }
-func (r JWTValidationBypass) Name() string                    { return "JWT Validation Bypass" }
-func (r JWTValidationBypass) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r JWTValidationBypass) Description() string {
+func (r *JWTValidationBypass) ID() string                      { return "BATOU-LUA-019" }
+func (r *JWTValidationBypass) Name() string                    { return "JWT Validation Bypass" }
+func (r *JWTValidationBypass) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *JWTValidationBypass) Description() string {
 	return "Detects JWT verification without algorithm validation, which allows attackers to forge tokens using the 'none' algorithm or switch from RS256 to HS256."
 }
-func (r JWTValidationBypass) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
+func (r *JWTValidationBypass) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
 
-func (r JWTValidationBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *JWTValidationBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -356,15 +356,15 @@ func (r JWTValidationBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FFIUnsafePointer struct{}
 
-func (r FFIUnsafePointer) ID() string                      { return "BATOU-LUA-020" }
-func (r FFIUnsafePointer) Name() string                    { return "LuaJIT FFI Unsafe Pointer" }
-func (r FFIUnsafePointer) DefaultSeverity() rules.Severity { return rules.High }
-func (r FFIUnsafePointer) Description() string {
+func (r *FFIUnsafePointer) ID() string                      { return "BATOU-LUA-020" }
+func (r *FFIUnsafePointer) Name() string                    { return "LuaJIT FFI Unsafe Pointer" }
+func (r *FFIUnsafePointer) DefaultSeverity() rules.Severity { return rules.High }
+func (r *FFIUnsafePointer) Description() string {
 	return "Detects LuaJIT FFI ffi.cast with pointer types, which can bypass Lua's memory safety guarantees and cause memory corruption."
 }
-func (r FFIUnsafePointer) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
+func (r *FFIUnsafePointer) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
 
-func (r FFIUnsafePointer) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *FFIUnsafePointer) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -400,15 +400,15 @@ func (r FFIUnsafePointer) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LuaSocketWithoutTLS struct{}
 
-func (r LuaSocketWithoutTLS) ID() string                      { return "BATOU-LUA-021" }
-func (r LuaSocketWithoutTLS) Name() string                    { return "LuaSocket Without TLS" }
-func (r LuaSocketWithoutTLS) DefaultSeverity() rules.Severity { return rules.High }
-func (r LuaSocketWithoutTLS) Description() string {
+func (r *LuaSocketWithoutTLS) ID() string                      { return "BATOU-LUA-021" }
+func (r *LuaSocketWithoutTLS) Name() string                    { return "LuaSocket Without TLS" }
+func (r *LuaSocketWithoutTLS) DefaultSeverity() rules.Severity { return rules.High }
+func (r *LuaSocketWithoutTLS) Description() string {
 	return "Detects LuaSocket connections (socket.connect/socket.tcp) without SSL/TLS wrapping, exposing data to eavesdropping."
 }
-func (r LuaSocketWithoutTLS) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
+func (r *LuaSocketWithoutTLS) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
 
-func (r LuaSocketWithoutTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *LuaSocketWithoutTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	if reGenSSLWrap.MatchString(ctx.Content) {
 		return findings
@@ -447,15 +447,15 @@ func (r LuaSocketWithoutTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type StringDumpCodeLeak struct{}
 
-func (r StringDumpCodeLeak) ID() string                      { return "BATOU-LUA-022" }
-func (r StringDumpCodeLeak) Name() string                    { return "string.dump Code Leak" }
-func (r StringDumpCodeLeak) DefaultSeverity() rules.Severity { return rules.Medium }
-func (r StringDumpCodeLeak) Description() string {
+func (r *StringDumpCodeLeak) ID() string                      { return "BATOU-LUA-022" }
+func (r *StringDumpCodeLeak) Name() string                    { return "string.dump Code Leak" }
+func (r *StringDumpCodeLeak) DefaultSeverity() rules.Severity { return rules.Medium }
+func (r *StringDumpCodeLeak) Description() string {
 	return "Detects string.dump usage in response context, which can leak bytecode containing function implementations and internal logic."
 }
-func (r StringDumpCodeLeak) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
+func (r *StringDumpCodeLeak) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
 
-func (r StringDumpCodeLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *StringDumpCodeLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	if !reGenResponseCtx.MatchString(ctx.Content) {
 		return findings
@@ -494,15 +494,15 @@ func (r StringDumpCodeLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingHTTPSRedirect struct{}
 
-func (r MissingHTTPSRedirect) ID() string                      { return "BATOU-LUA-023" }
-func (r MissingHTTPSRedirect) Name() string                    { return "Missing HTTPS Redirect" }
-func (r MissingHTTPSRedirect) DefaultSeverity() rules.Severity { return rules.High }
-func (r MissingHTTPSRedirect) Description() string {
+func (r *MissingHTTPSRedirect) ID() string                      { return "BATOU-LUA-023" }
+func (r *MissingHTTPSRedirect) Name() string                    { return "Missing HTTPS Redirect" }
+func (r *MissingHTTPSRedirect) DefaultSeverity() rules.Severity { return rules.High }
+func (r *MissingHTTPSRedirect) Description() string {
 	return "Detects ngx.redirect with an HTTP (non-HTTPS) URL, which sends users to an unencrypted endpoint."
 }
-func (r MissingHTTPSRedirect) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
+func (r *MissingHTTPSRedirect) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
 
-func (r MissingHTTPSRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *MissingHTTPSRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -538,15 +538,15 @@ func (r MissingHTTPSRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureMathRandom struct{}
 
-func (r InsecureMathRandom) ID() string                      { return "BATOU-LUA-024" }
-func (r InsecureMathRandom) Name() string                    { return "Insecure math.random" }
-func (r InsecureMathRandom) DefaultSeverity() rules.Severity { return rules.High }
-func (r InsecureMathRandom) Description() string {
+func (r *InsecureMathRandom) ID() string                      { return "BATOU-LUA-024" }
+func (r *InsecureMathRandom) Name() string                    { return "Insecure math.random" }
+func (r *InsecureMathRandom) DefaultSeverity() rules.Severity { return rules.High }
+func (r *InsecureMathRandom) Description() string {
 	return "Detects math.random usage in security-sensitive contexts (auth, tokens, sessions). math.random is a weak PRNG not suitable for cryptographic purposes."
 }
-func (r InsecureMathRandom) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
+func (r *InsecureMathRandom) Languages() []rules.Language { return []rules.Language{rules.LangLua} }
 
-func (r InsecureMathRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *InsecureMathRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	if !reGenSecurityCtx.MatchString(ctx.Content) {
 		return findings
@@ -584,14 +584,14 @@ func (r InsecureMathRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 // ---------------------------------------------------------------------------
 
 func init() {
-	rules.Register(OpenRestyArgsSQL{})
-	rules.Register(RedisInjection{})
-	rules.Register(SSRFNgxCapture{})
-	rules.Register(RedisSandboxEscape{})
-	rules.Register(JWTValidationBypass{})
-	rules.Register(FFIUnsafePointer{})
-	rules.Register(LuaSocketWithoutTLS{})
-	rules.Register(StringDumpCodeLeak{})
-	rules.Register(MissingHTTPSRedirect{})
-	rules.Register(InsecureMathRandom{})
+	rules.Register(&OpenRestyArgsSQL{})
+	rules.Register(&RedisInjection{})
+	rules.Register(&SSRFNgxCapture{})
+	rules.Register(&RedisSandboxEscape{})
+	rules.Register(&JWTValidationBypass{})
+	rules.Register(&FFIUnsafePointer{})
+	rules.Register(&LuaSocketWithoutTLS{})
+	rules.Register(&StringDumpCodeLeak{})
+	rules.Register(&MissingHTTPSRedirect{})
+	rules.Register(&InsecureMathRandom{})
 }

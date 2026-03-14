@@ -31,8 +31,8 @@ var (
 
 // PL-022: DBI do() with interpolation
 var (
-	reGenDbiDoInterp  = regexp.MustCompile(`\$\w+->do\s*\(\s*"[^"]*\$[a-zA-Z_{][^"]*"`)
-	reGenDbiDoConcat  = regexp.MustCompile(`\$\w+->do\s*\(\s*["'][^"']*["']\s*\.`)
+	reGenDbiDoInterp = regexp.MustCompile(`\$\w+->do\s*\(\s*"[^"]*\$[a-zA-Z_{][^"]*"`)
+	reGenDbiDoConcat = regexp.MustCompile(`\$\w+->do\s*\(\s*["'][^"']*["']\s*\.`)
 )
 
 // PL-023: require with variable
@@ -40,20 +40,20 @@ var reGenRequireVar = regexp.MustCompile(`\brequire\s+\$[a-zA-Z_]`)
 
 // PL-024: Regex with user input ReDoS
 var (
-	reGenRegexUserVar  = regexp.MustCompile(`=~\s*(?:m\s*)?/[^/]*\$[a-zA-Z_]`)
-	reGenQrUserVar     = regexp.MustCompile(`qr/[^/]*\$[a-zA-Z_]`)
+	reGenRegexUserVar = regexp.MustCompile(`=~\s*(?:m\s*)?/[^/]*\$[a-zA-Z_]`)
+	reGenQrUserVar    = regexp.MustCompile(`qr/[^/]*\$[a-zA-Z_]`)
 )
 
 // PL-025: Weak hash for passwords
 var (
-	reGenWeakDigest  = regexp.MustCompile(`(?:Digest::MD5|Digest::SHA1|Digest::SHA\b)`)
-	reGenPasswdCtx   = regexp.MustCompile(`(?i)(?:password|passwd|pwd|credential)`)
+	reGenWeakDigest = regexp.MustCompile(`(?:Digest::MD5|Digest::SHA1|Digest::SHA\b)`)
+	reGenPasswdCtx  = regexp.MustCompile(`(?i)(?:password|passwd|pwd|credential)`)
 )
 
 // PL-026: MIME::Lite header injection
 var (
-	reGenMimeLite    = regexp.MustCompile(`MIME::Lite->new\s*\(`)
-	reGenMimeHeader  = regexp.MustCompile(`(?:To|From|Subject|Cc|Bcc)\s*=>\s*\$`)
+	reGenMimeLite   = regexp.MustCompile(`MIME::Lite->new\s*\(`)
+	reGenMimeHeader = regexp.MustCompile(`(?:To|From|Subject|Cc|Bcc)\s*=>\s*\$`)
 )
 
 // PL-027: CGI::Cookie parse DoS
@@ -61,8 +61,8 @@ var reGenCGICookieParse = regexp.MustCompile(`CGI::Cookie->parse\s*\(`)
 
 // PL-028: Taint mode disabled
 var (
-	reGenPerlShebang    = regexp.MustCompile(`^#!\s*/usr/bin/(?:env\s+)?perl`)
-	reGenTaintFlag      = regexp.MustCompile(`-.*T`)
+	reGenPerlShebang = regexp.MustCompile(`^#!\s*/usr/bin/(?:env\s+)?perl`)
+	reGenTaintFlag   = regexp.MustCompile(`-.*T`)
 )
 
 // ---------------------------------------------------------------------------
@@ -416,7 +416,9 @@ func (r *MIMELiteHeaderInjection) DefaultSeverity() rules.Severity { return rule
 func (r *MIMELiteHeaderInjection) Description() string {
 	return "Detects MIME::Lite email creation with user-controlled variables in header fields, enabling email header injection."
 }
-func (r *MIMELiteHeaderInjection) Languages() []rules.Language { return []rules.Language{rules.LangPerl} }
+func (r *MIMELiteHeaderInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangPerl}
+}
 
 func (r *MIMELiteHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding

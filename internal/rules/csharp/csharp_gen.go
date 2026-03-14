@@ -25,16 +25,16 @@ var (
 
 // CS-034: EF Core FromSqlRaw injection
 var (
-	reGenFromSqlRawInterp  = regexp.MustCompile(`\.FromSqlRaw\s*\(\s*\$"`)
-	reGenFromSqlRawConcat  = regexp.MustCompile(`\.FromSqlRaw\s*\(\s*["'][^"']*["']\s*\+`)
-	reGenFromSqlRawSafe    = regexp.MustCompile(`(?i)FromSqlInterpolated|FromSqlRaw\s*\([^,]+,\s*new`)
+	reGenFromSqlRawInterp = regexp.MustCompile(`\.FromSqlRaw\s*\(\s*\$"`)
+	reGenFromSqlRawConcat = regexp.MustCompile(`\.FromSqlRaw\s*\(\s*["'][^"']*["']\s*\+`)
+	reGenFromSqlRawSafe   = regexp.MustCompile(`(?i)FromSqlInterpolated|FromSqlRaw\s*\([^,]+,\s*new`)
 )
 
 // CS-035: Minimal API missing auth
 var (
-	reGenMapEndpoint  = regexp.MustCompile(`app\.(?:MapGet|MapPost|MapPut|MapDelete|MapPatch)\s*\(`)
-	reGenRequireAuth  = regexp.MustCompile(`\.RequireAuthorization\s*\(`)
-	reGenAllowAnon    = regexp.MustCompile(`\.AllowAnonymous\s*\(`)
+	reGenMapEndpoint = regexp.MustCompile(`app\.(?:MapGet|MapPost|MapPut|MapDelete|MapPatch)\s*\(`)
+	reGenRequireAuth = regexp.MustCompile(`\.RequireAuthorization\s*\(`)
+	reGenAllowAnon   = regexp.MustCompile(`\.AllowAnonymous\s*\(`)
 )
 
 // CS-036: gRPC channel without TLS
@@ -42,26 +42,26 @@ var reGenGrpcInsecure = regexp.MustCompile(`GrpcChannel\.ForAddress\s*\(\s*"http
 
 // CS-037: Missing anti-forgery on HttpPost
 var (
-	reGenHttpPost              = regexp.MustCompile(`\[HttpPost\]|\[HttpPut\]|\[HttpDelete\]`)
-	reGenValidateAntiForgery   = regexp.MustCompile(`\[ValidateAntiForgeryToken\]|\[AutoValidateAntiforgeryToken\]|\[IgnoreAntiforgeryToken\]`)
+	reGenHttpPost            = regexp.MustCompile(`\[HttpPost\]|\[HttpPut\]|\[HttpDelete\]`)
+	reGenValidateAntiForgery = regexp.MustCompile(`\[ValidateAntiForgeryToken\]|\[AutoValidateAntiforgeryToken\]|\[IgnoreAntiforgeryToken\]`)
 )
 
 // CS-038: Regex without timeout
 var (
-	reGenNewRegex      = regexp.MustCompile(`new\s+Regex\s*\(`)
-	reGenRegexTimeout  = regexp.MustCompile(`(?i)(?:MatchTimeout|TimeSpan|RegexOptions)`)
+	reGenNewRegex     = regexp.MustCompile(`new\s+Regex\s*\(`)
+	reGenRegexTimeout = regexp.MustCompile(`(?i)(?:MatchTimeout|TimeSpan|RegexOptions)`)
 )
 
 // CS-039: Developer exception page in production
 var (
-	reGenDevExPage     = regexp.MustCompile(`\.UseDeveloperExceptionPage\s*\(`)
-	reGenDevExGuard    = regexp.MustCompile(`(?i)(?:IsDevelopment|#if\s+DEBUG|\.IsEnvironment)`)
+	reGenDevExPage  = regexp.MustCompile(`\.UseDeveloperExceptionPage\s*\(`)
+	reGenDevExGuard = regexp.MustCompile(`(?i)(?:IsDevelopment|#if\s+DEBUG|\.IsEnvironment)`)
 )
 
 // CS-040: Weak password hashing
 var (
-	reGenWeakHash     = regexp.MustCompile(`(?:MD5|SHA1|SHA256)\.Create\s*\(`)
-	reGenPasswordCtx  = regexp.MustCompile(`(?i)(?:password|passwd|pwd|credential|hash.*pass|pass.*hash)`)
+	reGenWeakHash    = regexp.MustCompile(`(?:MD5|SHA1|SHA256)\.Create\s*\(`)
+	reGenPasswordCtx = regexp.MustCompile(`(?i)(?:password|passwd|pwd|credential|hash.*pass|pass.*hash)`)
 )
 
 // ---------------------------------------------------------------------------

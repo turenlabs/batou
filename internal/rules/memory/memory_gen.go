@@ -35,8 +35,8 @@ var reGenSystemVar = regexp.MustCompile(`\b(?:system|popen)\s*\(\s*[a-zA-Z_]\w*\
 // MEM-019: strncpy without null termination
 var reGenStrncpy = regexp.MustCompile(`\bstrncpy\s*\(`)
 
-// MEM-020: Use-after-free realloc
-var reGenReallocSelf = regexp.MustCompile(`(\w+)\s*=\s*realloc\s*\(\s*\1\s*,`)
+// MEM-020: Use-after-free realloc (ptr = realloc(ptr, ...))
+var reGenReallocSelf = regexp.MustCompile(`(\w+)\s*=\s*realloc\s*\(`)
 
 // MEM-021: OpenSSL deprecated API
 var reGenDeprecatedSSL = regexp.MustCompile(`\b(?:SSLv23_method|TLSv1_method|TLSv1_1_method|SSL_library_init|SSLv2_method|SSLv3_method)\s*\(`)
@@ -53,17 +53,17 @@ var reGenRSAKeySize = regexp.MustCompile(`RSA_generate_key_ex\s*\([^,]*,\s*(?:10
 
 type SprintfOverflow struct{}
 
-func (r SprintfOverflow) ID() string                      { return "BATOU-MEM-014" }
-func (r SprintfOverflow) Name() string                    { return "sprintf Buffer Overflow" }
-func (r SprintfOverflow) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r SprintfOverflow) Description() string {
+func (r *SprintfOverflow) ID() string                      { return "BATOU-MEM-014" }
+func (r *SprintfOverflow) Name() string                    { return "sprintf Buffer Overflow" }
+func (r *SprintfOverflow) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *SprintfOverflow) Description() string {
 	return "Detects use of sprintf() which writes to a buffer without bounds checking, causing buffer overflows when the formatted output exceeds the buffer size."
 }
-func (r SprintfOverflow) Languages() []rules.Language {
+func (r *SprintfOverflow) Languages() []rules.Language {
 	return []rules.Language{rules.LangC, rules.LangCPP}
 }
 
-func (r SprintfOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *SprintfOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -99,17 +99,17 @@ func (r SprintfOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GetsBanned struct{}
 
-func (r GetsBanned) ID() string                      { return "BATOU-MEM-015" }
-func (r GetsBanned) Name() string                    { return "gets() Banned Function" }
-func (r GetsBanned) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r GetsBanned) Description() string {
+func (r *GetsBanned) ID() string                      { return "BATOU-MEM-015" }
+func (r *GetsBanned) Name() string                    { return "gets() Banned Function" }
+func (r *GetsBanned) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *GetsBanned) Description() string {
 	return "Detects use of gets() which is always a buffer overflow vulnerability. It was removed from the C11 standard due to being inherently unsafe."
 }
-func (r GetsBanned) Languages() []rules.Language {
+func (r *GetsBanned) Languages() []rules.Language {
 	return []rules.Language{rules.LangC, rules.LangCPP}
 }
 
-func (r GetsBanned) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *GetsBanned) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -145,17 +145,17 @@ func (r GetsBanned) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type IntegerOverflowMalloc struct{}
 
-func (r IntegerOverflowMalloc) ID() string                      { return "BATOU-MEM-016" }
-func (r IntegerOverflowMalloc) Name() string                    { return "Integer Overflow Before malloc" }
-func (r IntegerOverflowMalloc) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r IntegerOverflowMalloc) Description() string {
+func (r *IntegerOverflowMalloc) ID() string                      { return "BATOU-MEM-016" }
+func (r *IntegerOverflowMalloc) Name() string                    { return "Integer Overflow Before malloc" }
+func (r *IntegerOverflowMalloc) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *IntegerOverflowMalloc) Description() string {
 	return "Detects malloc() with multiplication in the size argument (var * sizeof) without overflow protection, which can wrap around and allocate a tiny buffer."
 }
-func (r IntegerOverflowMalloc) Languages() []rules.Language {
+func (r *IntegerOverflowMalloc) Languages() []rules.Language {
 	return []rules.Language{rules.LangC, rules.LangCPP}
 }
 
-func (r IntegerOverflowMalloc) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *IntegerOverflowMalloc) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -191,17 +191,17 @@ func (r IntegerOverflowMalloc) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FormatStringGen struct{}
 
-func (r FormatStringGen) ID() string                      { return "BATOU-MEM-017" }
-func (r FormatStringGen) Name() string                    { return "Format String Vulnerability" }
-func (r FormatStringGen) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r FormatStringGen) Description() string {
+func (r *FormatStringGen) ID() string                      { return "BATOU-MEM-017" }
+func (r *FormatStringGen) Name() string                    { return "Format String Vulnerability" }
+func (r *FormatStringGen) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *FormatStringGen) Description() string {
 	return "Detects printf/fprintf called with a variable as the format string instead of a string literal, enabling format string attacks."
 }
-func (r FormatStringGen) Languages() []rules.Language {
+func (r *FormatStringGen) Languages() []rules.Language {
 	return []rules.Language{rules.LangC, rules.LangCPP}
 }
 
-func (r FormatStringGen) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *FormatStringGen) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -243,17 +243,17 @@ func (r FormatStringGen) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SystemPopenVariable struct{}
 
-func (r SystemPopenVariable) ID() string                      { return "BATOU-MEM-018" }
-func (r SystemPopenVariable) Name() string                    { return "system/popen with Variable" }
-func (r SystemPopenVariable) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r SystemPopenVariable) Description() string {
+func (r *SystemPopenVariable) ID() string                      { return "BATOU-MEM-018" }
+func (r *SystemPopenVariable) Name() string                    { return "system/popen with Variable" }
+func (r *SystemPopenVariable) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *SystemPopenVariable) Description() string {
 	return "Detects system() or popen() called with a variable argument, enabling command injection via shell metacharacters."
 }
-func (r SystemPopenVariable) Languages() []rules.Language {
+func (r *SystemPopenVariable) Languages() []rules.Language {
 	return []rules.Language{rules.LangC, rules.LangCPP}
 }
 
-func (r SystemPopenVariable) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *SystemPopenVariable) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -289,17 +289,17 @@ func (r SystemPopenVariable) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type StrncpyNullTerm struct{}
 
-func (r StrncpyNullTerm) ID() string                      { return "BATOU-MEM-019" }
-func (r StrncpyNullTerm) Name() string                    { return "strncpy Without Null Termination" }
-func (r StrncpyNullTerm) DefaultSeverity() rules.Severity { return rules.High }
-func (r StrncpyNullTerm) Description() string {
+func (r *StrncpyNullTerm) ID() string                      { return "BATOU-MEM-019" }
+func (r *StrncpyNullTerm) Name() string                    { return "strncpy Without Null Termination" }
+func (r *StrncpyNullTerm) DefaultSeverity() rules.Severity { return rules.High }
+func (r *StrncpyNullTerm) Description() string {
 	return "Detects strncpy() usage which does not guarantee null termination when the source is longer than or equal to the size limit."
 }
-func (r StrncpyNullTerm) Languages() []rules.Language {
+func (r *StrncpyNullTerm) Languages() []rules.Language {
 	return []rules.Language{rules.LangC, rules.LangCPP}
 }
 
-func (r StrncpyNullTerm) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *StrncpyNullTerm) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -335,17 +335,17 @@ func (r StrncpyNullTerm) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ReallocUseAfterFree struct{}
 
-func (r ReallocUseAfterFree) ID() string                      { return "BATOU-MEM-020" }
-func (r ReallocUseAfterFree) Name() string                    { return "Use-After-Free realloc" }
-func (r ReallocUseAfterFree) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r ReallocUseAfterFree) Description() string {
+func (r *ReallocUseAfterFree) ID() string                      { return "BATOU-MEM-020" }
+func (r *ReallocUseAfterFree) Name() string                    { return "Use-After-Free realloc" }
+func (r *ReallocUseAfterFree) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *ReallocUseAfterFree) Description() string {
 	return "Detects ptr = realloc(ptr, ...) pattern where failure leaves the original pointer freed and the variable set to NULL, losing the original allocation."
 }
-func (r ReallocUseAfterFree) Languages() []rules.Language {
+func (r *ReallocUseAfterFree) Languages() []rules.Language {
 	return []rules.Language{rules.LangC, rules.LangCPP}
 }
 
-func (r ReallocUseAfterFree) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *ReallocUseAfterFree) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -353,7 +353,14 @@ func (r ReallocUseAfterFree) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if isCommentLine(line) {
 			continue
 		}
-		if reGenReallocSelf.MatchString(line) {
+		m := reGenReallocSelf.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		// Check that the assigned variable is also the first arg to realloc
+		varName := m[1]
+		argPattern := regexp.MustCompile(`realloc\s*\(\s*` + regexp.QuoteMeta(varName) + `\s*,`)
+		if argPattern.MatchString(line) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -381,17 +388,17 @@ func (r ReallocUseAfterFree) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DeprecatedSSLAPI struct{}
 
-func (r DeprecatedSSLAPI) ID() string                      { return "BATOU-MEM-021" }
-func (r DeprecatedSSLAPI) Name() string                    { return "OpenSSL Deprecated API" }
-func (r DeprecatedSSLAPI) DefaultSeverity() rules.Severity { return rules.High }
-func (r DeprecatedSSLAPI) Description() string {
+func (r *DeprecatedSSLAPI) ID() string                      { return "BATOU-MEM-021" }
+func (r *DeprecatedSSLAPI) Name() string                    { return "OpenSSL Deprecated API" }
+func (r *DeprecatedSSLAPI) DefaultSeverity() rules.Severity { return rules.High }
+func (r *DeprecatedSSLAPI) Description() string {
 	return "Detects use of deprecated OpenSSL functions (SSLv23_method, TLSv1_method, SSL_library_init) that enable insecure protocol versions."
 }
-func (r DeprecatedSSLAPI) Languages() []rules.Language {
+func (r *DeprecatedSSLAPI) Languages() []rules.Language {
 	return []rules.Language{rules.LangC, rules.LangCPP}
 }
 
-func (r DeprecatedSSLAPI) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *DeprecatedSSLAPI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -427,17 +434,17 @@ func (r DeprecatedSSLAPI) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NamespaceBreakout struct{}
 
-func (r NamespaceBreakout) ID() string                      { return "BATOU-MEM-022" }
-func (r NamespaceBreakout) Name() string                    { return "Container Namespace Breakout" }
-func (r NamespaceBreakout) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r NamespaceBreakout) Description() string {
+func (r *NamespaceBreakout) ID() string                      { return "BATOU-MEM-022" }
+func (r *NamespaceBreakout) Name() string                    { return "Container Namespace Breakout" }
+func (r *NamespaceBreakout) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *NamespaceBreakout) Description() string {
 	return "Detects setns/unshare calls with CLONE_NEW* flags that can be used to break out of container namespaces and escalate privileges."
 }
-func (r NamespaceBreakout) Languages() []rules.Language {
+func (r *NamespaceBreakout) Languages() []rules.Language {
 	return []rules.Language{rules.LangC, rules.LangCPP}
 }
 
-func (r NamespaceBreakout) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *NamespaceBreakout) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -473,17 +480,17 @@ func (r NamespaceBreakout) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DeprecatedRSAKeySize struct{}
 
-func (r DeprecatedRSAKeySize) ID() string                      { return "BATOU-MEM-023" }
-func (r DeprecatedRSAKeySize) Name() string                    { return "Deprecated RSA Key Size" }
-func (r DeprecatedRSAKeySize) DefaultSeverity() rules.Severity { return rules.Medium }
-func (r DeprecatedRSAKeySize) Description() string {
+func (r *DeprecatedRSAKeySize) ID() string                      { return "BATOU-MEM-023" }
+func (r *DeprecatedRSAKeySize) Name() string                    { return "Deprecated RSA Key Size" }
+func (r *DeprecatedRSAKeySize) DefaultSeverity() rules.Severity { return rules.Medium }
+func (r *DeprecatedRSAKeySize) Description() string {
 	return "Detects RSA_generate_key_ex with 1024-bit or 512-bit key sizes, which are considered cryptographically weak."
 }
-func (r DeprecatedRSAKeySize) Languages() []rules.Language {
+func (r *DeprecatedRSAKeySize) Languages() []rules.Language {
 	return []rules.Language{rules.LangC, rules.LangCPP}
 }
 
-func (r DeprecatedRSAKeySize) Scan(ctx *rules.ScanContext) []rules.Finding {
+func (r *DeprecatedRSAKeySize) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -518,14 +525,14 @@ func (r DeprecatedRSAKeySize) Scan(ctx *rules.ScanContext) []rules.Finding {
 // ---------------------------------------------------------------------------
 
 func init() {
-	rules.Register(SprintfOverflow{})
-	rules.Register(GetsBanned{})
-	rules.Register(IntegerOverflowMalloc{})
-	rules.Register(FormatStringGen{})
-	rules.Register(SystemPopenVariable{})
-	rules.Register(StrncpyNullTerm{})
-	rules.Register(ReallocUseAfterFree{})
-	rules.Register(DeprecatedSSLAPI{})
-	rules.Register(NamespaceBreakout{})
-	rules.Register(DeprecatedRSAKeySize{})
+	rules.Register(&SprintfOverflow{})
+	rules.Register(&GetsBanned{})
+	rules.Register(&IntegerOverflowMalloc{})
+	rules.Register(&FormatStringGen{})
+	rules.Register(&SystemPopenVariable{})
+	rules.Register(&StrncpyNullTerm{})
+	rules.Register(&ReallocUseAfterFree{})
+	rules.Register(&DeprecatedSSLAPI{})
+	rules.Register(&NamespaceBreakout{})
+	rules.Register(&DeprecatedRSAKeySize{})
 }
