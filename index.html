@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Batou - Runtime SAST for Claude Code</title>
+  <meta name="description" content="Batou catches security vulnerabilities in real-time as AI writes code. 684 rules, 17 languages, four analysis layers.">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #1e1e2e;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #6c5ce7;
+      --accent-glow: rgba(108, 92, 231, 0.25);
+      --red: #ff4757;
+      --green: #2ed573;
+      --amber: #ffa502;
+      --code-bg: #0d0d14;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Nav */
+    nav {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      padding: 0 2rem;
+    }
+    .nav-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+    }
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--accent);
+      color: #fff;
+      padding: 0.45rem 1.1rem;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+    .nav-cta:hover { opacity: 0.85; }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 6rem 2rem 4rem;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -200px;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--accent-glow), transparent 70%);
+      pointer-events: none;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.35rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+      background: var(--surface);
+    }
+    h1 {
+      font-size: clamp(2.5rem, 6vw, 4rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+    }
+    h1 .highlight { color: var(--accent); }
+    .hero p {
+      font-size: 1.2rem;
+      color: var(--text-dim);
+      max-width: 600px;
+      margin-bottom: 2.5rem;
+    }
+    .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 0.75rem 1.75rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      padding: 0.75rem 1.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--accent); }
+
+    /* Install snippet */
+    .install-box {
+      margin-top: 3rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.5rem;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      max-width: 680px;
+      width: 100%;
+      text-align: left;
+      position: relative;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .install-box:hover { border-color: var(--accent); }
+    .install-box code { color: var(--green); }
+    .install-box .copy-hint {
+      position: absolute;
+      right: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      opacity: 0.5;
+    }
+
+    /* Section base */
+    section { padding: 6rem 2rem; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+    h2 {
+      font-size: clamp(1.8rem, 4vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+    }
+    .section-subtitle {
+      color: var(--text-dim);
+      font-size: 1.1rem;
+      max-width: 600px;
+      margin-bottom: 3rem;
+    }
+
+    /* Pipeline */
+    .pipeline {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2.5rem;
+      margin-bottom: 4rem;
+    }
+    .pipeline-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+    }
+    .pipeline-step {
+      padding: 0.6rem 1.2rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+    .pipeline-arrow {
+      color: var(--text-dim);
+      padding: 0 0.5rem;
+      font-size: 1.2rem;
+    }
+    .pipeline-step.block { border-color: var(--red); color: var(--red); }
+    .pipeline-step.hint { border-color: var(--amber); color: var(--amber); }
+
+    /* Layer cards */
+    .layers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.25rem;
+    }
+    .layer-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .layer-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    .layer-num {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      line-height: 32px;
+      text-align: center;
+      background: var(--accent-glow);
+      color: var(--accent);
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .layer-card h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .layer-card p {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+    .layer-stat {
+      display: inline-block;
+      margin-top: 0.75rem;
+      padding: 0.25rem 0.6rem;
+      background: var(--code-bg);
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--green);
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.25rem;
+      margin-top: 4rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    .stat-card .num {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+    .stat-card .label {
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      margin-top: 0.25rem;
+    }
+
+    /* Confidence */
+    .confidence-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 2rem;
+      font-size: 0.9rem;
+    }
+    .confidence-table th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-dim);
+      font-weight: 500;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .confidence-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .confidence-table tr:last-child td { border-bottom: none; }
+    .result-block {
+      color: var(--red);
+      font-weight: 600;
+      font-family: monospace;
+    }
+    .result-hint {
+      color: var(--amber);
+      font-weight: 600;
+      font-family: monospace;
+    }
+    .score { font-family: monospace; color: var(--green); }
+
+    /* Languages */
+    .lang-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 2rem;
+    }
+    .lang-tag {
+      padding: 0.4rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: var(--text);
+      transition: border-color 0.2s;
+    }
+    .lang-tag:hover { border-color: var(--accent); }
+
+    /* Categories */
+    .cat-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+    }
+    .cat-tag {
+      padding: 0.3rem 0.75rem;
+      background: var(--code-bg);
+      border-radius: 6px;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      font-family: monospace;
+    }
+
+    /* Code demo */
+    .demo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-top: 2rem;
+    }
+    @media (max-width: 768px) {
+      .demo-grid { grid-template-columns: 1fr; }
+    }
+    .demo-block {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .demo-header {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .demo-header.blocked { color: var(--red); }
+    .demo-header.hinted { color: var(--amber); }
+    .demo-body {
+      padding: 1rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      overflow-x: auto;
+    }
+    .demo-body .kw { color: #c792ea; }
+    .demo-body .fn { color: #82aaff; }
+    .demo-body .str { color: #c3e88d; }
+    .demo-body .cm { color: #546e7a; }
+    .demo-body .var { color: #f78c6c; }
+    .demo-body .op { color: #89ddff; }
+    .demo-body .danger { background: rgba(255, 71, 87, 0.12); display: block; border-left: 2px solid var(--red); padding-left: 0.5rem; margin-left: -0.5rem; }
+    .demo-body .safe { background: rgba(46, 213, 115, 0.08); display: block; border-left: 2px solid var(--green); padding-left: 0.5rem; margin-left: -0.5rem; }
+
+    /* Suppress section */
+    .suppress-demo {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.82rem;
+      line-height: 1.8;
+      margin-top: 2rem;
+      overflow-x: auto;
+    }
+
+    /* CTA */
+    .cta-section {
+      text-align: center;
+      padding: 6rem 2rem;
+    }
+    .cta-section h2 { margin-bottom: 1rem; }
+    .cta-section p {
+      color: var(--text-dim);
+      margin-bottom: 2rem;
+      font-size: 1.1rem;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+    footer a {
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    footer a:hover { color: var(--text); }
+
+    /* Mobile */
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .pipeline-flow { flex-direction: column; gap: 0.5rem; }
+      .pipeline-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-inner">
+      <a href="#" class="logo"><span>B</span>atou</a>
+      <ul class="nav-links">
+        <li><a href="#how-it-works">How it works</a></li>
+        <li><a href="#detection">Detection</a></li>
+        <li><a href="#languages">Languages</a></li>
+        <li><a href="https://github.com/turenlabs/batou">GitHub</a></li>
+      </ul>
+      <a href="#install" class="nav-cta">Install</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="badge">Claude Code Hook &middot; Open Source &middot; MIT</div>
+    <h1>
+      Code guard for your<br>
+      <span class="highlight">AI agents</span>
+    </h1>
+    <p>Batou catches security vulnerabilities in real-time as AI writes code. Four analysis layers. 684 rules. 17 languages. Zero config.</p>
+    <div class="hero-actions">
+      <a href="#install" class="btn-primary">Get Started</a>
+      <a href="https://github.com/turenlabs/batou" class="btn-secondary">View on GitHub</a>
+    </div>
+    <div class="install-box" onclick="navigator.clipboard.writeText('curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash')">
+      <code>$</code> curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how-it-works">
+    <div class="container">
+      <div class="section-label">How it works</div>
+      <h2>Four layers of analysis, one decision</h2>
+      <p class="section-subtitle">Every file write is intercepted, scanned across four layers, and scored. High-confidence findings block. The rest become hints for Claude.</p>
+
+      <div class="pipeline">
+        <div class="pipeline-flow">
+          <div class="pipeline-step">Claude writes code</div>
+          <span class="pipeline-arrow">&rarr;</span>
+          <div class="pipeline-step">Batou intercepts</div>
+          <span class="pipeline-arrow">&rarr;</span>
+          <div class="pipeline-step">4-layer scan</div>
+          <span class="pipeline-arrow">&rarr;</span>
+          <div class="pipeline-step">Confidence scoring</div>
+          <span class="pipeline-arrow">&rarr;</span>
+          <div class="pipeline-step block">Block</div>
+          <span style="color:var(--text-dim); padding: 0 0.4rem;">/</span>
+          <div class="pipeline-step hint">Hint</div>
+        </div>
+      </div>
+
+      <div class="layers-grid">
+        <div class="layer-card">
+          <div class="layer-num">1</div>
+          <h3>Regex Rules</h3>
+          <p>Fast pattern matching for known vulnerability signatures across 45 categories.</p>
+          <span class="layer-stat">684 rules</span>
+        </div>
+        <div class="layer-card">
+          <div class="layer-num">2</div>
+          <h3>AST Analysis</h3>
+          <p>Tree-sitter structural parsing. Suppresses false positives in comments and dead code.</p>
+          <span class="layer-stat">15 languages</span>
+        </div>
+        <div class="layer-card">
+          <div class="layer-num">3</div>
+          <h3>Taint Analysis</h3>
+          <p>Source-to-sink dataflow tracking. Follows user input through variables to dangerous functions.</p>
+          <span class="layer-stat">1,123 catalog entries</span>
+        </div>
+        <div class="layer-card">
+          <div class="layer-num">4</div>
+          <h3>Call Graph</h3>
+          <p>Interprocedural analysis across function and file boundaries within a session.</p>
+          <span class="layer-stat">cross-file</span>
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="num">684</div>
+          <div class="label">Security rules</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">45</div>
+          <div class="label">Rule categories</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">17</div>
+          <div class="label">Languages</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">1,123</div>
+          <div class="label">Taint entries</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Confidence -->
+  <section id="confidence" style="background: var(--surface);">
+    <div class="container">
+      <div class="section-label">Confidence scoring</div>
+      <h2>Block what matters, hint the rest</h2>
+      <p class="section-subtitle">Regex-only findings produce hints. Multi-layer confirmation raises confidence and blocks the write. No more drowning in false positives.</p>
+
+      <table class="confidence-table">
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th>Score</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Regex-only Critical</td>
+            <td class="score">0.3 &ndash; 0.5</td>
+            <td class="result-hint">Hint</td>
+          </tr>
+          <tr>
+            <td>AST-confirmed</td>
+            <td class="score">0.7</td>
+            <td class="result-block">Blocked</td>
+          </tr>
+          <tr>
+            <td>Taint-confirmed</td>
+            <td class="score">0.85 &ndash; 0.95</td>
+            <td class="result-block">Blocked</td>
+          </tr>
+          <tr>
+            <td>Multiple layers agree</td>
+            <td class="score">up to 1.0</td>
+            <td class="result-block">Blocked</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Detection examples -->
+  <section id="detection">
+    <div class="container">
+      <div class="section-label">Detection</div>
+      <h2>What it catches</h2>
+      <p class="section-subtitle">SQL injection, XSS, path traversal, hardcoded secrets, SSRF, and 40 more categories. Here's how it looks in practice.</p>
+
+      <div class="demo-grid">
+        <div class="demo-block">
+          <div class="demo-header blocked">Blocked &mdash; SQL injection (taint-confirmed)</div>
+          <div class="demo-body">
+<span class="kw">func</span> <span class="fn">getUser</span>(w http.ResponseWriter, r *http.Request) {
+    id <span class="op">:=</span> r.URL.Query().Get(<span class="str">"id"</span>)
+<span class="danger">    db.Query(<span class="str">"SELECT * FROM users WHERE id = "</span> <span class="op">+</span> id)</span>
+}
+          </div>
+        </div>
+        <div class="demo-block">
+          <div class="demo-header" style="color: var(--green);">Safe &mdash; parameterized query</div>
+          <div class="demo-body">
+<span class="kw">func</span> <span class="fn">getUser</span>(w http.ResponseWriter, r *http.Request) {
+    id <span class="op">:=</span> r.URL.Query().Get(<span class="str">"id"</span>)
+<span class="safe">    db.Query(<span class="str">"SELECT * FROM users WHERE id = $1"</span>, id)</span>
+}
+          </div>
+        </div>
+        <div class="demo-block">
+          <div class="demo-header blocked">Blocked &mdash; XSS (AST + taint)</div>
+          <div class="demo-body">
+<span class="kw">const</span> <span class="fn">Profile</span> = <span class="op">(</span>{ user }<span class="op">)</span> <span class="op">=></span> {
+<span class="danger">    <span class="kw">return</span> <span class="op">&lt;</span>div dangerouslySetInnerHTML<span class="op">=</span>{{ __html: user.bio }} <span class="op">/></span></span>
+}
+          </div>
+        </div>
+        <div class="demo-block">
+          <div class="demo-header hinted">Hint &mdash; hardcoded secret (regex-only)</div>
+          <div class="demo-body">
+<span class="cm"># Low confidence &mdash; could be a placeholder</span>
+config <span class="op">=</span> {
+<span class="danger">    <span class="str">"api_key"</span>: <span class="str">"sk-proj-abc123..."</span></span>
+}
+          </div>
+        </div>
+      </div>
+
+      <div class="cat-grid" style="margin-top: 3rem;">
+        <span class="cat-tag">injection</span>
+        <span class="cat-tag">xss</span>
+        <span class="cat-tag">traversal</span>
+        <span class="cat-tag">crypto</span>
+        <span class="cat-tag">secrets</span>
+        <span class="cat-tag">ssrf</span>
+        <span class="cat-tag">auth</span>
+        <span class="cat-tag">xxe</span>
+        <span class="cat-tag">deserialization</span>
+        <span class="cat-tag">cors</span>
+        <span class="cat-tag">ssti</span>
+        <span class="cat-tag">jwt</span>
+        <span class="cat-tag">session</span>
+        <span class="cat-tag">upload</span>
+        <span class="cat-tag">race</span>
+        <span class="cat-tag">websocket</span>
+        <span class="cat-tag">oauth</span>
+        <span class="cat-tag">nosql</span>
+        <span class="cat-tag">prototype</span>
+        <span class="cat-tag">redirect</span>
+        <span class="cat-tag">logging</span>
+        <span class="cat-tag">validation</span>
+        <span class="cat-tag">memory</span>
+        <span class="cat-tag">misconfig</span>
+        <span class="cat-tag">massassign</span>
+        <span class="cat-tag">graphql</span>
+        <span class="cat-tag">encoding</span>
+        <span class="cat-tag">header</span>
+        <span class="cat-tag">container</span>
+        <span class="cat-tag">framework</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Languages -->
+  <section id="languages" style="background: var(--surface);">
+    <div class="container">
+      <div class="section-label">Language support</div>
+      <h2>17 languages, all four layers</h2>
+      <p class="section-subtitle">Full regex, AST, and taint coverage. Parsed trees and taint flows are shared across layers &mdash; each file is parsed once.</p>
+
+      <div class="lang-grid">
+        <span class="lang-tag">Go</span>
+        <span class="lang-tag">Python</span>
+        <span class="lang-tag">JavaScript</span>
+        <span class="lang-tag">TypeScript</span>
+        <span class="lang-tag">Java</span>
+        <span class="lang-tag">PHP</span>
+        <span class="lang-tag">Ruby</span>
+        <span class="lang-tag">C</span>
+        <span class="lang-tag">C++</span>
+        <span class="lang-tag">Kotlin</span>
+        <span class="lang-tag">Swift</span>
+        <span class="lang-tag">Rust</span>
+        <span class="lang-tag">C#</span>
+        <span class="lang-tag">Perl</span>
+        <span class="lang-tag">Lua</span>
+        <span class="lang-tag">Groovy</span>
+        <span class="lang-tag">Zig</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Suppress -->
+  <section>
+    <div class="container">
+      <div class="section-label">False positive suppression</div>
+      <h2>Suppress when you know better</h2>
+      <p class="section-subtitle">Inline directives let you silence findings for safe code. Target by rule ID, category, or suppress all. Always include a reason.</p>
+
+      <div class="suppress-demo">
+        <span class="cm">// batou:ignore BATOU-INJ-001 -- query uses parameterized input</span><br>
+        db.Query(<span class="str">"SELECT * FROM users WHERE id = "</span> + id)<br>
+        <br>
+        <span class="cm"># batou:ignore secrets -- test fixture, not a real credential</span><br>
+        password = <span class="str">"test-password-for-ci"</span><br>
+        <br>
+        <span class="cm">// batou:ignore-start injection</span><br>
+        rows := db.Query(dynamicSQL)<br>
+        process(rows)<br>
+        <span class="cm">// batou:ignore-end</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" style="background: var(--surface);">
+    <div class="container">
+      <div class="section-label">Installation</div>
+      <h2>Up and running in seconds</h2>
+      <p class="section-subtitle">One command installs the binary. Add --setup to auto-configure hooks for a project.</p>
+
+      <div class="demo-block" style="max-width: 700px;">
+        <div class="demo-header" style="color: var(--text-dim);">Terminal</div>
+        <div class="demo-body">
+<span class="cm"># Quick install</span>
+curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash
+
+<span class="cm"># Install + configure hooks for a project</span>
+curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash -s -- --setup /path/to/project
+
+<span class="cm"># Or install globally</span>
+curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash -s -- --global
+
+<span class="cm"># Build from source (requires Go 1.21+, CGo)</span>
+git clone https://github.com/turenlabs/batou.git && cd batou && make build && make install
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <h2>Stop shipping vulnerabilities</h2>
+    <p>Let your AI write code freely. Batou has its back.</p>
+    <div class="hero-actions">
+      <a href="https://github.com/turenlabs/batou" class="btn-primary">Get Started on GitHub</a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>Batou &middot; MIT License &middot; <a href="https://github.com/turenlabs/batou">GitHub</a></p>
+  </footer>
+
+</body>
+</html>
