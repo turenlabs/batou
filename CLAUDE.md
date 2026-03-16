@@ -1,4 +1,4 @@
-# Batou - Code guard for your AI agents
+# Batou - Generation-time SAST for Claude Code
 
 ## Project Overview
 
