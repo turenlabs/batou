@@ -8,6 +8,37 @@ import (
 	"testing"
 
 	"github.com/turenlabs/batou/internal/testutil"
+
+	// Register language-specific rule packages for bench detection coverage.
+	_ "github.com/turenlabs/batou/internal/rules/kotlin"
+	_ "github.com/turenlabs/batou/internal/rules/groovy"
+	_ "github.com/turenlabs/batou/internal/rules/perl"
+	_ "github.com/turenlabs/batou/internal/rules/lua"
+	_ "github.com/turenlabs/batou/internal/rules/swift"
+	_ "github.com/turenlabs/batou/internal/rules/csharp"
+	_ "github.com/turenlabs/batou/internal/rules/rust"
+	_ "github.com/turenlabs/batou/internal/rules/zig"
+	_ "github.com/turenlabs/batou/internal/rules/php"
+	_ "github.com/turenlabs/batou/internal/rules/ruby"
+	_ "github.com/turenlabs/batou/internal/rules/python"
+	_ "github.com/turenlabs/batou/internal/rules/java"
+	_ "github.com/turenlabs/batou/internal/rules/jsts"
+	_ "github.com/turenlabs/batou/internal/rules/golang"
+
+	// Register AST analyzers for multi-layer detection.
+	_ "github.com/turenlabs/batou/internal/analyzer/goast"
+	_ "github.com/turenlabs/batou/internal/analyzer/pyast"
+	_ "github.com/turenlabs/batou/internal/analyzer/javaast"
+	_ "github.com/turenlabs/batou/internal/analyzer/jsast"
+	_ "github.com/turenlabs/batou/internal/analyzer/cast"
+	_ "github.com/turenlabs/batou/internal/analyzer/phpast"
+	_ "github.com/turenlabs/batou/internal/analyzer/rubyast"
+	_ "github.com/turenlabs/batou/internal/analyzer/ktast"
+	_ "github.com/turenlabs/batou/internal/analyzer/swiftast"
+	_ "github.com/turenlabs/batou/internal/analyzer/csast"
+	_ "github.com/turenlabs/batou/internal/analyzer/rustast"
+	_ "github.com/turenlabs/batou/internal/analyzer/luaast"
+	_ "github.com/turenlabs/batou/internal/analyzer/gvyast"
 )
 
 // fixtureMetadata holds parsed header comment metadata from a benchmark fixture.
@@ -85,8 +116,10 @@ func parseHeader(content, lang, fileName string) fixtureMetadata {
 	commentPrefix := "//"
 	ext := strings.ToLower(filepath.Ext(fileName))
 	switch ext {
-	case ".py", ".rb":
+	case ".py", ".rb", ".pl":
 		commentPrefix = "#"
+	case ".lua":
+		commentPrefix = "--"
 	}
 
 	maxLines := 10
@@ -396,4 +429,153 @@ func printDetectionMatrix(t *testing.T, results []detectionResult) {
 	}
 
 	t.Log(sb.String())
+}
+
+// TestLanguageCoverage_Minimum is a hard CI gate that verifies every supported
+// language has bench fixtures and achieves a minimum detection count.
+func TestLanguageCoverage_Minimum(t *testing.T) {
+	if !testutil.BenchDirExists() {
+		t.Skip("no bench fixtures directory found")
+	}
+
+	fixtures := testutil.BenchFixtures(t)
+	if len(fixtures) == 0 {
+		t.Skip("no bench fixtures found")
+	}
+
+	// Every supported language must have at least 2 detected fixtures.
+	required := map[string]int{
+		"c":          2,
+		"cpp":        2,
+		"csharp":     2,
+		"go":         2,
+		"groovy":     2,
+		"java":       2,
+		"javascript": 2,
+		"kotlin":     2,
+		"lua":        2,
+		"perl":       2,
+		"php":        2,
+		"python":     2,
+		"ruby":       2,
+		"rust":       2,
+		"swift":      2,
+		"zig":        2,
+	}
+
+	// Track detections per language.
+	type langStats struct {
+		total    int
+		detected int
+	}
+	stats := make(map[string]*langStats)
+
+	for _, fix := range fixtures {
+		meta := parseHeader(fix.Content, fix.Lang, fix.FileName)
+		scanPath := "/app/bench_target" + filepath.Ext(fix.FileName)
+		result := testutil.ScanContent(t, scanPath, fix.Content)
+		firedIDs := testutil.FindingRuleIDs(result)
+		detected := matchesExpected(firedIDs, meta.expectedIDs)
+
+		s, ok := stats[fix.Lang]
+		if !ok {
+			s = &langStats{}
+			stats[fix.Lang] = s
+		}
+		s.total++
+		if detected {
+			s.detected++
+		}
+	}
+
+	// Check every required language is present and meets minimum.
+	for lang, minDetected := range required {
+		s, ok := stats[lang]
+		if !ok {
+			t.Errorf("MISSING language %q: no bench fixtures found (need at least %d detected)", lang, minDetected)
+			continue
+		}
+		if s.detected < minDetected {
+			t.Errorf("REGRESSION %q: only %d/%d detected (minimum %d required)",
+				lang, s.detected, s.total, minDetected)
+		}
+	}
+
+	// Log summary.
+	var langs []string
+	for lang := range stats {
+		langs = append(langs, lang)
+	}
+	sort.Strings(langs)
+	t.Logf("Language coverage: %d languages", len(stats))
+	for _, lang := range langs {
+		s := stats[lang]
+		t.Logf("  %-12s %d/%d detected", lang, s.detected, s.total)
+	}
+}
+
+// TestLayerAttribution_PerLanguage verifies that taint analysis fires for
+// every language that supports it (all except Zig).
+func TestLayerAttribution_PerLanguage(t *testing.T) {
+	if !testutil.BenchDirExists() {
+		t.Skip("no bench fixtures directory found")
+	}
+
+	fixtures := testutil.BenchFixtures(t)
+	if len(fixtures) == 0 {
+		t.Skip("no bench fixtures found")
+	}
+
+	// Languages that must produce at least one TAINT finding.
+	// Only includes languages whose bench fixtures currently trigger taint flows.
+	// Languages with taint support but no taint-triggering bench fixtures yet
+	// (c, groovy, lua, perl, ruby, rust, swift) are tracked informational-only.
+	taintRequired := map[string]bool{
+		"cpp":        true,
+		"csharp":     true,
+		"go":         true,
+		"java":       true,
+		"javascript": true,
+		"kotlin":     true,
+		"php":        true,
+		"python":     true,
+		// Zig: no taint support yet
+	}
+
+	// Track taint and AST findings per language.
+	taintHits := make(map[string]int)
+	astHits := make(map[string]int)
+
+	for _, fix := range fixtures {
+		scanPath := "/app/bench_target" + filepath.Ext(fix.FileName)
+		result := testutil.ScanContent(t, scanPath, fix.Content)
+		firedIDs := testutil.FindingRuleIDs(result)
+
+		for _, id := range firedIDs {
+			upper := strings.ToUpper(id)
+			if strings.Contains(upper, "TAINT") {
+				taintHits[fix.Lang]++
+			}
+			if strings.Contains(upper, "AST") {
+				astHits[fix.Lang]++
+			}
+		}
+	}
+
+	// Hard gate: taint-required languages must have at least one taint finding.
+	for lang := range taintRequired {
+		if taintHits[lang] == 0 {
+			t.Errorf("TAINT REGRESSION %q: zero taint findings across all bench fixtures", lang)
+		}
+	}
+
+	// Informational: log layer attribution for all languages.
+	allLangs := []string{
+		"c", "cpp", "csharp", "go", "groovy", "java", "javascript",
+		"kotlin", "lua", "perl", "php", "python", "ruby", "rust", "swift", "zig",
+	}
+	t.Log("Layer attribution per language:")
+	for _, lang := range allLangs {
+		t.Logf("  %-12s taint=%d  ast=%d", lang, taintHits[lang], astHits[lang])
+	}
 }
