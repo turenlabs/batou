@@ -111,9 +111,9 @@ func acquireLock(lockFile string) (*os.File, error) {
 			os.Remove(lockFile)
 		} else {
 			// Lock is recent — another process is likely active.
-			// Fall through and overwrite; in this single-process CLI context
-			// a brief conflict is unlikely.
-			return os.OpenFile(lockFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			// Return an error instead of overwriting. The scanner
+			// handles graph save failures gracefully (non-fatal).
+			return nil, fmt.Errorf("lock held by another process (age %s)", time.Since(info.ModTime()))
 		}
 		f, err = os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
 		if err != nil {

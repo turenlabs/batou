@@ -103,9 +103,10 @@ type Finding struct {
 	CWEID         string   `json:"cwe_id,omitempty"`
 	OWASPCategory string   `json:"owasp_category,omitempty"`
 	Language      Language `json:"language,omitempty"`
-	Confidence      string   `json:"confidence"`                  // high, medium, low
-	ConfidenceScore float64  `json:"confidence_score"`            // 0.0-1.0, computed by pipeline
-	Tags            []string `json:"tags,omitempty"`
+	Confidence       string   `json:"confidence"`                   // high, medium, low
+	ConfidenceScore  float64  `json:"confidence_score"`             // 0.0-1.0, computed by pipeline
+	ConfidencePreset bool     `json:"confidence_preset,omitempty"`  // true if score was set by taint/interproc engine
+	Tags             []string `json:"tags,omitempty"`
 }
 
 // FormatShort returns a one-line summary of the finding.

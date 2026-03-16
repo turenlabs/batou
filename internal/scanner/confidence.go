@@ -19,7 +19,7 @@ const (
 func AssignBaseConfidenceScore(f *rules.Finding) {
 	// Taint and interprocedural findings already have a score set
 	// at creation time — preserve it.
-	if f.ConfidenceScore > 0 {
+	if f.ConfidencePreset {
 		return
 	}
 

@@ -250,7 +250,12 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 	patterns := []pattern{
 		{reSQLSprintfGo, "high", rules.LangGo},
-		{reSQLConcatGo, "high", rules.LangAny},
+		{reSQLConcatGo, "high", rules.LangGo},
+		{reSQLConcatGo, "high", rules.LangJava},
+		{reSQLConcatGo, "high", rules.LangJavaScript},
+		{reSQLConcatGo, "high", rules.LangTypeScript},
+		{reSQLConcatGo, "high", rules.LangCSharp},
+		{reSQLConcatGo, "high", rules.LangKotlin},
 		{reSQLFStringPy, "high", rules.LangPython},
 		{reSQLPercentPy, "high", rules.LangPython},
 		{reSQLFormatPy, "high", rules.LangPython},

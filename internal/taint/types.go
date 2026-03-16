@@ -174,7 +174,8 @@ func (tf *TaintFlow) ToFinding() rules.Finding {
 		CWEID:           tf.Sink.CWEID,
 		OWASPCategory:   tf.Sink.OWASPCategory,
 		Confidence:      conf,
-		ConfidenceScore: tf.Confidence,
+		ConfidenceScore:  tf.Confidence,
+		ConfidencePreset: true,
 		Tags:            []string{"taint-analysis", "dataflow", string(tf.Source.Category), string(tf.Sink.Category)},
 	}
 }

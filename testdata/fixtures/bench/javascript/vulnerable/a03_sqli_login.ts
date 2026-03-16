@@ -1,5 +1,5 @@
 // Source: OWASP Juice Shop - Login with SQL injection
-// Expected: BATOU-INJ-001 (SQL Injection via string concatenation)
+// Expected: BATOU-INJ-001, BATOU-JSAST, BATOU-TAINT
 // OWASP: A03:2021 - Injection (SQL Injection)
 
 import { Request, Response } from 'express';

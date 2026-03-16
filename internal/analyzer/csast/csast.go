@@ -240,7 +240,28 @@ func (c *csChecker) checkProcessStart(n *ast.Node) {
 	}
 
 	if hasVarArg {
-		c.findings = append(c.findings, rules.Finding{
+		// If the only argument is a single identifier (e.g., Process.Start(startInfo)),
+		// this is likely a ProcessStartInfo variable — lower confidence since
+		// the actual command may have been validated earlier. Direct string
+		// concat/interpolation in arguments gets full confidence.
+		confidence := "high"
+		confScore := 0.0
+		if len(args) == 1 {
+			firstArg := args[0]
+			nc := firstArg.NamedChildren()
+			isSingleIdent := false
+			if firstArg.Type() == "identifier" {
+				isSingleIdent = true
+			} else if firstArg.Type() == "argument" && len(nc) == 1 && nc[0].Type() == "identifier" {
+				isSingleIdent = true
+			}
+			if isSingleIdent {
+				confidence = "medium"
+				confScore = 0.55
+			}
+		}
+
+		finding := rules.Finding{
 			RuleID:        "BATOU-CS-AST-004",
 			Severity:      rules.Critical,
 			SeverityLabel: rules.Critical.String(),
@@ -253,9 +274,14 @@ func (c *csChecker) checkProcessStart(n *ast.Node) {
 			CWEID:         "CWE-78",
 			OWASPCategory: "A03:2021-Injection",
 			Language:      rules.LangCSharp,
-			Confidence:    "high",
+			Confidence:    confidence,
 			Tags:          []string{"command-injection", "injection", "rce"},
-		})
+		}
+		if confScore > 0 {
+			finding.ConfidenceScore = confScore
+			finding.ConfidencePreset = true
+		}
+		c.findings = append(c.findings, finding)
 	}
 }
 

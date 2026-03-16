@@ -247,14 +247,16 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		AssignBaseConfidenceScore(&findings[i])
 	}
 
+	// Apply inline suppressions BEFORE dedup so that suppressed findings
+	// cannot boost the confidence of non-suppressed winners via the
+	// multi-layer boost.
+	var suppressedFindings []rules.Finding
+	findings, suppressedFindings = suppress.Apply(suppressions, findings)
+
 	// Deduplicate findings that share the same (line, CWE) — keep the
 	// highest-fidelity finding (taint > AST > interprocedural > regex)
 	// and merge tags from suppressed duplicates into the winner.
 	findings = DeduplicateFindings(findings)
-
-	// Apply inline suppressions: partition findings into kept and suppressed.
-	var suppressedFindings []rules.Finding
-	findings, suppressedFindings = suppress.Apply(suppressions, findings)
 
 	// Reduce severity for findings in test / fixture files.
 	// Test code intentionally contains vulnerable patterns so we downgrade
