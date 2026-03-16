@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/turenlabs/batou/internal/rules"
 	"github.com/turenlabs/batou/internal/taint"
@@ -561,11 +562,15 @@ func FindImpactedCallers(cg *CallGraph, changedFuncIDs []string) []ImpactedCalle
 
 // --- Internal helpers ---
 
+// callerFileReadTimeout is the maximum time to wait for a cross-file read.
+// Prevents hangs on network mounts or slow filesystems.
+const callerFileReadTimeout = 500 * time.Millisecond
+
 // loadCallerFile reads a caller's source file from disk for cross-file
 // interprocedural analysis. Results are cached in fileContents so each
 // file is read at most once per PropagateInterproc invocation.
 // Returns the content and true on success, or ("", false) if the file
-// cannot be read (missing, too large, or unreadable).
+// cannot be read (missing, too large, unreadable, or read times out).
 func loadCallerFile(filePath string, fileContents map[string]string) (string, bool) {
 	// Check cache first (another caller in the same file may have loaded it).
 	if content, ok := fileContents[filePath]; ok {
@@ -577,14 +582,31 @@ func loadCallerFile(filePath string, fileContents map[string]string) (string, bo
 		return "", false
 	}
 
-	data, err := os.ReadFile(filePath)
-	if err != nil {
+	// Read with a timeout to avoid hanging on network mounts.
+	type readResult struct {
+		data []byte
+		err  error
+	}
+	ch := make(chan readResult, 1)
+	go func() {
+		data, err := os.ReadFile(filePath)
+		ch <- readResult{data, err}
+	}()
+
+	timer := time.NewTimer(callerFileReadTimeout)
+	defer timer.Stop()
+
+	select {
+	case res := <-ch:
+		if res.err != nil {
+			return "", false
+		}
+		content := string(res.data)
+		fileContents[filePath] = content
+		return content, true
+	case <-timer.C:
 		return "", false
 	}
-
-	content := string(data)
-	fileContents[filePath] = content
-	return content, true
 }
 
 // extractFuncBody extracts lines startLine..endLine (1-indexed, inclusive) from content.
@@ -909,7 +931,8 @@ func checkCallerPassesTaintToCallee(
 			CWEID:           cwe,
 			OWASPCategory:   owasp,
 			Confidence:      "high",
-			ConfidenceScore: 0.8,
+			ConfidenceScore:  0.8,
+			ConfidencePreset: true,
 			Tags:            []string{"interprocedural", "taint-analysis", "cross-function", string(matchedSink.SinkCategory)},
 		}
 
@@ -1045,7 +1068,8 @@ func checkCallerUsesTaintedReturn(
 				CWEID:           cwe,
 				OWASPCategory:   owasp,
 				Confidence:      "high",
-				ConfidenceScore: 0.8,
+				ConfidenceScore:  0.8,
+				ConfidencePreset: true,
 				Tags:            []string{"interprocedural", "taint-analysis", "cross-function", "return-taint", string(sp.category)},
 			}
 

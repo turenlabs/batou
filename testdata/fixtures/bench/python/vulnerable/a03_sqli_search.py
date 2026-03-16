@@ -1,5 +1,5 @@
 # Source: OWASP WebGoat - SQL injection in search functionality
-# Expected: BATOU-INJ-001 (SQL Injection via string formatting)
+# Expected: BATOU-INJ-001, BATOU-PYAST, BATOU-TAINT
 # OWASP: A03:2021 - Injection (SQL Injection)
 
 import sqlite3

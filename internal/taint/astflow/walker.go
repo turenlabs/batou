@@ -24,7 +24,7 @@ func walkFunc(
 
 	// Seed taint for HTTP handler parameters.
 	if fnType != nil && fnType.Params != nil {
-		seedHTTPHandlerParams(fset, fnType.Params, tm)
+		seedHTTPHandlerParams(fset, fnType.Params, tm, scopeName)
 	}
 
 	// Walk every statement in the body.
@@ -122,6 +122,7 @@ func seedHTTPHandlerParams(
 	fset *token.FileSet,
 	params *ast.FieldList,
 	tm *TaintMap,
+	scopeName string,
 ) {
 	for _, field := range params.List {
 		typeName := exprToString(field.Type)
@@ -156,6 +157,34 @@ func seedHTTPHandlerParams(
 						VarName:     varName,
 					}},
 				})
+				continue
+			}
+
+			// Exported functions with io.Reader, []byte, or string params
+			// are potential entry points — seed at lower confidence.
+			if isExportedScope(scopeName) {
+				if isExportedEntryPointType(typeName) {
+					src := &taint.SourceDef{
+						ID:          "go.param.exported." + varName,
+						Category:    taint.SrcExternal,
+						Language:    rules.LangGo,
+						MethodName:  "parameter:" + varName,
+						Description: "exported function parameter with input-capable type",
+					}
+					line := fset.Position(name.Pos()).Line
+					tm.Set(varName, &taintState{
+						varName:    varName,
+						source:     src,
+						sourceLine: line,
+						sanitized:  make(map[taint.SinkCategory]bool),
+						confidence: 0.4,
+						steps: []taint.FlowStep{{
+							Line:        line,
+							Description: "parameter " + varName + " (exported entry point) assumed tainted",
+							VarName:     varName,
+						}},
+					})
+				}
 			}
 		}
 	}
@@ -357,4 +386,30 @@ func isInputParamName(name string) bool {
 		}
 	}
 	return false
+}
+
+// isExportedEntryPointType checks if a type name represents a common input
+// type (io.Reader, []byte, string) that could carry untrusted data when
+// the parameter belongs to an exported function.
+func isExportedEntryPointType(typeName string) bool {
+	lower := strings.ToLower(typeName)
+	return lower == "string" || lower == "[]byte" ||
+		strings.Contains(lower, "io.reader") ||
+		strings.Contains(lower, "io.readcloser")
+}
+
+// isExportedScope returns true if the scope name starts with an uppercase
+// letter, indicating an exported Go function that could be a public entry point.
+func isExportedScope(scopeName string) bool {
+	if scopeName == "" {
+		return false
+	}
+	// Handle "Receiver.Method" format — check the method name.
+	if dotIdx := strings.LastIndex(scopeName, "."); dotIdx >= 0 {
+		scopeName = scopeName[dotIdx+1:]
+	}
+	if scopeName == "" {
+		return false
+	}
+	return scopeName[0] >= 'A' && scopeName[0] <= 'Z'
 }

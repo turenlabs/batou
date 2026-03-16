@@ -1,5 +1,5 @@
 # Source: CWE-89 - SQL Injection via string interpolation in Perl
-# Expected: BATOU-INJ, TAINT
+# Expected: BATOU-INJ, BATOU-PL, TAINT
 # OWASP: A03:2021 - Injection (SQL Injection)
 
 use strict;

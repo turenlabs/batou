@@ -127,11 +127,11 @@ func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 // ---------------------------------------------------------------------------
 
 func TestScanRegexOnlyCritical_NoBlock(t *testing.T) {
-	// JavaScript regex-only injection — no taint rule fires for this snippet
-	// because there's no source-to-sink flow (just a dangerous pattern).
-	code := `const q = "DELETE FROM users WHERE id=" + id;
-db.query(q);`
-	result := testutil.ScanContent(t, "handler.js", code)
+	// Shell SQL injection — no AST analyzer for shell, so only regex rules
+	// fire. This tests that regex-only Critical findings don't block.
+	code := `QUERY="DELETE FROM users WHERE id=$ID"
+mysql -e "$QUERY"`
+	result := testutil.ScanContent(t, "/app/deploy.sh", code)
 
 	hasCritical := false
 	for _, f := range result.Findings {

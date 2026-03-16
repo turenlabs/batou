@@ -1,5 +1,5 @@
 // Source: CWE-78 - OS Command Injection via Process in Swift
-// Expected: BATOU-INJ, TAINT
+// Expected: BATOU-INJ, BATOU-SWIFT-AST, TAINT
 // OWASP: A03:2021 - Injection (Command Injection)
 
 import Foundation

@@ -573,11 +573,12 @@ func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 // ---------------------------------------------------------------------------
 
 func TestBlock_RegexOnlyCritical_NoBlock(t *testing.T) {
-	// JavaScript code with regex-detected SQL injection but no taint source.
-	code := `const q = "DELETE FROM users WHERE id=" + id;
-db.query(q);
+	// Shell code with regex-detected SQL injection but no AST analyzer
+	// and no taint source — only regex rules fire.
+	code := `QUERY="DELETE FROM users WHERE id=$ID"
+mysql -e "$QUERY"
 `
-	result := testutil.ScanContent(t, "/app/handler.js", code)
+	result := testutil.ScanContent(t, "/app/deploy.sh", code)
 
 	hasCritical := false
 	for _, f := range result.Findings {

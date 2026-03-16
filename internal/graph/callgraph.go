@@ -27,6 +27,10 @@ type CallGraph struct {
 	// Nodes maps function IDs to their metadata.
 	Nodes map[string]*FuncNode `json:"nodes"`
 
+	// fileIndex maps file paths to the nodes defined in that file.
+	// Maintained by AddNode/RemoveFile for O(1) NodesInFile lookups.
+	fileIndex map[string][]*FuncNode `json:"-"`
+
 	// ProjectRoot is the project directory this graph belongs to.
 	ProjectRoot string `json:"project_root"`
 
@@ -130,6 +134,7 @@ type ImpactedCaller struct {
 func NewCallGraph(projectRoot, sessionID string) *CallGraph {
 	return &CallGraph{
 		Nodes:       make(map[string]*FuncNode),
+		fileIndex:   make(map[string][]*FuncNode),
 		ProjectRoot: projectRoot,
 		SessionID:   sessionID,
 		LastUpdated: time.Now(),
@@ -150,7 +155,28 @@ func ContentHash(content string) string {
 
 // AddNode adds or updates a function node in the graph.
 func (cg *CallGraph) AddNode(node *FuncNode) {
+	// Remove old entry from fileIndex if updating an existing node
+	// with a different file path.
+	if old, exists := cg.Nodes[node.ID]; exists && old.FilePath != node.FilePath {
+		cg.removeFromFileIndex(old)
+	}
+
 	cg.Nodes[node.ID] = node
+	cg.ensureFileIndex()
+
+	// Add to fileIndex if not already present.
+	nodes := cg.fileIndex[node.FilePath]
+	found := false
+	for _, n := range nodes {
+		if n.ID == node.ID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		cg.fileIndex[node.FilePath] = append(nodes, node)
+	}
+
 	cg.LastUpdated = time.Now()
 }
 
@@ -255,18 +281,44 @@ func (cg *CallGraph) GetTransitiveCallers(funcID string, maxDepth int) []*FuncNo
 
 // NodesInFile returns all function nodes defined in a given file.
 func (cg *CallGraph) NodesInFile(filePath string) []*FuncNode {
-	var nodes []*FuncNode
+	cg.ensureFileIndex()
+	return cg.fileIndex[filePath]
+}
+
+// ensureFileIndex lazily builds the fileIndex if it is nil (e.g. after
+// JSON deserialization which skips the unexported field).
+func (cg *CallGraph) ensureFileIndex() {
+	if cg.fileIndex != nil {
+		return
+	}
+	cg.fileIndex = make(map[string][]*FuncNode, len(cg.Nodes)/4+1)
 	for _, node := range cg.Nodes {
-		if node.FilePath == filePath {
-			nodes = append(nodes, node)
+		cg.fileIndex[node.FilePath] = append(cg.fileIndex[node.FilePath], node)
+	}
+}
+
+// removeFromFileIndex removes a node from the fileIndex.
+func (cg *CallGraph) removeFromFileIndex(node *FuncNode) {
+	if cg.fileIndex == nil {
+		return
+	}
+	nodes := cg.fileIndex[node.FilePath]
+	for i, n := range nodes {
+		if n.ID == node.ID {
+			cg.fileIndex[node.FilePath] = append(nodes[:i], nodes[i+1:]...)
+			if len(cg.fileIndex[node.FilePath]) == 0 {
+				delete(cg.fileIndex, node.FilePath)
+			}
+			return
 		}
 	}
-	return nodes
 }
 
 // RemoveFile removes all nodes from a file and cleans up edges.
 func (cg *CallGraph) RemoveFile(filePath string) {
-	for _, node := range cg.NodesInFile(filePath) {
+	// Copy the slice since we'll be modifying the index during iteration.
+	nodes := append([]*FuncNode(nil), cg.NodesInFile(filePath)...)
+	for _, node := range nodes {
 		// Clean up edges pointing to this node
 		for _, callerID := range node.CalledBy {
 			if caller := cg.Nodes[callerID]; caller != nil {
@@ -279,6 +331,10 @@ func (cg *CallGraph) RemoveFile(filePath string) {
 			}
 		}
 		delete(cg.Nodes, node.ID)
+	}
+	// Clear the fileIndex entry for this file.
+	if cg.fileIndex != nil {
+		delete(cg.fileIndex, filePath)
 	}
 }
 

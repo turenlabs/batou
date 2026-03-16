@@ -21,6 +21,8 @@ var (
 	reJSSHA1     = regexp.MustCompile(`crypto\.createHash\s*\(\s*['"]sha1['"]`)
 	reJavaMD5    = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*"MD5"`)
 	reJavaSHA1   = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*"SHA-?1"`)
+	reCSharpMD5  = regexp.MustCompile(`\bMD5\.Create\s*\(`)
+	reCSharpSHA1 = regexp.MustCompile(`\bSHA1\.Create\s*\(`)
 	reSecurityCtx = regexp.MustCompile(`(?i)(password|secret|token|auth|sign|hmac|credential|cert)`)
 )
 
@@ -249,7 +251,7 @@ func (r *WeakHashing) Description() string {
 }
 
 func (r *WeakHashing) Languages() []rules.Language {
-	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript, rules.LangJava}
+	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript, rules.LangJava, rules.LangKotlin, rules.LangGroovy, rules.LangCSharp}
 }
 
 func (r *WeakHashing) Scan(ctx *rules.ScanContext) []rules.Finding {
@@ -298,6 +300,23 @@ func (r *WeakHashing) Scan(ctx *rules.ScanContext) []rules.Finding {
 				matched = loc
 				algo = "MD5"
 			} else if loc := reJavaSHA1.FindString(line); loc != "" {
+				matched = loc
+				algo = "SHA-1"
+			}
+		case rules.LangKotlin, rules.LangGroovy:
+			// Kotlin and Groovy use Java's MessageDigest API
+			if loc := reJavaMD5.FindString(line); loc != "" {
+				matched = loc
+				algo = "MD5"
+			} else if loc := reJavaSHA1.FindString(line); loc != "" {
+				matched = loc
+				algo = "SHA-1"
+			}
+		case rules.LangCSharp:
+			if loc := reCSharpMD5.FindString(line); loc != "" {
+				matched = loc
+				algo = "MD5"
+			} else if loc := reCSharpSHA1.FindString(line); loc != "" {
 				matched = loc
 				algo = "SHA-1"
 			}
