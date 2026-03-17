@@ -32,17 +32,37 @@ Parsed trees and taint flows are shared across layers — each file is parsed on
 
 ## Installation
 
+### Homebrew (recommended)
+
 ```bash
-# Quick install
+brew install turenlabs/tap/batou && batou-setup
+```
+
+This installs the binary and configures Claude Code hooks automatically.
+
+To update:
+
+```bash
+brew upgrade batou
+```
+
+### Install script
+
+```bash
+# Quick install (downloads binary + configures hooks globally)
 curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash
 
-# Install + configure hooks for a project
+# Install + configure hooks for a specific project
 curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash -s -- --setup /path/to/project
 
-# Or install globally
+# Or install + configure hooks globally
 curl -fsSL https://raw.githubusercontent.com/turenlabs/batou/main/install.sh | bash -s -- --global
+```
 
-# Build from source (requires Go 1.21+, CGo, gcc/clang)
+### Build from source
+
+```bash
+# Requires Go 1.21+, CGo, gcc/clang
 git clone https://github.com/turenlabs/batou.git && cd batou && make build && make install
 ```
 
