@@ -23,7 +23,7 @@ jobs:
       - name: go vet
         env:
           CGO_ENABLED: '1'
-        run: go vet ./...
+        run: go vet ./batou-core/... ./batou-rules/...
 
   test:
     name: Test
@@ -41,9 +41,9 @@ jobs:
       - name: Run tests
         env:
           CGO_ENABLED: '1'
-        run: go test -race -count=1 ./...
+        run: go test -race -count=1 ./batou-core/... ./batou-rules/...
 
       - name: Build
         env:
           CGO_ENABLED: '1'
-        run: go build -o /dev/null ./cmd/batou
+        run: go build -o /dev/null ./batou-core/cmd/batou
