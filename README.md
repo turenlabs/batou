@@ -14,21 +14,14 @@ Claude writes code → Batou intercepts → 4-layer scan → Confidence scoring 
 
 | Layer | What | How |
 |-------|------|-----|
-| 1. Regex | 684 pattern rules across 45 categories | Fast pattern matching for known vulnerability signatures |
-| 2. AST | Tree-sitter parsing for 15 languages | Suppresses false positives in comments, structural analysis |
-| 3. Taint | Source-to-sink dataflow (1,123 catalog entries) | Tracks user input through variables to dangerous functions |
+| 1. Regex | Pattern rules across 45 categories | Fast pattern matching for known vulnerability signatures |
+| 2. AST | Tree-sitter structural parsing | Suppresses false positives in comments, structural analysis |
+| 3. Taint | Source-to-sink dataflow tracking | Tracks user input through variables to dangerous functions |
 | 4. Call Graph | Interprocedural analysis across files | Persistent cross-function taint tracking within a session |
 
 Parsed trees and taint flows are shared across layers — each file is parsed once.
 
-**Blocking threshold:** `Severity >= Critical AND ConfidenceScore >= 0.7`
-
-| Scenario | Score | Result |
-|----------|-------|--------|
-| Regex-only Critical | 0.3–0.5 | Hint only |
-| AST-confirmed | 0.7 | Blocked |
-| Taint-confirmed | ~0.85–0.95 | Blocked |
-| Multiple layers agree | up to 1.0 | Blocked |
+Findings confirmed by multiple layers block the write. Single-layer regex matches produce hints instead — Claude sees the advice without being interrupted by false positives.
 
 ## Installation
 
@@ -67,8 +60,6 @@ git clone https://github.com/turenlabs/batou.git && cd batou && make build && ma
 ```
 
 ## What It Detects
-
-**684 rules, 45 categories, 17 languages**
 
 Injection, XSS, path traversal, crypto weaknesses, hardcoded secrets, SSRF, auth issues, XXE, deserialization, CORS, SSTI, JWT flaws, session issues, file upload, race conditions, log injection, input validation, memory safety, and framework-specific misconfigs (Spring, Express, Django, Flask, Rails, Laravel, React, Tauri).
 
