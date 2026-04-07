@@ -1,0 +1,92 @@
+package ast
+
+import (
+	"strings"
+
+	"github.com/turenlabs/batou-rules/rules"
+)
+
+// FilterFindings runs each finding through the AST to suppress false
+// positives that originate from comments.  Findings whose matched text
+// falls inside a comment node in the AST are removed.
+//
+// Note: string literals are NOT filtered because many security findings
+// (SQL injection, XSS, etc.) legitimately match patterns inside string
+// literals used as queries/templates.
+//
+// If tree is nil (parsing failed or unsupported language) the original
+// findings are returned unchanged.
+func FilterFindings(tree *Tree, filePath string, findings []rules.Finding) []rules.Finding {
+	if tree == nil || len(findings) == 0 {
+		return findings
+	}
+
+	content := tree.Content()
+	if len(content) == 0 {
+		return findings
+	}
+
+	// Use cached line offsets from the tree.
+	lineOffsets := tree.LineOffsets()
+
+	out := make([]rules.Finding, 0, len(findings))
+	for _, f := range findings {
+		// Skip filtering for findings from other files (e.g.
+		// interprocedural findings) — the AST tree only covers the
+		// current file, so offset-based suppression would be wrong.
+		if f.FilePath != "" && f.FilePath != filePath {
+			out = append(out, f)
+			continue
+		}
+		if shouldSuppressFinding(tree, f, lineOffsets, content) {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+// shouldSuppressFinding returns true if the finding should be suppressed
+// because it falls entirely within a comment.
+func shouldSuppressFinding(tree *Tree, f rules.Finding, lineOffsets []int, content []byte) bool {
+	offset, ok := findingOffset(f, lineOffsets, content)
+	if !ok {
+		return false // can't determine offset, keep the finding
+	}
+
+	// Use binary-search over cached comment ranges for O(log n) lookup
+	// instead of NodeAtOffset + parent walk per finding.
+	return tree.IsOffsetInComment(offset)
+}
+
+// findingOffset converts a finding's line number (and optional matched text)
+// into a byte offset in the source content.  Returns (offset, true) on
+// success or (0, false) if the position cannot be determined.
+func findingOffset(f rules.Finding, lineOffsets []int, content []byte) (uint32, bool) {
+	// LineNumber is 1-based in rules.Finding.
+	if f.LineNumber <= 0 || f.LineNumber > len(lineOffsets) {
+		return 0, false
+	}
+
+	lineStart := lineOffsets[f.LineNumber-1]
+
+	// If we have matched text, find its position within the line for a
+	// more precise offset.
+	if f.MatchedText != "" {
+		// Search from line start for the matched text.
+		remaining := string(content[lineStart:])
+		idx := strings.Index(remaining, f.MatchedText)
+		if idx >= 0 {
+			return uint32(lineStart + idx), true
+		}
+	}
+
+	// If we have a column, use it (1-based).
+	if f.Column > 0 {
+		return uint32(lineStart + f.Column - 1), true
+	}
+
+	// Fall back to the start of the line.
+	return uint32(lineStart), true
+}
+

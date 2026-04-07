@@ -1,0 +1,196 @@
+package languages
+
+import (
+	"github.com/turenlabs/batou-rules/rules"
+	"github.com/turenlabs/batou-core/taint"
+)
+
+func (c *GroovyCatalog) Sanitizers() []taint.SanitizerDef {
+	return []taint.SanitizerDef{
+		// --- Parameterized SQL ---
+		{
+			ID:          "groovy.sql.prepared",
+			Language:    rules.LangGroovy,
+			Pattern:     `PreparedStatement|\.execute\s*\([^"]*,\s*\[`,
+			ObjectType:  "groovy.sql.Sql",
+			MethodName:  "execute (parameterized)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Groovy SQL with parameter list (parameterized query)",
+		},
+		{
+			ID:          "groovy.sql.params.list",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.rows\s*\([^,]+,\s*\[|\.firstRow\s*\([^,]+,\s*\[|\.executeUpdate\s*\([^,]+,\s*\[`,
+			ObjectType:  "groovy.sql.Sql",
+			MethodName:  "rows/firstRow/executeUpdate (parameterized)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Groovy SQL query methods with parameter list",
+		},
+
+		// --- HTML escaping ---
+		{
+			ID:          "groovy.htmlutils.htmlescape",
+			Language:    rules.LangGroovy,
+			Pattern:     `HtmlUtils\.htmlEscape\s*\(`,
+			ObjectType:  "HtmlUtils",
+			MethodName:  "htmlEscape",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate},
+			Description: "Spring HtmlUtils HTML escaping",
+		},
+		{
+			ID:          "groovy.stringescapeutils",
+			Language:    rules.LangGroovy,
+			Pattern:     `StringEscapeUtils\.escapeHtml\s*\(|StringEscapeUtils\.escapeXml\s*\(`,
+			ObjectType:  "StringEscapeUtils",
+			MethodName:  "escapeHtml/escapeXml",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate},
+			Description: "Apache Commons StringEscapeUtils HTML/XML escaping",
+		},
+		{
+			ID:          "groovy.encodeashtml",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.encodeAsHTML\s*\(`,
+			ObjectType:  "Grails",
+			MethodName:  "encodeAsHTML",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate},
+			Description: "Grails encodeAsHTML codec",
+		},
+		{
+			ID:          "groovy.encodeasurl",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.encodeAsURL\s*\(`,
+			ObjectType:  "Grails",
+			MethodName:  "encodeAsURL",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkRedirect},
+			Description: "Grails encodeAsURL codec",
+		},
+
+		// --- Access control annotations ---
+		{
+			ID:          "groovy.spring.secured",
+			Language:    rules.LangGroovy,
+			Pattern:     `@Secured`,
+			ObjectType:  "Spring",
+			MethodName:  "@Secured",
+			Neutralizes: []taint.SinkCategory{taint.SnkRedirect, taint.SnkFileWrite},
+			Description: "Spring Security @Secured annotation enforces access control",
+		},
+		{
+			ID:          "groovy.spring.preauthorize",
+			Language:    rules.LangGroovy,
+			Pattern:     `@PreAuthorize`,
+			ObjectType:  "Spring",
+			MethodName:  "@PreAuthorize",
+			Neutralizes: []taint.SinkCategory{taint.SnkRedirect, taint.SnkFileWrite},
+			Description: "Spring Security @PreAuthorize annotation enforces access control",
+		},
+
+		// --- Input validation ---
+		{
+			ID:          "groovy.integer.parseint",
+			Language:    rules.LangGroovy,
+			Pattern:     `Integer\.parseInt\s*\(|\.toInteger\s*\(|as\s+Integer`,
+			ObjectType:  "",
+			MethodName:  "parseInt/toInteger",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite},
+			Description: "Integer conversion restricts to numeric values",
+		},
+		{
+			ID:          "groovy.commandobject",
+			Language:    rules.LangGroovy,
+			Pattern:     `@Validateable|class\s+\w+Command\b`,
+			ObjectType:  "Grails",
+			MethodName:  "Command object",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
+			Description: "Grails command object with validation",
+		},
+
+		// --- XXE prevention ---
+		{
+			ID:          "groovy.xmlslurper.secure",
+			Language:    rules.LangGroovy,
+			Pattern:     `setFeature\s*\(\s*.*disallow-doctype-decl|XMLConstants\.FEATURE_SECURE_PROCESSING`,
+			ObjectType:  "XmlSlurper",
+			MethodName:  "setFeature (secure)",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "XML parser with XXE protection enabled",
+		},
+
+		// --- LDAP escaping ---
+		{
+			ID:          "groovy.ldap.escape",
+			Language:    rules.LangGroovy,
+			Pattern:     `LdapEncoder\.filterEncode\s*\(|LdapNameBuilder|LdapUtils\.convertBinary`,
+			ObjectType:  "LdapEncoder",
+			MethodName:  "LdapEncoder.filterEncode",
+			Neutralizes: []taint.SinkCategory{taint.SnkLDAP},
+			Description: "LDAP filter encoding to prevent injection",
+		},
+
+		// --- Log sanitization ---
+		{
+			ID:          "groovy.log.sanitize",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.replaceAll\s*\(\s*"[\[\(]\\\\[nrt][\]\)]"`,
+			ObjectType:  "",
+			MethodName:  "replaceAll(newlines)",
+			Neutralizes: []taint.SinkCategory{taint.SnkLog},
+			Description: "Log injection prevention via control character removal",
+		},
+
+		// --- Regex validation ---
+		{
+			ID:          "groovy.regex.matches",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.matches\s*\(|==~\s*/`,
+			ObjectType:  "String",
+			MethodName:  "matches/==~",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
+			Description: "Regex validation restricts input to safe patterns",
+		},
+
+		// --- URL validation ---
+		{
+			ID:          "groovy.url.validate",
+			Language:    rules.LangGroovy,
+			Pattern:     `new\s+URL\s*\(.*\)\.toURI\s*\(|URI\.create\s*\(`,
+			ObjectType:  "URL",
+			MethodName:  "URL.toURI",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URL/URI parsing and validation",
+		},
+
+		// --- Path normalization ---
+		{
+			ID:          "groovy.file.canonicalpath",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.getCanonicalPath\s*\(|\.getCanonicalFile\s*\(|\.normalize\s*\(`,
+			ObjectType:  "File",
+			MethodName:  "getCanonicalPath",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Description: "Path canonicalization prevents directory traversal",
+		},
+
+		// --- Regex escaping ---
+		{
+			ID:          "groovy.pattern.quote",
+			Language:    rules.LangGroovy,
+			Pattern:     `Pattern\.quote\s*\(|Matcher\.quoteReplacement\s*\(`,
+			ObjectType:  "Pattern",
+			MethodName:  "quote/quoteReplacement",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
+			Description: "Regex/replacement metacharacter escaping (prevents ReDoS)",
+		},
+
+		// --- Numeric conversion ---
+		{
+			ID:          "groovy.tointeger",
+			Language:    rules.LangGroovy,
+			Pattern:     `\.toInteger\s*\(|\.toDouble\s*\(|\.toLong\s*\(|\.toFloat\s*\(`,
+			ObjectType:  "",
+			MethodName:  "toInteger/toDouble/toLong/toFloat",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Groovy numeric type conversion (restricts to numeric values)",
+		},
+	}
+}
