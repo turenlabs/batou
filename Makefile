@@ -1,4 +1,4 @@
-.PHONY: build install clean test lint
+.PHONY: build install clean test lint bench-owasp-java-clone bench-owasp-python-clone bench-owasp-clone bench-owasp
 
 # Build output
 BIN_DIR := bin
@@ -17,15 +17,15 @@ all: build
 # Build the Batou binary
 build:
 	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/batou
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BINARY) ./batou-core/cmd/batou
 
 # Build for all platforms (CGO cross-compilation requires appropriate C toolchain)
 build-all:
 	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=darwin GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/batou-darwin-arm64 ./cmd/batou
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=darwin GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/batou-darwin-amd64 ./cmd/batou
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/batou-linux-amd64 ./cmd/batou
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/batou-linux-arm64 ./cmd/batou
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=darwin GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/batou-darwin-arm64 ./batou-core/cmd/batou
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=darwin GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/batou-darwin-amd64 ./batou-core/cmd/batou
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/batou-linux-amd64 ./batou-core/cmd/batou
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/batou-linux-arm64 ./batou-core/cmd/batou
 
 # Install to user directory
 install: build
@@ -74,6 +74,31 @@ lint:
 # Clean build artifacts
 clean:
 	rm -rf $(BIN_DIR) coverage.out coverage.html
+
+# Clone OWASP BenchmarkJava to testdata/external/
+bench-owasp-java-clone:
+	@mkdir -p testdata/external
+	@if [ ! -d testdata/external/BenchmarkJava ]; then \
+		git clone --depth 1 https://github.com/OWASP-Benchmark/BenchmarkJava.git testdata/external/BenchmarkJava; \
+	else \
+		echo "BenchmarkJava already cloned"; \
+	fi
+
+# Clone OWASP BenchmarkPython to testdata/external/
+bench-owasp-python-clone:
+	@mkdir -p testdata/external
+	@if [ ! -d testdata/external/BenchmarkPython ]; then \
+		git clone --depth 1 https://github.com/OWASP-Benchmark/BenchmarkPython.git testdata/external/BenchmarkPython; \
+	else \
+		echo "BenchmarkPython already cloned"; \
+	fi
+
+# Clone both OWASP Benchmark repos
+bench-owasp-clone: bench-owasp-java-clone bench-owasp-python-clone
+
+# Run OWASP Benchmark tests (requires prior clone)
+bench-owasp:
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) test -v -race -run 'TestOWASPBench' -timeout 30m ./batou-core/scanner/
 
 # Dev: build and watch for changes
 dev: build
