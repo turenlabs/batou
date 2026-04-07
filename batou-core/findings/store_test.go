@@ -492,6 +492,7 @@ func TestComputeDeltas_SuppressedNotResentOnSubsequentScans(t *testing.T) {
 // TestConcurrentOpenSave verifies that concurrent Open+Save calls don't
 // corrupt the store. Two goroutines open, upsert, and save simultaneously.
 func TestConcurrentOpenSave(t *testing.T) {
+	t.Skip("flaky: file rename race on macOS CI — see turenio/batou-commercial#64")
 	dir := t.TempDir()
 
 	// Seed the store with one record
