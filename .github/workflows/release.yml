@@ -46,7 +46,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           VERSION="${GITHUB_REF_NAME}"
-          go build -trimpath -ldflags "-s -w -X 'main.version=${VERSION}'" -o ${{ matrix.artifact }} ./cmd/batou
+          go build -trimpath -ldflags "-s -w -X 'main.version=${VERSION}'" -o ${{ matrix.artifact }} ./batou-core/cmd/batou
 
       - uses: actions/upload-artifact@v4
         with:

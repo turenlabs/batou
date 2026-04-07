@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Batou - Generation-time SAST for Claude Code
+# Batou - Code guard for your AI agents
 # Installation Script
 #
 # Downloads the latest Batou binary from GitHub releases and optionally
@@ -39,7 +39,7 @@ banner() {
     echo "  ║  ██████╔╝██║  ██║   ██║   ╚██████╔╝╚██████╔╝         ║"
     echo "  ║  ╚═════╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝  ╚═════╝         ║"
     echo "  ║                                                       ║"
-    echo "  ║   Generation-time SAST for Claude Code              ║"
+    echo "  ║   Code guard for your AI agents                       ║"
     echo "  ║                                                       ║"
     echo "  ╚═══════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -362,7 +362,7 @@ echo ""
 success "Batou installation complete!"
 echo ""
 info "Quick test:"
-echo "  echo '{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"test.py\",\"content\":\"import pickle; pickle.loads(user_data)\"}}' | $BIN_DIR/batou"
+echo "  echo '{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"test.py\",\"content\":\"import pickle\\npickle.loads(user_data)\"}}' | $BIN_DIR/batou"
 echo ""
 info "To scan code as it's written, Batou hooks are active in Claude Code."
 echo ""
