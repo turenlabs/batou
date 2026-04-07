@@ -74,7 +74,7 @@ var (
 func init() {
 	rules.Register(&DebugMode{})
 	rules.Register(&ErrorDisclosure{})
-	rules.Register(&MissingSecurityHeaders{})
+	// rules.Register(&MissingSecurityHeaders{}) // Removed: low-value noise rule
 }
 
 // --- BATOU-MISC-001: DebugMode ---

@@ -1,5 +1,5 @@
 // Source: OWASP Juice Shop - DOM XSS via search query reflection
-// Expected: BATOU-GEN-018, BATOU-XSS-001, BATOU-JSAST
+// Expected: BATOU-GEN-018 (innerHTML assignment), BATOU-XSS-001 (innerHTML)
 // OWASP: A03:2021 - Injection (DOM-based XSS)
 
 export function initSearchPage(): void {

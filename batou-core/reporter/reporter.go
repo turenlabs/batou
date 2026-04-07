@@ -18,6 +18,8 @@ type ScanResult struct {
 	RulesRun           int             `json:"rules_run"`
 	ScanTimeMs         int64           `json:"scan_time_ms"`
 	HintsOutput        string          `json:"hints_output,omitempty"`
+	SuppressOnlyEdit   bool            `json:"suppress_only_edit,omitempty"`
+	PreSuppressBlock   bool            `json:"pre_suppress_block,omitempty"`
 }
 
 // MaxSeverity returns the highest severity among all findings.
@@ -47,15 +49,6 @@ func (r *ScanResult) ShouldBlock() bool {
 	return false
 }
 
-// CountBySeverity returns the count of findings at each severity level.
-func (r *ScanResult) CountBySeverity() map[rules.Severity]int {
-	counts := make(map[rules.Severity]int)
-	for _, f := range r.Findings {
-		counts[f.Severity]++
-	}
-	return counts
-}
-
 // FormatForClaude formats the scan results as context for Claude.
 // This is the string injected into additionalContext so Claude
 // sees the findings and can act on them.
@@ -66,23 +59,42 @@ func FormatForClaude(result *ScanResult) string {
 
 	var b strings.Builder
 
-	counts := result.CountBySeverity()
-	b.WriteString(fmt.Sprintf("\n--- Batou Security Scan [%s] ---\n", result.FilePath))
-	b.WriteString(fmt.Sprintf("Language: %s | Findings: %d | Rules checked: %d | Time: %dms\n",
-		result.Language, len(result.Findings), result.RulesRun, result.ScanTimeMs))
+	fmt.Fprintf(&b, "\n--- Batou Security Scan [%s] ---\n", result.FilePath)
+	fmt.Fprintf(&b, "Language: %s | Findings: %d | Rules checked: %d | Time: %dms\n",
+		result.Language, len(result.Findings), result.RulesRun, result.ScanTimeMs)
 
-	// Summary bar
-	parts := []string{}
-	for _, sev := range []rules.Severity{rules.Critical, rules.High, rules.Medium, rules.Low, rules.Info} {
-		if c, ok := counts[sev]; ok && c > 0 {
-			parts = append(parts, fmt.Sprintf("%s:%d", sev, c))
+	// Risk summary bar
+	var blocking, high, medium, low int
+	for _, f := range result.Findings {
+		switch {
+		case f.RiskScore >= 0.7:
+			blocking++
+		case f.RiskScore >= 0.4:
+			high++
+		case f.RiskScore >= 0.2:
+			medium++
+		default:
+			low++
 		}
 	}
-	b.WriteString(fmt.Sprintf("Severity: %s\n\n", strings.Join(parts, " | ")))
+	parts := []string{}
+	if blocking > 0 {
+		parts = append(parts, fmt.Sprintf("blocking:%d", blocking))
+	}
+	if high > 0 {
+		parts = append(parts, fmt.Sprintf("high-risk:%d", high))
+	}
+	if medium > 0 {
+		parts = append(parts, fmt.Sprintf("medium-risk:%d", medium))
+	}
+	if low > 0 {
+		parts = append(parts, fmt.Sprintf("low-risk:%d", low))
+	}
+	fmt.Fprintf(&b, "Risk: %s\n\n", strings.Join(parts, " | "))
 
 	// Detail for each finding
 	for i, f := range result.Findings {
-		b.WriteString(fmt.Sprintf("(%d) %s\n", i+1, f.FormatDetail()))
+		fmt.Fprintf(&b, "(%d) %s\n", i+1, f.FormatDetail())
 		if i < len(result.Findings)-1 {
 			b.WriteString("\n")
 		}
@@ -96,7 +108,7 @@ func FormatForClaude(result *ScanResult) string {
 	}
 
 	b.WriteString("\nFalse positive? Add above the flagged line:\n")
-	b.WriteString(fmt.Sprintf("  %s batou:ignore <RULE-ID> -- <reason>\n", commentPrefixForLang(result.Language)))
+	fmt.Fprintf(&b, "  %s batou:ignore <RULE-ID> -- <reason>\n", commentPrefixForLang(result.Language))
 
 	b.WriteString("--- End Batou Scan ---\n")
 
@@ -113,32 +125,32 @@ func FormatBlockMessage(result *ScanResult) string {
 
 	for _, f := range result.Findings {
 		if f.ShouldBlock() {
-			b.WriteString(fmt.Sprintf("[%s] %s: %s\n", f.Severity, f.RuleID, f.Title))
+			fmt.Fprintf(&b, "[%s] %s: %s\n", f.Severity, f.RuleID, f.Title)
 			if f.FilePath != "" {
 				loc := f.FilePath
 				if f.LineNumber > 0 {
 					loc = fmt.Sprintf("%s:%d", f.FilePath, f.LineNumber)
 				}
-				b.WriteString(fmt.Sprintf("  Location: %s\n", loc))
+				fmt.Fprintf(&b, "  Location: %s\n", loc)
 			}
 			if f.MatchedText != "" {
 				snippet := f.MatchedText
 				if len(snippet) > 120 {
 					snippet = snippet[:120] + "..."
 				}
-				b.WriteString(fmt.Sprintf("  Vulnerable code: %s\n", snippet))
+				fmt.Fprintf(&b, "  Vulnerable code: %s\n", snippet)
 			}
-			b.WriteString(fmt.Sprintf("  Why: %s\n", f.Description))
+			fmt.Fprintf(&b, "  Why: %s\n", f.Description)
 			if f.Suggestion != "" {
-				b.WriteString(fmt.Sprintf("  Fix: %s\n", f.Suggestion))
+				fmt.Fprintf(&b, "  Fix: %s\n", f.Suggestion)
 			}
-			if f.ConfidenceScore > 0 {
-				b.WriteString(fmt.Sprintf("  Confidence: %.0f%%\n", f.ConfidenceScore*100))
+			if f.RiskScore > 0 {
+				fmt.Fprintf(&b, "  Risk: %.0f%%\n", f.RiskScore*100)
 			}
 			if f.CWEID != "" {
-				b.WriteString(fmt.Sprintf("  Reference: %s", f.CWEID))
+				fmt.Fprintf(&b, "  Reference: %s", f.CWEID)
 				if f.OWASPCategory != "" {
-					b.WriteString(fmt.Sprintf(", %s", f.OWASPCategory))
+					fmt.Fprintf(&b, ", %s", f.OWASPCategory)
 				}
 				b.WriteString("\n")
 			}
@@ -147,8 +159,8 @@ func FormatBlockMessage(result *ScanResult) string {
 	}
 
 	b.WriteString("ACTION: Rewrite the code to fix the critical vulnerabilities above, then retry the write.\n")
-	b.WriteString(fmt.Sprintf("\nFalse positive? Add above the flagged line:\n  %s batou:ignore <RULE-ID> -- <reason>\n",
-		commentPrefixForLang(result.Language)))
+	fmt.Fprintf(&b, "\nFalse positive? Add above the flagged line:\n  %s batou:ignore <RULE-ID> -- <reason>\n",
+		commentPrefixForLang(result.Language))
 
 	return b.String()
 }

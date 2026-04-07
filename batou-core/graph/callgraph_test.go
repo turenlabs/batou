@@ -368,3 +368,85 @@ func TestStats(t *testing.T) {
 		t.Errorf("TaintedFuncs = %d, want 1", stats.TaintedFuncs)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// FileTaintCache
+// ---------------------------------------------------------------------------
+
+func TestFileTaintCacheSetAndGet(t *testing.T) {
+	cg := graph.NewCallGraph("/project", "s1")
+
+	hash := graph.FileContentHash("package main\nfunc handler() {}")
+	cg.SetFileTaintCache("/project/handler.go", hash, 0)
+
+	entry := cg.GetFileTaintCache("/project/handler.go")
+	if entry == nil {
+		t.Fatal("expected cache entry, got nil")
+	}
+	if entry.ContentHash != hash {
+		t.Errorf("ContentHash = %d, want %d", entry.ContentHash, hash)
+	}
+	if entry.FlowCount != 0 {
+		t.Errorf("FlowCount = %d, want 0", entry.FlowCount)
+	}
+	if entry.ScannedAt.IsZero() {
+		t.Error("ScannedAt should not be zero")
+	}
+}
+
+func TestFileTaintCacheGetMissing(t *testing.T) {
+	cg := graph.NewCallGraph("/project", "s1")
+
+	if entry := cg.GetFileTaintCache("/project/nonexistent.go"); entry != nil {
+		t.Errorf("expected nil for missing entry, got %+v", entry)
+	}
+}
+
+func TestFileTaintCacheOverwrite(t *testing.T) {
+	cg := graph.NewCallGraph("/project", "s1")
+
+	hash1 := graph.FileContentHash("version1")
+	cg.SetFileTaintCache("/project/f.go", hash1, 3)
+
+	hash2 := graph.FileContentHash("version2")
+	cg.SetFileTaintCache("/project/f.go", hash2, 0)
+
+	entry := cg.GetFileTaintCache("/project/f.go")
+	if entry == nil {
+		t.Fatal("expected cache entry after overwrite")
+	}
+	if entry.ContentHash != hash2 {
+		t.Errorf("ContentHash should be updated, got %d want %d", entry.ContentHash, hash2)
+	}
+	if entry.FlowCount != 0 {
+		t.Errorf("FlowCount should be 0 after overwrite, got %d", entry.FlowCount)
+	}
+}
+
+func TestFileTaintCacheGetOnNilMap(t *testing.T) {
+	// Simulate a deserialized graph with nil FileTaintCaches.
+	cg := &graph.CallGraph{
+		Nodes: make(map[string]*graph.FuncNode),
+	}
+
+	if entry := cg.GetFileTaintCache("/any/path.go"); entry != nil {
+		t.Errorf("expected nil for nil map, got %+v", entry)
+	}
+}
+
+func TestFileContentHashDeterministic(t *testing.T) {
+	content := "package main\nfunc main() {}"
+	h1 := graph.FileContentHash(content)
+	h2 := graph.FileContentHash(content)
+	if h1 != h2 {
+		t.Errorf("same content should produce same hash: %d vs %d", h1, h2)
+	}
+}
+
+func TestFileContentHashDiffers(t *testing.T) {
+	h1 := graph.FileContentHash("version1")
+	h2 := graph.FileContentHash("version2")
+	if h1 == h2 {
+		t.Error("different content should produce different hashes")
+	}
+}

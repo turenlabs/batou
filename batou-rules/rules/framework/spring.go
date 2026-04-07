@@ -107,7 +107,7 @@ func init() {
 	rules.Register(&InsecureCookie{})
 	rules.Register(&FrameOptionsDisabled{})
 	rules.Register(&DispatcherForward{})
-	rules.Register(&SessionFixation{})
+	// rules.Register(&SessionFixation{}) // Removed: low-value noise rule
 }
 
 // --- BATOU-FW-SPRING-001: CSRF Disabled ---

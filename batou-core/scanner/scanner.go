@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -53,14 +54,40 @@ func Scan(input *hook.Input) *reporter.ScanResult {
 		return result
 	}
 
+	if shouldSkipFile(filePath, content) {
+		result.ScanTimeMs = time.Since(start).Milliseconds()
+		return result
+	}
+
 	// Normalize CRLF line endings to LF so that regex rules, taint
 	// analysis, and line splitting all behave consistently regardless
 	// of the line ending style used in the source file.
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 
+	// Detect agent adding new batou:ignore directives. In PreToolUse, compare
+	// the new content against the existing file to find freshly introduced
+	// suppress comments. Emit a high-visibility hint telling Claude to ask the
+	// user before suppressing.
+	if input.IsPreToolUse() {
+		detectNewSuppressDirectives(input, content, result)
+	}
+
 	// Skip generated / vendored files — they are not authored by the user
-	// and produce noise.
-	if fpfilter.IsGeneratedFile(filePath, content) || fpfilter.IsVendoredLibrary(filePath) {
+	// and produce noise. In PreToolUse, only trust the generated marker if
+	// it was already in the file on disk (not added by the current edit/write).
+	// This prevents an agent from injecting "Code generated - DO NOT EDIT"
+	// to bypass scanning entirely.
+	isGenerated := fpfilter.IsGeneratedFile(filePath, content)
+	if input.IsPreToolUse() && isGenerated {
+		// Check if the marker existed before this edit.
+		if existing, err := os.ReadFile(filePath); err == nil {
+			isGenerated = fpfilter.IsGeneratedFile(filePath, string(existing))
+		} else {
+			// New file (Write) — don't trust agent-provided generated markers.
+			isGenerated = false
+		}
+	}
+	if isGenerated || fpfilter.IsVendoredLibrary(filePath) {
 		result.ScanTimeMs = time.Since(start).Milliseconds()
 		return result
 	}
@@ -86,6 +113,12 @@ func Scan(input *hook.Input) *reporter.ScanResult {
 
 	select {
 	case <-done:
+		// Mark suppress-only edits so the block decision can let them through.
+		// This breaks the chicken-and-egg deadlock where pre-existing blocking
+		// findings prevent adding suppress directives to the file.
+		if input.IsPreToolUse() && isSuppressOnlyEdit(input) {
+			coreResult.SuppressOnlyEdit = true
+		}
 		return coreResult
 	case <-ctx.Done():
 		result.ScanTimeMs = time.Since(start).Milliseconds()
@@ -183,10 +216,21 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		return
 	}
 
-	// Parse inline suppression directives (early, before call graph so
-	// suppressedLines can filter sinks in taint signatures).
-	suppressions := suppress.Parse(content)
+	// Parse inline suppression directives from the PREPROCESSED content so
+	// line numbers match what rules report (rules scan preprocessed content).
+	// JoinContinuationLines preserves comment lines, so batou:ignore directives
+	// are still present and at the correct preprocessed line numbers.
+	suppressions := suppress.Parse(preprocessed)
 	suppressedLines := suppressions.SuppressedLines()
+
+	// Compute content hash for taint cache (FNV-1a, fast).
+	contentHash := graph.FileContentHash(content)
+
+	// Count taint flows from the TaintRule cache for the taint cache.
+	var taintFlowCount int
+	if cached, ok := sctx.TaintFlows.([]taint.TaintFlow); ok {
+		taintFlowCount = len(cached)
+	}
 
 	// Phase 2: Call graph update and interprocedural analysis
 	var callGraph *graph.CallGraph
@@ -214,7 +258,7 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 			// Extract just the function name from the ID
 			for _, id := range changedIDs {
 				// ID format is "filepath:FuncName"
-				if idx := lastIndexByte(id, ':'); idx >= 0 {
+				if idx := strings.LastIndexByte(id, ':'); idx >= 0 {
 					changedFuncName = id[idx+1:]
 					break
 				}
@@ -233,8 +277,8 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		interprocFindings = graph.PropagateInterproc(callGraph, changedIDs, fileContents, layer3Flows, suppressedLines)
 		findings = append(findings, interprocFindings...)
 
-		// Save updated graph (best-effort)
-		graph.SaveGraph(callGraph)
+		// Note: graph is saved AFTER suppression checks below, along with
+		// the taint cache population.
 	}
 
 	// AST-based false positive filtering: suppress findings that fall
@@ -247,16 +291,98 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		AssignBaseConfidenceScore(&findings[i])
 	}
 
-	// Apply inline suppressions BEFORE dedup so that suppressed findings
-	// cannot boost the confidence of non-suppressed winners via the
-	// multi-layer boost.
-	var suppressedFindings []rules.Finding
-	findings, suppressedFindings = suppress.Apply(suppressions, findings)
+	// Suppress regex-only findings for CWEs where taint analysis confirmed
+	// safety BEFORE dedup, so removed regex noise doesn't inflate the
+	// multi-layer boost. Two modes:
+	//   1. Taint found flows in this scan → regex-only findings for same CWEs
+	//      are redundant (existing behavior).
+	//   2. Taint ran and found 0 flows, AND the file taint cache confirms this
+	//      with a matching content hash → "negative confirmation" suppresses
+	//      regex findings for all taint-coverable CWEs.
+	findings = SuppressRegexWhenTaintClean(findings, callGraph, filePath, contentHash)
 
 	// Deduplicate findings that share the same (line, CWE) — keep the
 	// highest-fidelity finding (taint > AST > interprocedural > regex)
 	// and merge tags from suppressed duplicates into the winner.
 	findings = DeduplicateFindings(findings)
+
+	// JavaScript/TypeScript scanner-level FP suppression: suppress regex+taint
+	// findings where safe APIs, sanitizers, or guard patterns neutralize the CWE.
+	if lang == rules.LangJavaScript || lang == rules.LangTypeScript {
+		findings = jsFilterAllFindings(content, findings)
+	}
+
+	// Go scanner-level FP suppression: suppress regex findings where Go safety
+	// patterns (filepath.Clean, url.Parse+host check, strconv.Atoi, etc.) are present.
+	if lang == rules.LangGo {
+		findings = goFilterAllFindings(content, findings)
+	}
+
+	// Python scanner-level FP suppression: suppress findings where Python
+	// framework patterns (SQLAlchemy ORM, jwt.encode, Pydantic, etc.) are safe.
+	if lang == rules.LangPython {
+		findings = pyFilterAllFindings(content, findings)
+	}
+
+	// Rust scanner-level FP suppression: suppress findings where Rust safety
+	// patterns (canonicalize+starts_with, .parse::<T>, typed deser, etc.) are present.
+	if lang == rules.LangRust {
+		findings = rustFilterAllFindings(content, findings)
+	}
+
+	// PHP scanner-level FP suppression: suppress findings where PHP safety
+	// patterns (htmlspecialchars, escapeshellarg, prepare, realpath, etc.) are present.
+	if lang == rules.LangPHP {
+		findings = phpFilterAllFindings(content, findings)
+	}
+
+	// Ruby scanner-level FP suppression: suppress findings where Ruby safety
+	// patterns (File.basename, expand_path+start_with?, sanitize, YAML.safe_load, etc.) are present.
+	if lang == rules.LangRuby {
+		findings = rubyFilterAllFindings(content, findings)
+	}
+
+	// C# scanner-level FP suppression: suppress findings where C# safety
+	// patterns (SqlParameter, HtmlEncode, Path.GetFullPath+StartsWith, etc.) are present.
+	if lang == rules.LangCSharp {
+		findings = csharpFilterAllFindings(content, findings)
+	}
+
+	// Now that suppression checks are done, populate the taint cache for
+	// future scans. This must happen AFTER SuppressRegexWhenTaintClean so
+	// the current scan doesn't read its own cache entry.
+	if callGraph != nil {
+		callGraph.SetFileTaintCache(filePath, contentHash, taintFlowCount)
+		if err := graph.SaveGraph(callGraph); err != nil {
+			fmt.Fprintf(os.Stderr, "Batou: graph save: %v\n", err)
+		}
+	}
+
+	// Compute initial risk scores so ShouldBlock() works during cap/suppress.
+	// Recomputed after edge-case adjustments below.
+	for i := range findings {
+		ComputeRiskScore(&findings[i])
+	}
+
+	// Record whether any finding would block BEFORE suppression. This prevents
+	// a bypass where an agent adds batou:ignore directives to cover vulnerable
+	// code — the suppress hides findings but PreSuppressBlock ensures the
+	// write is still blocked in PreToolUse.
+	for _, f := range findings {
+		if f.ShouldBlock() {
+			result.PreSuppressBlock = true
+			break
+		}
+	}
+
+	// Apply inline suppressions first: respect user's batou:ignore directives
+	// before capping, so suppressed findings don't consume cap slots.
+	var suppressedFindings []rules.Finding
+	findings, suppressedFindings = suppress.Apply(suppressions, findings)
+
+	// Cap findings to keep output actionable: max 3 per rule, 20 per file.
+	var cappedCount int
+	findings, cappedCount = CapFindings(findings, DefaultPerRuleCap, DefaultPerFileCap)
 
 	// Reduce severity for findings in test / fixture files.
 	// Test code intentionally contains vulnerable patterns so we downgrade
@@ -270,7 +396,7 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		}
 	}
 
-	// Edge-case confidence adjustments and sync string labels.
+	// Edge-case confidence adjustments, compute final risk score, and sync labels.
 	for i := range findings {
 		if findings[i].RuleID == "BATOU-TIMEOUT" || findings[i].RuleID == "BATOU-PANIC" {
 			findings[i].ConfidenceScore = 0.2
@@ -278,6 +404,7 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		if fpfilter.IsTestFile(filePath) && findings[i].ConfidenceScore > 0.3 {
 			findings[i].ConfidenceScore = 0.3
 		}
+		ComputeRiskScore(&findings[i])
 		findings[i].SyncConfidenceString()
 	}
 
@@ -333,6 +460,7 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 		ChangedFunc:        changedFuncName,
 		IsNewFile:          input.IsWriteOperation(),
 		ScanTimeMs:         result.ScanTimeMs,
+		CappedCount:        cappedCount,
 	}
 
 	hintList := hints.GenerateHints(hintCtx)
@@ -341,6 +469,29 @@ func scanCore(ctx context.Context, input *hook.Input, content, filePath string, 
 
 func resolveContent(input *hook.Input) string {
 	if input.IsPreToolUse() {
+		// For Edit PreToolUse, ResolveContent() returns only NewString
+		// (the replacement snippet), not the full file. Read the current
+		// file from disk and apply the edit so suppress directives and
+		// rules see the complete post-edit content.
+		if input.IsEditOperation() {
+			filePath := input.ResolvePath()
+			if filePath != "" {
+				if data, err := os.ReadFile(filePath); err == nil {
+					original := string(data)
+					old := input.ToolInput.OldString
+					new := input.ToolInput.NewString
+					if old != "" {
+						if input.ToolInput.ReplaceAll {
+							return strings.ReplaceAll(original, old, new)
+						}
+						if idx := strings.Index(original, old); idx >= 0 {
+							return original[:idx] + new + original[idx+len(old):]
+						}
+					}
+					return original
+				}
+			}
+		}
 		return input.ResolveContent()
 	}
 	filePath := input.ResolvePath()
@@ -354,13 +505,156 @@ func resolveContent(input *hook.Input) string {
 	return string(data)
 }
 
-func lastIndexByte(s string, c byte) int {
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == c {
-			return i
+
+// isSuppressOnlyEdit returns true if an Edit operation's diff only adds
+// batou:ignore directives (and whitespace/comments around them). This detects
+// the chicken-and-egg case where an agent can't add suppress directives because
+// the pre-existing findings block every edit to the file.
+func isSuppressOnlyEdit(input *hook.Input) bool {
+	if !input.IsEditOperation() {
+		return false
+	}
+	old := input.ToolInput.OldString
+	new := input.ToolInput.NewString
+	if old == "" || new == "" || old == new {
+		return false
+	}
+
+	// The new string must contain at least one batou:ignore directive.
+	if !strings.Contains(strings.ToLower(new), "batou:ignore") {
+		return false
+	}
+
+	// Split both into lines. Every line in new that isn't in old must be
+	// a suppress directive (or blank/comment-only whitespace around it).
+	oldLines := strings.Split(old, "\n")
+	newLines := strings.Split(new, "\n")
+
+	// Build a set of old lines for fast lookup.
+	oldSet := make(map[string]int, len(oldLines))
+	for _, l := range oldLines {
+		oldSet[strings.TrimSpace(l)]++
+	}
+
+	// Check each new line: if it wasn't in old, it must be a suppress directive or blank.
+	for _, l := range newLines {
+		trimmed := strings.TrimSpace(l)
+		if count, ok := oldSet[trimmed]; ok && count > 0 {
+			oldSet[trimmed]--
+			continue
+		}
+		// New line — must be suppress directive or empty.
+		if trimmed == "" {
+			continue
+		}
+		if !isSuppressComment(trimmed) {
+			return false
 		}
 	}
-	return -1
+	return true
+}
+
+// isSuppressComment returns true if the line is a comment containing batou:ignore.
+// Rejects string literals like `secret = "batou:ignore"` that contain the substring
+// but aren't actual suppress directives.
+func isSuppressComment(trimmed string) bool {
+	lower := strings.ToLower(trimmed)
+	if !strings.Contains(lower, "batou:ignore") {
+		return false
+	}
+	// Must start with a recognized comment prefix.
+	commentPrefixes := []string{"//", "#", "--", "/*", "<!--", "rem ", "'"}
+	for _, p := range commentPrefixes {
+		if strings.HasPrefix(lower, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// detectNewSuppressDirectives checks if the agent is adding new batou:ignore
+// directives. Compares new content against the file on disk. For each new
+// directive found, emits a high-visibility hint telling Claude to ask the user.
+func detectNewSuppressDirectives(input *hook.Input, newContent string, result *reporter.ScanResult) {
+	// Count suppress directives in new content.
+	newLines := strings.Split(newContent, "\n")
+	var newDirectives []int // 1-indexed line numbers with new directives
+	for i, line := range newLines {
+		if strings.Contains(strings.ToLower(line), "batou:ignore") {
+			newDirectives = append(newDirectives, i+1)
+		}
+	}
+	if len(newDirectives) == 0 {
+		return
+	}
+
+	// Read existing file to find pre-existing directives.
+	existingCount := 0
+	filePath := input.ResolvePath()
+	if filePath != "" {
+		if data, err := os.ReadFile(filePath); err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				if strings.Contains(strings.ToLower(line), "batou:ignore") {
+					existingCount++
+				}
+			}
+		}
+	}
+
+	// If new content has more directives than the existing file, the agent
+	// is adding suppression. Emit a finding for each new one.
+	added := len(newDirectives) - existingCount
+	if added <= 0 {
+		return
+	}
+
+	// Pick the line numbers of the last N directives (the new ones).
+	start := len(newDirectives) - added
+	for _, lineNum := range newDirectives[start:] {
+		result.Findings = append(result.Findings, rules.Finding{
+			RuleID:          "BATOU-SUPPRESS-REVIEW",
+			Severity:        rules.High,
+			SeverityLabel:   rules.High.String(),
+			Title:           "Fix the security issue instead of suppressing it",
+			Description:     "You are adding a batou:ignore directive instead of fixing the underlying issue. Remove the suppress comment and fix the code. If the finding is about missing auth, add auth. If it's about injection, use parameterized queries. If it's about secrets, use environment variables. Suppression is a last resort — fix the code first.",
+			Suggestion:      "Remove the batou:ignore comment and fix the underlying security issue. Write secure code instead of suppressing the warning.",
+			FilePath:        filePath,
+			LineNumber:      lineNum,
+			Confidence:      "high",
+			ConfidenceScore: 1.0,
+			RiskScore:       0.6, // High enough to show prominently, not enough to block
+			Tags:            []string{"suppress-review", "workflow"},
+		})
+	}
+}
+
+// shouldSkipFile returns true for files that should not be scanned because
+// they are non-source content (markdown, .claude/ config, empty files, or
+// stub __init__.py files).
+func shouldSkipFile(filePath, content string) bool {
+	// Skip markdown files — documentation, not source code.
+	if strings.EqualFold(filepath.Ext(filePath), ".md") {
+		return true
+	}
+
+	// Skip files inside .claude/ directories (config/metadata).
+	for _, part := range strings.Split(filepath.ToSlash(filePath), "/") {
+		if part == ".claude" {
+			return true
+		}
+	}
+
+	// Skip empty files (no content or whitespace-only).
+	if strings.TrimSpace(content) == "" {
+		return true
+	}
+
+	// Skip stub __init__.py files (empty or just whitespace).
+	if filepath.Base(filePath) == "__init__.py" && strings.TrimSpace(content) == "" {
+		return true
+	}
+
+	return false
 }
 
 // appendUnique appends tag to tags only if it is not already present.

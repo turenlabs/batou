@@ -62,7 +62,7 @@ var (
 var (
 	reWSMsgToSQL       = regexp.MustCompile(`(?i)(?:\.query|\.execute|\.exec|cursor\.execute|db\.query)\s*\(\s*(?:["'][^"']*["']\s*\+\s*(?:message|msg|data|payload)|f["'][^"']*\{(?:message|msg|data|payload)|["'][^"']*["']\s*%\s*(?:message|msg|data|payload))`)
 	reWSMsgToMongo     = regexp.MustCompile(`(?i)(?:\.find|\.findOne|\.updateOne|\.deleteOne|\.aggregate)\s*\(\s*(?:JSON\.parse\s*\(\s*(?:message|msg|data|payload)|\{[^}]*:\s*(?:message|msg|data|payload))`)
-	reWSMsgToQuery     = regexp.MustCompile(`(?i)(?:message|msg|data|payload|event\.data)\s*.*(?:\.query|\.execute|\.exec|db\.)\s*\(`)
+	reWSMsgToQuery     = regexp.MustCompile(`(?i)\b(?:message|msg|payload|event\.data)\s*.*(?:\.query|\.execute|\.exec|db\.)\s*\(`)
 )
 
 // ---------------------------------------------------------------------------

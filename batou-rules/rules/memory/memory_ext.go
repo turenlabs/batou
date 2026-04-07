@@ -39,6 +39,11 @@ var (
 	reExtFmtStrFunc   = regexp.MustCompile(`\b(printf|fprintf|sprintf|snprintf|syslog|err|warn|vprintf|vfprintf|vsprintf|vsnprintf)\s*\(`)
 	reExtFmtStrVar    = regexp.MustCompile(`\b(?:printf|fprintf|sprintf|snprintf|syslog|err|warn)\s*\([^"]*[a-zA-Z_]\w*\s*[,)]`)
 	reExtFmtStrLiteral = regexp.MustCompile(`\b(?:printf|syslog|err|warn)\s*\(\s*"`)
+	// Broader literal checks for multi-arg functions: fprintf(file, ".."), snprintf(buf, sz, "..")
+	reExtFmtStrFprintfLiteral  = regexp.MustCompile(`\bfprintf\s*\(\s*\w+\s*,\s*"`)
+	reExtFmtStrSnprintfLiteral = regexp.MustCompile(`\bsnprintf\s*\(\s*\w+\s*,\s*[^,]+,\s*"`)
+	reExtFmtStrSprintfLiteral  = regexp.MustCompile(`\bsprintf\s*\(\s*\w+\s*,\s*"`)
+	reExtFmtStrSyslogLiteral   = regexp.MustCompile(`\bsyslog\s*\(\s*\w+\s*,\s*"`)
 
 	// BATOU-MEM-012: Uninitialized variable use
 	reExtLocalDecl     = regexp.MustCompile(`^\s*(?:int|char|unsigned|long|short|float|double|size_t|ssize_t|off_t|pid_t|void\s*\*|[A-Z][a-zA-Z_]*\s*\*?)\s+([a-zA-Z_]\w*)\s*;`)
@@ -413,8 +418,13 @@ func (r *FormatStringExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if isCommentLine(line) {
 			continue
 		}
-		// Skip if the format string is a literal
-		if reExtFmtStrLiteral.MatchString(line) {
+		// Skip if the format string is a literal (single-arg: printf(".."),
+		// multi-arg: fprintf(f, ".."), snprintf(b, n, ".."), sprintf(b, "..")).
+		if reExtFmtStrLiteral.MatchString(line) ||
+			reExtFmtStrFprintfLiteral.MatchString(line) ||
+			reExtFmtStrSnprintfLiteral.MatchString(line) ||
+			reExtFmtStrSprintfLiteral.MatchString(line) ||
+			reExtFmtStrSyslogLiteral.MatchString(line) {
 			continue
 		}
 		if m := reExtFmtStrVar.FindString(line); m != "" {

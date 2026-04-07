@@ -42,6 +42,7 @@ const (
 	SnkSQLQuery    SinkCategory = "sql_query"      // SQL queries
 	SnkCommand     SinkCategory = "command_exec"    // OS command execution
 	SnkFileWrite   SinkCategory = "file_write"      // File path/write operations
+	SnkFileRead    SinkCategory = "file_read"       // File read operations (path traversal)
 	SnkHTMLOutput  SinkCategory = "html_output"     // HTML response/render (XSS)
 	SnkEval        SinkCategory = "code_eval"       // Dynamic code evaluation
 	SnkRedirect    SinkCategory = "redirect"        // URL redirect
@@ -51,9 +52,17 @@ const (
 	SnkTemplate    SinkCategory = "template_render" // Template rendering
 	SnkDeserialize SinkCategory = "deserialize"     // Deserialization input
 	SnkLog         SinkCategory = "log_output"      // Logging (log injection)
-	SnkCrypto      SinkCategory = "crypto_input"    // Cryptographic operations
-	SnkURLFetch    SinkCategory = "url_fetch"       // URL fetching (SSRF)
+	SnkCrypto        SinkCategory = "crypto_input"    // Cryptographic operations
+	SnkURLFetch      SinkCategory = "url_fetch"       // URL fetching (SSRF)
+	SnkTrustBoundary SinkCategory = "trust_boundary"  // Trust boundary violation (CWE-501)
 )
+
+// AllSinkCategories enumerates every SinkCategory for iteration.
+var AllSinkCategories = []SinkCategory{
+	SnkSQLQuery, SnkCommand, SnkFileWrite, SnkFileRead, SnkHTMLOutput,
+	SnkEval, SnkRedirect, SnkLDAP, SnkXPath, SnkHeader, SnkTemplate,
+	SnkDeserialize, SnkLog, SnkCrypto, SnkURLFetch, SnkTrustBoundary,
+}
 
 // SourceDef defines a pattern that introduces untrusted data.
 type SourceDef struct {
@@ -174,8 +183,7 @@ func (tf *TaintFlow) ToFinding() rules.Finding {
 		CWEID:           tf.Sink.CWEID,
 		OWASPCategory:   tf.Sink.OWASPCategory,
 		Confidence:      conf,
-		ConfidenceScore:  tf.Confidence,
-		ConfidencePreset: true,
+		ConfidenceScore: tf.Confidence,
 		Tags:            []string{"taint-analysis", "dataflow", string(tf.Source.Category), string(tf.Sink.Category)},
 	}
 }

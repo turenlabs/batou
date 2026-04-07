@@ -11,7 +11,15 @@ const (
 	ConfBaseInterproc   = 0.8
 	ConfMultiLayerBoost = 0.1
 	ConfBlockThreshold  = 0.7
+
+	// RiskBlockThreshold is the minimum RiskScore for a finding to block a write.
+	RiskBlockThreshold = 0.7
 )
+
+// ComputeRiskScore sets a finding's RiskScore from its severity and confidence.
+func ComputeRiskScore(f *rules.Finding) {
+	f.RiskScore = f.Severity.ImpactWeight() * f.ConfidenceScore
+}
 
 // AssignBaseConfidenceScore sets a baseline ConfidenceScore on a finding
 // based on which analysis tier produced it. Taint findings already carry
@@ -19,7 +27,7 @@ const (
 func AssignBaseConfidenceScore(f *rules.Finding) {
 	// Taint and interprocedural findings already have a score set
 	// at creation time — preserve it.
-	if f.ConfidencePreset {
+	if f.ConfidenceScore > 0 {
 		return
 	}
 

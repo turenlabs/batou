@@ -119,6 +119,50 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSaveAndLoadRoundTrip_FileTaintCache(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cg := graph.NewCallGraph(tmpDir, "session-tc")
+	hash := graph.FileContentHash("package main\nfunc handler() {}")
+	cg.SetFileTaintCache("/app/handler.go", hash, 0)
+	cg.SetFileTaintCache("/app/service.go", graph.FileContentHash("package main"), 5)
+
+	if err := graph.SaveGraph(cg); err != nil {
+		t.Fatalf("SaveGraph failed: %v", err)
+	}
+
+	loaded, err := graph.LoadGraph(tmpDir, "session-tc")
+	if err != nil {
+		t.Fatalf("LoadGraph failed: %v", err)
+	}
+
+	// Check the clean file cache entry.
+	entry := loaded.GetFileTaintCache("/app/handler.go")
+	if entry == nil {
+		t.Fatal("expected cache entry for /app/handler.go after round-trip")
+	}
+	if entry.ContentHash != hash {
+		t.Errorf("ContentHash = %d, want %d", entry.ContentHash, hash)
+	}
+	if entry.FlowCount != 0 {
+		t.Errorf("FlowCount = %d, want 0", entry.FlowCount)
+	}
+
+	// Check the file with flows.
+	entry2 := loaded.GetFileTaintCache("/app/service.go")
+	if entry2 == nil {
+		t.Fatal("expected cache entry for /app/service.go after round-trip")
+	}
+	if entry2.FlowCount != 5 {
+		t.Errorf("FlowCount = %d, want 5", entry2.FlowCount)
+	}
+
+	// Non-existent file should still return nil.
+	if loaded.GetFileTaintCache("/app/nonexistent.go") != nil {
+		t.Error("expected nil for non-existent file path in loaded cache")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // LoadGraph with non-existent file
 // ---------------------------------------------------------------------------

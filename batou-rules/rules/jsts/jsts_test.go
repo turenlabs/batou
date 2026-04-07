@@ -47,31 +47,6 @@ window.addEventListener('message', function(event) {
 // BATOU-JSTS-002: DOM clobbering risk
 // ==========================================================================
 
-func TestJSTS002_DOMClobber_GetElementById_Href(t *testing.T) {
-	content := `
-const link = document.getElementById('config').href;
-fetch(link).then(r => r.json());
-`
-	result := testutil.ScanContent(t, "/app/loader.js", content)
-	testutil.MustFindRule(t, result, "BATOU-JSTS-002")
-}
-
-func TestJSTS002_DOMClobber_QuerySelector_InnerHTML(t *testing.T) {
-	content := `
-const el = document.querySelector('#widget').innerHTML;
-`
-	result := testutil.ScanContent(t, "/app/widget.js", content)
-	testutil.MustFindRule(t, result, "BATOU-JSTS-002")
-}
-
-func TestJSTS002_DOMClobber_Forms(t *testing.T) {
-	content := `
-const action = document.forms['login'].action;
-`
-	result := testutil.ScanContent(t, "/app/form.js", content)
-	testutil.MustFindRule(t, result, "BATOU-JSTS-002")
-}
-
 // ==========================================================================
 // BATOU-JSTS-003: Regex DoS (ReDoS)
 // ==========================================================================

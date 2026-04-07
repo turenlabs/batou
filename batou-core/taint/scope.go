@@ -29,7 +29,6 @@ func detectScopesBrace(lines []string, lang rules.Language) []Scope {
 		startLine  int
 		params     []string
 		braceDepth int
-		parent     *Scope
 	}
 
 	var scopes []Scope
@@ -111,10 +110,6 @@ func detectScopesBrace(lines []string, lang rules.Language) []Scope {
 							Params:    top.params,
 							Body:      strings.Join(bodyLines, "\n"),
 							Lines:     bodyLines,
-						}
-						// If there's a parent pending, set the parent pointer when parent closes.
-						if len(stack) > 1 {
-							// We'll set parent later; for now, store nil.
 						}
 						scopes = append(scopes, scope)
 						stack = stack[:len(stack)-1]
@@ -967,12 +962,13 @@ func extractParamName(param string) string {
 func countIndent(line string) int {
 	count := 0
 	for _, ch := range line {
-		if ch == ' ' {
+		switch ch {
+		case ' ':
 			count++
-		} else if ch == '\t' {
+		case '\t':
 			count += 4
-		} else {
-			break
+		default:
+			return count
 		}
 	}
 	return count

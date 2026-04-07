@@ -24,8 +24,8 @@ func FixtureDir() string {
 	}
 	// thisFile is .../batou-core/testutil/fixtures.go
 	// module root is one directory up from testutil/
-	dir := filepath.Dir(thisFile)   // batou-core/testutil
-	moduleRoot := filepath.Dir(dir) // batou-core/
+	dir := filepath.Dir(thisFile)                  // batou-core/testutil
+	moduleRoot := filepath.Dir(dir)                // batou-core/
 	return filepath.Join(moduleRoot, "testdata", "fixtures")
 }
 

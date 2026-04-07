@@ -331,5 +331,49 @@ func (c *CCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
 			Description: "Strong SHA-512/384 hash function usage",
 		},
+
+		// --- ODBC parameterized query binding ---
+		{
+			ID:          "c.sql.odbc.bindparam",
+			Language:    rules.LangC,
+			Pattern:     `\bSQLBindParameter\s*\(`,
+			ObjectType:  "",
+			MethodName:  "SQLBindParameter",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "ODBC parameterized query binding (prevents SQL injection)",
+		},
+
+		// --- PCRE2 regex validation ---
+		{
+			ID:          "c.validate.pcre2_match",
+			Language:    rules.LangC,
+			Pattern:     `\bpcre2_match\s*\(`,
+			ObjectType:  "",
+			MethodName:  "pcre2_match",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand, taint.SnkSQLQuery, taint.SnkHTMLOutput, taint.SnkFileWrite},
+			Description: "PCRE2 regex matching for input validation (allowlist enforcement)",
+		},
+
+		// --- POSIX regex validation ---
+		{
+			ID:          "c.validate.regexec",
+			Language:    rules.LangC,
+			Pattern:     `\bregexec\s*\(`,
+			ObjectType:  "",
+			MethodName:  "regexec",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand, taint.SnkSQLQuery, taint.SnkHTMLOutput, taint.SnkFileWrite},
+			Description: "POSIX regex matching for input validation (allowlist enforcement)",
+		},
+
+		// --- Secure DNS resolution ---
+		{
+			ID:          "c.validate.inet_pton",
+			Language:    rules.LangC,
+			Pattern:     `\binet_pton\s*\(`,
+			ObjectType:  "",
+			MethodName:  "inet_pton",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch},
+			Description: "IP address parsing and validation (restricts to valid IP format)",
+		},
 	}
 }

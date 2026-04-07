@@ -750,6 +750,134 @@ func handler() {
 	}
 }
 
+// FP 3: _, err := f() should NOT be flagged — error IS captured.
+func TestAST004_SafeTupleReturnBlankFirst(t *testing.T) {
+	code := `package main
+
+import "os"
+
+func handler() error {
+	_, err := os.Open("/etc/passwd")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+`
+	findings := scanGo(code)
+	f := findByRule(findings, "BATOU-AST-004")
+	if f != nil {
+		t.Error("should not flag _, err := os.Open() — error is captured")
+	}
+}
+
+// FP 3: _, _, err := f() should NOT be flagged — error IS captured.
+func TestAST004_SafeMultiBlankWithErr(t *testing.T) {
+	code := `package main
+
+import "os"
+
+func doAuthRequest() ([]byte, int, error) {
+	return nil, 0, nil
+}
+
+func handler() error {
+	_, _, err := doAuthRequest()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+`
+	findings := scanGo(code)
+	f := findByRule(findings, "BATOU-AST-004")
+	if f != nil {
+		t.Error("should not flag _, _, err := f() — error is captured in last position")
+	}
+}
+
+// Confirm: result, _ := f() STILL flagged — error IS discarded.
+func TestAST004_StillFlaggedBlankError(t *testing.T) {
+	code := `package main
+
+import "os"
+
+func handler() {
+	f, _ := os.Open("/etc/passwd")
+	_ = f
+}
+`
+	findings := scanGo(code)
+	f := findByRule(findings, "BATOU-AST-004")
+	if f == nil {
+		t.Error("should flag f, _ := os.Open() — error is discarded")
+	}
+}
+
+// FP 4: Goroutine with context.WithTimeout(context.Background(), ...) is safe.
+func TestAST008_SafeGoroutineWithOwnContext(t *testing.T) {
+	code := `package main
+
+import (
+	"context"
+	"time"
+)
+
+func handler() {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = ctx
+	}()
+}
+`
+	findings := scanGo(code)
+	f := findByRule(findings, "BATOU-AST-008")
+	if f != nil {
+		t.Error("should not flag goroutine that creates its own context via WithTimeout(Background())")
+	}
+}
+
+// FP 4: Goroutine with context.WithCancel(context.Background()) is safe.
+func TestAST008_SafeGoroutineWithOwnCancelContext(t *testing.T) {
+	code := `package main
+
+import "context"
+
+func handler() {
+	go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		_ = ctx
+	}()
+}
+`
+	findings := scanGo(code)
+	f := findByRule(findings, "BATOU-AST-008")
+	if f != nil {
+		t.Error("should not flag goroutine that creates its own context via WithCancel(Background())")
+	}
+}
+
+// Confirm: bare goroutine without context STILL flagged.
+func TestAST008_StillFlaggedNoContext(t *testing.T) {
+	code := `package main
+
+func handler() {
+	go func() {
+		doWork()
+	}()
+}
+
+func doWork() {}
+`
+	findings := scanGo(code)
+	f := findByRule(findings, "BATOU-AST-008")
+	if f == nil {
+		t.Error("should still flag goroutine with no context at all")
+	}
+}
+
 // =========================================================================
 // Edge cases
 // =========================================================================

@@ -108,55 +108,6 @@ func TestAUTH003_CORSAllOrigins_Go(t *testing.T) {
 	testutil.MustFindRule(t, result, "BATOU-AUTH-003")
 }
 
-// --- BATOU-AUTH-004: Session Fixation ---
-
-func TestAUTH004_Python_LoginNoRegen(t *testing.T) {
-	content := `def login(request):
-    username = request.POST['username']
-    password = request.POST['password']
-    user = authenticate(username, password)
-    if user:
-        request.session['user_id'] = user.id
-        return redirect('/dashboard')`
-	result := testutil.ScanContent(t, "/app/auth.py", content)
-	testutil.MustFindRule(t, result, "BATOU-AUTH-004")
-}
-
-func TestAUTH004_Python_Safe_WithCycleKey(t *testing.T) {
-	content := `def login(request):
-    username = request.POST['username']
-    user = authenticate(username, request.POST['password'])
-    if user:
-        request.session.cycle_key()
-        request.session['user_id'] = user.id
-        return redirect('/dashboard')`
-	result := testutil.ScanContent(t, "/app/auth.py", content)
-	testutil.MustNotFindRule(t, result, "BATOU-AUTH-004")
-}
-
-func TestAUTH004_PHP_LoginNoRegen(t *testing.T) {
-	content := `<?php
-function login($user, $pass) {
-    if (check_password($user, $pass)) {
-        $_SESSION['user'] = $user;
-    }
-}`
-	result := testutil.ScanContent(t, "/app/auth.php", content)
-	testutil.MustFindRule(t, result, "BATOU-AUTH-004")
-}
-
-func TestAUTH004_Express_LoginNoRegen(t *testing.T) {
-	content := `app.post('/login', (req, res) => {
-	const { username, password } = req.body;
-	if (checkCredentials(username, password)) {
-		req.session.user = username;
-		res.redirect('/dashboard');
-	}
-});`
-	result := testutil.ScanContent(t, "/app/auth.ts", content)
-	testutil.MustFindRule(t, result, "BATOU-AUTH-004")
-}
-
 // --- BATOU-AUTH-005: Weak Password Policy ---
 
 func TestAUTH005_ShortMinLength(t *testing.T) {
@@ -298,3 +249,4 @@ func setup() {
 	result := testutil.ScanContent(t, "/app/setup.go", content)
 	testutil.MustNotFindRule(t, result, "BATOU-AUTH-007")
 }
+

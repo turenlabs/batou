@@ -17,8 +17,8 @@ var (
 	reSQLSprintfGo = regexp.MustCompile(`(?i)fmt\.Sprintf\(\s*"[^"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"]*%[svdq]`)
 	// Go: string concat with SQL keywords
 	reSQLConcatGo = regexp.MustCompile(`(?i)(?:"[^"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"]*"\s*\+|\+\s*"[^"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b)`)
-	// Python: f-string with SQL keywords
-	reSQLFStringPy = regexp.MustCompile(`(?i)f["'][^"']*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"']*\{`)
+	// Python: f-string with SQL keywords (allows escaped quotes like \' inside f-strings)
+	reSQLFStringPy = regexp.MustCompile(`(?i)f["'](?:[^"'\\]|\\.)*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b(?:[^"'\\]|\\.)*\{`)
 	// Python: % formatting with SQL keywords
 	reSQLPercentPy = regexp.MustCompile(`(?i)["'][^"']*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"']*["']\s*%\s*[(\w]`)
 	// Python: .format() with SQL keywords
@@ -95,6 +95,18 @@ var (
 	reLDAPFilter = regexp.MustCompile(`(?i)(?:search_filter|ldap_filter|filter)\s*=\s*(?:f["'][^"']*\{|["'][^"']*["']\s*[+%]|["'][^"']*["']\s*\.format)`)
 )
 
+// Python false-positive reduction patterns (shared by BATOU-INJ-003 and BATOU-INJ-004)
+var (
+	// Known sanitizer that returns safe values (e.g., OWASP benchmark get_safe_value)
+	rePySafeInputSource = regexp.MustCompile(`get_safe_value\s*\(`)
+	// Validation guard before eval/exec: checking string literal format
+	rePyEvalGuard = regexp.MustCompile(`(?i)\bnot\s+\w+\.startswith\s*\(\s*['"]`)
+	// Extract first f-string interpolation variable: {varName}
+	rePyFStringVar = regexp.MustCompile(`\{(\w+)\}`)
+	// Python user-input taint source indicators
+	rePyTaintKeywords = regexp.MustCompile(`\bparam\b|\brequest\b|\bwrapped\b`)
+)
+
 // Template Injection patterns (BATOU-INJ-005)
 var (
 	// Python: render_template_string with variable
@@ -123,9 +135,11 @@ var (
 	// XPath with format string
 	reXPathFormat = regexp.MustCompile(`(?i)(?:xpath|selectNodes|selectSingleNode|evaluate)\s*\(\s*(?:f["']|.*\.format\(|fmt\.Sprintf)`)
 	// XPath query construction
-	reXPathBuild = regexp.MustCompile(`(?i)(?:xpath_expr|xpath_query|xpath_string)\s*=\s*(?:f["'][^"']*\{|["'][^"']*["']\s*[+%]|["'][^"']*["']\s*\.format)`)
+	reXPathBuild = regexp.MustCompile(`(?i)(?:xpath_expr|xpath_query|xpath_string|query)\s*=\s*(?:f["'][^"']*\{|["'][^"']*["']\s*[+%]|["'][^"']*["']\s*\.format)`)
 	// Generic XPath pattern
 	reXPathGeneric = regexp.MustCompile(`(?i)["'][^"']*(?://|/)\w+\s*\[\s*@?\w+\s*=\s*["']\s*\+`)
+	// XPath f-string with path syntax: f'/root/element[@attr=\'{var}\']'
+	reXPathFString = regexp.MustCompile(`f["'][^"']*(?://|/)\w+\s*\[\s*@?\w+\s*=.*\{[a-zA-Z_]`)
 )
 
 // NoSQL Injection patterns (BATOU-INJ-007)
@@ -219,6 +233,33 @@ func truncate(s string, maxLen int) string {
 	return s
 }
 
+// pyHasSafeInputSource checks if the Python file's user input comes from a known
+// sanitizer (e.g., get_safe_value) rather than raw request data. When the input
+// is pre-sanitized, injection patterns in the same file are false positives.
+func pyHasSafeInputSource(content string) bool {
+	return rePySafeInputSource.MatchString(content)
+}
+
+// pyHasEvalGuard checks if there's a validation guard (e.g., startswith check)
+// before an eval/exec call on the given line range.
+func pyHasEvalGuard(lines []string, sinkIdx int) bool {
+	start := sinkIdx - 10
+	if start < 0 {
+		start = 0
+	}
+	for _, l := range lines[start:sinkIdx] {
+		if rePyEvalGuard.MatchString(l) {
+			return true
+		}
+	}
+	return false
+}
+
+// pyLastAssignmentIsSafe delegates to the shared implementation in rules.PyLastAssignmentIsSafe.
+func pyLastAssignmentIsSafe(lines []string, lineIdx int, varName string) bool {
+	return rules.PyLastAssignmentIsSafe(lines, lineIdx, varName)
+}
+
 // ---------------------------------------------------------------------------
 // BATOU-INJ-001: SQL Injection
 // ---------------------------------------------------------------------------
@@ -239,6 +280,11 @@ func (r SQLInjection) Languages() []rules.Language {
 }
 
 func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Frontend JS has no database access — suppress SQL injection findings.
+	if rules.IsFrontendJS(ctx) {
+		return nil
+	}
+
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -250,12 +296,7 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 	patterns := []pattern{
 		{reSQLSprintfGo, "high", rules.LangGo},
-		{reSQLConcatGo, "high", rules.LangGo},
-		{reSQLConcatGo, "high", rules.LangJava},
-		{reSQLConcatGo, "high", rules.LangJavaScript},
-		{reSQLConcatGo, "high", rules.LangTypeScript},
-		{reSQLConcatGo, "high", rules.LangCSharp},
-		{reSQLConcatGo, "high", rules.LangKotlin},
+		{reSQLConcatGo, "high", rules.LangAny},
 		{reSQLFStringPy, "high", rules.LangPython},
 		{reSQLPercentPy, "high", rules.LangPython},
 		{reSQLFormatPy, "high", rules.LangPython},
@@ -277,6 +318,10 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 				continue
 			}
 			if loc := p.re.FindStringIndex(line); loc != nil {
+				// Java: suppress if the concatenated variable has a safe data flow.
+				if ctx.Language == rules.LangJava && rules.JavaSinkVarIsSafe(lines, i) {
+					continue
+				}
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -323,6 +368,12 @@ func (r CommandInjection) Languages() []rules.Language {
 func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
+	isPython := ctx.Language == rules.LangPython
+
+	// Python-specific: if user input comes from a known sanitizer, skip.
+	if isPython && pyHasSafeInputSource(ctx.Content) {
+		return nil
+	}
 
 	type pattern struct {
 		re      *regexp.Regexp
@@ -364,6 +415,15 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 			if loc := p.re.FindStringIndex(line); loc != nil {
+				// Java: suppress if the sink variable has safe data flow.
+				if ctx.Language == rules.LangJava && rules.JavaSinkVarIsSafe(lines, i) {
+					continue
+				}
+				// Python: check if the sink variable was last assigned a safe value.
+				if isPython && rules.PySinkVarIsSafe(lines, i) {
+					continue
+				}
+
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -411,6 +471,12 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
+	// Python-specific: if user input comes from a known sanitizer, skip injection checks.
+	isPython := ctx.Language == rules.LangPython
+	if isPython && pyHasSafeInputSource(ctx.Content) {
+		return nil
+	}
+
 	type pattern struct {
 		re   *regexp.Regexp
 		conf string
@@ -442,6 +508,15 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 				// Skip re.compile/regex.compile/pattern.compile — regex compilation, not code execution
 				if p.re == reCodeCompile && reCodeSafeCompile.MatchString(line) {
 					continue
+				}
+				// Python: skip if a validation guard or safe assignment precedes eval/exec
+				if isPython && (p.re == reCodeEval || p.re == reCodeExecPy) {
+					if pyHasEvalGuard(lines, i) {
+						continue
+					}
+					if rules.PySinkVarIsSafe(lines, i) {
+						continue
+					}
 				}
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
@@ -490,6 +565,12 @@ func (r LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
+	// Python-specific: if user input comes from a known sanitizer, skip LDAP injection checks.
+	isPython := ctx.Language == rules.LangPython
+	if isPython && pyHasSafeInputSource(ctx.Content) {
+		return nil
+	}
+
 	type pattern struct {
 		re   *regexp.Regexp
 		conf string
@@ -507,6 +588,15 @@ func (r LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		for _, p := range patterns {
 			if loc := p.re.FindStringIndex(line); loc != nil {
+				// Java: suppress if the sink variable has safe data flow.
+				if ctx.Language == rules.LangJava && rules.JavaSinkVarIsSafe(lines, i) {
+					continue
+				}
+				// Python: check if the sink variable was last assigned a safe value.
+				if isPython && rules.PySinkVarIsSafe(lines, i) {
+					continue
+				}
+
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -623,6 +713,12 @@ func (r XPathInjection) Languages() []rules.Language {
 func (r XPathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
+	isPython := ctx.Language == rules.LangPython
+
+	// Python-specific: if user input comes from a known sanitizer, skip.
+	if isPython && pyHasSafeInputSource(ctx.Content) {
+		return nil
+	}
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -633,6 +729,7 @@ func (r XPathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		{reXPathConcat, "high"},
 		{reXPathFormat, "high"},
 		{reXPathBuild, "high"},
+		{reXPathFString, "high"},
 		{reXPathGeneric, "medium"},
 	}
 
@@ -642,6 +739,12 @@ func (r XPathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		for _, p := range patterns {
 			if loc := p.re.FindStringIndex(line); loc != nil {
+				// Python: check if the sink variable was last assigned a safe value,
+				// or if there is an XPath injection guard (apostrophe check).
+				if isPython && (rules.PySinkVarIsSafe(lines, i) || rules.PyHasXPathGuard(lines, i)) {
+					continue
+				}
+
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),

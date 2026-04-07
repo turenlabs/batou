@@ -119,6 +119,24 @@ var jsSources = []taint.SourceDef{
 
 	// Fastify additional sources
 	{ID: "js.fastify.request.headers", Category: taint.SrcUserInput, Pattern: `request\.headers`, ObjectType: "FastifyRequest", MethodName: "headers", Description: "Fastify request headers", Assigns: "return"},
+	{ID: "js.fastify.request.raw", Category: taint.SrcUserInput, Pattern: `request\.raw`, ObjectType: "FastifyRequest", MethodName: "raw", Description: "Fastify raw Node.js IncomingMessage", Assigns: "return"},
+
+	// Hono sources
+	{ID: "js.hono.req.query", Category: taint.SrcUserInput, Pattern: `c\.req\.query\s*\(`, ObjectType: "HonoContext", MethodName: "req.query", Description: "Hono query parameter", Assigns: "return"},
+	{ID: "js.hono.req.param", Category: taint.SrcUserInput, Pattern: `c\.req\.param\s*\(`, ObjectType: "HonoContext", MethodName: "req.param", Description: "Hono route parameter", Assigns: "return"},
+	{ID: "js.hono.req.json", Category: taint.SrcUserInput, Pattern: `c\.req\.json\s*\(`, ObjectType: "HonoContext", MethodName: "req.json", Description: "Hono JSON request body", Assigns: "return"},
+	{ID: "js.hono.req.header", Category: taint.SrcUserInput, Pattern: `c\.req\.header\s*\(`, ObjectType: "HonoContext", MethodName: "req.header", Description: "Hono request header value", Assigns: "return"},
+	{ID: "js.hono.req.text", Category: taint.SrcUserInput, Pattern: `c\.req\.text\s*\(`, ObjectType: "HonoContext", MethodName: "req.text", Description: "Hono raw body text", Assigns: "return"},
+	{ID: "js.hono.req.raw", Category: taint.SrcUserInput, Pattern: `c\.req\.raw`, ObjectType: "HonoContext", MethodName: "req.raw", Description: "Hono raw Request object", Assigns: "return"},
+
+	// Remix sources
+	{ID: "js.remix.request.formdata", Category: taint.SrcUserInput, Pattern: `request\.formData\s*\(`, ObjectType: "Request", MethodName: "formData", Description: "Remix form submission data", Assigns: "return"},
+	{ID: "js.remix.request.json", Category: taint.SrcUserInput, Pattern: `request\.json\s*\(`, ObjectType: "Request", MethodName: "json", Description: "Remix JSON request body", Assigns: "return"},
+	{ID: "js.remix.url.searchparams", Category: taint.SrcUserInput, Pattern: `new\s+URL\s*\(\s*request\.url\s*\)\.searchParams`, ObjectType: "URL", MethodName: "searchParams", Description: "Remix URL search parameters", Assigns: "return"},
+
+	// Astro sources
+	{ID: "js.astro.url.searchparams", Category: taint.SrcUserInput, Pattern: `Astro\.url\.searchParams`, ObjectType: "Astro", MethodName: "url.searchParams", Description: "Astro query parameters", Assigns: "return"},
+	{ID: "js.astro.request", Category: taint.SrcUserInput, Pattern: `Astro\.request`, ObjectType: "Astro", MethodName: "request", Description: "Astro request object", Assigns: "return"},
 
 	// Socket.IO additional sources
 	{ID: "js.socketio.handshake", Category: taint.SrcNetwork, Pattern: `socket\.handshake\.query`, ObjectType: "Socket", MethodName: "handshake.query", Description: "Socket.IO handshake query parameters", Assigns: "return"},
@@ -146,4 +164,17 @@ var jsSources = []taint.SourceDef{
 	// IP-based trust bypass sources
 	{ID: "js.express.req.headers.xforwardedfor", Category: taint.SrcUserInput, Pattern: `req\.headers\s*\[\s*['"]x-forwarded-for['"]\s*\]`, ObjectType: "Request", MethodName: "headers['x-forwarded-for']", Description: "X-Forwarded-For header (client-controlled, IP spoofing)", Assigns: "return"},
 	{ID: "js.express.req.socket.remoteaddress", Category: taint.SrcUserInput, Pattern: `req\.socket\.remoteAddress|req\.connection\.remoteAddress`, ObjectType: "Request", MethodName: "socket.remoteAddress", Description: "Client IP address from socket (spoofable via proxy)", Assigns: "return"},
+
+	// SvelteKit sources
+	{ID: "js.sveltekit.event.url.searchparams", Category: taint.SrcUserInput, Pattern: `event\.url\.searchParams\.get\s*\(`, ObjectType: "RequestEvent", MethodName: "event.url.searchParams.get", Description: "SvelteKit URL search parameter in load/actions", Assigns: "return"},
+	{ID: "js.sveltekit.event.request.formdata", Category: taint.SrcUserInput, Pattern: `event\.request\.formData\s*\(`, ObjectType: "RequestEvent", MethodName: "event.request.formData", Description: "SvelteKit form submission data in actions", Assigns: "return"},
+	{ID: "js.sveltekit.event.params", Category: taint.SrcUserInput, Pattern: `event\.params`, ObjectType: "RequestEvent", MethodName: "event.params", Description: "SvelteKit route parameters", Assigns: "return"},
+	{ID: "js.sveltekit.event.cookies.get", Category: taint.SrcUserInput, Pattern: `event\.cookies\.get\s*\(`, ObjectType: "RequestEvent", MethodName: "event.cookies.get", Description: "SvelteKit cookie value", Assigns: "return"},
+
+	// Next.js App Router sources
+	{ID: "js.nextjs.approuter.searchparams", Category: taint.SrcUserInput, Pattern: `searchParams\s*[\[.]`, ObjectType: "PageProps", MethodName: "searchParams", Description: "Next.js App Router searchParams page prop", Assigns: "return"},
+	{ID: "js.nextjs.approuter.params", Category: taint.SrcUserInput, Pattern: `params\.\w+`, ObjectType: "PageProps", MethodName: "params", Description: "Next.js App Router dynamic route params", Assigns: "return"},
+	{ID: "js.nextjs.cookies", Category: taint.SrcUserInput, Pattern: `cookies\s*\(\s*\)`, ObjectType: "next/headers", MethodName: "cookies", Description: "Next.js App Router cookies() from next/headers", Assigns: "return"},
+	{ID: "js.nextjs.headers", Category: taint.SrcUserInput, Pattern: `headers\s*\(\s*\)`, ObjectType: "next/headers", MethodName: "headers", Description: "Next.js App Router headers() from next/headers", Assigns: "return"},
+	{ID: "js.nextjs.nextrequest.nexturl.searchparams", Category: taint.SrcUserInput, Pattern: `NextRequest\.nextUrl\.searchParams|request\.nextUrl\.searchParams|req\.nextUrl\.searchParams`, ObjectType: "NextRequest", MethodName: "nextUrl.searchParams", Description: "Next.js NextRequest URL search parameters", Assigns: "return"},
 }

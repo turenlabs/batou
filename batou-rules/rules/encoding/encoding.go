@@ -103,7 +103,7 @@ func nearbyLines(lines []string, idx, window int) string {
 func init() {
 	rules.Register(&DoubleEncoding{})
 	rules.Register(&MissingOutputEncoding{})
-	rules.Register(&IncorrectCharEncoding{})
+	// rules.Register(&IncorrectCharEncoding{}) // Removed: low-value noise rule
 	rules.Register(&URLEncodingBypass{})
 	rules.Register(&Base64AsEncryption{})
 	rules.Register(&UnicodeNormBypass{})

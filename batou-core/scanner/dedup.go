@@ -38,7 +38,6 @@ func DeduplicateFindings(findings []rules.Finding) []rules.Finding {
 	}
 
 	groups := make(map[groupKey]*group)
-	order := make([]groupKey, 0)
 
 	for i, f := range findings {
 		// Never dedup findings without CWE or line number.
@@ -46,7 +45,8 @@ func DeduplicateFindings(findings []rules.Finding) []rules.Finding {
 			continue
 		}
 
-		key := groupKey{Line: f.LineNumber, CWE: f.CWEID}
+		cwe := strings.TrimPrefix(f.CWEID, "CWE-")
+		key := groupKey{Line: f.LineNumber, CWE: cwe}
 		if g, exists := groups[key]; exists {
 			g.members = append(g.members, i)
 			if beats(findings[i], findings[g.winnerIdx]) {
@@ -57,7 +57,6 @@ func DeduplicateFindings(findings []rules.Finding) []rules.Finding {
 				winnerIdx: i,
 				members:   []int{i},
 			}
-			order = append(order, key)
 		}
 	}
 
@@ -73,7 +72,8 @@ func DeduplicateFindings(findings []rules.Finding) []rules.Finding {
 			continue
 		}
 
-		key := groupKey{Line: f.LineNumber, CWE: f.CWEID}
+		cwe := strings.TrimPrefix(f.CWEID, "CWE-")
+		key := groupKey{Line: f.LineNumber, CWE: cwe}
 		if seen[key] {
 			continue
 		}

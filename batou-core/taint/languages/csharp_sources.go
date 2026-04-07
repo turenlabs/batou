@@ -301,6 +301,98 @@ func (c *CSharpCatalog) Sources() []taint.SourceDef {
 			Assigns:     "return",
 		},
 
+		// --- Blazor ---
+		{
+			ID:          "csharp.blazor.parameter",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `\[Parameter\]|\[SupplyParameterFromQuery\]|\[CascadingParameter\]`,
+			ObjectType:  "Blazor",
+			MethodName:  "[Parameter]/[SupplyParameterFromQuery]",
+			Description: "Blazor component parameter from URL or parent component",
+			Assigns:     "return",
+		},
+		{
+			ID:          "csharp.blazor.navigationmanager",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `NavigationManager\.Uri|NavigationManager\.ToAbsoluteUri`,
+			ObjectType:  "NavigationManager",
+			MethodName:  "NavigationManager.Uri",
+			Description: "Blazor NavigationManager URI (contains user-controlled URL)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "csharp.blazor.editcontext",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `EditContext\.Model|EditForm.*Model`,
+			ObjectType:  "EditContext",
+			MethodName:  "EditContext.Model",
+			Description: "Blazor EditForm model bound to user input",
+			Assigns:     "return",
+		},
+
+		// --- ASP.NET Core: Route values ---
+		{
+			ID:          "csharp.http.request.routevalues",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `Request\.RouteValues\[|RouteData\.Values\[|HttpContext\.GetRouteValue\s*\(`,
+			ObjectType:  "HttpRequest",
+			MethodName:  "RouteValues/GetRouteValue",
+			Description: "HTTP route parameter value",
+			Assigns:     "return",
+		},
+
+		// --- ASP.NET Core: Session ---
+		{
+			ID:          "csharp.http.session.getstring",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `HttpContext\.Session\.GetString\s*\(|Session\.GetString\s*\(|Session\.GetInt32\s*\(`,
+			ObjectType:  "ISession",
+			MethodName:  "Session.GetString/GetInt32",
+			Description: "Session data (may contain user-controlled values)",
+			Assigns:     "return",
+		},
+
+		// --- ASP.NET Core: TempData ---
+		{
+			ID:          "csharp.mvc.tempdata",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `TempData\[`,
+			ObjectType:  "ITempDataDictionary",
+			MethodName:  "TempData[]",
+			Description: "Temp data dictionary (may contain user-controlled values from previous request)",
+			Assigns:     "return",
+		},
+
+		// --- ASP.NET Core: Request content type/method ---
+		{
+			ID:          "csharp.http.request.contenttype",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `Request\.ContentType`,
+			ObjectType:  "HttpRequest",
+			MethodName:  "Request.ContentType",
+			Description: "HTTP request Content-Type header (user-controllable)",
+			Assigns:     "return",
+		},
+
+		// --- Host header injection ---
+		{
+			ID:          "csharp.http.request.host",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangCSharp,
+			Pattern:     `Request\.Host|HttpContext\.Request\.Host`,
+			ObjectType:  "HttpRequest",
+			MethodName:  "Request.Host",
+			Description: "HTTP Host header (user-controllable, used in password reset poisoning)",
+			Assigns:     "return",
+		},
+
 		// --- Additional ASP.NET sources ---
 		{
 			ID:          "csharp.http.request.rawurl",

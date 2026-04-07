@@ -22,8 +22,9 @@ var (
 
 // LUA-002: Code Injection
 var (
-	reLoadstring     = regexp.MustCompile(`loadstring\s*\(`)
-	reLoadFunc       = regexp.MustCompile(`\bload\s*\(\s*[a-zA-Z_]`)
+	reLoadstring       = regexp.MustCompile(`loadstring\s*\(`)
+	reLoadstringStatic = regexp.MustCompile(`loadstring\s*\(\s*["'][^"']*["']\s*\)`)
+	reLoadFunc         = regexp.MustCompile(`\bload\s*\(\s*[a-zA-Z_]`)
 	reDofileVar      = regexp.MustCompile(`dofile\s*\(\s*[a-zA-Z_]`)
 	reLoadfileVar    = regexp.MustCompile(`loadfile\s*\(\s*[a-zA-Z_]`)
 	reDofileStatic   = regexp.MustCompile(`dofile\s*\(\s*["'][^"']+["']\s*\)`)
@@ -209,7 +210,7 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		// loadstring() with any argument (always dangerous with variable input)
 		if reLoadstring.MatchString(line) {
 			// Check if it's a static string literal like loadstring("return 1")
-			if matched, _ := regexp.MatchString(`loadstring\s*\(\s*["'][^"']*["']\s*\)`, line); matched {
+			if reLoadstringStatic.MatchString(line) {
 				continue
 			}
 			findings = append(findings, rules.Finding{

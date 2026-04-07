@@ -152,6 +152,12 @@ func (r *LDAPInjectionBroad) Languages() []rules.Language {
 func (r *LDAPInjectionBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
+	isPython := ctx.Language == rules.LangPython
+
+	if isPython && pyHasSafeInputSource(ctx.Content) {
+		return nil
+	}
+
 	pats := []*regexp.Regexp{reLDAPConcatBroad, reLDAPFilterBuild}
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -159,6 +165,9 @@ func (r *LDAPInjectionBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		for _, p := range pats {
 			if loc := p.FindStringIndex(line); loc != nil {
+				if isPython && rules.PySinkVarIsSafe(lines, i) {
+					continue
+				}
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:       "LDAP injection via string concatenation",
@@ -196,6 +205,13 @@ func (r *XPathInjectionBroad) Languages() []rules.Language {
 func (r *XPathInjectionBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
+	isPython := ctx.Language == rules.LangPython
+
+	// Python: skip entire file if input comes from a known sanitizer.
+	if isPython && pyHasSafeInputSource(ctx.Content) {
+		return nil
+	}
+
 	pats := []*regexp.Regexp{reXPathConcatBroad, reXPathVarEmbed}
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -203,6 +219,11 @@ func (r *XPathInjectionBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		for _, p := range pats {
 			if loc := p.FindStringIndex(line); loc != nil {
+				// Python: check if the sink variable was last assigned a safe value,
+				// or if there is an input validation guard nearby.
+				if isPython && (rules.PySinkVarIsSafe(lines, i) || rules.PyHasXPathGuard(lines, i)) {
+					continue
+				}
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:       "XPath injection via string concatenation",

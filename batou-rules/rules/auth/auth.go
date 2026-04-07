@@ -42,6 +42,10 @@ var (
 	reCORSWildcardPy     = regexp.MustCompile(`(?i)CORS_ALLOW_ALL_ORIGINS\s*=\s*True`)
 )
 
+// JWT/Bearer auth indicator — files using stateless token auth are not
+// susceptible to session-fixation or CSRF attacks that require cookies.
+var reJWTBearerAuth = regexp.MustCompile(`(?i)(?:jsonwebtoken|PyJWT|\bjose\b|HTTPBearer|OAuth2PasswordBearer|JWTBearer|Authorization.*Bearer|bearer_token|access_token.*jwt|token.*decode|import\s+jwt\b|from\s+jwt\b|\"jwt\"|\'jwt\')`)
+
 // BATOU-AUTH-004: Session fixation patterns
 var (
 	reLoginHandler       = regexp.MustCompile(`(?i)(?:def\s+login|func.*login|function\s+login|\.post\s*\(\s*['"]\/login)`)
@@ -357,6 +361,11 @@ func (r *SessionFixation) Languages() []rules.Language {
 }
 
 func (r *SessionFixation) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Stateless JWT/Bearer auth has no server-side sessions to regenerate.
+	if reJWTBearerAuth.MatchString(ctx.Content) {
+		return nil
+	}
+
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -795,7 +804,7 @@ func init() {
 	rules.Register(&HardcodedCredentialCheck{})
 	rules.Register(&MissingAuthCheck{})
 	rules.Register(&CORSWildcard{})
-	rules.Register(&SessionFixation{})
+	// rules.Register(&SessionFixation{}) // Removed: low-value noise rule
 	rules.Register(&WeakPasswordPolicy{})
 	rules.Register(&InsecureCookie{})
 	rules.Register(&PrivilegeEscalation{})

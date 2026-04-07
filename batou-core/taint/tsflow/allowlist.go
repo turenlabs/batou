@@ -230,6 +230,122 @@ func isMembershipMethod(name string) bool {
 	return false
 }
 
+// detectValidationGuard detects patterns where a tainted variable calls a
+// validation/checking method with a literal argument, indicating input validation.
+// This is the inverse of detectAllowlistCheck: instead of COLLECTION.contains(tainted),
+// it detects tainted.contains("bad_value"), tainted.starts_with("//"), etc.
+//
+// Recognized patterns:
+//   - Rust/JS/general: x.contains(".."), x.starts_with("//"), x.ends_with(".txt")
+//   - Rust: x.is_empty(), x.is_ascii(), x.len() > N
+//   - Rust: x.chars().all(|c| ...) — character validation closures
+//   - Negation: !x.contains("..") { return } still validates x
+//
+// Returns the tainted variable name if a validation pattern is found.
+func detectValidationGuard(cond *ast.Node, tm *taintMap, cfg *langConfig) *allowlistCheckResult {
+	if cond == nil {
+		return nil
+	}
+
+	// Unwrap parenthesized expressions.
+	for cond.Type() == "parenthesized_expression" {
+		named := cond.NamedChildren()
+		if len(named) != 1 {
+			break
+		}
+		cond = named[0]
+	}
+
+	// Unwrap negation: !x.contains("..") still validates x
+	inner := cond
+	if inner.Type() == "unary_expression" || inner.Type() == "not_operator" {
+		named := inner.NamedChildren()
+		if len(named) == 1 {
+			inner = named[0]
+			// Unwrap parenthesized inside negation
+			for inner.Type() == "parenthesized_expression" {
+				named = inner.NamedChildren()
+				if len(named) != 1 {
+					break
+				}
+				inner = named[0]
+			}
+		}
+	}
+
+	// Check for method call on tainted variable: x.method(literal)
+	if cfg.callTypes[inner.Type()] {
+		methodName := strings.ToLower(cfg.extractCallName(inner))
+		if isValidationMethod(methodName) {
+			recv := cfg.extractCallReceiver(inner)
+			if recv != "" {
+				// Check the base receiver (before chained calls like x.chars().all())
+				baseRecv := extractBaseReceiver(inner, cfg)
+				if baseRecv != "" {
+					if ts := tm.get(baseRecv); ts != nil && ts.source != nil {
+						return &allowlistCheckResult{varName: baseRecv}
+					}
+				}
+				if ts := tm.get(recv); ts != nil && ts.source != nil {
+					return &allowlistCheckResult{varName: recv}
+				}
+			}
+		}
+	}
+
+	// Check binary expressions: x.contains("..") || x.contains("/")
+	if inner.Type() == "binary_expression" || inner.Type() == "binary_operator" {
+		// Check both sides recursively
+		left := inner.ChildByFieldName("left")
+		if r := detectValidationGuard(left, tm, cfg); r != nil {
+			return r
+		}
+		right := inner.ChildByFieldName("right")
+		return detectValidationGuard(right, tm, cfg)
+	}
+
+	return nil
+}
+
+// extractBaseReceiver walks through chained method calls to find the
+// root variable. For example, for x.chars().all(|c| ...), it returns "x".
+func extractBaseReceiver(n *ast.Node, cfg *langConfig) string {
+	fn := n.ChildByFieldName("function")
+	if fn == nil {
+		return ""
+	}
+	if fn.Type() != "field_expression" {
+		return ""
+	}
+	val := fn.ChildByFieldName("value")
+	if val == nil {
+		return ""
+	}
+	// If the value is itself a call expression, recurse
+	if cfg.callTypes[val.Type()] {
+		return extractBaseReceiver(val, cfg)
+	}
+	if val.Type() == "identifier" || val.Type() == cfg.identType {
+		return val.Text()
+	}
+	return ""
+}
+
+// isValidationMethod returns true if the method name indicates a validation/checking
+// operation that would be used in an input guard.
+func isValidationMethod(name string) bool {
+	switch name {
+	case "contains", "starts_with", "ends_with", "startswith", "endswith",
+		"is_empty", "is_ascii", "is_alphanumeric",
+		"all", "any", "none",
+		"len", "length",
+		"is_match", "matches",
+		"starts_with?", "ends_with?", "include?":
+		return true
+	}
+	return false
+}
+
 // taintedIdentInNode finds the first tainted identifier inside a node.
 // Returns an allowlistCheckResult with the variable name, or nil.
 func taintedIdentInNode(n *ast.Node, tm *taintMap, cfg *langConfig) *allowlistCheckResult {

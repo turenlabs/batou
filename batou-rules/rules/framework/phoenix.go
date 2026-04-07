@@ -434,7 +434,6 @@ func (r *PhoenixRouterNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 			} else {
 				pipelineName = ":browser"
 			}
-			braceEnd = 0
 			continue
 		}
 

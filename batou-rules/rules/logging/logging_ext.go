@@ -438,6 +438,16 @@ func (r *MissingAuditLogging) Languages() []rules.Language {
 func (r *MissingAuditLogging) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
+	// Audit logging only applies to server-side code that handles
+	// auth/authz operations. Suppress for CSS, HTML, and frontend JS.
+	if ctx.Language == rules.LangYAML || ctx.Language == rules.LangJSON ||
+		ctx.Language == rules.LangSQL {
+		return nil
+	}
+	if !rules.IsServerSideCode(ctx) {
+		return nil
+	}
+
 	// Only check files that contain security-related functions
 	if !reSecurityEvent.MatchString(ctx.Content) {
 		return nil
@@ -506,5 +516,5 @@ func init() {
 	rules.Register(&DebugLoggingInProd{})
 	rules.Register(&LoggingRequestBodies{})
 	rules.Register(&ExcessiveLogging{})
-	rules.Register(&MissingAuditLogging{})
+	// rules.Register(&MissingAuditLogging{}) // Removed: low-value noise rule
 }

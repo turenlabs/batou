@@ -44,6 +44,9 @@ var (
 var (
 	rePythonXMLParse     = regexp.MustCompile(`xml\.(?:etree|dom|sax|parsers)`)
 	reDefusedXML         = regexp.MustCompile(`defusedxml`)
+	// Python SAX parser: safe defaults since Python 3.7.1 (external entities disabled by default)
+	rePySAXMakeParser    = regexp.MustCompile(`xml\.sax\.make_parser`)
+	rePySAXExtEntEnabled = regexp.MustCompile(`feature_external_ges\s*,\s*True|feature_external_pes\s*,\s*True`)
 	reJavaDocBuilder     = regexp.MustCompile(`DocumentBuilderFactory`)
 	reJavaDisallowDTD    = regexp.MustCompile(`disallow-doctype-decl.*true|FEATURE_SECURE_PROCESSING.*true`)
 	reGoXMLDecoder       = regexp.MustCompile(`xml\.NewDecoder\s*\(`)
@@ -214,6 +217,10 @@ func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangPython:
+			// Check if the sink variable was last assigned a safe value.
+			if rules.PySinkVarIsSafe(lines, i) {
+				break
+			}
 			if m := rePickleLoads.FindString(line); m != "" {
 				matched = m
 				detail = "pickle deserialization can execute arbitrary code. Use JSON or a safe serialization format."
@@ -308,8 +315,18 @@ func (r *XXEVulnerability) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if reDefusedXML.MatchString(ctx.Content) {
 			break
 		}
+		// Python's xml.sax.make_parser() disables external entities by default (since 3.7.1).
+		// Only flag if external entities are explicitly enabled via setFeature().
+		if rePySAXMakeParser.MatchString(ctx.Content) && !rePySAXExtEntEnabled.MatchString(ctx.Content) {
+			break
+		}
 		for i, line := range lines {
 			if m := rePythonXMLParse.FindString(line); m != "" {
+				// Python FP suppression: check if the sink variable was
+				// last assigned a safe value.
+				if rules.PySinkVarIsSafe(lines, i) {
+					continue
+				}
 				findings = append(findings, r.makeFinding(ctx, i+1, m,
 					"Python's built-in XML libraries are vulnerable to XXE. Use defusedxml instead."))
 			}

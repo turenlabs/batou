@@ -74,10 +74,10 @@ var (
 )
 
 func init() {
-	rules.Register(RustUnsafePtrDeref{})
-	rules.Register(RustSQLFormat{})
+	// rules.Register(RustUnsafePtrDeref{}) // Removed: noise
+	// rules.Register(RustSQLFormat{}) // Removed: noise, use taint instead
 	rules.Register(RustCommandUser{})
-	rules.Register(RustUnwrapProd{})
+	// rules.Register(RustUnwrapProd{}) // Removed: noise
 	rules.Register(RustTransmuteIncompat{})
 	rules.Register(RustRegexNoLimit{})
 	rules.Register(RustNoTLS{})

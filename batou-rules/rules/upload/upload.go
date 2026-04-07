@@ -199,6 +199,8 @@ func (r *UploadPathTraversal) Languages() []rules.Language {
 func (r *UploadPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
+	isPython := ctx.Language == rules.LangPython
+
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
@@ -208,6 +210,10 @@ func (r *UploadPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if m := re.FindString(line); m != "" {
 				// Check for path sanitization nearby
 				if hasNearbyPattern(lines, i, 5, 5, reUploadPathSanitize) {
+					continue
+				}
+				// Python: suppress if the sink variable is safe or there is a traversal guard.
+				if isPython && (rules.PySinkVarIsSafe(lines, i) || rules.PyHasTraversalGuard(lines, i)) {
 					continue
 				}
 				findings = append(findings, rules.Finding{

@@ -131,7 +131,9 @@ func (i *Input) IsEditOperation() bool {
 }
 
 // BlockWrite outputs to stderr and exits with code 2 to block a write.
+// Flushes stdout first so any prior OutputPreTool JSON isn't lost on exit.
 func BlockWrite(message string) {
+	_ = os.Stdout.Sync()
 	fmt.Fprint(os.Stderr, message)
 	os.Exit(2)
 }

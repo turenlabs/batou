@@ -36,6 +36,10 @@ var (
 var (
 	reOAuthTokenFragment = regexp.MustCompile(`(?i)(?:window\.location\.hash|location\.hash|fragment|#access_token|#token)`)
 	reOAuthTokenFromHash = regexp.MustCompile(`(?i)(?:location\.hash\.(?:split|match|substring|replace|slice)|URLSearchParams\s*\(\s*(?:window\.)?location\.hash)`)
+	// Hash routing patterns (SPA routers) — not OAuth token extraction.
+	reHashRouting = regexp.MustCompile(`(?i)(?:#/|hashchange|\.router|\.route|createHashRouter|HashRouter|hash.*route|route.*hash)`)
+	// Credential-like patterns in hash — actual OAuth token extraction.
+	reHashCredential = regexp.MustCompile(`(?i)(?:access_token|id_token|token=|refresh_token|authorization)`)
 )
 
 // BATOU-OAUTH-005: PKCE not used
@@ -284,6 +288,16 @@ func (r *OAuthTokenFragment) Languages() []rules.Language {
 func (r *OAuthTokenFragment) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
+
+	// If the file uses hash routing patterns (SPA routers) and has no
+	// credential-like patterns, this is a hash router — not OAuth token
+	// extraction. Suppress to avoid false positives.
+	hasRouting := reHashRouting.MatchString(ctx.Content)
+	hasCredential := reHashCredential.MatchString(ctx.Content)
+	if hasRouting && !hasCredential {
+		return nil
+	}
+
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
@@ -291,6 +305,10 @@ func (r *OAuthTokenFragment) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		for _, re := range []*regexp.Regexp{reOAuthTokenFragment, reOAuthTokenFromHash} {
 			if m := re.FindString(line); m != "" {
+				// Per-line check: skip lines that look like route handling.
+				if reHashRouting.MatchString(line) && !reHashCredential.MatchString(line) {
+					continue
+				}
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),

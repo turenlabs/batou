@@ -232,6 +232,11 @@ func (r *PythonYAMLLoadRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if strings.Contains(line, "SafeLoader") || strings.Contains(line, "safe_load") {
 				continue
 			}
+			// Python FP suppression: check if the sink variable was
+			// last assigned a safe value.
+			if rules.PySinkVarIsSafe(lines, i) {
+				continue
+			}
 			confidence := "high"
 			if reExtYAMLFullLoad.MatchString(line) {
 				confidence = "medium" // FullLoader is less dangerous than default

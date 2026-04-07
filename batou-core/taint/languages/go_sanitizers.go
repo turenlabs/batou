@@ -31,7 +31,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `url\.PathEscape\(`,
 			ObjectType:  "",
 			MethodName:  "PathEscape",
-			Neutralizes: []taint.SinkCategory{taint.SnkRedirect, taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkRedirect, taint.SnkFileWrite, taint.SnkFileRead, taint.SnkURLFetch},
 			Description: "URL path segment escaping",
 		},
 		{
@@ -40,7 +40,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `filepath\.Base\(`,
 			ObjectType:  "",
 			MethodName:  "Base",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Extract base filename (strips directory traversal)",
 		},
 		{
@@ -49,7 +49,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `filepath\.Clean\(`,
 			ObjectType:  "",
 			MethodName:  "Clean",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Filepath cleaning (resolves .., ., double slashes)",
 		},
 		{
@@ -58,7 +58,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `strconv\.Atoi\(`,
 			ObjectType:  "",
 			MethodName:  "Atoi",
-			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite, taint.SnkFileRead, taint.SnkHTMLOutput, taint.SnkRedirect, taint.SnkURLFetch, taint.SnkLog, taint.SnkTemplate, taint.SnkHeader, taint.SnkEval, taint.SnkLDAP, taint.SnkXPath},
 			Description: "Integer conversion (restricts to numeric values)",
 		},
 		{
@@ -67,7 +67,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `strconv\.ParseInt\(`,
 			ObjectType:  "",
 			MethodName:  "ParseInt",
-			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite, taint.SnkFileRead, taint.SnkHTMLOutput, taint.SnkRedirect, taint.SnkURLFetch, taint.SnkLog, taint.SnkTemplate, taint.SnkHeader, taint.SnkEval, taint.SnkLDAP, taint.SnkXPath},
 			Description: "Integer parsing (restricts to numeric values)",
 		},
 		{
@@ -137,9 +137,9 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Language:    rules.LangGo,
 			Pattern:     `strings\.ReplaceAll\(.*\\n|strings\.ReplaceAll\(.*\\r`,
 			ObjectType:  "",
-			MethodName:  "ReplaceAll (newline strip)",
-			Neutralizes: []taint.SinkCategory{taint.SnkHeader},
-			Description: "Stripping newlines prevents header injection in SMTP/HTTP",
+			MethodName:  "ReplaceAll",
+			Neutralizes: []taint.SinkCategory{taint.SnkHeader, taint.SnkLog},
+			Description: "Stripping newlines prevents header/log injection in SMTP/HTTP/logs",
 		},
 
 		// --- regexp QuoteMeta for ReDoS ---
@@ -207,7 +207,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `\.ShouldBindJSON\(|\.ShouldBind\(|\.BindJSON\(|binding\.Bind\(`,
 			ObjectType:  "*gin.Context",
 			MethodName:  "ShouldBindJSON/BindJSON",
-			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput, taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput, taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Gin framework struct binding with validation tags",
 		},
 		{
@@ -225,7 +225,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `validation\.ValidateStruct\(|validation\.Validate\(`,
 			ObjectType:  "ozzo-validation",
 			MethodName:  "ValidateStruct",
-			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput, taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput, taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "ozzo-validation struct/field validation",
 		},
 
@@ -260,21 +260,12 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 
 		// --- Path sanitizers ---
 		{
-			ID:          "go.filepath.clean",
-			Language:    rules.LangGo,
-			Pattern:     `filepath\.Clean\(`,
-			ObjectType:  "",
-			MethodName:  "Clean",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
-			Description: "Filepath cleaning (resolves . and .. components)",
-		},
-		{
 			ID:          "go.filepath.abs",
 			Language:    rules.LangGo,
 			Pattern:     `filepath\.Abs\(`,
 			ObjectType:  "",
 			MethodName:  "Abs",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Absolute path resolution (anchors path to prevent traversal)",
 		},
 
@@ -329,7 +320,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `strconv\.ParseFloat\(`,
 			ObjectType:  "",
 			MethodName:  "ParseFloat",
-			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite, taint.SnkFileRead, taint.SnkHTMLOutput, taint.SnkRedirect, taint.SnkURLFetch, taint.SnkLog, taint.SnkTemplate, taint.SnkHeader, taint.SnkEval, taint.SnkLDAP, taint.SnkXPath},
 			Description: "Float parsing (restricts to numeric values)",
 		},
 		{
@@ -338,7 +329,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `strconv\.ParseBool\(`,
 			ObjectType:  "",
 			MethodName:  "ParseBool",
-			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite, taint.SnkFileRead, taint.SnkHTMLOutput, taint.SnkRedirect, taint.SnkURLFetch, taint.SnkLog, taint.SnkTemplate, taint.SnkHeader, taint.SnkEval, taint.SnkLDAP, taint.SnkXPath},
 			Description: "Boolean parsing (restricts to true/false values)",
 		},
 		{
@@ -347,7 +338,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `strconv\.ParseUint\(`,
 			ObjectType:  "",
 			MethodName:  "ParseUint",
-			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite, taint.SnkFileRead, taint.SnkHTMLOutput, taint.SnkRedirect, taint.SnkURLFetch, taint.SnkLog, taint.SnkTemplate, taint.SnkHeader, taint.SnkEval, taint.SnkLDAP, taint.SnkXPath},
 			Description: "Unsigned integer parsing (restricts to non-negative numeric values)",
 		},
 		{
@@ -356,7 +347,7 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `strconv\.FormatInt\(`,
 			ObjectType:  "",
 			MethodName:  "FormatInt",
-			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite, taint.SnkFileRead, taint.SnkHTMLOutput, taint.SnkRedirect, taint.SnkURLFetch, taint.SnkLog, taint.SnkTemplate, taint.SnkHeader, taint.SnkEval, taint.SnkLDAP, taint.SnkXPath},
 			Description: "Integer formatting (ensures numeric string output)",
 		},
 
@@ -369,6 +360,66 @@ func (c *GoCatalog) Sanitizers() []taint.SanitizerDef {
 			MethodName:  "rand.Read/rand.Int",
 			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
 			Description: "Cryptographically secure random via crypto/rand",
+		},
+
+		// --- sqlx parameterized queries ---
+		{
+			ID:          "go.sqlx.named",
+			Language:    rules.LangGo,
+			Pattern:     `sqlx\.Named\(`,
+			ObjectType:  "sqlx",
+			MethodName:  "Named",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "sqlx Named parameterized binding neutralizes SQL injection",
+		},
+		{
+			ID:          "go.sqlx.in",
+			Language:    rules.LangGo,
+			Pattern:     `sqlx\.In\(`,
+			ObjectType:  "sqlx",
+			MethodName:  "In",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "sqlx In parameter expansion neutralizes SQL injection",
+		},
+		{
+			ID:          "go.sqlx.rebind",
+			Language:    rules.LangGo,
+			Pattern:     `\.Rebind\(`,
+			ObjectType:  "*sqlx.DB",
+			MethodName:  "Rebind",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "sqlx Rebind placeholder rebinding neutralizes SQL injection",
+		},
+
+		// --- ent predicate builder ---
+		{
+			ID:          "go.ent.predicate",
+			Language:    rules.LangGo,
+			Pattern:     `\.Where\(.*predicate\.`,
+			ObjectType:  "*ent.Client",
+			MethodName:  "Where (predicate)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "ent predicate builder neutralizes SQL injection",
+		},
+
+		// --- bun query builders ---
+		{
+			ID:          "go.bun.selectquery",
+			Language:    rules.LangGo,
+			Pattern:     `\.NewSelect\(\)`,
+			ObjectType:  "*bun.DB",
+			MethodName:  "NewSelect",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "bun SelectQuery builder neutralizes SQL injection",
+		},
+		{
+			ID:          "go.bun.insertquery",
+			Language:    rules.LangGo,
+			Pattern:     `\.NewInsert\(\)`,
+			ObjectType:  "*bun.DB",
+			MethodName:  "NewInsert",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "bun InsertQuery builder neutralizes SQL injection",
 		},
 	}
 }

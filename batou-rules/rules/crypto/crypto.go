@@ -21,8 +21,8 @@ var (
 	reJSSHA1     = regexp.MustCompile(`crypto\.createHash\s*\(\s*['"]sha1['"]`)
 	reJavaMD5    = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*"MD5"`)
 	reJavaSHA1   = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*"SHA-?1"`)
-	reCSharpMD5  = regexp.MustCompile(`\bMD5\.Create\s*\(`)
-	reCSharpSHA1 = regexp.MustCompile(`\bSHA1\.Create\s*\(`)
+	// Indirect: MessageDigest.getInstance(variable) — algorithm from external source
+	reJavaDigestVar = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*([a-zA-Z_]\w*)[\s,)]`)
 	reSecurityCtx = regexp.MustCompile(`(?i)(password|secret|token|auth|sign|hmac|credential|cert)`)
 )
 
@@ -30,9 +30,9 @@ var (
 var (
 	reGoMathRand   = regexp.MustCompile(`\bmath/rand\b`)
 	reGoRandCall   = regexp.MustCompile(`\brand\.(Int|Intn|Float|Read|New)\b`)
-	rePyRandom     = regexp.MustCompile(`\brandom\.(random|randint|choice|randrange|getrandbits)\s*\(`)
+	rePyRandom     = regexp.MustCompile(`\brandom\.(random|randint|choice|randrange|getrandbits|normalvariate|randbytes|gauss|uniform|sample|shuffle|expovariate|gammavariate|lognormvariate|vonmisesvariate|paretovariate|weibullvariate|betavariate|triangular)\s*\(`)
 	reJSMathRandom = regexp.MustCompile(`\bMath\.random\s*\(`)
-	reSecRandCtx   = regexp.MustCompile(`(?i)(token|password|key|secret|nonce|salt|otp|csrf|session|uuid|auth)`)
+	reSecRandCtx   = regexp.MustCompile(`(?i)(token|password|key|secret|nonce|salt|otp|csrf|session|uuid|auth|cookie|remember)`)
 )
 
 // BATOU-CRY-003: Weak cipher
@@ -90,8 +90,8 @@ var (
 
 // BATOU-CRY-009: Python random module in security context
 var (
-	rePyRandomBroad = regexp.MustCompile(`\brandom\.(random|randint|choice|sample|randrange|getrandbits|shuffle|uniform)\s*\(`)
-	rePySecurityCtx = regexp.MustCompile(`(?i)(token|session|password|secret|nonce|otp|csrf|key|salt|iv|auth|uuid|api[_\-]?key|encrypt|hash)`)
+	rePyRandomBroad = regexp.MustCompile(`\brandom\.(random|randint|choice|sample|randrange|getrandbits|shuffle|uniform|normalvariate|randbytes|gauss|expovariate|gammavariate|lognormvariate|vonmisesvariate|paretovariate|weibullvariate|betavariate|triangular)\s*\(`)
+	rePySecurityCtx = regexp.MustCompile(`(?i)(token|session|password|secret|nonce|otp|csrf|key|salt|iv|auth|uuid|api[_\-]?key|encrypt|hash|cookie|remember)`)
 )
 
 // BATOU-CRY-010: Weak PRNG across languages
@@ -217,6 +217,16 @@ var (
 	reGoFixedNonceSeal         = regexp.MustCompile(`\.\s*(?:Seal|Open)\s*\(\s*nil\s*,\s*(?:\[\]byte\s*\{|make\s*\(\s*\[\]byte)`)
 )
 
+// BATOU-CRY-019: Java weak random (broad detection without requiring security context)
+var (
+	// new Random() or new java.util.Random() — NOT SecureRandom
+	reJavaNewRandom    = regexp.MustCompile(`\bnew\s+(?:java\.util\.)?Random\s*\(`)
+	// Math.random() or java.lang.Math.random()
+	reJavaMathRandom   = regexp.MustCompile(`\b(?:java\.lang\.)?Math\.random\s*\(`)
+	// SecureRandom on the same line (safe — do not flag)
+	reSecureRandomLine = regexp.MustCompile(`SecureRandom`)
+)
+
 func init() {
 	rules.Register(&WeakHashing{})
 	rules.Register(&InsecureRandom{})
@@ -236,6 +246,7 @@ func init() {
 	rules.Register(&InsecureRandomBroad{})
 	rules.Register(&TimingUnsafeCompare{})
 	rules.Register(&HardcodedIVBroad{})
+	rules.Register(&JavaWeakRandomBroad{})
 }
 
 // --- BATOU-CRY-001: WeakHashing ---
@@ -251,7 +262,7 @@ func (r *WeakHashing) Description() string {
 }
 
 func (r *WeakHashing) Languages() []rules.Language {
-	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript, rules.LangJava, rules.LangKotlin, rules.LangGroovy, rules.LangCSharp}
+	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript, rules.LangJava}
 }
 
 func (r *WeakHashing) Scan(ctx *rules.ScanContext) []rules.Finding {
@@ -302,23 +313,13 @@ func (r *WeakHashing) Scan(ctx *rules.ScanContext) []rules.Finding {
 			} else if loc := reJavaSHA1.FindString(line); loc != "" {
 				matched = loc
 				algo = "SHA-1"
-			}
-		case rules.LangKotlin, rules.LangGroovy:
-			// Kotlin and Groovy use Java's MessageDigest API
-			if loc := reJavaMD5.FindString(line); loc != "" {
-				matched = loc
-				algo = "MD5"
-			} else if loc := reJavaSHA1.FindString(line); loc != "" {
-				matched = loc
-				algo = "SHA-1"
-			}
-		case rules.LangCSharp:
-			if loc := reCSharpMD5.FindString(line); loc != "" {
-				matched = loc
-				algo = "MD5"
-			} else if loc := reCSharpSHA1.FindString(line); loc != "" {
-				matched = loc
-				algo = "SHA-1"
+			} else if loc := reJavaDigestVar.FindString(line); loc != "" {
+				// Indirect: getInstance(variable) — algorithm from config/properties.
+				// Suppress if the variable resolves to a strong algorithm.
+				if !rules.JavaDigestVarIsSafe(lines, i) {
+					matched = loc
+					algo = "MD5/SHA-1 (indirect)"
+				}
 			}
 		}
 
@@ -492,6 +493,17 @@ func (r *WeakCipher) Scan(ctx *rules.ScanContext) []rules.Finding {
 		// ECB mode check applies to all languages
 		if matched == "" {
 			if loc := reECBMode.FindString(line); loc != "" {
+				// Java: suppress ECB in getProperty defaults where cipher is AES (strong).
+				// FP pattern: getProperty("cryptoAlg2", "AES/ECB/PKCS5Padding")
+				// TP pattern: getProperty("cryptoAlg1", "DESede/ECB/PKCS5Padding")
+				if ctx.Language == rules.LangJava {
+					if m := rules.JavaGetPropertyDefault(line); m != "" {
+						upper := strings.ToUpper(m)
+						if strings.HasPrefix(upper, "AES") {
+							continue // AES is strong; ECB mode in default is acceptable
+						}
+					}
+				}
 				matched = loc
 				detail = "ECB mode"
 			}
@@ -1747,6 +1759,82 @@ func (r *HardcodedIVBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 			Language:      ctx.Language,
 			Confidence:    "high",
 			Tags:          []string{"crypto", "iv", "nonce"},
+		})
+	}
+
+	return findings
+}
+
+// --- BATOU-CRY-019: JavaWeakRandomBroad ---
+
+type JavaWeakRandomBroad struct{}
+
+func (r *JavaWeakRandomBroad) ID() string                    { return "BATOU-CRY-019" }
+func (r *JavaWeakRandomBroad) Name() string                  { return "JavaWeakRandomBroad" }
+func (r *JavaWeakRandomBroad) DefaultSeverity() rules.Severity { return rules.High }
+
+func (r *JavaWeakRandomBroad) Description() string {
+	return "Detects java.util.Random and Math.random() usage in Java code. These are not cryptographically secure."
+}
+
+func (r *JavaWeakRandomBroad) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
+
+func (r *JavaWeakRandomBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if ctx.Language != rules.LangJava {
+		return nil
+	}
+
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+
+		// Skip lines that use SecureRandom
+		if reSecureRandomLine.MatchString(line) {
+			continue
+		}
+
+		// Skip import statements
+		if strings.HasPrefix(trimmed, "import ") {
+			continue
+		}
+
+		var matched string
+		var detail string
+
+		if loc := reJavaNewRandom.FindString(line); loc != "" {
+			matched = loc
+			detail = "java.util.Random is not cryptographically secure"
+		} else if loc := reJavaMathRandom.FindString(line); loc != "" {
+			matched = loc
+			detail = "Math.random() is not cryptographically secure"
+		}
+
+		if matched == "" {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Weak random: " + detail,
+			Description:   "java.util.Random and Math.random() use predictable pseudo-random number generators. Their output can be reverse-engineered from observed values.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    i + 1,
+			MatchedText:   strings.TrimSpace(matched),
+			Suggestion:    "Use java.security.SecureRandom for all random number generation in security-sensitive contexts.",
+			CWEID:         "CWE-330",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+			Language:      ctx.Language,
+			Confidence:    "medium",
+			Tags:          []string{"crypto", "random", "java"},
 		})
 	}
 

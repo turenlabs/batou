@@ -39,10 +39,14 @@ func (phpCatalog) Sources() []taint.SourceDef {
 		{ID: "php.laravel.route.current", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `Route::current\s*\(`, ObjectType: "Route", MethodName: "Route::current", Description: "Laravel Route::current() route data", Assigns: "return"},
 		{ID: "php.laravel.route.parameter", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->route\s*\(`, ObjectType: "Request", MethodName: "route", Description: "Laravel route parameter data", Assigns: "return"},
 
-		// Symfony framework sources
-		{ID: "php.symfony.request.get", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->get\s*\(`, ObjectType: "SymfonyRequest", MethodName: "get", Description: "Symfony Request::get() user data", Assigns: "return"},
-		{ID: "php.symfony.request.query.get", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->query->get\s*\(`, ObjectType: "ParameterBag", MethodName: "query->get", Description: "Symfony query parameter bag", Assigns: "return"},
-		{ID: "php.symfony.request.request.get", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->request->get\s*\(`, ObjectType: "ParameterBag", MethodName: "request->get", Description: "Symfony POST parameter bag", Assigns: "return"},
+		// Symfony framework sources — attribute-based (matches $request->query, $request->headers, etc.)
+		{ID: "php.symfony.request.get", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->get\s*\(`, ObjectType: "Request", MethodName: "get", Description: "Symfony Request::get() user data", Assigns: "return"},
+		{ID: "php.symfony.request.query", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->query`, ObjectType: "Request", MethodName: "query", Description: "Symfony query parameter bag", Assigns: "return"},
+		{ID: "php.symfony.request.request", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->request`, ObjectType: "Request", MethodName: "request", Description: "Symfony POST parameter bag", Assigns: "return"},
+		{ID: "php.symfony.request.headers", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->headers`, ObjectType: "Request", MethodName: "headers", Description: "Symfony request headers bag", Assigns: "return"},
+		{ID: "php.symfony.request.cookies", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->cookies`, ObjectType: "Request", MethodName: "cookies", Description: "Symfony request cookies bag", Assigns: "return"},
+		{ID: "php.symfony.request.getcontent", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->getContent\s*\(`, ObjectType: "Request", MethodName: "getContent", Description: "Symfony raw request body", Assigns: "return"},
+		{ID: "php.symfony.request.files", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$request->files`, ObjectType: "Request", MethodName: "files", Description: "Symfony uploaded files bag", Assigns: "return"},
 
 		// CodeIgniter framework sources
 		{ID: "php.codeigniter.input.get", Category: taint.SrcUserInput, Language: rules.LangPHP, Pattern: `\$this->input->get\s*\(`, ObjectType: "CI_Input", MethodName: "get", Description: "CodeIgniter input->get() user data", Assigns: "return"},

@@ -32,6 +32,9 @@ var (
 	reXMLSaxParse    = regexp.MustCompile(`xml\.sax\.(?:parse|parseString|make_parser)\s*\(`)
 	reXMLDomParse    = regexp.MustCompile(`xml\.dom\.(?:minidom|pulldom)\.(?:parse|parseString)\s*\(`)
 	reDefusedXML     = regexp.MustCompile(`defusedxml`)
+	// Python SAX parser: safe defaults since Python 3.7.1 (external entities disabled)
+	rePySAXMakeParser    = regexp.MustCompile(`xml\.sax\.make_parser`)
+	rePySAXExtEntEnabled = regexp.MustCompile(`feature_external_ges\s*,\s*True|feature_external_pes\s*,\s*True`)
 )
 
 // PY-022: os.chmod with overly permissive mode
@@ -231,6 +234,11 @@ func (r *InsecureXMLParsing) Languages() []rules.Language { return []rules.Langu
 func (r *InsecureXMLParsing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	if reDefusedXML.MatchString(ctx.Content) {
+		return nil
+	}
+	// Python's xml.sax.make_parser() disables external entities by default (since 3.7.1).
+	// Only flag if external entities are explicitly enabled via setFeature().
+	if rePySAXMakeParser.MatchString(ctx.Content) && !rePySAXExtEntEnabled.MatchString(ctx.Content) {
 		return nil
 	}
 	lines := strings.Split(ctx.Content, "\n")

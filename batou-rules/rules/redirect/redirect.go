@@ -17,7 +17,7 @@ var (
 
 	// Python: redirect/HttpResponseRedirect with request input
 	rePyRedirectUserInput   = regexp.MustCompile(`(?:redirect|HttpResponseRedirect|HttpResponse)\s*\(\s*(?:request\.(?:GET|POST|args|params)|[a-zA-Z_]\w*)`)
-	rePyRequestSource       = regexp.MustCompile(`request\.(?:GET|POST|args|params|data)\b`)
+	rePyRequestSource       = regexp.MustCompile(`request\.(?:GET|POST|args|params|data|form|cookies|values|query_string)\b`)
 
 	// JS/TS: res.redirect with variable or req input
 	reJSRedirectDirect      = regexp.MustCompile(`res\.redirect\s*\(\s*(?:req\.(?:query|params|body)\b)`)
@@ -37,6 +37,11 @@ var (
 
 	// Django: HttpResponseRedirect with request.GET
 	reDjangoRedirect        = regexp.MustCompile(`HttpResponseRedirect\s*\(\s*request\.GET`)
+
+	// Flask: flask.redirect(var) — broader pattern for OWASP Benchmark
+	rePyFlaskRedirect       = regexp.MustCompile(`flask\.redirect\s*\(\s*[a-zA-Z_]\w*`)
+	// Extract variable name from redirect(varName)
+	rePyRedirectArgVar      = regexp.MustCompile(`(?:flask\.)?redirect\s*\(\s*([a-zA-Z_]\w*)`)
 )
 
 // BATOU-REDIR-002: Bypassable URL allowlist
@@ -144,8 +149,34 @@ func (r *ServerRedirectUserInput) scanPythonLine(line string, lines []string, id
 	if m := reDjangoRedirect.FindString(line); m != "" {
 		return m, "high"
 	}
+	// Detect flask.redirect(bar) pattern (OWASP Benchmark style)
+	if rePyFlaskRedirect.MatchString(line) {
+		if rePyRequestSource.MatchString(line) || hasNearbyPattern(lines, idx, rePyRequestSource, 15) {
+			// Check URL validation guard before the redirect
+			if rules.PyHasURLValidation(lines, idx) {
+				return "", ""
+			}
+			// Check if the redirect variable was last assigned from safe source
+			if m := rules.PyFStringVar.FindStringSubmatch(line); len(m) > 1 {
+				if rules.PyLastAssignmentIsSafe(lines, idx, m[1]) {
+					return "", ""
+				}
+			}
+			// Extract variable name from redirect(varName) for safe-assignment check
+			if m := rePyRedirectArgVar.FindStringSubmatch(line); len(m) > 1 {
+				if rules.PyLastAssignmentIsSafe(lines, idx, m[1]) {
+					return "", ""
+				}
+			}
+			return rePyFlaskRedirect.FindString(line), "high"
+		}
+	}
 	if m := rePyRedirectUserInput.FindString(line); m != "" {
 		if rePyRequestSource.MatchString(line) || hasNearbyPattern(lines, idx, rePyRequestSource, 10) {
+			// Check URL validation guard
+			if rules.PyHasURLValidation(lines, idx) {
+				return "", ""
+			}
 			return m, "high"
 		}
 	}

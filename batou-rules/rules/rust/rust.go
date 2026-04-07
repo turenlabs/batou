@@ -960,14 +960,14 @@ func (r CORSMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 // ---------------------------------------------------------------------------
 
 func init() {
-	rules.Register(UnsafeBlock{})
+	// rules.Register(UnsafeBlock{}) // Removed: noise
 	rules.Register(CommandInjection{})
 	rules.Register(SQLInjection{})
 	rules.Register(PathTraversal{})
 	rules.Register(InsecureDeserialization{})
 	rules.Register(InsecureTLS{})
 	rules.Register(PanicInHandler{})
-	rules.Register(InsecureRandom{})
-	rules.Register(MemoryUnsafety{})
+	// rules.Register(InsecureRandom{}) // Removed: Rust rand is fine for non-crypto
+	// rules.Register(MemoryUnsafety{}) // Removed: noise
 	rules.Register(CORSMisconfig{})
 }

@@ -74,7 +74,7 @@ func Record(sessionID string, result *reporter.ScanResult) error {
 	if err != nil {
 		return fmt.Errorf("opening ledger file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	data, err := json.Marshal(entry)
 	if err != nil {

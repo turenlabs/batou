@@ -101,6 +101,12 @@ var reServerSetup = regexp.MustCompile(`(?i)(?:\.listen\s*\(|createServer|http\.
 // Helpers (package-scoped)
 // ---------------------------------------------------------------------------
 
+// isFrontendJSFile returns true if the file is browser-side JavaScript
+// that cannot set HTTP response headers.
+func isFrontendJSFile(ctx *rules.ScanContext) bool {
+	return rules.IsFrontendJS(ctx)
+}
+
 // isRouteHandlerFile returns true if the file defines routes/handlers
 // but does NOT set up the server — meaning middleware handles security headers.
 func isRouteHandlerFile(content string) bool {
@@ -148,14 +154,9 @@ func isHTTPHandlerFile(content string) bool {
 // ---------------------------------------------------------------------------
 
 func init() {
-	rules.Register(&MissingCSP{})
-	rules.Register(&MissingXFrameOptions{})
-	rules.Register(&MissingXContentTypeOptions{})
-	rules.Register(&MissingHSTS{})
-	rules.Register(&PermissiveCSP{})
-	rules.Register(&MissingXXSSProtection{})
-	rules.Register(&MissingReferrerPolicy{})
-	rules.Register(&MissingPermissionsPolicy{})
+	// Infra-level header rules (CSP, HSTS, X-Frame-Options, etc.) removed —
+	// these are set at the reverse proxy / CDN, not in application code.
+	// Kept: app-level header rules that flag real vulnerabilities.
 	rules.Register(&CacheControlSensitive{})
 	rules.Register(&ServerHeaderDisclosure{})
 	rules.Register(&XPoweredByDisclosure{})
@@ -179,6 +180,9 @@ func (r *MissingCSP) Languages() []rules.Language {
 }
 
 func (r *MissingCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isFrontendJSFile(ctx) {
+		return nil
+	}
 	if !isHTTPHandlerFile(ctx.Content) {
 		return nil
 	}
@@ -240,6 +244,9 @@ func (r *MissingXFrameOptions) Languages() []rules.Language {
 }
 
 func (r *MissingXFrameOptions) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isFrontendJSFile(ctx) {
+		return nil
+	}
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
 	}
@@ -295,6 +302,9 @@ func (r *MissingXContentTypeOptions) Languages() []rules.Language {
 }
 
 func (r *MissingXContentTypeOptions) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isFrontendJSFile(ctx) {
+		return nil
+	}
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
 	}
@@ -350,6 +360,9 @@ func (r *MissingHSTS) Languages() []rules.Language {
 }
 
 func (r *MissingHSTS) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isFrontendJSFile(ctx) {
+		return nil
+	}
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
 	}
@@ -405,6 +418,9 @@ func (r *PermissiveCSP) Languages() []rules.Language {
 }
 
 func (r *PermissiveCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isFrontendJSFile(ctx) {
+		return nil
+	}
 	if isRouteHandlerFile(ctx.Content) {
 		return nil
 	}
@@ -462,6 +478,9 @@ func (r *MissingXXSSProtection) Languages() []rules.Language {
 }
 
 func (r *MissingXXSSProtection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isFrontendJSFile(ctx) {
+		return nil
+	}
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
 	}
@@ -521,6 +540,9 @@ func (r *MissingReferrerPolicy) Languages() []rules.Language {
 }
 
 func (r *MissingReferrerPolicy) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isFrontendJSFile(ctx) {
+		return nil
+	}
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
 	}
@@ -576,6 +598,9 @@ func (r *MissingPermissionsPolicy) Languages() []rules.Language {
 }
 
 func (r *MissingPermissionsPolicy) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isFrontendJSFile(ctx) {
+		return nil
+	}
 	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
 		return nil
 	}
@@ -631,6 +656,9 @@ func (r *CacheControlSensitive) Languages() []rules.Language {
 }
 
 func (r *CacheControlSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if isFrontendJSFile(ctx) {
+		return nil
+	}
 	if isRouteHandlerFile(ctx.Content) {
 		return nil
 	}

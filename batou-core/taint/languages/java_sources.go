@@ -83,6 +83,9 @@ func (javaCatalog) Sources() []taint.SourceDef {
 		{ID: "java.servlet.getparametermap", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getParameterMap\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getParameterMap", Description: "HTTP request all parameters map", Assigns: "return"},
 
 		// Servlet additional sources
+		{ID: "java.servlet.getheadernames", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getHeaderNames\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getHeaderNames", Description: "HTTP request header names enumeration", Assigns: "return"},
+		{ID: "java.servlet.getheaders", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getHeaders\s*\(`, ObjectType: "HttpServletRequest", MethodName: "getHeaders", Description: "HTTP request headers for a given name", Assigns: "return"},
+		{ID: "java.servlet.getparameternames", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getParameterNames\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getParameterNames", Description: "HTTP request parameter names enumeration", Assigns: "return"},
 		{ID: "java.servlet.getservletpath", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getServletPath\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getServletPath", Description: "HTTP request servlet path", Assigns: "return"},
 		{ID: "java.servlet.getrequesturl", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getRequestURL\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getRequestURL", Description: "HTTP full request URL", Assigns: "return"},
 		{ID: "java.servlet.getremoteaddr", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `request\.getRemoteAddr\s*\(\s*\)`, ObjectType: "HttpServletRequest", MethodName: "getRemoteAddr", Description: "Client IP address (spoofable via proxy headers)", Assigns: "return"},
@@ -92,5 +95,12 @@ func (javaCatalog) Sources() []taint.SourceDef {
 
 		// Spring multipart
 		{ID: "java.spring.multipart", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `@RequestPart|MultipartFile`, ObjectType: "Spring", MethodName: "@RequestPart/MultipartFile", Description: "Spring multipart file upload data", Assigns: "return"},
+
+		// Servlet request wrapper helpers (common in OWASP Benchmark and real code)
+		{ID: "java.requestwrapper.gettheparameter", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `\.getTheParameter\s*\(`, ObjectType: "SeparateClassRequest", MethodName: "getTheParameter", Description: "Request wrapper getTheParameter (delegates to request.getParameter)", Assigns: "return"},
+		{ID: "java.requestwrapper.getthevalue", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `\.getTheValue\s*\(`, ObjectType: "SeparateClassRequest", MethodName: "getTheValue", Description: "Request wrapper getTheValue (delegates to request parameter extraction)", Assigns: "return"},
+
+		// Enumeration iteration (user input from getHeaders/getParameterNames)
+		{ID: "java.enumeration.nextelement", Category: taint.SrcUserInput, Language: rules.LangJava, Pattern: `\.nextElement\s*\(`, ObjectType: "Enumeration", MethodName: "nextElement", Description: "Enumeration.nextElement() iterating over request headers/parameters", Assigns: "return"},
 	}
 }

@@ -104,6 +104,7 @@ func TestRecordWritesJSONL(t *testing.T) {
 				Severity:        rules.Critical,
 				Title:           "SQL Injection",
 				ConfidenceScore: 0.8,
+				RiskScore:       0.8,
 			},
 		},
 	}

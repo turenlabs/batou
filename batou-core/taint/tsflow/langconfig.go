@@ -122,6 +122,12 @@ func pythonConfig() *langConfig {
 			if lhs.Type() == "identifier" {
 				return lhs.Text()
 			}
+			// Subscript LHS: d['key'] = val → use full text "d['key']"
+			// for per-key taint tracking (avoids over-tainting the whole dict).
+			// Attribute LHS: obj.attr = val → use full text "obj.attr"
+			if lhs.Type() == "subscript" || lhs.Type() == "attribute" {
+				return lhs.Text()
+			}
 			return ""
 		},
 		extractAssignRHS: func(n *ast.Node) *ast.Node {
@@ -494,7 +500,7 @@ func phpConfig() *langConfig {
 	return &langConfig{
 		language:     rules.LangPHP,
 		funcTypes:    map[string]bool{"function_definition": true, "method_declaration": true},
-		callTypes:    map[string]bool{"function_call_expression": true, "member_call_expression": true, "scoped_call_expression": true},
+		callTypes:    map[string]bool{"function_call_expression": true, "member_call_expression": true, "scoped_call_expression": true, "object_creation_expression": true},
 		assignTypes:  map[string]bool{"assignment_expression": true, "augmented_assignment_expression": true},
 		varDeclTypes: map[string]bool{},
 		identType:    "variable_name",
@@ -522,6 +528,15 @@ func phpConfig() *langConfig {
 			name := n.ChildByFieldName("name")
 			if name != nil {
 				return name.Text()
+			}
+			// object_creation_expression: "new ClassName(...)" — class name is a "name" child node
+			if n.Type() == "object_creation_expression" {
+				for i := 0; i < n.ChildCount(); i++ {
+					c := n.Child(i)
+					if c.Type() == "name" || c.Type() == "qualified_name" {
+						return c.Text()
+					}
+				}
 			}
 			return ""
 		},
@@ -556,20 +571,7 @@ func phpConfig() *langConfig {
 			}
 			return ""
 		},
-		extractCallArgs: func(n *ast.Node) []*ast.Node {
-			args := n.ChildByFieldName("arguments")
-			if args == nil {
-				return nil
-			}
-			var out []*ast.Node
-			for i := 0; i < args.ChildCount(); i++ {
-				c := args.Child(i)
-				if c.IsNamed() {
-					out = append(out, c)
-				}
-			}
-			return out
-		},
+		extractCallArgs: phpExtractCallArgs,
 		extractFuncName: func(n *ast.Node) string {
 			name := n.ChildByFieldName("name")
 			if name != nil {
@@ -585,6 +587,31 @@ func phpConfig() *langConfig {
 		extractIfConsequence: genericExtractIfConsequence,
 		extractIfAlternative: genericExtractIfAlternative,
 	}
+}
+
+func phpExtractCallArgs(n *ast.Node) []*ast.Node {
+	args := n.ChildByFieldName("arguments")
+	if args == nil {
+		// object_creation_expression: arguments is a positional child, not a field
+		for i := 0; i < n.ChildCount(); i++ {
+			c := n.Child(i)
+			if c.Type() == "arguments" {
+				args = c
+				break
+			}
+		}
+	}
+	if args == nil {
+		return nil
+	}
+	var out []*ast.Node
+	for i := 0; i < args.ChildCount(); i++ {
+		c := args.Child(i)
+		if c.IsNamed() {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func phpExtractParams(n *ast.Node) []string {
@@ -992,7 +1019,7 @@ func csharpExtractParams(n *ast.Node) []string {
 func kotlinConfig() *langConfig {
 	return &langConfig{
 		language:     rules.LangKotlin,
-		funcTypes:    map[string]bool{"function_declaration": true},
+		funcTypes:    map[string]bool{"function_declaration": true, "lambda_literal": true, "anonymous_function": true},
 		callTypes:    map[string]bool{"call_expression": true},
 		assignTypes:  map[string]bool{"assignment": true},
 		varDeclTypes: map[string]bool{"property_declaration": true},
@@ -1239,12 +1266,42 @@ func rustExtractParams(n *ast.Node) []string {
 		p := params.Child(i)
 		if p.Type() == "parameter" {
 			pat := p.ChildByFieldName("pattern")
-			if pat != nil && pat.Type() == "identifier" {
+			if pat == nil {
+				continue
+			}
+			switch pat.Type() {
+			case "identifier":
 				names = append(names, pat.Text())
+			case "tuple_struct_pattern":
+				// Handles Axum extractors like Query(params), Path(id), Json(body)
+				rustCollectIdentifiers(pat, &names)
+			case "tuple_pattern":
+				// Handles (a, b) destructuring
+				rustCollectIdentifiers(pat, &names)
 			}
 		}
 	}
 	return names
+}
+
+// rustCollectIdentifiers recursively collects identifier names from a pattern node.
+func rustCollectIdentifiers(n *ast.Node, names *[]string) {
+	if n == nil {
+		return
+	}
+	for i := 0; i < n.ChildCount(); i++ {
+		c := n.Child(i)
+		if c.Type() == "identifier" {
+			text := c.Text()
+			// Skip the type name in tuple_struct_pattern (e.g., "Query" in "Query(params)")
+			if i == 0 && n.Type() == "tuple_struct_pattern" {
+				continue
+			}
+			*names = append(*names, text)
+		} else if c.IsNamed() {
+			rustCollectIdentifiers(c, names)
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1400,31 +1457,44 @@ func luaConfig() *langConfig {
 		ifTypes:      map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
-			// Lua function_call: prefix contains the function expression
-			// For "os.execute(x)", prefix children are: identifier("os"), ".", identifier("execute")
-			// The last identifier in prefix is the method name
+			// Lua function_call: prefix contains the function expression.
+			// Dot calls: identifier("os"), ".", identifier("execute") → "execute"
+			// Colon calls: identifier("conn"), self_call_colon(":"), identifier("search") → "search"
+			// The last identifier child is the method name in both cases.
 			var last string
 			for i := 0; i < n.ChildCount(); i++ {
 				c := n.Child(i)
-				if c.Type() == "identifier" || c.Type() == "dot_index_expression" {
-					if c.Type() == "dot_index_expression" {
-						last = luaDotLast(c)
-					} else {
-						last = c.Text()
-					}
+				switch c.Type() {
+				case "dot_index_expression":
+					last = luaDotLast(c)
+				case "identifier":
+					last = c.Text()
 				}
 			}
 			return last
 		},
 		extractCallReceiver: func(n *ast.Node) string {
+			// Handle dot_index_expression children.
 			for i := 0; i < n.ChildCount(); i++ {
 				c := n.Child(i)
 				if c.Type() == "dot_index_expression" {
-					// Return the table part
 					table := c.ChildByFieldName("table")
 					if table != nil {
 						return table.Text()
 					}
+				}
+			}
+			// Flat structure: identifier + separator + identifier + args.
+			// Works for both dot calls (identifier "." identifier) and
+			// colon calls (identifier self_call_colon identifier).
+			for i := 0; i+2 < n.ChildCount(); i++ {
+				c := n.Child(i)
+				sep := n.Child(i + 1)
+				next := n.Child(i + 2)
+				if c.Type() == "identifier" &&
+					(sep.Type() == "." || sep.Type() == "self_call_colon") &&
+					next.Type() == "identifier" {
+					return c.Text()
 				}
 			}
 			return ""

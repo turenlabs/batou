@@ -359,22 +359,6 @@ func TestSpring009_DispatcherForward_FixedPath_Safe(t *testing.T) {
 	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-009")
 }
 
-// --- BATOU-FW-SPRING-010: Session Fixation ---
-
-func TestSpring010_SessionFixationNone(t *testing.T) {
-	content := `http.sessionManagement()
-    .sessionFixation().none();`
-	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-010")
-}
-
-func TestSpring010_SessionFixationMigrateSession_Safe(t *testing.T) {
-	content := `http.sessionManagement()
-    .sessionFixation().migrateSession();`
-	result := testutil.ScanContent(t, "/app/SecurityConfig.java", content)
-	testutil.MustNotFindRule(t, result, "BATOU-FW-SPRING-010")
-}
-
 // --- Integration: Multiple findings in one config ---
 
 func TestSpring_MultipleIssues_SecurityConfig(t *testing.T) {
@@ -399,7 +383,6 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-002") // permitAll wildcard
 	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-004") // actuator exposed
 	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-008") // frame options disabled
-	testutil.MustFindRule(t, result, "BATOU-FW-SPRING-010") // session fixation off
 }
 
 // --- Fixture-based tests ---

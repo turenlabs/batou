@@ -25,9 +25,11 @@ var (
 )
 
 // BATOU-GEN-015: Commented-out security code
+// Only match commented-out lines that contain actual security function calls
+// (not CSS ternaries, ignore directives, or generic words near security terms).
 var (
-	reCommentedAuth   = regexp.MustCompile(`(?i)(?://|#)\s*(?:if\s*\(|require|import|use\s+).*(?:auth|authenticate|authorize|verify|check_?permission|requireLogin|isAuthenticated|@login_required|@auth|before_action\s*:authenticate)`)
-	reCommentedCrypto = regexp.MustCompile(`(?i)(?://|#)\s*(?:.*(?:encrypt|hash|bcrypt|argon|scrypt|hmac|verify_?password|check_?password|csrf_?protect|rate_?limit|sanitize|escape|validate))`)
+	reCommentedAuth   = regexp.MustCompile(`(?i)(?://|#)\s*(?:if\s*\(|require|import|use\s+).*(?:authenticate|authorize|check_?permission|requireLogin|isAuthenticated|@login_required|@auth|before_action\s*:authenticate)\s*[\(;]?`)
+	reCommentedCrypto = regexp.MustCompile(`(?i)(?://|#)\s*[^*]*(?:encrypt|decrypt|bcrypt|argon|scrypt|hmac|verify_?password|check_?password|csrf_?protect|rate_?limit)\s*\(`)
 )
 
 // BATOU-GEN-016: Empty catch/except block
@@ -610,7 +612,7 @@ func (r *InsecureTempFile) Scan(ctx *rules.ScanContext) []rules.Finding {
 func init() {
 	rules.Register(&HardcodedIPAddress{})
 	rules.Register(&TodoInSecurityCode{})
-	rules.Register(&CommentedOutSecurityCode{})
+	// rules.Register(&CommentedOutSecurityCode{}) // Removed: low-value noise rule
 	rules.Register(&EmptyCatchBlock{})
 	rules.Register(&UnrestrictedFilePermissions{})
 	rules.Register(&UnsafeInnerHTML{})

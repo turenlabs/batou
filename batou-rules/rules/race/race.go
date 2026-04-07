@@ -679,6 +679,6 @@ func init() {
 	rules.Register(&DoubleCheckedLocking{})
 	rules.Register(&SignalHandlerRace{})
 	rules.Register(&SharedMutableState{})
-	rules.Register(&NonAtomicRMW{})
+	// rules.Register(&NonAtomicRMW{}) // Removed: noise rule
 	rules.Register(&LazyInitRace{})
 }

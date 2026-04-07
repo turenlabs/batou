@@ -8,7 +8,8 @@ import (
 func (javaCatalog) Sanitizers() []taint.SanitizerDef {
 	return []taint.SanitizerDef{
 		// HTML encoding
-		{ID: "java.stringescapeutils.escapehtml4", Language: rules.LangJava, Pattern: `StringEscapeUtils\.escapeHtml4\s*\(`, ObjectType: "StringEscapeUtils", MethodName: "escapeHtml4", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "Apache Commons HTML escape"},
+		{ID: "java.stringescapeutils.escapehtml4", Language: rules.LangJava, Pattern: `StringEscapeUtils\.escapeHtml4\s*\(`, ObjectType: "StringEscapeUtils", MethodName: "escapeHtml4", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "Apache Commons HTML escape (lang3)"},
+		{ID: "java.stringescapeutils.escapehtml", Language: rules.LangJava, Pattern: `StringEscapeUtils\.escapeHtml\s*\(`, ObjectType: "StringEscapeUtils", MethodName: "escapeHtml", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "Apache Commons HTML escape (lang2)"},
 		{ID: "java.spring.htmlutils.htmlescape", Language: rules.LangJava, Pattern: `HtmlUtils\.htmlEscape\s*\(`, ObjectType: "HtmlUtils", MethodName: "htmlEscape", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "Spring HTML escape"},
 		{ID: "java.esapi.encodeforhtml", Language: rules.LangJava, Pattern: `ESAPI\.encoder\s*\(\s*\)\s*\.encodeForHTML\s*\(`, ObjectType: "ESAPI", MethodName: "encodeForHTML", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "ESAPI HTML encoding"},
 		{ID: "java.jsoup.clean", Language: rules.LangJava, Pattern: `Jsoup\.clean\s*\(`, ObjectType: "Jsoup", MethodName: "clean", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "Jsoup HTML sanitization"},
@@ -21,7 +22,7 @@ func (javaCatalog) Sanitizers() []taint.SanitizerDef {
 		{ID: "java.long.parselong", Language: rules.LangJava, Pattern: `Long\.parseLong\s*\(`, ObjectType: "Long", MethodName: "parseLong", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand}, Description: "Long parsing (type coercion)"},
 
 		// Path traversal
-		{ID: "java.filenameutils.getname", Language: rules.LangJava, Pattern: `FilenameUtils\.getName\s*\(`, ObjectType: "FilenameUtils", MethodName: "getName", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Filename extraction via FilenameUtils"},
+		{ID: "java.filenameutils.getname", Language: rules.LangJava, Pattern: `FilenameUtils\.getName\s*\(`, ObjectType: "FilenameUtils", MethodName: "getName", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "Filename extraction via FilenameUtils"},
 
 		// URL encoding
 		{ID: "java.urlencoder.encode", Language: rules.LangJava, Pattern: `URLEncoder\.encode\s*\(`, ObjectType: "URLEncoder", MethodName: "encode", Neutralizes: []taint.SinkCategory{taint.SnkRedirect, taint.SnkHTMLOutput}, Description: "URL encoding"},
@@ -49,8 +50,20 @@ func (javaCatalog) Sanitizers() []taint.SanitizerDef {
 		// Jackson safe deserialization config
 		{ID: "java.jackson.activatedefaulttyping.safe", Language: rules.LangJava, Pattern: `activateDefaultTyping\s*\([^)]*LaissezFaireSubTypeValidator`, ObjectType: "ObjectMapper", MethodName: "activateDefaultTyping", Neutralizes: []taint.SinkCategory{taint.SnkDeserialize}, Description: "Jackson activateDefaultTyping with validator (safer polymorphic deser)"},
 
+		// SnakeYAML safe loading
+		{ID: "java.snakeyaml.safeload", Language: rules.LangJava, Pattern: `(?:Yaml|yaml)\.loadAs\s*\(|new\s+Yaml\s*\(\s*new\s+SafeConstructor`, ObjectType: "Yaml", MethodName: "loadAs/SafeConstructor", Neutralizes: []taint.SinkCategory{taint.SnkDeserialize}, Description: "SnakeYAML type-safe loading via loadAs() or SafeConstructor"},
+
+		// XStream security framework (post-1.4.7)
+		{ID: "java.xstream.allowtypes", Language: rules.LangJava, Pattern: `(?:XStream|xstream)\.allowTypes\s*\(|(?:XStream|xstream)\.setupDefaultSecurity\s*\(|(?:XStream|xstream)\.addPermission\s*\(`, ObjectType: "XStream", MethodName: "allowTypes/setupDefaultSecurity", Neutralizes: []taint.SinkCategory{taint.SnkDeserialize}, Description: "XStream security framework type allowlisting"},
+
+		// Kryo class registration enforcement
+		{ID: "java.kryo.setregistrationrequired", Language: rules.LangJava, Pattern: `(?:Kryo|kryo)\.setRegistrationRequired\s*\(\s*true`, ObjectType: "Kryo", MethodName: "setRegistrationRequired(true)", Neutralizes: []taint.SinkCategory{taint.SnkDeserialize}, Description: "Kryo registration-required mode (prevents arbitrary class instantiation)"},
+
+		// ObjectInputFilter (Java 9+ deserialization filter)
+		{ID: "java.objectinputfilter", Language: rules.LangJava, Pattern: `ObjectInputFilter\.Config\.setSerialFilter\s*\(|\.setObjectInputFilter\s*\(`, ObjectType: "ObjectInputFilter", MethodName: "setSerialFilter/setObjectInputFilter", Neutralizes: []taint.SinkCategory{taint.SnkDeserialize}, Description: "Java 9+ ObjectInputFilter for deserialization allowlisting"},
+
 		// Input validation sanitizers (CWE-20)
-		{ID: "java.validator.validate", Language: rules.LangJava, Pattern: `validator\.validate\s*\(`, ObjectType: "Validator", MethodName: "validate", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput, taint.SnkFileWrite}, Description: "Bean Validation (JSR-380) validator.validate()"},
+		{ID: "java.validator.validate", Language: rules.LangJava, Pattern: `validator\.validate\s*\(`, ObjectType: "Validator", MethodName: "validate", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput, taint.SnkFileWrite, taint.SnkFileRead}, Description: "Bean Validation (JSR-380) validator.validate()"},
 		{ID: "java.validation.notnull", Language: rules.LangJava, Pattern: `@NotNull|@NotBlank|@NotEmpty|@Size|@Min|@Max|@Email`, ObjectType: "", MethodName: "@NotNull/@Size/@Min/@Max", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput}, Description: "Bean Validation constraint annotations"},
 		{ID: "java.spring.validated", Language: rules.LangJava, Pattern: `@Validated`, ObjectType: "Spring", MethodName: "@Validated", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput}, Description: "Spring @Validated annotation for method-level validation"},
 
@@ -77,11 +90,11 @@ func (javaCatalog) Sanitizers() []taint.SanitizerDef {
 		{ID: "java.spring.ldapencoder.filterencode", Language: rules.LangJava, Pattern: `LdapEncoder\.filterEncode\s*\(|LdapUtils\.encode\s*\(`, ObjectType: "LdapEncoder", MethodName: "filterEncode", Neutralizes: []taint.SinkCategory{taint.SnkLDAP}, Description: "Spring LDAP filter encoding"},
 
 		// Path traversal sanitization
-		{ID: "java.file.getcanonicalpath", Language: rules.LangJava, Pattern: `\.getCanonicalPath\s*\(`, ObjectType: "File", MethodName: "getCanonicalPath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Canonical path validation (resolves symlinks and relative paths)"},
-		{ID: "java.file.topath.normalize", Language: rules.LangJava, Pattern: `\.toPath\s*\(\s*\)\s*\.normalize\s*\(`, ObjectType: "File", MethodName: "toPath().normalize()", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Path normalization via File.toPath().normalize()"},
+		{ID: "java.file.getcanonicalpath", Language: rules.LangJava, Pattern: `\.getCanonicalPath\s*\(`, ObjectType: "File", MethodName: "getCanonicalPath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "Canonical path validation (resolves symlinks and relative paths)"},
+		{ID: "java.file.topath.normalize", Language: rules.LangJava, Pattern: `\.toPath\s*\(\s*\)\s*\.normalize\s*\(`, ObjectType: "File", MethodName: "toPath().normalize()", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "Path normalization via File.toPath().normalize()"},
 
 		// Path normalization
-		{ID: "java.nio.path.normalize", Language: rules.LangJava, Pattern: `\.normalize\s*\(\s*\)`, ObjectType: "Path", MethodName: "normalize", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "NIO Path normalization (resolves .. components)"},
+		{ID: "java.nio.path.normalize", Language: rules.LangJava, Pattern: `\.normalize\s*\(\s*\)`, ObjectType: "Path", MethodName: "normalize", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "NIO Path normalization (resolves .. components)"},
 
 		// Regex escaping
 		{ID: "java.pattern.quote", Language: rules.LangJava, Pattern: `Pattern\.quote\s*\(`, ObjectType: "Pattern", MethodName: "quote", Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery}, Description: "Regex metacharacter escaping (prevents ReDoS and injection in patterns)"},
@@ -94,5 +107,13 @@ func (javaCatalog) Sanitizers() []taint.SanitizerDef {
 
 		// StringUtils escaping
 		{ID: "java.stringescapeutils.escapeecmascript", Language: rules.LangJava, Pattern: `StringEscapeUtils\.escapeEcmaScript\s*\(|StringEscapeUtils\.escapeXml\s*\(`, ObjectType: "StringEscapeUtils", MethodName: "escapeEcmaScript/escapeXml", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate}, Description: "Apache Commons text escaping for JavaScript/XML contexts"},
+
+		// JOOQ parameterization
+		{ID: "java.jooq.param", Language: rules.LangJava, Pattern: `DSL\.(param|val)\(`, ObjectType: "DSL", MethodName: "param/val", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery}, Description: "JOOQ DSL.param()/val() parameterized binding"},
+		{ID: "java.jooq.dsl", Language: rules.LangJava, Pattern: `DSL\.(select|insertInto|update|delete)\(`, ObjectType: "DSL", MethodName: "select/insertInto/update/delete", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery}, Description: "JOOQ DSL type-safe query builder (parameterized)"},
+
+		// MongoDB safe query builders (type-safe Filters API prevents NoSQL injection)
+		{ID: "java.mongodb.filters", Language: rules.LangJava, Pattern: `Filters\.(eq|ne|gt|gte|lt|lte|in|nin|and|or|not|regex|exists|elemMatch)\s*\(`, ObjectType: "Filters", MethodName: "Filters.*", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery}, Description: "MongoDB Filters builder API (type-safe query construction)"},
+		{ID: "java.spring.criteria.where", Language: rules.LangJava, Pattern: `Criteria\.where\s*\(`, ObjectType: "Criteria", MethodName: "where", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery}, Description: "Spring Data MongoDB Criteria builder (type-safe query construction)"},
 	}
 }

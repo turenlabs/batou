@@ -302,22 +302,10 @@ func (c *jsChecker) checkSQLTemplateString(n *ast.Node) {
 
 func (c *jsChecker) checkSQLBinaryExpression(n *ast.Node) {
 	text := n.Text()
-	if !strings.Contains(text, "+") {
+	if !containsSQLKeyword(text) {
 		return
 	}
-	// Only flag if a SQL keyword appears inside a string literal child,
-	// not in method names (e.g., cipher.update is not SQL UPDATE).
-	hasSQLInLiteral := false
-	n.Walk(func(child *ast.Node) bool {
-		if child.Type() == "string" || child.Type() == "string_fragment" {
-			if containsSQLKeyword(child.Text()) {
-				hasSQLInLiteral = true
-				return false
-			}
-		}
-		return true
-	})
-	if !hasSQLInLiteral {
+	if !strings.Contains(text, "+") {
 		return
 	}
 	// Check at least one part is not a literal

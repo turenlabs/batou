@@ -597,6 +597,37 @@ func TestMatchesTargets_AllCategories(t *testing.T) {
 		{"BATOU-GQL-001", "graphql"},
 		{"BATOU-MISCONF-001", "misconfig"},
 		{"BATOU-INTERPROC-SQL", "interprocedural"},
+		{"BATOU-FW-FASTAPI-001", "framework"},
+		{"BATOU-FW-DJANGO-001", "framework"},
+		{"BATOU-FW-EXPRESS-001", "framework"},
+		{"BATOU-JWT-001", "jwt"},
+		{"BATOU-SESS-001", "session"},
+		{"BATOU-OAUTH-001", "oauth"},
+		{"BATOU-RACE-001", "race"},
+		{"BATOU-SSTI-001", "ssti"},
+		{"BATOU-UPLOAD-001", "upload"},
+		{"BATOU-VAL-001", "validation"},
+		{"BATOU-HDR-001", "header"},
+		{"BATOU-ENC-001", "encoding"},
+		{"BATOU-WS-001", "websocket"},
+		{"BATOU-MISC-001", "misconfig"},
+		{"BATOU-GEN-001", "general"},
+		{"BATOU-GO-001", "golang"},
+		{"BATOU-PY-001", "python"},
+		{"BATOU-PYAST-001", "python"},
+		{"BATOU-JSTS-001", "jsts"},
+		{"BATOU-JAVA-001", "java"},
+		{"BATOU-PHP-001", "php"},
+		{"BATOU-RB-001", "ruby"},
+		{"BATOU-RS-001", "rust"},
+		{"BATOU-CS-001", "csharp"},
+		{"BATOU-KT-001", "kotlin"},
+		{"BATOU-SWIFT-001", "swift"},
+		{"BATOU-LUA-001", "lua"},
+		{"BATOU-PL-001", "perl"},
+		{"BATOU-GVY-001", "groovy"},
+		{"BATOU-ZIG-001", "zig"},
+		{"BATOU-CTR-001", "container"},
 	}
 
 	for _, tt := range tests {
@@ -620,5 +651,209 @@ func TestMatchesTargets_GeneralFallback(t *testing.T) {
 	f := rules.Finding{RuleID: "BATOU-UNKNOWN-001", LineNumber: 1}
 	if !matchesTargets(f, []string{"general"}) {
 		t.Error("unknown rule should fall back to 'general' category")
+	}
+}
+
+func TestMatchesTargets_TaintSinkSubcategory(t *testing.T) {
+	// BATOU-TAINT-sql_query should be suppressible by "sql_query"
+	tests := []struct {
+		ruleID string
+		target string
+	}{
+		{"BATOU-TAINT-sql_query", "sql_query"},
+		{"BATOU-TAINT-file_write", "file_write"},
+		{"BATOU-TAINT-url_fetch", "url_fetch"},
+		{"BATOU-TAINT-command_exec", "command_exec"},
+		{"BATOU-TAINT-html_output", "html_output"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.ruleID, func(t *testing.T) {
+			f := rules.Finding{RuleID: tt.ruleID, LineNumber: 1}
+			if !matchesTargets(f, []string{tt.target}) {
+				t.Errorf("expected %s to match target %q", tt.ruleID, tt.target)
+			}
+		})
+	}
+}
+
+func TestMatchesTargets_TaintCatchAll(t *testing.T) {
+	// All BATOU-TAINT-* findings should match the "taint" catch-all
+	taintRules := []string{
+		"BATOU-TAINT-sql_query",
+		"BATOU-TAINT-file_write",
+		"BATOU-TAINT-url_fetch",
+	}
+	for _, ruleID := range taintRules {
+		f := rules.Finding{RuleID: ruleID, LineNumber: 1}
+		if !matchesTargets(f, []string{"taint"}) {
+			t.Errorf("expected %s to match 'taint' catch-all", ruleID)
+		}
+	}
+}
+
+func TestIsSuppressed_LineZeroFinding(t *testing.T) {
+	// A finding at line 0 (file-level) should be suppressible by a
+	// directive on line 1 of the file.
+	s := Parse("# batou:ignore BATOU-SSRF-001 -- false positive\nimport requests")
+	f := rules.Finding{RuleID: "BATOU-SSRF-001", LineNumber: 0}
+	if !s.IsSuppressed(f) {
+		t.Error("line 0 finding should be suppressed by directive on line 1")
+	}
+}
+
+func TestIsSuppressed_LineZeroNotSuppressedWithoutDirective(t *testing.T) {
+	// A finding at line 0 should NOT be suppressed if line 1 has no directive.
+	s := Parse("import requests\n# batou:ignore BATOU-SSRF-001\ndo_stuff()")
+	f := rules.Finding{RuleID: "BATOU-SSRF-001", LineNumber: 0}
+	if s.IsSuppressed(f) {
+		t.Error("line 0 finding should not be suppressed when directive is on line 2")
+	}
+}
+
+func TestIsSuppressed_PythonDecorator(t *testing.T) {
+	// Exact scenario from user: suppress directive above @app.post decorator
+	code := "# batou:ignore BATOU-FW-FASTAPI-001 -- public meme generator\n@app.post(\"/api/generate\")\nasync def generate_meme():\n    pass"
+	s := Parse(code)
+
+	// Finding is on the decorator line (line 2)
+	f := rules.Finding{RuleID: "BATOU-FW-FASTAPI-001", LineNumber: 2}
+	if !s.IsSuppressed(f) {
+		t.Error("expected BATOU-FW-FASTAPI-001 on line 2 to be suppressed by directive on line 1")
+		t.Logf("lineTargets: %v", s.lineTargets)
+	}
+}
+
+func TestIsSuppressed_PythonDecoratorWithBlankLine(t *testing.T) {
+	// What if there's a blank line between the directive and the decorator?
+	code := "# batou:ignore BATOU-FW-FASTAPI-001 -- public\n\n@app.post(\"/api/generate\")\nasync def generate_meme():\n    pass"
+	s := Parse(code)
+
+	// Blank line should be skipped; finding on line 3 (decorator)
+	f := rules.Finding{RuleID: "BATOU-FW-FASTAPI-001", LineNumber: 3}
+	if !s.IsSuppressed(f) {
+		t.Error("expected finding on line 3 to be suppressed (blank line between directive and decorator)")
+		t.Logf("lineTargets: %v", s.lineTargets)
+	}
+}
+
+func TestIsSuppressed_FrameworkRuleCategory(t *testing.T) {
+	// Test that BATOU-FW-FASTAPI-001 can be suppressed by category
+	code := "# batou:ignore framework\n@app.post(\"/api/generate\")"
+	s := Parse(code)
+	f := rules.Finding{RuleID: "BATOU-FW-FASTAPI-001", LineNumber: 2}
+	if !s.IsSuppressed(f) {
+		t.Errorf("expected framework category suppress to work for BATOU-FW-FASTAPI-001")
+		t.Logf("categorizeRule result: %q", categorizeRule("BATOU-FW-FASTAPI-001"))
+	}
+}
+
+// =========================================================================
+// Failure mode tests — edge cases and regressions
+// =========================================================================
+
+func TestUnsuppressible_SuppressReview(t *testing.T) {
+	// BATOU-SUPPRESS-REVIEW must never be suppressible — agents can't suppress
+	// the warning that tells them to fix code instead of suppressing.
+	code := "// batou:ignore all\n// batou:ignore BATOU-SUPPRESS-REVIEW\ndb.Query(sql)"
+	s := Parse(code)
+	f := rules.Finding{RuleID: "BATOU-SUPPRESS-REVIEW", LineNumber: 3}
+	if s.IsSuppressed(f) {
+		t.Fatal("BATOU-SUPPRESS-REVIEW must not be suppressible")
+	}
+}
+
+func TestUnsuppressible_Timeout(t *testing.T) {
+	code := "// batou:ignore all\npackage main"
+	s := Parse(code)
+	f := rules.Finding{RuleID: "BATOU-TIMEOUT", LineNumber: 2}
+	if s.IsSuppressed(f) {
+		t.Fatal("BATOU-TIMEOUT must not be suppressible")
+	}
+}
+
+func TestUnsuppressible_Panic(t *testing.T) {
+	code := "// batou:ignore all\npackage main"
+	s := Parse(code)
+	f := rules.Finding{RuleID: "BATOU-PANIC", LineNumber: 2}
+	if s.IsSuppressed(f) {
+		t.Fatal("BATOU-PANIC must not be suppressible")
+	}
+}
+
+func TestUnsuppressible_NormalRulesStillWork(t *testing.T) {
+	// Normal rules should still be suppressible
+	code := "// batou:ignore BATOU-INJ-001\ndb.Query(sql)"
+	s := Parse(code)
+	f := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 2}
+	if !s.IsSuppressed(f) {
+		t.Fatal("normal rules should still be suppressible")
+	}
+}
+
+func TestBlockSuppress_MissingEnd(t *testing.T) {
+	// Missing ignore-end should suppress everything after ignore-start
+	// (over-suppress for safety — better than under-suppress)
+	code := "// batou:ignore-start injection\ndb.Query(sql)\ndb.Query(sql2)\ndb.Query(sql3)"
+	s := Parse(code)
+	for _, line := range []int{2, 3, 4} {
+		f := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: line}
+		if !s.IsSuppressed(f) {
+			t.Errorf("line %d should be suppressed (unclosed block covers rest of file)", line)
+		}
+	}
+}
+
+func TestBlockSuppress_EmptyBlock(t *testing.T) {
+	// ignore-start immediately followed by ignore-end should suppress nothing
+	code := "line1\n// batou:ignore-start injection\n// batou:ignore-end\ndb.Query(sql)"
+	s := Parse(code)
+	f := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 4}
+	if s.IsSuppressed(f) {
+		t.Fatal("finding outside empty block should not be suppressed")
+	}
+}
+
+func TestSuppress_CaseInsensitiveTarget(t *testing.T) {
+	// Targets should be case-insensitive
+	code := "// batou:ignore INJECTION\ndb.Query(sql)"
+	s := Parse(code)
+	f := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 2}
+	if !s.IsSuppressed(f) {
+		t.Fatal("uppercase category target should still match")
+	}
+}
+
+func TestSuppress_MisspelledRuleID(t *testing.T) {
+	// Misspelled rule ID should NOT suppress
+	code := "// batou:ignore BATOU-INJ-999\ndb.Query(sql)"
+	s := Parse(code)
+	f := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 2}
+	if s.IsSuppressed(f) {
+		t.Fatal("misspelled rule ID should not suppress a different rule")
+	}
+}
+
+func TestSuppress_DirectiveInStringLiteral(t *testing.T) {
+	// A suppress directive inside a string literal is still parsed as a directive
+	// because suppress.Parse is regex-based (no AST). This is a known limitation.
+	// The test documents the behavior.
+	code := "msg := \"// batou:ignore injection\"\ndb.Query(sql)"
+	s := Parse(code)
+	// The regex parser WILL find this — it's a known false positive in parsing.
+	// We document the behavior rather than assert it's filtered.
+	t.Logf("directives found in string literal test: %d", len(s.Directives))
+}
+
+func TestSuppress_MultipleTargets(t *testing.T) {
+	// Multiple targets on one directive should suppress all
+	code := "// batou:ignore injection xss -- both categories\ndb.Query(sql)"
+	s := Parse(code)
+	injF := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 2}
+	xssF := rules.Finding{RuleID: "BATOU-XSS-001", LineNumber: 2}
+	if !s.IsSuppressed(injF) {
+		t.Error("injection should be suppressed by multi-target directive")
+	}
+	if !s.IsSuppressed(xssF) {
+		t.Error("xss should be suppressed by multi-target directive")
 	}
 }

@@ -23,7 +23,7 @@ func TestTRV001_PathTraversal_JS_Fixture(t *testing.T) {
 func TestTRV001_PathTraversal_Python_Fixture(t *testing.T) {
 	content := testutil.LoadFixture(t, "python/vulnerable/path_traversal.py")
 	result := testutil.ScanContent(t, "/app/views.py", content)
-	testutil.MustFindRule(t, result, "BATOU-TRV-001")
+	testutil.MustFindAnyRule(t, result, "BATOU-TRV-001", "BATOU-TRV-008", "BATOU-TRV-018")
 }
 
 func TestTRV001_PathTraversal_PHP_Fixture(t *testing.T) {

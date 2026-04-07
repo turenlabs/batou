@@ -15,7 +15,6 @@ import (
 	_ "github.com/turenlabs/batou-rules/rules/xss"
 	_ "github.com/turenlabs/batou-rules/rules/ssrf"
 	_ "github.com/turenlabs/batou-rules/rules/generic"
-	_ "github.com/turenlabs/batou-core/taint"
 	_ "github.com/turenlabs/batou-core/taint/languages"
 	_ "github.com/turenlabs/batou-core/taintrule"
 )

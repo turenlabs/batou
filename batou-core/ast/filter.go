@@ -26,8 +26,9 @@ func FilterFindings(tree *Tree, filePath string, findings []rules.Finding) []rul
 		return findings
 	}
 
-	// Use cached line offsets from the tree.
-	lineOffsets := tree.LineOffsets()
+	// Pre-build a line-start offset table for translating line numbers
+	// to byte offsets.
+	lineOffsets := buildLineOffsets(content)
 
 	out := make([]rules.Finding, 0, len(findings))
 	for _, f := range findings {
@@ -54,9 +55,7 @@ func shouldSuppressFinding(tree *Tree, f rules.Finding, lineOffsets []int, conte
 		return false // can't determine offset, keep the finding
 	}
 
-	// Use binary-search over cached comment ranges for O(log n) lookup
-	// instead of NodeAtOffset + parent walk per finding.
-	return tree.IsOffsetInComment(offset)
+	return IsInComment(tree, offset)
 }
 
 // findingOffset converts a finding's line number (and optional matched text)
@@ -90,3 +89,14 @@ func findingOffset(f rules.Finding, lineOffsets []int, content []byte) (uint32, 
 	return uint32(lineStart), true
 }
 
+// buildLineOffsets returns a slice where lineOffsets[i] is the byte offset
+// of the start of the (i+1)-th line (0-indexed internally).
+func buildLineOffsets(content []byte) []int {
+	offsets := []int{0}
+	for i, b := range content {
+		if b == '\n' && i+1 < len(content) {
+			offsets = append(offsets, i+1)
+		}
+	}
+	return offsets
+}

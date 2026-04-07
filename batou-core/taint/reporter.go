@@ -12,11 +12,11 @@ func FormatFlowForClaude(flow *TaintFlow) string {
 	var b strings.Builder
 
 	sev := flow.Sink.Severity
-	b.WriteString(fmt.Sprintf("[%s] TAINT FLOW: %s → %s\n",
-		sev, flow.Source.Category, flow.Sink.Category))
-	b.WriteString(fmt.Sprintf("  Scope: %s\n", flow.ScopeName))
-	b.WriteString(fmt.Sprintf("  Source: %s (line %d) — %s\n",
-		flow.Source.MethodName, flow.SourceLine, flow.Source.Description))
+	fmt.Fprintf(&b, "[%s] TAINT FLOW: %s → %s\n",
+		sev, flow.Source.Category, flow.Sink.Category)
+	fmt.Fprintf(&b, "  Scope: %s\n", flow.ScopeName)
+	fmt.Fprintf(&b, "  Source: %s (line %d) — %s\n",
+		flow.Source.MethodName, flow.SourceLine, flow.Source.Description)
 
 	if len(flow.Steps) > 0 {
 		b.WriteString("  Flow path:\n")
@@ -25,13 +25,13 @@ func FormatFlowForClaude(flow *TaintFlow) string {
 			if i == len(flow.Steps)-1 {
 				connector = "└─"
 			}
-			b.WriteString(fmt.Sprintf("    %s line %d: %s (%s)\n",
-				connector, step.Line, step.Description, step.VarName))
+			fmt.Fprintf(&b, "    %s line %d: %s (%s)\n",
+				connector, step.Line, step.Description, step.VarName)
 		}
 	}
 
-	b.WriteString(fmt.Sprintf("  Sink: %s (line %d) — %s\n",
-		flow.Sink.MethodName, flow.SinkLine, flow.Sink.Description))
+	fmt.Fprintf(&b, "  Sink: %s (line %d) — %s\n",
+		flow.Sink.MethodName, flow.SinkLine, flow.Sink.Description)
 
 	conf := "HIGH"
 	if flow.Confidence < 0.7 {
@@ -40,10 +40,10 @@ func FormatFlowForClaude(flow *TaintFlow) string {
 	if flow.Confidence < 0.4 {
 		conf = "LOW"
 	}
-	b.WriteString(fmt.Sprintf("  Confidence: %s (%.0f%%)\n", conf, flow.Confidence*100))
+	fmt.Fprintf(&b, "  Confidence: %s (%.0f%%)\n", conf, flow.Confidence*100)
 
 	if flow.Sink.CWEID != "" {
-		b.WriteString(fmt.Sprintf("  CWE: %s | OWASP: %s\n", flow.Sink.CWEID, flow.Sink.OWASPCategory))
+		fmt.Fprintf(&b, "  CWE: %s | OWASP: %s\n", flow.Sink.CWEID, flow.Sink.OWASPCategory)
 	}
 
 	return b.String()
@@ -57,9 +57,9 @@ func FormatFlowsReport(flows []TaintFlow, filePath string, lang rules.Language, 
 
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("\n--- Batou Taint Analysis [%s] ---\n", filePath))
-	b.WriteString(fmt.Sprintf("Language: %s | Taint flows: %d | Time: %dms\n\n",
-		lang, len(flows), scanTimeMs))
+	fmt.Fprintf(&b, "\n--- Batou Taint Analysis [%s] ---\n", filePath)
+	fmt.Fprintf(&b, "Language: %s | Taint flows: %d | Time: %dms\n\n",
+		lang, len(flows), scanTimeMs)
 
 	// Count by severity
 	sevCounts := make(map[rules.Severity]int)
@@ -72,10 +72,10 @@ func FormatFlowsReport(flows []TaintFlow, filePath string, lang rules.Language, 
 			parts = append(parts, fmt.Sprintf("%s:%d", sev, c))
 		}
 	}
-	b.WriteString(fmt.Sprintf("Severity: %s\n\n", strings.Join(parts, " | ")))
+	fmt.Fprintf(&b, "Severity: %s\n\n", strings.Join(parts, " | "))
 
 	for i, flow := range flows {
-		b.WriteString(fmt.Sprintf("FLOW %d:\n", i+1))
+		fmt.Fprintf(&b, "FLOW %d:\n", i+1)
 		b.WriteString(FormatFlowForClaude(&flow))
 		b.WriteString("\n")
 	}

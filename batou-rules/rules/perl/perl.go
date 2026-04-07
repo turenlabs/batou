@@ -40,8 +40,6 @@ var (
 	dbiSelectInterp   = regexp.MustCompile(`\$dbh->select(?:row|all)_\w+\s*\(\s*"[^"]*\$[a-zA-Z_{][^"]*"`)
 	// $dbh->selectrow_*("..." . $var) - concatenation
 	dbiSelectConcat   = regexp.MustCompile(`\$dbh->select(?:row|all)_\w+\s*\(\s*["'][^"']*["']\s*\.`)
-	// General Perl SQL interpolation: "SELECT/INSERT/... $var" in any assignment
-	rePerlSQLInterp   = regexp.MustCompile(`"[^"]*\b(?:SELECT|INSERT|UPDATE|DELETE|DROP)\b[^"]*\$[a-zA-Z_{][^"]*"`)
 )
 
 // PL-003: Code Injection
@@ -231,9 +229,6 @@ func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		} else if loc := dbiSelectConcat.FindString(line); loc != "" {
 			matched = loc
 			desc = "DBI selectrow/selectall with string concatenation"
-		} else if loc := rePerlSQLInterp.FindString(line); loc != "" {
-			matched = loc
-			desc = "SQL query string with variable interpolation"
 		}
 
 		if matched != "" {

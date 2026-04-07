@@ -19,7 +19,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
@@ -136,7 +135,10 @@ var sinkCallPatterns = []struct {
 	{regexp.MustCompile(`\bhttp\.Redirect\s*\(`), taint.SnkRedirect, "http.Redirect"},
 	{regexp.MustCompile(`\bhttp\.\s*(Get|Post|Head)\s*\(`), taint.SnkURLFetch, "http.Get"},
 	{regexp.MustCompile(`\beval\s*\(`), taint.SnkEval, "eval"},
-	{regexp.MustCompile(`\bjson\.Unmarshal\s*\(`), taint.SnkDeserialize, "json.Unmarshal"},
+	// Note: json.Unmarshal is intentionally excluded. Go's encoding/json
+	// deserializes into typed structs and is NOT vulnerable to RCE like
+	// Java's ObjectInputStream or Python's pickle. Only gob.Decode and
+	// xml.Unmarshal (XXE) are risky in Go.
 	{regexp.MustCompile(`\byaml\.Unmarshal\s*\(`), taint.SnkDeserialize, "yaml.Unmarshal"},
 	{regexp.MustCompile(`\blog\.\s*(Print|Printf|Println|Fatal|Fatalf)\s*\(`), taint.SnkLog, "log.Print"},
 }
@@ -562,15 +564,11 @@ func FindImpactedCallers(cg *CallGraph, changedFuncIDs []string) []ImpactedCalle
 
 // --- Internal helpers ---
 
-// callerFileReadTimeout is the maximum time to wait for a cross-file read.
-// Prevents hangs on network mounts or slow filesystems.
-const callerFileReadTimeout = 500 * time.Millisecond
-
 // loadCallerFile reads a caller's source file from disk for cross-file
 // interprocedural analysis. Results are cached in fileContents so each
 // file is read at most once per PropagateInterproc invocation.
 // Returns the content and true on success, or ("", false) if the file
-// cannot be read (missing, too large, unreadable, or read times out).
+// cannot be read (missing, too large, or unreadable).
 func loadCallerFile(filePath string, fileContents map[string]string) (string, bool) {
 	// Check cache first (another caller in the same file may have loaded it).
 	if content, ok := fileContents[filePath]; ok {
@@ -582,31 +580,35 @@ func loadCallerFile(filePath string, fileContents map[string]string) (string, bo
 		return "", false
 	}
 
-	// Read with a timeout to avoid hanging on network mounts.
-	type readResult struct {
-		data []byte
-		err  error
-	}
-	ch := make(chan readResult, 1)
-	go func() {
-		data, err := os.ReadFile(filePath)
-		ch <- readResult{data, err}
-	}()
-
-	timer := time.NewTimer(callerFileReadTimeout)
-	defer timer.Stop()
-
-	select {
-	case res := <-ch:
-		if res.err != nil {
-			return "", false
-		}
-		content := string(res.data)
-		fileContents[filePath] = content
-		return content, true
-	case <-timer.C:
+	data, err := os.ReadFile(filePath)
+	if err != nil {
 		return "", false
 	}
+
+	content := string(data)
+	fileContents[filePath] = content
+	return content, true
+}
+
+// reJSONContentType matches Content-Type headers set to non-HTML types
+// like application/json, text/plain, application/ndjson, etc. When a
+// ResponseWriter sets one of these, w.Write() is NOT an XSS vector.
+var reJSONContentType = regexp.MustCompile(
+	`(?i)\.Header\(\)\.\s*Set\(\s*"Content-Type"\s*,\s*"(application/(json|ndjson|octet-stream|protobuf)|text/plain)`)
+
+// hasNonHTMLContentType checks if the function body (as lines) sets a
+// Content-Type header to a non-HTML type anywhere before or near the
+// given line index. This suppresses false-positive XSS (CWE-79)
+// findings on w.Write() in JSON API handlers.
+func hasNonHTMLContentType(lines []string, sinkLineIdx int) bool {
+	// Scan the entire function for Content-Type headers. JSON APIs
+	// typically set the header once near the top of the handler.
+	for i := 0; i < len(lines); i++ {
+		if reJSONContentType.MatchString(lines[i]) {
+			return true
+		}
+	}
+	return false
 }
 
 // extractFuncBody extracts lines startLine..endLine (1-indexed, inclusive) from content.
@@ -893,6 +895,12 @@ func checkCallerPassesTaintToCallee(
 			continue
 		}
 
+		// Suppress XSS (HTML_OUTPUT) findings when the caller or callee
+		// sets a non-HTML Content-Type (e.g., application/json).
+		if matchedSink.SinkCategory == taint.SnkHTMLOutput && hasNonHTMLContentType(callerLines, callLineIdx) {
+			continue
+		}
+
 		sev := severityForSinkCategory[matchedSink.SinkCategory]
 		if sev < rules.High {
 			sev = rules.High
@@ -931,8 +939,7 @@ func checkCallerPassesTaintToCallee(
 			CWEID:           cwe,
 			OWASPCategory:   owasp,
 			Confidence:      "high",
-			ConfidenceScore:  0.8,
-			ConfidencePreset: true,
+			ConfidenceScore: 0.8,
 			Tags:            []string{"interprocedural", "taint-analysis", "cross-function", string(matchedSink.SinkCategory)},
 		}
 
@@ -998,6 +1005,13 @@ func checkCallerUsesTaintedReturn(
 				continue
 			}
 			if !strings.Contains(line, returnVar) {
+				continue
+			}
+
+			// Suppress XSS (HTML_OUTPUT) findings when the function
+			// sets a non-HTML Content-Type (e.g., application/json).
+			// Writing to ResponseWriter with JSON Content-Type is not XSS.
+			if sp.category == taint.SnkHTMLOutput && hasNonHTMLContentType(callerLines, i) {
 				continue
 			}
 
@@ -1068,8 +1082,7 @@ func checkCallerUsesTaintedReturn(
 				CWEID:           cwe,
 				OWASPCategory:   owasp,
 				Confidence:      "high",
-				ConfidenceScore:  0.8,
-				ConfidencePreset: true,
+				ConfidenceScore: 0.8,
 				Tags:            []string{"interprocedural", "taint-analysis", "cross-function", "return-taint", string(sp.category)},
 			}
 

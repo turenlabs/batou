@@ -142,6 +142,24 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 				return ts, true
 			}
 		}
+		// For chained calls like base64.b64decode(tmp).decode('utf-8'),
+		// the receiver text is the full inner expression which won't be
+		// in the taint map. Recursively check the receiver AST node.
+		fn := n.ChildByFieldName("function")
+		if fn == nil {
+			fn = n.ChildByFieldName("name")
+		}
+		if fn != nil {
+			obj := fn.ChildByFieldName("object")
+			if obj == nil {
+				obj = fn.ChildByFieldName("value")
+			}
+			if obj != nil {
+				if ts, ok := nodeIsTainted(obj, tm, cfg); ok {
+					return ts, true
+				}
+			}
+		}
 		// Check arguments
 		args := cfg.extractCallArgs(n)
 		for _, arg := range args {
@@ -152,8 +170,14 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 		return nil, false
 	}
 
-	// Subscript / index expression — check the base
+	// Subscript / index expression — check full text first (per-key taint),
+	// then fall back to checking the base object.
 	if nodeType == "subscript" || nodeType == "subscript_expression" || nodeType == "element_reference" {
+		// Per-key lookup: d['keyB'] stored as full text in taint map.
+		fullText := n.Text()
+		if ts := tm.get(fullText); ts != nil && ts.source != nil {
+			return ts, true
+		}
 		obj := n.ChildByFieldName("object")
 		if obj == nil {
 			obj = n.ChildByFieldName("value")
@@ -162,6 +186,19 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 			obj = n.Child(0)
 		}
 		return nodeIsTainted(obj, tm, cfg)
+	}
+
+	// Tuple expression — check all elements (Rust: ("Location", param.as_str()))
+	if nodeType == "tuple_expression" {
+		for i := 0; i < n.ChildCount(); i++ {
+			c := n.Child(i)
+			if c.IsNamed() {
+				if ts, ok := nodeIsTainted(c, tm, cfg); ok {
+					return ts, true
+				}
+			}
+		}
+		return nil, false
 	}
 
 	// Parenthesized expression
@@ -175,13 +212,47 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 		return nil, false
 	}
 
-	// Conditional / ternary expression — check both branches
+	// Cast expression — unwrap to the casted value (e.g., (String) expr)
+	if nodeType == "cast_expression" {
+		// The casted value is typically the "value" field or the last named child.
+		val := n.ChildByFieldName("value")
+		if val != nil {
+			return nodeIsTainted(val, tm, cfg)
+		}
+		// Fallback: check all named children (type + value).
+		named := n.NamedChildren()
+		for i := len(named) - 1; i >= 0; i-- {
+			if ts, ok := nodeIsTainted(named[i], tm, cfg); ok {
+				return ts, true
+			}
+		}
+		return nil, false
+	}
+
+	// Conditional / ternary expression — check branches.
+	// If the condition is a constant expression that can be evaluated,
+	// only check the branch that would actually execute (reduces FPs
+	// from patterns like: (7*18)+num > 200 ? "safe" : param).
 	if nodeType == "conditional_expression" || nodeType == "ternary_expression" {
+		cond := n.ChildByFieldName("condition")
 		cons := n.ChildByFieldName("consequence")
+		alt := n.ChildByFieldName("alternative")
+
+		if cond != nil {
+			if val, ok := evalConstExpr(cond, tm); ok {
+				if val != 0 {
+					// Condition is true — only consequence executes.
+					return nodeIsTainted(cons, tm, cfg)
+				}
+				// Condition is false — only alternative executes.
+				return nodeIsTainted(alt, tm, cfg)
+			}
+		}
+
+		// Cannot evaluate condition — check both branches (conservative).
 		if ts, ok := nodeIsTainted(cons, tm, cfg); ok {
 			return ts, true
 		}
-		alt := n.ChildByFieldName("alternative")
 		return nodeIsTainted(alt, tm, cfg)
 	}
 
@@ -197,7 +268,7 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 	}
 
 	// Array/list literal — check elements
-	if nodeType == "list" || nodeType == "array" || nodeType == "array_creation_expression" {
+	if nodeType == "list" || nodeType == "array" || nodeType == "array_creation_expression" || nodeType == "array_initializer" {
 		for i := 0; i < n.ChildCount(); i++ {
 			c := n.Child(i)
 			if c.IsNamed() {
@@ -244,11 +315,20 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 		return nil, false
 	}
 
-	// Fallback: for named children, recursively check the first named child
+	// Fallback: for named children, recursively check named children
 	// to handle language-specific wrapper nodes we haven't explicitly handled.
 	named := n.NamedChildren()
 	if len(named) == 1 {
 		return nodeIsTainted(named[0], tm, cfg)
+	}
+	// For wrapper nodes with multiple children (e.g., cast_expression, type+value),
+	// check each named child for taint.
+	if len(named) > 1 {
+		for _, c := range named {
+			if ts, ok := nodeIsTainted(c, tm, cfg); ok {
+				return ts, true
+			}
+		}
 	}
 
 	return nil, false
@@ -278,3 +358,4 @@ func propagationConfidence(n *ast.Node) float64 {
 		return 1.0
 	}
 }
+

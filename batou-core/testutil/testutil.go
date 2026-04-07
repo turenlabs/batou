@@ -2,11 +2,14 @@
 //
 // It wraps the scanner pipeline so tests can feed in arbitrary code strings
 // and assert on findings without constructing hook.Input structs by hand.
+//
+// batou:ignore-start BATOU-AST-003 -- test helper uses exec.Command with build paths, not user input
 package testutil
 
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,6 +48,26 @@ func ScanContent(t *testing.T, filePath string, content string) *ScanResult {
 	input := &hook.Input{
 		HookEventName: "PreToolUse",
 		ToolName:      "Write",
+		ToolInput: hook.ToolInput{
+			FilePath: filePath,
+			Content:  content,
+		},
+	}
+
+	result := scanner.Scan(input)
+	return fromReporter(result)
+}
+
+// ScanContentInDir scans content with an isolated working directory.
+// This ensures the taint cache and findings store don't leak between test cases.
+// Use this in benchmark harnesses where each test case should be independent.
+func ScanContentInDir(t *testing.T, filePath string, content string, cwd string) *ScanResult {
+	t.Helper()
+
+	input := &hook.Input{
+		HookEventName: "PreToolUse",
+		ToolName:      "Write",
+		Cwd:           cwd,
 		ToolInput: hook.ToolInput{
 			FilePath: filePath,
 			Content:  content,
@@ -213,8 +236,8 @@ func AssertBlocked(t *testing.T, result *ScanResult) {
 func AssertNotBlocked(t *testing.T, result *ScanResult) {
 	t.Helper()
 	if result.Blocked {
-		t.Errorf("expected scan to not be blocked but it was; critical findings: %s",
-			criticalFindings(result.Findings))
+		t.Errorf("expected scan to not be blocked but it was; blocking findings: %s",
+			blockingFindings(result.Findings))
 	}
 }
 
@@ -327,6 +350,19 @@ func FindingsByRule(result *ScanResult, ruleID string) []rules.Finding {
 	return out
 }
 
+// FindingCWEIDs returns a deduplicated list of all CWE IDs present in results.
+func FindingCWEIDs(result *ScanResult) []string {
+	seen := make(map[string]bool)
+	var cwes []string
+	for _, f := range result.Findings {
+		if f.CWEID != "" && !seen[f.CWEID] {
+			seen[f.CWEID] = true
+			cwes = append(cwes, f.CWEID)
+		}
+	}
+	return cwes
+}
+
 // FindingRuleIDs returns a deduplicated list of all rule IDs present in results.
 func FindingRuleIDs(result *ScanResult) []string {
 	seen := make(map[string]bool)
@@ -418,14 +454,14 @@ func summarizeFindings(findings []rules.Finding) string {
 	return s
 }
 
-func criticalFindings(findings []rules.Finding) string {
+func blockingFindings(findings []rules.Finding) string {
 	s := ""
 	for _, f := range findings {
-		if f.Severity >= rules.Critical {
+		if f.ShouldBlock() {
 			if s != "" {
 				s += ", "
 			}
-			s += f.RuleID
+			s += fmt.Sprintf("%s(risk=%.2f)", f.RuleID, f.RiskScore)
 		}
 	}
 	if s == "" {

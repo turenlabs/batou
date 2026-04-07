@@ -101,7 +101,7 @@ func init() {
 	rules.Register(&RegexCatastrophic{})
 	rules.Register(&NPMPostinstallRCE{})
 	rules.Register(&MathRandomSecurity{})
-	rules.Register(&DOMClobberingExt{})
+	// rules.Register(&DOMClobberingExt{}) // Removed: low-value noise rule
 	rules.Register(&MissingContentType{})
 	rules.Register(&RequireUserPath{})
 	rules.Register(&InsecureCookieExt{})

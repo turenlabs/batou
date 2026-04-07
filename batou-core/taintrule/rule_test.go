@@ -63,7 +63,7 @@ func TestTaintRule_EnvVarToCommand_NotSuppressed(t *testing.T) {
 		Source: taint.SourceDef{Category: taint.SrcEnvVar},
 		Sink:   taint.SinkDef{Category: taint.SnkLog},
 	}
-	if !(logFlow.Source.Category == taint.SrcEnvVar && logFlow.Sink.Category == taint.SnkLog) {
+	if logFlow.Source.Category != taint.SrcEnvVar || logFlow.Sink.Category != taint.SnkLog {
 		t.Errorf("env→log flow should match suppression filter")
 	}
 }

@@ -344,13 +344,26 @@ func TestKT007_StructuredConcurrency_Safe(t *testing.T) {
 // ==========================================================================
 
 func TestKT008_JsonDecode_WithUserInput(t *testing.T) {
+	// Typed decodeFromString<SpecificType> is safe in kotlinx.serialization
+	// (no polymorphic class instantiation risk). Only untyped/Any is unsafe.
+	content := `fun handleRequest(call: ApplicationCall) {
+    val body = call.receiveText()
+    val data = Json.decodeFromString(body)
+    processData(data)
+}`
+	result := testutil.ScanContent(t, "/app/UserHandler.kt", content)
+	testutil.MustFindRule(t, result, "BATOU-KT-008")
+}
+
+func TestKT008_JsonDecode_TypedSafe(t *testing.T) {
+	// Typed decodeFromString<User> is safe -- no arbitrary class instantiation
 	content := `fun handleRequest(call: ApplicationCall) {
     val body = call.receiveText()
     val user = Json.decodeFromString<User>(body)
     processUser(user)
 }`
 	result := testutil.ScanContent(t, "/app/UserHandler.kt", content)
-	testutil.MustFindRule(t, result, "BATOU-KT-008")
+	testutil.MustNotFindRule(t, result, "BATOU-KT-008")
 }
 
 func TestKT008_JsonDecode_CustomConfig_WithUserInput(t *testing.T) {

@@ -340,5 +340,81 @@ func (c *CCatalog) Sources() []taint.SourceDef {
 			Description: "Delimited line read from input stream",
 			Assigns:     "return",
 		},
+
+		// --- Mongoose embedded HTTP server (cesanta/mongoose) ---
+		{
+			ID:          "c.mongoose.get_header",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangC,
+			Pattern:     `mg_http_get_header\s*\(`,
+			ObjectType:  "",
+			MethodName:  "mg_http_get_header",
+			Description: "Mongoose HTTP request header value",
+			Assigns:     "return",
+		},
+		{
+			ID:          "c.mongoose.get_var",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangC,
+			Pattern:     `mg_http_get_var\s*\(`,
+			ObjectType:  "",
+			MethodName:  "mg_http_get_var",
+			Description: "Mongoose HTTP query/form parameter extraction",
+			Assigns:     "arg:3",
+		},
+
+		// --- Civetweb embedded HTTP server ---
+		{
+			ID:          "c.civetweb.get_var",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangC,
+			Pattern:     `\bmg_get_var\s*\(`,
+			ObjectType:  "",
+			MethodName:  "mg_get_var",
+			Description: "Civetweb query/form parameter extraction",
+			Assigns:     "arg:3",
+		},
+		{
+			ID:          "c.civetweb.read",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangC,
+			Pattern:     `\bmg_read\s*\(`,
+			ObjectType:  "",
+			MethodName:  "mg_read",
+			Description: "Civetweb request body read",
+			Assigns:     "arg:1",
+		},
+		{
+			ID:          "c.civetweb.get_request_info",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangC,
+			Pattern:     `mg_get_request_info\s*\(`,
+			ObjectType:  "",
+			MethodName:  "mg_get_request_info",
+			Description: "Civetweb request info (URI, query string, headers)",
+			Assigns:     "return",
+		},
+
+		// --- FastCGI (libfcgi) ---
+		{
+			ID:          "c.fcgi.getparam",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangC,
+			Pattern:     `\bFCGX_GetParam\s*\(`,
+			ObjectType:  "",
+			MethodName:  "FCGX_GetParam",
+			Description: "FastCGI environment/request parameter",
+			Assigns:     "return",
+		},
+		{
+			ID:          "c.fcgi.getstr",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangC,
+			Pattern:     `\bFCGX_GetStr\s*\(`,
+			ObjectType:  "",
+			MethodName:  "FCGX_GetStr",
+			Description: "FastCGI stream read (request body)",
+			Assigns:     "arg:0",
+		},
 	}
 }

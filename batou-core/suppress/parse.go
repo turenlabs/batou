@@ -35,13 +35,6 @@ type Directive struct {
 	IsEnd   bool     // true for batou:ignore-end
 }
 
-// blockRange tracks a start/end suppression block.
-type blockRange struct {
-	startLine int
-	endLine   int
-	targets   []string
-}
-
 // Suppressions holds all parsed directives and computed suppression state.
 type Suppressions struct {
 	Directives []Directive

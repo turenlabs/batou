@@ -195,6 +195,11 @@ func (r *SubprocessShellInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 		}
 
 		if matched != "" {
+			// Python FP suppression: check if the sink variable was
+			// last assigned a safe value (handles += compound assignments).
+			if rules.PySinkVarIsSafe(lines, i) {
+				continue
+			}
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -365,6 +370,11 @@ func (r *UnsafeYAMLLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if yamlSafeLoader.MatchString(context) {
 				continue
 			}
+			// Python FP suppression: check if the sink variable was
+			// last assigned a safe value.
+			if rules.PySinkVarIsSafe(lines, i) {
+				continue
+			}
 
 			severity := r.DefaultSeverity()
 			title := "yaml.load() without SafeLoader allows arbitrary code execution"
@@ -522,6 +532,11 @@ func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if loc := pickleLoadUserInput.FindString(line); loc != "" {
+			// Python FP suppression: check if the sink variable was
+			// last assigned a safe value.
+			if rules.PySinkVarIsSafe(lines, i) {
+				continue
+			}
 			lib := "pickle"
 			if strings.Contains(loc, "dill") {
 				lib = "dill"
@@ -689,12 +704,7 @@ func (r *FlaskHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if flaskSecretEnv.MatchString(line) {
 				continue
 			}
-			// Skip example/placeholder values
-			if strings.Contains(line, "change-me") || strings.Contains(line, "CHANGE_ME") ||
-				strings.Contains(line, "your-secret") || strings.Contains(line, "TODO") {
-				// Still flag, but lower confidence
-			}
-
+			// Placeholder values still flagged (they shouldn't be in production)
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

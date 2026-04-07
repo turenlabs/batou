@@ -438,7 +438,25 @@ func (c *astChecker) checkUncheckedError(assign *ast.AssignStmt) {
 		return
 	}
 
-	// Check if any LHS identifier is blank (_).
+	// Check if the error return value is discarded with _.
+	// In Go, the error is conventionally the last return value.
+	// Pattern to FLAG:   _, _ = someFunc()  (all blanks, error discarded)
+	//                    result, _ := securityFunc()  (error position is blank)
+	// Pattern to SKIP:   _, err := someFunc()  (first value discarded, error captured)
+	//                    _, _, err := someFunc()  (multiple values discarded, error captured)
+	if len(assign.Lhs) == 0 {
+		return
+	}
+
+	// Check the last LHS position (error position). If it's NOT blank,
+	// the error IS being captured — this is safe even if other values use _.
+	lastLhs := assign.Lhs[len(assign.Lhs)-1]
+	if ident, ok := lastLhs.(*ast.Ident); ok && ident.Name != "_" {
+		// Error is captured (e.g., _, err := f()). Not a finding.
+		return
+	}
+
+	// Also ensure at least one LHS is blank (handles edge case of single return).
 	hasBlank := false
 	for _, lhs := range assign.Lhs {
 		if ident, ok := lhs.(*ast.Ident); ok && ident.Name == "_" {
@@ -449,9 +467,6 @@ func (c *astChecker) checkUncheckedError(assign *ast.AssignStmt) {
 	if !hasBlank {
 		return
 	}
-
-	// Verify the blank is in the error position (last return value typically).
-	// For simplicity, any blank identifier with a security-critical call is flagged.
 	pos := c.fset.Position(assign.Pos())
 	c.findings = append(c.findings, rules.Finding{
 		RuleID:        "BATOU-AST-004",
@@ -819,6 +834,17 @@ func (c *astChecker) checkGoroutineLeak(goStmt *ast.GoStmt) {
 			return // Context is captured from outer scope, likely fine.
 		}
 
+		// Check if the goroutine creates its own context with a timeout/cancel.
+		// This is the standard pattern for intentional background work:
+		//   go func() {
+		//       ctx, cancel := context.WithTimeout(context.Background(), ...)
+		//       defer cancel()
+		//       ...
+		//   }()
+		if c.createsOwnContext(funcLit.Body) {
+			return // Goroutine manages its own context lifecycle.
+		}
+
 		pos := c.fset.Position(goStmt.Pos())
 		c.findings = append(c.findings, rules.Finding{
 			RuleID:        "BATOU-AST-008",
@@ -907,6 +933,79 @@ func (c *astChecker) usesContextInBody(body *ast.BlockStmt) bool {
 				return false
 			}
 		}
+		return true
+	})
+	return found
+}
+
+// createsOwnContext checks if a function body creates its own context via
+// context.WithTimeout, context.WithCancel, or context.WithDeadline called
+// with context.Background() or context.TODO(). This is the standard Go
+// pattern for intentional background work that manages its own lifecycle.
+func (c *astChecker) createsOwnContext(body *ast.BlockStmt) bool {
+	if body == nil {
+		return false
+	}
+
+	// contextCreators are methods on the context package that create
+	// a derived context with cancellation/timeout.
+	contextCreators := map[string]bool{
+		"WithTimeout":  true,
+		"WithCancel":   true,
+		"WithDeadline": true,
+	}
+
+	// backgroundCtx are context constructors that create a root context
+	// for intentional background work.
+	backgroundCtx := map[string]bool{
+		"Background": true,
+		"TODO":       true,
+	}
+
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		// Match context.WithTimeout(...), context.WithCancel(...), etc.
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		ident, ok := sel.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		if ident.Name != "context" || !contextCreators[sel.Sel.Name] {
+			return true
+		}
+
+		// Check that the first argument is context.Background() or context.TODO().
+		if len(call.Args) == 0 {
+			return true
+		}
+		argCall, ok := call.Args[0].(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		argSel, ok := argCall.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		argIdent, ok := argSel.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		if argIdent.Name == "context" && backgroundCtx[argSel.Sel.Name] {
+			found = true
+			return false
+		}
+
 		return true
 	})
 	return found

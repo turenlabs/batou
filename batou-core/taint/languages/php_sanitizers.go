@@ -154,5 +154,74 @@ func (phpCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
 			Description: "Float conversion (restricts to numeric values)",
 		},
+
+		// --- Symfony / Twig sanitizers ---
+		{
+			ID:          "php.twig.autoescape",
+			Language:    rules.LangPHP,
+			Pattern:     `\{\{.*\}\}|->render\s*\(.*\.html\.twig`,
+			ObjectType:  "Twig",
+			MethodName:  "{{ }} auto-escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "Twig auto-escaping in templates (enabled by default)",
+		},
+		{
+			ID:          "php.twig.escape.filter",
+			Language:    rules.LangPHP,
+			Pattern:     `\|\s*e\b|\|\s*escape\b`,
+			ObjectType:  "Twig",
+			MethodName:  "|e / |escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "Twig explicit escape filter",
+		},
+		{
+			ID:          "php.symfony.htmlspecialchars",
+			Language:    rules.LangPHP,
+			Pattern:     `\bhtmlspecialchars\s*\(.*ENT_QUOTES`,
+			ObjectType:  "Symfony",
+			MethodName:  "htmlspecialchars(ENT_QUOTES)",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "Symfony-style htmlspecialchars with ENT_QUOTES flag",
+		},
+
+		// Doctrine sanitizers
+		{
+			ID:          "php.doctrine.setparameter",
+			Language:    rules.LangPHP,
+			Pattern:     `->setParameter\(`,
+			ObjectType:  "Query",
+			MethodName:  "setParameter",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Doctrine setParameter() parameterized query binding",
+		},
+		{
+			ID:          "php.doctrine.querybuilder",
+			Language:    rules.LangPHP,
+			Pattern:     `->createQueryBuilder\(\)`,
+			ObjectType:  "EntityManager",
+			MethodName:  "createQueryBuilder",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Doctrine createQueryBuilder() type-safe query builder",
+		},
+
+		// Eloquent sanitizers
+		{
+			ID:          "php.eloquent.parameterized",
+			Language:    rules.LangPHP,
+			Pattern:     `->whereRaw\([^,]+,\s*\[`,
+			ObjectType:  "Eloquent",
+			MethodName:  "whereRaw",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Eloquent whereRaw() with bindings array (parameterized)",
+		},
+		{
+			ID:          "php.eloquent.querybuilder",
+			Language:    rules.LangPHP,
+			Pattern:     `->(where|select|orderBy)\(`,
+			ObjectType:  "Eloquent",
+			MethodName:  "where/select/orderBy",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Eloquent query builder methods (parameterized)",
+		},
 		}
 }

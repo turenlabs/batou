@@ -16,6 +16,7 @@ package graph
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"hash/fnv"
 	"time"
 
 	"github.com/turenlabs/batou-rules/rules"
@@ -27,9 +28,16 @@ type CallGraph struct {
 	// Nodes maps function IDs to their metadata.
 	Nodes map[string]*FuncNode `json:"nodes"`
 
-	// fileIndex maps file paths to the nodes defined in that file.
-	// Maintained by AddNode/RemoveFile for O(1) NodesInFile lookups.
-	fileIndex map[string][]*FuncNode `json:"-"`
+	// FileTaintCaches maps file paths to their taint analysis cache entries.
+	// When taint analysis runs on a file and finds zero flows, the cache
+	// records this "negative confirmation" so that future scans can suppress
+	// regex-only findings for taint-coverable CWEs without re-running taint.
+	FileTaintCaches map[string]*FileTaintCache `json:"file_taint_caches,omitempty"`
+
+	// FileFindingHistories maps file paths to their finding lifecycle summaries.
+	// Updated after each scan with delta counts so the graph tracks how many
+	// findings have been fixed over time per file.
+	FileFindingHistories map[string]*FileFindingHistory `json:"file_finding_histories,omitempty"`
 
 	// ProjectRoot is the project directory this graph belongs to.
 	ProjectRoot string `json:"project_root"`
@@ -42,6 +50,53 @@ type CallGraph struct {
 
 	// Version for format compatibility.
 	Version int `json:"version"`
+}
+
+// FileTaintCache records the result of taint analysis on a file so that
+// subsequent scans can use "negative taint confirmation" — if taint ran
+// and found nothing, regex findings for taint-coverable CWEs are suppressed.
+type FileTaintCache struct {
+	// ContentHash is an FNV-1a hash of the file content. When the hash
+	// changes, the cache entry is stale and taint must re-run.
+	ContentHash uint64 `json:"content_hash"`
+
+	// FlowCount is the number of taint flows found (0 = taint-clean).
+	FlowCount int `json:"flow_count"`
+
+	// ScannedAt records when this entry was last updated.
+	ScannedAt time.Time `json:"scanned_at"`
+}
+
+// FileFindingHistory tracks finding lifecycle metrics for a file across scans.
+// This allows the call graph to serve as a single source of truth for how many
+// findings have been introduced, fixed, and suppressed over time.
+type FileFindingHistory struct {
+	ContentHash     uint64    `json:"content_hash"`
+	ActiveCount     int       `json:"active_count"`
+	FixedCount      int       `json:"fixed_count"`
+	SuppressedCount int       `json:"suppressed_count"`
+	LastScanned     time.Time `json:"last_scanned"`
+}
+
+// UpdateFindingHistory updates the finding history for a file using the
+// given delta counts from the findings store. The content hash is used
+// to detect file changes.
+func (cg *CallGraph) UpdateFindingHistory(filePath string, contentHash uint64, activeCount, fixedCount, suppressedCount int) {
+	if cg.FileFindingHistories == nil {
+		cg.FileFindingHistories = make(map[string]*FileFindingHistory)
+	}
+
+	existing := cg.FileFindingHistories[filePath]
+	if existing == nil {
+		existing = &FileFindingHistory{}
+		cg.FileFindingHistories[filePath] = existing
+	}
+
+	existing.ContentHash = contentHash
+	existing.ActiveCount = activeCount
+	existing.FixedCount += fixedCount // accumulate total fixed over time
+	existing.SuppressedCount = suppressedCount
+	existing.LastScanned = time.Now()
 }
 
 // FuncNode represents a single function/method in the call graph.
@@ -133,12 +188,12 @@ type ImpactedCaller struct {
 // NewCallGraph creates an empty call graph.
 func NewCallGraph(projectRoot, sessionID string) *CallGraph {
 	return &CallGraph{
-		Nodes:       make(map[string]*FuncNode),
-		fileIndex:   make(map[string][]*FuncNode),
-		ProjectRoot: projectRoot,
-		SessionID:   sessionID,
-		LastUpdated: time.Now(),
-		Version:     1,
+		Nodes:           make(map[string]*FuncNode),
+		FileTaintCaches: make(map[string]*FileTaintCache),
+		ProjectRoot:     projectRoot,
+		SessionID:       sessionID,
+		LastUpdated:     time.Now(),
+		Version:         1,
 	}
 }
 
@@ -153,30 +208,41 @@ func ContentHash(content string) string {
 	return hex.EncodeToString(h[:8]) // First 8 bytes = 16 hex chars
 }
 
+// FileContentHash computes an FNV-1a hash of file content for fast
+// cache invalidation. FNV-1a is non-cryptographic but extremely fast
+// and sufficient for change detection.
+func FileContentHash(content string) uint64 {
+	h := fnv.New64a()
+	h.Write([]byte(content))
+	return h.Sum64()
+}
+
+// SetFileTaintCache records a taint analysis result for a file.
+// Call this after taint analysis runs to enable negative confirmation
+// (suppressing regex findings when taint found nothing).
+func (cg *CallGraph) SetFileTaintCache(path string, contentHash uint64, flowCount int) {
+	if cg.FileTaintCaches == nil {
+		cg.FileTaintCaches = make(map[string]*FileTaintCache)
+	}
+	cg.FileTaintCaches[path] = &FileTaintCache{
+		ContentHash: contentHash,
+		FlowCount:   flowCount,
+		ScannedAt:   time.Now(),
+	}
+}
+
+// GetFileTaintCache returns the cached taint result for a file, or nil
+// if no cache entry exists.
+func (cg *CallGraph) GetFileTaintCache(path string) *FileTaintCache {
+	if cg.FileTaintCaches == nil {
+		return nil
+	}
+	return cg.FileTaintCaches[path]
+}
+
 // AddNode adds or updates a function node in the graph.
 func (cg *CallGraph) AddNode(node *FuncNode) {
-	// Remove old entry from fileIndex if updating an existing node
-	// with a different file path.
-	if old, exists := cg.Nodes[node.ID]; exists && old.FilePath != node.FilePath {
-		cg.removeFromFileIndex(old)
-	}
-
 	cg.Nodes[node.ID] = node
-	cg.ensureFileIndex()
-
-	// Add to fileIndex if not already present.
-	nodes := cg.fileIndex[node.FilePath]
-	found := false
-	for _, n := range nodes {
-		if n.ID == node.ID {
-			found = true
-			break
-		}
-	}
-	if !found {
-		cg.fileIndex[node.FilePath] = append(nodes, node)
-	}
-
 	cg.LastUpdated = time.Now()
 }
 
@@ -281,44 +347,18 @@ func (cg *CallGraph) GetTransitiveCallers(funcID string, maxDepth int) []*FuncNo
 
 // NodesInFile returns all function nodes defined in a given file.
 func (cg *CallGraph) NodesInFile(filePath string) []*FuncNode {
-	cg.ensureFileIndex()
-	return cg.fileIndex[filePath]
-}
-
-// ensureFileIndex lazily builds the fileIndex if it is nil (e.g. after
-// JSON deserialization which skips the unexported field).
-func (cg *CallGraph) ensureFileIndex() {
-	if cg.fileIndex != nil {
-		return
-	}
-	cg.fileIndex = make(map[string][]*FuncNode, len(cg.Nodes)/4+1)
+	var nodes []*FuncNode
 	for _, node := range cg.Nodes {
-		cg.fileIndex[node.FilePath] = append(cg.fileIndex[node.FilePath], node)
-	}
-}
-
-// removeFromFileIndex removes a node from the fileIndex.
-func (cg *CallGraph) removeFromFileIndex(node *FuncNode) {
-	if cg.fileIndex == nil {
-		return
-	}
-	nodes := cg.fileIndex[node.FilePath]
-	for i, n := range nodes {
-		if n.ID == node.ID {
-			cg.fileIndex[node.FilePath] = append(nodes[:i], nodes[i+1:]...)
-			if len(cg.fileIndex[node.FilePath]) == 0 {
-				delete(cg.fileIndex, node.FilePath)
-			}
-			return
+		if node.FilePath == filePath {
+			nodes = append(nodes, node)
 		}
 	}
+	return nodes
 }
 
 // RemoveFile removes all nodes from a file and cleans up edges.
 func (cg *CallGraph) RemoveFile(filePath string) {
-	// Copy the slice since we'll be modifying the index during iteration.
-	nodes := append([]*FuncNode(nil), cg.NodesInFile(filePath)...)
-	for _, node := range nodes {
+	for _, node := range cg.NodesInFile(filePath) {
 		// Clean up edges pointing to this node
 		for _, callerID := range node.CalledBy {
 			if caller := cg.Nodes[callerID]; caller != nil {
@@ -331,10 +371,6 @@ func (cg *CallGraph) RemoveFile(filePath string) {
 			}
 		}
 		delete(cg.Nodes, node.ID)
-	}
-	// Clear the fileIndex entry for this file.
-	if cg.fileIndex != nil {
-		delete(cg.fileIndex, filePath)
 	}
 }
 

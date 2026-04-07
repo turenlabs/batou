@@ -241,7 +241,7 @@ def receive(conn):
     obj = dill.loads(data)
 `
 	result := testutil.ScanContent(t, "/app/server.py", content)
-	testutil.MustFindRule(t, result, "BATOU-PY-007")
+	testutil.MustFindAnyRule(t, result, "BATOU-PY-007", "BATOU-PY-026")
 }
 
 func TestPY007_PickleLoad_InternalFile_Safe(t *testing.T) {

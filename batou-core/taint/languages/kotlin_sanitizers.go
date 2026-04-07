@@ -182,6 +182,28 @@ func (c *KotlinCatalog) Sanitizers() []taint.SanitizerDef {
 			Description: "OWASP Java encoder for context-aware output encoding",
 		},
 
+		// --- Spring SpEL restricted context ---
+		{
+			ID:          "kotlin.spring.spel.simpleevaluationcontext",
+			Language:    rules.LangKotlin,
+			Pattern:     `SimpleEvaluationContext\.forReadOnlyDataBinding\s*\(|SimpleEvaluationContext\.forPropertyAccessors\s*\(`,
+			ObjectType:  "SimpleEvaluationContext",
+			MethodName:  "forReadOnlyDataBinding/forPropertyAccessors",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval},
+			Description: "Spring SimpleEvaluationContext restricts SpEL to safe operations",
+		},
+
+		// --- ESAPI SQL encoding ---
+		{
+			ID:          "kotlin.esapi.encodeforsql",
+			Language:    rules.LangKotlin,
+			Pattern:     `ESAPI\.encoder\s*\(\s*\)\s*\.encodeForSQL\s*\(|Encoder.*\.encodeForSQL\s*\(`,
+			ObjectType:  "ESAPI",
+			MethodName:  "encodeForSQL",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "OWASP ESAPI SQL encoding prevents SQL injection",
+		},
+
 		// --- LDAP escaping ---
 		{
 			ID:          "kotlin.ldap.escape",
@@ -257,6 +279,251 @@ func (c *KotlinCatalog) Sanitizers() []taint.SanitizerDef {
 			MethodName:  "parse.host",
 			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
 			Description: "Android URI hostname extraction for domain validation",
+		},
+
+		// --- XXE Prevention ---
+		{
+			ID:          "kotlin.xml.disallow.doctype",
+			Language:    rules.LangKotlin,
+			Pattern:     `setFeature\s*\(\s*"http://apache\.org/xml/features/disallow-doctype-decl"\s*,\s*true`,
+			ObjectType:  "DocumentBuilderFactory/SAXParserFactory",
+			MethodName:  "setFeature(disallow-doctype-decl, true)",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "Disables DTD processing entirely, preventing XXE attacks",
+		},
+		{
+			ID:          "kotlin.xml.disable.external.dtd",
+			Language:    rules.LangKotlin,
+			Pattern:     `ACCESS_EXTERNAL_DTD.*""`,
+			ObjectType:  "XMLConstants",
+			MethodName:  "ACCESS_EXTERNAL_DTD = empty",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "Restricts external DTD access to prevent XXE",
+		},
+		{
+			ID:          "kotlin.xml.stax.disable.dtd",
+			Language:    rules.LangKotlin,
+			Pattern:     `XMLInputFactory\.SUPPORT_DTD.*false|IS_SUPPORTING_EXTERNAL_ENTITIES.*false`,
+			ObjectType:  "XMLInputFactory",
+			MethodName:  "SUPPORT_DTD/IS_SUPPORTING_EXTERNAL_ENTITIES = false",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "Disables DTD and external entities in StAX parser",
+		},
+		{
+			ID:          "kotlin.xml.secure.processing",
+			Language:    rules.LangKotlin,
+			Pattern:     `FEATURE_SECURE_PROCESSING.*true|XMLConstants\.FEATURE_SECURE_PROCESSING`,
+			ObjectType:  "TransformerFactory",
+			MethodName:  "FEATURE_SECURE_PROCESSING = true",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "Enables secure processing mode on XML factories",
+		},
+
+		// --- Command Injection Prevention ---
+		{
+			ID:          "kotlin.processbuilder.list",
+			Language:    rules.LangKotlin,
+			Pattern:     `ProcessBuilder\s*\(\s*listOf\s*\(`,
+			ObjectType:  "ProcessBuilder",
+			MethodName:  "ProcessBuilder(listOf(...))",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand},
+			Description: "ProcessBuilder with list args bypasses shell interpretation",
+		},
+		{
+			ID:          "kotlin.runtime.exec.array",
+			Language:    rules.LangKotlin,
+			Pattern:     `Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(\s*arrayOf\s*\(`,
+			ObjectType:  "Runtime",
+			MethodName:  "exec(arrayOf(...))",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand},
+			Description: "Runtime.exec with array args bypasses shell interpretation",
+		},
+		{
+			ID:          "kotlin.commons.exec.commandline",
+			Language:    rules.LangKotlin,
+			Pattern:     `CommandLine\s*\(\s*[^)]+\)\s*\.addArgument\s*\(`,
+			ObjectType:  "CommandLine",
+			MethodName:  "CommandLine.addArgument",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand},
+			Description: "Apache Commons Exec CommandLine with individual arguments",
+		},
+
+		// --- Deserialization Safety ---
+		{
+			ID:          "kotlin.objectinputfilter",
+			Language:    rules.LangKotlin,
+			Pattern:     `ObjectInputFilter\.|setObjectInputFilter\s*\(`,
+			ObjectType:  "ObjectInputFilter",
+			MethodName:  "ObjectInputFilter",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "JVM ObjectInputFilter restricts deserializable classes (JEP 290)",
+		},
+		{
+			ID:          "kotlin.jackson.defaulttyping.safe",
+			Language:    rules.LangKotlin,
+			Pattern:     `activateDefaultTyping\s*\([^)]*LaissezFaireSubTypeValidator`,
+			ObjectType:  "ObjectMapper",
+			MethodName:  "activateDefaultTyping with validator",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Jackson polymorphic deserialization with type validator",
+		},
+		{
+			ID:          "kotlin.kotlinx.serialization.json",
+			Language:    rules.LangKotlin,
+			Pattern:     `Json\s*\{[^}]*\}\.decodeFromString\s*<`,
+			ObjectType:  "kotlinx.serialization",
+			MethodName:  "Json{}.decodeFromString<T>",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "kotlinx.serialization with explicit type (no polymorphic gadgets)",
+		},
+
+		// --- HTTP Header Injection Prevention ---
+		{
+			ID:          "kotlin.header.newline.strip",
+			Language:    rules.LangKotlin,
+			Pattern:     `\.replace\s*\(\s*["']\s*\\[rn].*["']\s*,\s*["']\s*["']\s*\)|\.filter\s*\{\s*it\s*!=\s*'\\[rn]`,
+			ObjectType:  "",
+			MethodName:  "replace/filter newlines",
+			Neutralizes: []taint.SinkCategory{taint.SnkHeader},
+			Description: "Newline removal prevents HTTP header injection (CRLF)",
+		},
+		{
+			ID:          "kotlin.spring.httpheaders",
+			Language:    rules.LangKotlin,
+			Pattern:     `HttpHeaders\s*\(\s*\)|ResponseEntity\.ok\s*\(\s*\)\s*\.header\s*\(`,
+			ObjectType:  "HttpHeaders",
+			MethodName:  "HttpHeaders/ResponseEntity.header",
+			Neutralizes: []taint.SinkCategory{taint.SnkHeader},
+			Description: "Spring HttpHeaders builder validates header values",
+		},
+		{
+			ID:          "kotlin.ktor.respondtext.contenttype",
+			Language:    rules.LangKotlin,
+			Pattern:     `call\.respondText\s*\([^)]*ContentType\.|call\.response\.header\s*\(\s*HttpHeaders\.`,
+			ObjectType:  "ApplicationCall",
+			MethodName:  "respondText with ContentType",
+			Neutralizes: []taint.SinkCategory{taint.SnkHeader},
+			Description: "Ktor typed header APIs prevent raw header injection",
+		},
+
+		// --- SSRF Prevention ---
+		{
+			ID:          "kotlin.url.gethost",
+			Language:    rules.LangKotlin,
+			Pattern:     `URL\s*\([^)]+\)\s*\.host|\.toURL\s*\(\s*\)\s*\.host`,
+			ObjectType:  "java.net.URL",
+			MethodName:  "URL.host",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URL hostname extraction for domain allowlist validation",
+		},
+		{
+			ID:          "kotlin.inetaddress.issitelocal",
+			Language:    rules.LangKotlin,
+			Pattern:     `InetAddress\.getByName\s*\(.*\.isSiteLocalAddress|\.isLoopbackAddress|\.isLinkLocalAddress`,
+			ObjectType:  "InetAddress",
+			MethodName:  "isSiteLocalAddress/isLoopbackAddress",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch},
+			Description: "IP address validation for internal network detection (SSRF prevention)",
+		},
+		{
+			ID:          "kotlin.apache.urlvalidator",
+			Language:    rules.LangKotlin,
+			Pattern:     `UrlValidator.*\.isValid\s*\(|RegexUrlValidator`,
+			ObjectType:  "UrlValidator",
+			MethodName:  "UrlValidator.isValid",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "Apache Commons URL validation for SSRF prevention",
+		},
+		{
+			ID:          "kotlin.uri.host.check",
+			Language:    rules.LangKotlin,
+			Pattern:     `URI\s*\([^)]+\)\s*\.host|URI\.create\s*\([^)]+\)\s*\.host`,
+			ObjectType:  "java.net.URI",
+			MethodName:  "URI.host",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URI hostname extraction for domain validation (SSRF prevention)",
+		},
+		{
+			ID:          "kotlin.url.host.allowlist",
+			Language:    rules.LangKotlin,
+			Pattern:     `URI\(.*\)\.host\s*(?:in|==)|URL\(.*\)\.host\s*(?:in|==)`,
+			ObjectType:  "java.net.URI/URL",
+			MethodName:  "host in allowlist/==",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch},
+			Description: "URL host validation against allowlist before fetching",
+		},
+
+		// --- Path traversal prevention ---
+		{
+			ID:          "kotlin.path.startswith",
+			Language:    rules.LangKotlin,
+			Pattern:     `\.normalize\s*\(\s*\)\s*\.startsWith\s*\(|\.toRealPath\s*\(\s*\)\s*\.startsWith\s*\(`,
+			ObjectType:  "java.nio.file.Path",
+			MethodName:  "normalize().startsWith(basePath)",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
+			Description: "Path normalization + base directory containment check",
+		},
+
+		// --- Additional HTML encoding ---
+		{
+			ID:          "kotlin.apache.stringescapeutils.escapehtml",
+			Language:    rules.LangKotlin,
+			Pattern:     `StringEscapeUtils\.escapeHtml4?\s*\(`,
+			ObjectType:  "StringEscapeUtils",
+			MethodName:  "escapeHtml4",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate},
+			Description: "Apache Commons Text HTML entity escaping",
+		},
+		{
+			ID:          "kotlin.ktor.html.escape",
+			Language:    rules.LangKotlin,
+			Pattern:     `\.escapeHTML\s*\(|kotlinx\.html.*escape`,
+			ObjectType:  "kotlinx.html",
+			MethodName:  "escapeHTML",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "Ktor/kotlinx.html HTML escaping",
+		},
+
+		// --- Additional crypto sanitizers ---
+		{
+			ID:          "kotlin.crypto.pbkdf2",
+			Language:    rules.LangKotlin,
+			Pattern:     `PBKDF2WithHmacSHA|PBEKeySpec\s*\(`,
+			ObjectType:  "SecretKeyFactory",
+			MethodName:  "PBKDF2",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "PBKDF2 key derivation function",
+		},
+		{
+			ID:          "kotlin.crypto.securerandom",
+			Language:    rules.LangKotlin,
+			Pattern:     `SecureRandom\s*\(|SecureRandom\.getInstance`,
+			ObjectType:  "SecureRandom",
+			MethodName:  "SecureRandom",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "Cryptographically secure random number generator",
+		},
+
+		// --- Deserialization safety ---
+		{
+			ID:          "kotlin.jackson.typevalidation",
+			Language:    rules.LangKotlin,
+			Pattern:     `activateDefaultTyping\s*\(|@JsonTypeInfo`,
+			ObjectType:  "ObjectMapper",
+			MethodName:  "activateDefaultTyping/@JsonTypeInfo",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Jackson type validation for safe deserialization",
+		},
+
+		// --- Trust boundary sanitizers ---
+		{
+			ID:          "kotlin.session.validate",
+			Language:    rules.LangKotlin,
+			Pattern:     `\.toInt\s*\(\)|\.toLong\s*\(\)|\.toBoolean\s*\(|Enum\.valueOf\s*\(`,
+			ObjectType:  "",
+			MethodName:  "type coercion",
+			Neutralizes: []taint.SinkCategory{taint.SnkTrustBoundary},
+			Description: "Type coercion before storing in session sanitizes trust boundary",
 		},
 	}
 }

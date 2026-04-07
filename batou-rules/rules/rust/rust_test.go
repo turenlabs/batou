@@ -6,39 +6,6 @@ import (
 	"github.com/turenlabs/batou-rules/testutil"
 )
 
-// --- RS-001: Unsafe Block Usage ---
-
-func TestRS001_UnsafeBlock(t *testing.T) {
-	content := `fn dangerous() {
-    unsafe {
-        let ptr = &mut x as *mut i32;
-        *ptr = 42;
-    }
-}`
-	result := testutil.ScanContent(t, "/app/handler.rs", content)
-	testutil.MustFindRule(t, result, "BATOU-RS-001")
-}
-
-func TestRS001_UnsafeTransmute(t *testing.T) {
-	content := `fn convert() {
-    unsafe {
-        let val: u64 = std::mem::transmute(some_f64);
-    }
-}`
-	result := testutil.ScanContent(t, "/app/convert.rs", content)
-	testutil.MustFindRule(t, result, "BATOU-RS-001")
-}
-
-func TestRS001_Safe_NoUnsafe(t *testing.T) {
-	content := `fn safe_function() {
-    let x = 42;
-    let y = x + 1;
-    println!("{}", y);
-}`
-	result := testutil.ScanContent(t, "/app/safe.rs", content)
-	testutil.MustNotFindRule(t, result, "BATOU-RS-001")
-}
-
 // --- RS-002: Command Injection ---
 
 func TestRS002_CommandNewShell(t *testing.T) {
@@ -230,84 +197,6 @@ func TestRS007_Safe_QuestionMark(t *testing.T) {
 }`
 	result := testutil.ScanContent(t, "/app/util.rs", content)
 	testutil.MustNotFindRule(t, result, "BATOU-RS-007")
-}
-
-// --- RS-008: Insecure Random ---
-
-func TestRS008_ThreadRngForToken(t *testing.T) {
-	content := `use rand::Rng;
-fn generate_token() -> String {
-    let mut rng = thread_rng();
-    let token: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
-    hex::encode(token)
-}`
-	result := testutil.ScanContent(t, "/app/auth.rs", content)
-	testutil.MustFindRule(t, result, "BATOU-RS-008")
-}
-
-func TestRS008_Safe_OsRng(t *testing.T) {
-	content := `use rand::rngs::OsRng;
-use rand::Rng;
-fn generate_token() -> String {
-    let token: Vec<u8> = (0..32).map(|_| OsRng.gen()).collect();
-    hex::encode(token)
-}`
-	result := testutil.ScanContent(t, "/app/auth.rs", content)
-	testutil.MustNotFindRule(t, result, "BATOU-RS-008")
-}
-
-func TestRS008_Safe_NonSecurityContext(t *testing.T) {
-	content := `use rand::Rng;
-fn shuffle_items(items: &mut Vec<i32>) {
-    let mut rng = thread_rng();
-    items.shuffle(&mut rng);
-}`
-	result := testutil.ScanContent(t, "/app/game.rs", content)
-	testutil.MustNotFindRule(t, result, "BATOU-RS-008")
-}
-
-// --- RS-009: Memory Unsafety Patterns ---
-
-func TestRS009_Transmute(t *testing.T) {
-	content := `fn convert(val: f64) -> u64 {
-    unsafe { std::mem::transmute(val) }
-}`
-	result := testutil.ScanContent(t, "/app/convert.rs", content)
-	testutil.MustFindRule(t, result, "BATOU-RS-009")
-}
-
-func TestRS009_FromRawParts(t *testing.T) {
-	content := `fn make_slice(ptr: *const u8, len: usize) -> &'static [u8] {
-    unsafe { std::slice::from_raw_parts(ptr, len) }
-}`
-	result := testutil.ScanContent(t, "/app/ffi.rs", content)
-	testutil.MustFindRule(t, result, "BATOU-RS-009")
-}
-
-func TestRS009_MemForget(t *testing.T) {
-	content := `fn leak_resource(resource: Resource) {
-    std::mem::forget(resource);
-}`
-	result := testutil.ScanContent(t, "/app/resource.rs", content)
-	testutil.MustFindRule(t, result, "BATOU-RS-009")
-}
-
-func TestRS009_BoxFromRaw(t *testing.T) {
-	content := `fn reclaim(ptr: *mut Widget) {
-    let widget = unsafe { Box::from_raw(ptr) };
-}`
-	result := testutil.ScanContent(t, "/app/ffi.rs", content)
-	testutil.MustFindRule(t, result, "BATOU-RS-009")
-}
-
-func TestRS009_Safe_NoUnsafePatterns(t *testing.T) {
-	content := `fn safe_vec() {
-    let v = vec![1, 2, 3];
-    let s = &v[..];
-    println!("{:?}", s);
-}`
-	result := testutil.ScanContent(t, "/app/safe.rs", content)
-	testutil.MustNotFindRule(t, result, "BATOU-RS-009")
 }
 
 // --- RS-010: CORS Misconfiguration ---

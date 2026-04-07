@@ -34,7 +34,8 @@ module.exports = router;`
 	testutil.MustNotFindRule(t, result, "BATOU-HDR-001")
 }
 
-func TestHDR001_ServerSetup_NoMiddleware_StillTriggers(t *testing.T) {
+func TestHDR001_ServerSetup_NoMiddleware_NotRegistered(t *testing.T) {
+	// HDR-001 (Missing CSP) removed — infra-level header, set at reverse proxy.
 	content := `const express = require('express');
 const app = express();
 app.get('/api', (req, res) => {
@@ -43,7 +44,7 @@ app.get('/api', (req, res) => {
 });
 app.listen(3000);`
 	result := testutil.ScanContent(t, "/app/server.js", content)
-	testutil.MustFindRule(t, result, "BATOU-HDR-001")
+	testutil.MustNotFindRule(t, result, "BATOU-HDR-001")
 }
 
 func TestHDR002_RouteOnlyFile_Safe(t *testing.T) {

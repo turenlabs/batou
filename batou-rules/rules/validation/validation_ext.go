@@ -535,5 +535,5 @@ func init() {
 	rules.Register(&MissingNullCheck{})
 	rules.Register(&ClientSideValidationOnly{})
 	rules.Register(&TypeConfusionJSON{})
-	rules.Register(&MissingArrayBoundsCheck{})
+	// rules.Register(&MissingArrayBoundsCheck{}) // Removed: noise
 }

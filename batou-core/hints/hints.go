@@ -19,9 +19,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/turenlabs/batou-core/findings"
 	"github.com/turenlabs/batou-core/graph"
-	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
+	"github.com/turenlabs/batou-rules/rules"
 )
 
 // HintContext contains everything needed to generate hints for a scan.
@@ -29,12 +30,14 @@ type HintContext struct {
 	FilePath           string
 	Language           rules.Language
 	Findings           []rules.Finding
-	SuppressedFindings []rules.Finding  // Findings silenced by batou:ignore directives
+	SuppressedFindings []rules.Finding // Findings silenced by batou:ignore directives
 	TaintFlows         []taint.TaintFlow
 	CallGraph          *graph.CallGraph
-	ChangedFunc        string    // The function that was just modified
-	IsNewFile          bool      // True if this is a new file (Write), false for Edit
+	ChangedFunc        string // The function that was just modified
+	IsNewFile          bool   // True if this is a new file (Write), false for Edit
 	ScanTimeMs         int64
+	CappedCount        int    // Number of lower-priority findings omitted by capping
+	Deltas             *findings.Deltas // Lifecycle deltas from findings store (nil if store unavailable)
 }
 
 // Hint represents a single piece of actionable advice for Claude.
@@ -42,7 +45,8 @@ type Hint struct {
 	Priority          int            // 1 = most urgent
 	Severity          rules.Severity // Matches the finding severity
 	ConfidenceScore   float64        // 0.0-1.0, propagated from finding/flow
-	Category          string         // e.g., "taint_flow", "pattern", "architecture", "positive"
+	Category          string         // e.g., "taint_flow", "finding", "architecture", "positive"
+	RuleID            string         // e.g., "BATOU-AUTH-011" — used for dedup/rollup
 	Title             string         // Short summary
 	Explanation       string         // Why this matters
 	FixExample        string         // Concrete code showing the fix
@@ -62,22 +66,39 @@ func GenerateHints(ctx *HintContext) []Hint {
 		hints = append(hints, h)
 	}
 
-	// Generate hints from regex findings not already covered by taint flows
+	// Generate hints from findings, filtering out regex-only noise.
+	// Only AST, taint, and interprocedural findings get individual hints.
+	// Regex-only findings are counted and shown as a single summary line.
 	covered := make(map[int]bool)
 	for _, flow := range ctx.TaintFlows {
 		covered[flow.SinkLine] = true
 	}
+	regexOnlyCount := 0
 	for _, f := range ctx.Findings {
-		if !covered[f.LineNumber] {
-			h := hintFromFinding(f, ctx)
-			hints = append(hints, h)
+		if covered[f.LineNumber] {
+			continue
 		}
+		if isRegexOnly(f) && !f.ShouldBlock() {
+			regexOnlyCount++
+			continue
+		}
+		h := hintFromFinding(f, ctx)
+		hints = append(hints, h)
 	}
 
 	// Generate interprocedural impact hints
 	if ctx.CallGraph != nil && ctx.ChangedFunc != "" {
 		impactHints := hintFromCallGraph(ctx)
 		hints = append(hints, impactHints...)
+	}
+
+	// Add regex-only summary if any were filtered
+	if regexOnlyCount > 0 {
+		hints = append(hints, Hint{
+			Category:    "regex_summary",
+			Title:       fmt.Sprintf("%d low-fidelity regex patterns omitted", regexOnlyCount),
+			Explanation: "These regex-only detections were not confirmed by AST or taint analysis. Review manually if concerned.",
+		})
 	}
 
 	// Generate architectural hints if patterns repeat
@@ -100,84 +121,308 @@ func GenerateHints(ctx *HintContext) []Hint {
 func FormatForClaude(ctx *HintContext, hints []Hint) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("\n=== Batou Security Copilot [%s] ===\n", ctx.FilePath))
-	b.WriteString(fmt.Sprintf("Language: %s | Scan: %dms", ctx.Language, ctx.ScanTimeMs))
-	if ctx.CallGraph != nil {
-		stats := ctx.CallGraph.Stats()
-		b.WriteString(fmt.Sprintf(" | Graph: %d funcs, %d edges", stats.TotalFunctions, stats.TotalEdges))
-	}
-	b.WriteString("\n\n")
+	fmt.Fprintf(&b, "\n=== Batou [%s] %s | %dms ===\n", ctx.FilePath, ctx.Language, ctx.ScanTimeMs)
 
-	if len(hints) == 0 || (len(hints) == 1 && hints[0].Category == "positive") {
+	// Check if only low-value hints remain (positive and/or regex_summary).
+	hasActionableHints := false
+	var regexSummary *Hint
+	for i, h := range hints {
+		if h.Category == "regex_summary" {
+			regexSummary = &hints[i]
+		} else if h.Category != "positive" {
+			hasActionableHints = true
+		}
+	}
+	if !hasActionableHints {
 		b.WriteString("No security issues detected. Code looks clean.\n")
-		if len(hints) == 1 {
-			b.WriteString(hints[0].Explanation)
-			b.WriteString("\n")
+		if regexSummary != nil {
+			fmt.Fprintf(&b, "%s (not confirmed by AST/taint analysis)\n", regexSummary.Title)
 		}
 		b.WriteString("=== End Batou ===\n")
 		return b.String()
 	}
 
-	// Count by severity
-	sevCounts := make(map[rules.Severity]int)
-	for _, h := range hints {
-		if h.Category != "positive" {
-			sevCounts[h.Severity]++
-		}
-	}
-	parts := []string{}
-	for _, sev := range []rules.Severity{rules.Critical, rules.High, rules.Medium, rules.Low} {
-		if c := sevCounts[sev]; c > 0 {
-			parts = append(parts, fmt.Sprintf("%s:%d", sev, c))
-		}
-	}
-	if len(parts) > 0 {
-		b.WriteString(fmt.Sprintf("Issues: %s\n\n", strings.Join(parts, " | ")))
-	}
+	b.WriteString("Fix each finding OR suppress with: // batou:ignore RULE-ID -- reason\nYou do not need permission to fix valid security issues. Fix them immediately.\n")
+	b.WriteString("Always fix the code first. Only suppress as a last resort after attempting a fix.\n\n")
 
-	for i, h := range hints {
-		if h.Category == "positive" {
+	// Dedup: group hints by RuleID, roll up duplicates.
+	type ruleGroup struct {
+		first Hint
+		count int
+	}
+	groups := make(map[string]*ruleGroup)
+	var order []string
+	for _, h := range hints {
+		if h.Category == "positive" || h.Category == "regex_summary" {
 			continue
 		}
-
-		if h.ConfidenceScore > 0 {
-			b.WriteString(fmt.Sprintf("--- Hint %d [%s | Confidence: %.0f%%] ---\n", i+1, h.Severity, h.ConfidenceScore*100))
+		if h.ConfidenceScore > 0 && h.ConfidenceScore < 0.4 {
+			continue
+		}
+		key := h.RuleID
+		if key == "" {
+			key = h.Title
+		}
+		if g, ok := groups[key]; ok {
+			g.count++
 		} else {
-			b.WriteString(fmt.Sprintf("--- Hint %d [%s] ---\n", i+1, h.Severity))
+			groups[key] = &ruleGroup{first: h, count: 1}
+			order = append(order, key)
 		}
-		b.WriteString(fmt.Sprintf("%s\n", h.Title))
-		b.WriteString(fmt.Sprintf("\nWhy: %s\n", h.Explanation))
+	}
 
+	// Build lifecycle lookup from deltas (ruleID → lifecycle tag string)
+	lifecycleTags := buildLifecycleTags(ctx)
+
+	hintNum := 0
+	for _, key := range order {
+		g := groups[key]
+		h := g.first
+		hintNum++
+
+		// Line 1: number, severity, confidence, rule ID, occurrences, lifecycle tag
+		confStr := ""
+		if h.ConfidenceScore > 0 {
+			confStr = fmt.Sprintf(" %.0f%%", h.ConfidenceScore*100)
+		}
+		countStr := ""
+		if g.count > 1 {
+			countStr = fmt.Sprintf(" (×%d)", g.count)
+		}
+		ruleID := h.RuleID
+		if ruleID == "" {
+			ruleID = extractTitle(h.Title)
+		}
+		lifecycleStr := ""
+		if tag, ok := lifecycleTags[h.RuleID]; ok {
+			lifecycleStr = " " + tag
+		}
+		riskStr := shortSeverity(h.Severity)
+		if h.ConfidenceScore > 0 {
+			rs := h.Severity.ImpactWeight() * h.ConfidenceScore
+			riskStr = riskLabel(rs)
+		}
+		fmt.Fprintf(&b, "%d. [%s%s] %s%s%s\n", hintNum, riskStr, confStr, ruleID, countStr, lifecycleStr)
+
+		// Line 2: explanation (the dataflow or description)
+		fmt.Fprintf(&b, "   %s\n", h.Explanation)
+
+		// Fix example (indented, preserves multi-line code)
 		if h.FixExample != "" {
-			b.WriteString(fmt.Sprintf("\nFix:\n%s\n", h.FixExample))
+			fmt.Fprintf(&b, "   Fix: %s\n", indentFix(h.FixExample))
 		}
 
-		if h.Impact != "" {
-			b.WriteString(fmt.Sprintf("\nImpact: %s\n", h.Impact))
-		}
-
-		if len(h.AffectedBy) > 0 {
-			b.WriteString(fmt.Sprintf("\nAlso affects: %s\n", strings.Join(h.AffectedBy, ", ")))
-		}
-
+		// Line 4: refs + suppress (compact, on one line)
+		var meta []string
 		if len(h.References) > 0 {
-			b.WriteString(fmt.Sprintf("Refs: %s\n", strings.Join(h.References, ", ")))
+			meta = append(meta, strings.Join(h.References, ", "))
 		}
-
 		if h.SuppressDirective != "" {
-			b.WriteString(fmt.Sprintf("\nSuppress: If false positive, add above the line: %s\n", h.SuppressDirective))
+			if g.count >= 3 {
+				// Suggest block suppression when same rule fires 3+ times
+				prefix := commentPrefixForLang(ctx.Language)
+				ruleTarget := h.RuleID
+				ruleTarget = strings.TrimPrefix(ruleTarget, "BATOU-TAINT-")
+				meta = append(meta, fmt.Sprintf("Suppress: %s batou:ignore-start %s -- <reason> ... %s batou:ignore-end", prefix, ruleTarget, prefix))
+			} else {
+				meta = append(meta, fmt.Sprintf("Suppress: %s", h.SuppressDirective))
+			}
+			// Decision prompt: force Claude to fix rather than suppress
+			b.WriteString("   Action: FIX the underlying issue. Only suppress as a last resort.\n")
+		}
+		if len(meta) > 0 {
+			fmt.Fprintf(&b, "   %s\n", strings.Join(meta, " | "))
 		}
 
 		b.WriteString("\n")
 	}
 
-	// Suppression summary
+	// Footer summaries (all on compact lines)
+	var footerParts []string
+	if ctx.Deltas != nil && len(ctx.Deltas.Fixed) > 0 {
+		n := len(ctx.Deltas.Fixed)
+		if n == 1 {
+			footerParts = append(footerParts, "1 finding fixed since last scan")
+		} else {
+			footerParts = append(footerParts, fmt.Sprintf("%d findings fixed since last scan", n))
+		}
+	}
+	if regexSummary != nil {
+		footerParts = append(footerParts, fmt.Sprintf("%s (regex-only, unconfirmed)", regexSummary.Title))
+	}
+	if ctx.CappedCount > 0 {
+		footerParts = append(footerParts, fmt.Sprintf("%d lower-priority findings capped", ctx.CappedCount))
+	}
 	if len(ctx.SuppressedFindings) > 0 {
-		b.WriteString(fmt.Sprintf("--- %d finding(s) silenced by batou:ignore directives ---\n\n", len(ctx.SuppressedFindings)))
+		footerParts = append(footerParts, fmt.Sprintf("%d suppressed by batou:ignore", len(ctx.SuppressedFindings)))
+	}
+	if len(footerParts) > 0 {
+		b.WriteString(strings.Join(footerParts, " | "))
+		b.WriteString("\n")
 	}
 
 	b.WriteString("=== End Batou ===\n")
 	return b.String()
+}
+
+// InjectLifecycle patches lifecycle tags into an existing hints output string.
+// It is called from main.go after the findings store computes deltas, so that
+// the scanner doesn't need to know about the store. It modifies the output
+// in-place using string replacement on rule IDs.
+func InjectLifecycle(output string, deltas *findings.Deltas, allFindings []rules.Finding) string {
+	if deltas == nil {
+		return output
+	}
+
+	// Build a set of new finding dedup keys
+	newKeys := make(map[string]bool)
+	for _, f := range deltas.New {
+		newKeys[findings.DedupKey(f)] = true
+	}
+
+	// For each finding, patch its rule ID line with a lifecycle tag.
+	// We match on the rule ID (e.g., "BATOU-INJ-001") and append the tag.
+	for _, f := range allFindings {
+		key := findings.DedupKey(f)
+		var tag string
+		if newKeys[key] {
+			tag = " (NEW)"
+		} else {
+			count := deltas.RecurringCount(f)
+			if count > 1 {
+				tag = fmt.Sprintf(" (seen %dx)", count)
+			}
+		}
+		if tag != "" && f.RuleID != "" {
+			// Replace first occurrence of the rule ID in the output that doesn't
+			// already have a lifecycle tag. We look for the rule ID followed by
+			// a newline or space (not already tagged).
+			old := f.RuleID + "\n"
+			new := f.RuleID + tag + "\n"
+			output = strings.Replace(output, old, new, 1)
+		}
+	}
+
+	// Inject fixed-findings footer before "=== End Batou ==="
+	if len(deltas.Fixed) > 0 {
+		n := len(deltas.Fixed)
+		var fixedLine string
+		if n == 1 {
+			fixedLine = "1 finding fixed since last scan"
+		} else {
+			fixedLine = fmt.Sprintf("%d findings fixed since last scan", n)
+		}
+		// Insert before the closing marker. If there's already footer content
+		// on the line before "=== End Batou ===", append with " | ".
+		endMarker := "=== End Batou ==="
+		idx := strings.LastIndex(output, endMarker)
+		if idx > 0 {
+			before := output[:idx]
+			after := output[idx:]
+			// Check if the line before the marker already has footer content
+			lastNewline := strings.LastIndex(before, "\n")
+			if lastNewline >= 0 {
+				lineBeforeEnd := before[lastNewline+1:]
+				if lineBeforeEnd == "" {
+					// Empty line — insert the fixed line
+					before = before + fixedLine + "\n"
+				} else {
+					// Existing footer content — append with separator
+					before = before[:lastNewline+1] + fixedLine + " | " + lineBeforeEnd
+				}
+			}
+			output = before + after
+		}
+	}
+
+	return output
+}
+
+// extractTitle strips the [RULE-ID] prefix and (line N) suffix from a hint title.
+// shortSeverity returns a compact severity label for hint output.
+func shortSeverity(s rules.Severity) string {
+	switch s {
+	case rules.Critical:
+		return "CRIT"
+	case rules.High:
+		return "HIGH"
+	case rules.Medium:
+		return "MED"
+	case rules.Low:
+		return "LOW"
+	default:
+		return "INFO"
+	}
+}
+
+// riskLabel returns a compact risk tier label from a risk score.
+func riskLabel(riskScore float64) string {
+	switch {
+	case riskScore >= 0.7:
+		return "BLOCK"
+	case riskScore >= 0.4:
+		return "HIGH"
+	case riskScore >= 0.2:
+		return "MED"
+	default:
+		return "LOW"
+	}
+}
+
+// indentFix formats a multi-line fix example with continuation lines indented.
+func indentFix(fix string) string {
+	lines := strings.Split(strings.TrimSpace(fix), "\n")
+	if len(lines) <= 1 {
+		return strings.TrimSpace(fix)
+	}
+	var b strings.Builder
+	b.WriteString(strings.TrimSpace(lines[0]))
+	for _, line := range lines[1:] {
+		b.WriteString("\n   ")
+		b.WriteString(strings.TrimSpace(line))
+	}
+	return b.String()
+}
+
+// buildLifecycleTags creates a map from finding RuleID to a lifecycle tag
+// string like "(NEW)" or "(seen 3x)" based on the deltas from the findings store.
+func buildLifecycleTags(ctx *HintContext) map[string]string {
+	tags := make(map[string]string)
+	if ctx.Deltas == nil {
+		return tags
+	}
+
+	// Mark new findings
+	newKeys := make(map[string]bool)
+	for _, f := range ctx.Deltas.New {
+		newKeys[findings.DedupKey(f)] = true
+	}
+
+	// Build tags from actual findings in the context
+	for _, f := range ctx.Findings {
+		key := findings.DedupKey(f)
+		if newKeys[key] {
+			tags[f.RuleID] = "(NEW)"
+		} else {
+			count := ctx.Deltas.RecurringCount(f)
+			if count > 1 {
+				tags[f.RuleID] = fmt.Sprintf("(seen %dx)", count)
+			}
+		}
+	}
+	return tags
+}
+
+func extractTitle(title string) string {
+	// Remove "[BATOU-XXX-NNN] " prefix
+	if idx := strings.Index(title, "] "); idx >= 0 {
+		title = title[idx+2:]
+	}
+	// Remove " (line N)" or " (N occurrences)" suffix
+	if idx := strings.LastIndex(title, " (line "); idx >= 0 {
+		title = title[:idx]
+	}
+	return title
 }
 
 func hintFromTaintFlow(flow taint.TaintFlow, ctx *HintContext) Hint {
@@ -201,7 +446,7 @@ func hintFromTaintFlow(flow taint.TaintFlow, ctx *HintContext) Hint {
 			flow.Source.Description, flow.SourceLine, path,
 			flow.Sink.Description, flow.SinkLine),
 		FixExample: generateFixExample(flow, ctx.Language),
-		Impact: impactDescription(string(flow.Sink.Category)),
+		Impact:     impactDescription(string(flow.Sink.Category)),
 		References: []string{},
 	}
 
@@ -229,12 +474,24 @@ func hintFromTaintFlow(flow taint.TaintFlow, ctx *HintContext) Hint {
 	return h
 }
 
+// isRegexOnly returns true if the finding comes from the regex layer only,
+// not confirmed by AST, taint, or interprocedural analysis.
+func isRegexOnly(f rules.Finding) bool {
+	for _, t := range f.Tags {
+		if t == "taint-analysis" || t == "interprocedural" {
+			return false
+		}
+	}
+	return !strings.Contains(f.RuleID, "AST")
+}
+
 func hintFromFinding(f rules.Finding, ctx *HintContext) Hint {
 	h := Hint{
 		Priority:          severityToPriority(f.Severity),
 		Severity:          f.Severity,
 		ConfidenceScore:   f.ConfidenceScore,
 		Category:          "finding",
+		RuleID:            f.RuleID,
 		Title:             fmt.Sprintf("[%s] %s (line %d)", f.RuleID, f.Title, f.LineNumber),
 		Explanation:       f.Description,
 		Impact:            impactDescription(string(categorizeRule(f.RuleID))),
@@ -296,13 +553,17 @@ func hintFromCallGraph(ctx *HintContext) []Hint {
 func detectPatterns(ctx *HintContext) []Hint {
 	var hints []Hint
 
-	// Count finding categories
+	// Only count high-fidelity findings (AST/taint/interproc) — regex-only
+	// findings are noise and shouldn't trigger architectural advice.
 	cats := make(map[string]int)
 	for _, f := range ctx.Findings {
-		cats[categorizeRule(f.RuleID)]++
+		if !isRegexOnly(f) {
+			cats[categorizeRule(f.RuleID)]++
+		}
 	}
 
-	// If same category appears 3+ times, suggest architectural fix
+	// If same category appears 3+ times in high-fidelity findings,
+	// suggest architectural fix.
 	for cat, count := range cats {
 		if count >= 3 {
 			hints = append(hints, Hint{
@@ -896,64 +1157,7 @@ func architecturalAdvice(cat string) string {
 }
 
 func categorizeRule(ruleID string) string {
-	if strings.Contains(ruleID, "INJ") {
-		return "injection"
-	}
-	if strings.Contains(ruleID, "XSS") {
-		return "xss"
-	}
-	if strings.Contains(ruleID, "SEC") {
-		return "secrets"
-	}
-	if strings.Contains(ruleID, "CRY") {
-		return "crypto"
-	}
-	if strings.Contains(ruleID, "TRV") {
-		return "traversal"
-	}
-	if strings.Contains(ruleID, "AUTH") {
-		return "auth"
-	}
-	if strings.Contains(ruleID, "SSRF") {
-		return "ssrf"
-	}
-	if strings.Contains(ruleID, "TAINT") {
-		return "taint"
-	}
-	if strings.Contains(ruleID, "DESER") {
-		return "deserialize"
-	}
-	if strings.Contains(ruleID, "REDIR") {
-		return "redirect"
-	}
-	if strings.Contains(ruleID, "NOSQL") {
-		return "injection"
-	}
-	if strings.Contains(ruleID, "XXE") {
-		return "xxe"
-	}
-	if strings.Contains(ruleID, "CORS") {
-		return "cors"
-	}
-	if strings.Contains(ruleID, "LOG") {
-		return "logging"
-	}
-	if strings.Contains(ruleID, "MEM") {
-		return "memory"
-	}
-	if strings.Contains(ruleID, "PROTO") {
-		return "prototype"
-	}
-	if strings.Contains(ruleID, "MASS") {
-		return "massassign"
-	}
-	if strings.Contains(ruleID, "GQL") {
-		return "graphql"
-	}
-	if strings.Contains(ruleID, "MISCONF") {
-		return "misconfig"
-	}
-	return "general"
+	return rules.CategoryForRule(ruleID)
 }
 
 func severityToPriority(sev rules.Severity) int {
@@ -973,6 +1177,11 @@ func sortHints(hints []Hint) {
 // above the flagged line to suppress a false positive.
 func formatSuppressDirective(f rules.Finding, lang rules.Language) string {
 	prefix := commentPrefixForLang(lang)
+	// For taint findings, also show the sink category shorthand since agents try it naturally.
+	if strings.HasPrefix(f.RuleID, "BATOU-TAINT-") {
+		sink := strings.TrimPrefix(f.RuleID, "BATOU-TAINT-")
+		return fmt.Sprintf("%s batou:ignore %s -- <reason>", prefix, sink)
+	}
 	return fmt.Sprintf("%s batou:ignore %s -- <reason>", prefix, f.RuleID)
 }
 
@@ -990,9 +1199,9 @@ func commentPrefixForLang(lang rules.Language) string {
 
 // SessionHints tracks hint patterns across a session for progressive improvement.
 type SessionHints struct {
-	TotalScans     int            `json:"total_scans"`
-	TotalFindings  int            `json:"total_findings"`
-	FixedFindings  int            `json:"fixed_findings"`
-	PatternCounts  map[string]int `json:"pattern_counts"`
-	LastScanTime   time.Time      `json:"last_scan_time"`
+	TotalScans    int            `json:"total_scans"`
+	TotalFindings int            `json:"total_findings"`
+	FixedFindings int            `json:"fixed_findings"`
+	PatternCounts map[string]int `json:"pattern_counts"`
+	LastScanTime  time.Time      `json:"last_scan_time"`
 }

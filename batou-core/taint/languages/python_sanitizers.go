@@ -67,7 +67,7 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `os\.path\.basename\(`,
 			ObjectType:  "",
 			MethodName:  "os.path.basename",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Extract base filename (strips directory traversal)",
 		},
 		{
@@ -286,7 +286,7 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `os\.path\.realpath\(|os\.path\.abspath\(`,
 			ObjectType:  "",
 			MethodName:  "os.path.realpath/abspath",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Path resolution to absolute path (prevents relative path traversal)",
 		},
 		{
@@ -295,7 +295,7 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `\.resolve\(\)`,
 			ObjectType:  "pathlib.Path",
 			MethodName:  "resolve",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Pathlib path resolution (resolves symlinks and relative components)",
 		},
 
@@ -361,7 +361,7 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `re\.match\(.*\^\[`,
 			ObjectType:  "",
 			MethodName:  "re.match (whitelist)",
-			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Regex whitelist match validation",
 		},
 
@@ -372,7 +372,7 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `os\.path\.normpath\(`,
 			ObjectType:  "",
 			MethodName:  "os.path.normpath",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Path normalization (resolves double dots and slashes)",
 		},
 
@@ -383,8 +383,19 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `secure_filename\(`,
 			ObjectType:  "werkzeug.utils",
 			MethodName:  "secure_filename",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Werkzeug secure filename sanitization (strips path separators)",
+		},
+
+		// --- Flask send_from_directory (safe file serving) ---
+		{
+			ID:          "py.flask.send_from_directory",
+			Language:    rules.LangPython,
+			Pattern:     `send_from_directory\(`,
+			ObjectType:  "flask",
+			MethodName:  "send_from_directory",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileRead, taint.SnkFileWrite},
+			Description: "Flask send_from_directory uses safe_join to prevent path traversal",
 		},
 
 		// --- urllib.parse.quote ---
@@ -418,6 +429,55 @@ func (c *PythonCatalog) Sanitizers() []taint.SanitizerDef {
 			MethodName:  "clean",
 			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
 			Description: "nh3 HTML sanitizer (Rust-based, successor to bleach)",
+		},
+
+		// --- Peewee ORM sanitizers ---
+		{
+			ID:          "py.peewee.fn",
+			Language:    rules.LangPython,
+			Pattern:     `fn\.\w+\(`,
+			ObjectType:  "peewee",
+			MethodName:  "fn.*",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Peewee fn.param() parameterized function calls (prevents SQL injection)",
+		},
+		{
+			ID:          "py.peewee.parameterized",
+			Language:    rules.LangPython,
+			Pattern:     `\.SQL\([^,]+,\s*\[`,
+			ObjectType:  "peewee",
+			MethodName:  "SQL with params",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Peewee SQL() with parameter list (prevents SQL injection)",
+		},
+		{
+			ID:          "py.peewee.where",
+			Language:    rules.LangPython,
+			Pattern:     `\.where\(.*==`,
+			ObjectType:  "peewee",
+			MethodName:  "where",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Peewee Model.select().where() query builder (parameterized)",
+		},
+
+		// --- Tortoise ORM sanitizers ---
+		{
+			ID:          "py.tortoise.filter",
+			Language:    rules.LangPython,
+			Pattern:     `\.filter\(`,
+			ObjectType:  "tortoise",
+			MethodName:  "filter",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Tortoise ORM Model.filter() queryset (parameterized, prevents SQL injection)",
+		},
+		{
+			ID:          "py.tortoise.parameterized",
+			Language:    rules.LangPython,
+			Pattern:     `execute_query\([^,]+,\s*\[`,
+			ObjectType:  "tortoise",
+			MethodName:  "execute_query with params",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Tortoise ORM execute_query() with parameter list (prevents SQL injection)",
 		},
 	}
 }

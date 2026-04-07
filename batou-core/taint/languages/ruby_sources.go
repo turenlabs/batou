@@ -190,5 +190,59 @@ func (rubyCatalog) Sources() []taint.SourceDef {
 			Description: "Sidekiq worker arguments from job queue",
 			Assigns:     "return",
 		},
+
+		// --- Rails request path/query/host sources ---
+		{
+			ID:          "ruby.rails.request.path",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRuby,
+			Pattern:     `request\.path\b|request\.path_info`,
+			ObjectType:  "ActionDispatch::Request",
+			MethodName:  "path/path_info",
+			Description: "Rails request URL path (user-controlled)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "ruby.rails.request.query_string",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRuby,
+			Pattern:     `request\.query_string`,
+			ObjectType:  "ActionDispatch::Request",
+			MethodName:  "query_string",
+			Description: "Rails raw query string",
+			Assigns:     "return",
+		},
+		{
+			ID:          "ruby.rails.request.host",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRuby,
+			Pattern:     `request\.host\b`,
+			ObjectType:  "ActionDispatch::Request",
+			MethodName:  "host",
+			Description: "Rails request Host header (user-controlled, cache poisoning risk)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "ruby.rails.request.content_type",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRuby,
+			Pattern:     `request\.content_type`,
+			ObjectType:  "ActionDispatch::Request",
+			MethodName:  "content_type",
+			Description: "Rails request Content-Type header",
+			Assigns:     "return",
+		},
+
+		// --- Roda framework sources ---
+		{
+			ID:          "ruby.roda.request.params",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangRuby,
+			Pattern:     `r\.params\s*\[|request\.params\s*\[`,
+			ObjectType:  "Roda::RodaRequest",
+			MethodName:  "params[]",
+			Description: "Roda framework request parameters",
+			Assigns:     "return",
+		},
 	}
 }

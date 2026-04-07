@@ -88,6 +88,16 @@ func (c *PythonCatalog) Sources() []taint.SourceDef {
 			Description: "Flask file uploads",
 			Assigns:     "return",
 		},
+		{
+			ID:          "py.flask.request.query_string",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangPython,
+			Pattern:     `request\.query_string`,
+			ObjectType:  "flask.Request",
+			MethodName:  "query_string",
+			Description: "Flask raw query string bytes",
+			Assigns:     "return",
+		},
 
 		// --- Django ---
 		{

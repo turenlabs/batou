@@ -693,6 +693,121 @@ func (r *SensitiveSessionData) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
+// BATOU-SESS-011: Trust boundary violation — user input in session key/attribute
+// ---------------------------------------------------------------------------
+
+// BATOU-SESS-011 patterns: user-controlled data used as session key or value
+var (
+	rePySessionKeyUserInput = regexp.MustCompile(`(?:session|flask\.session)\s*\[\s*(param|bar|user_input|key|name|attr|field|data|val|var|arg|input)\b`)
+	// Python: flask.session['key'] = bar (user-controlled value stored in session)
+	rePySessionValueUserInput = regexp.MustCompile(`(?:session|flask\.session)\s*\[\s*['"][^'"]+['"]\s*\]\s*=\s*([a-zA-Z_]\w*)`)
+	// Java: setAttribute/putValue with a variable (not string literal) in key or value position
+	reJavaSessionSetAttr = regexp.MustCompile(`(?:session|httpSession|request\.getSession\(\))\.\s*(?:setAttribute|putValue)\s*\(\s*(?:(?:[a-zA-Z_]\w*)\s*,\s*"[^"]*"|"[^"]*"\s*,\s*(?:[a-zA-Z_]\w*))`)
+	// Java: setAttribute/putValue where both args are variables (both tainted)
+	reJavaSessionSetAttrBothVars = regexp.MustCompile(`(?:session|httpSession|request\.getSession\(\))\.\s*(?:setAttribute|putValue)\s*\(\s*[a-zA-Z_]\w*\s*,\s*[a-zA-Z_]\w*\s*\)`)
+	rePHPSessionUserInput       = regexp.MustCompile(`\$_SESSION\s*\[\s*\$(?:param|input|key|name|attr|field|data|val|var|arg|_(?:GET|POST|REQUEST))`)
+	reSessionKeyFromRequest     = regexp.MustCompile(`(?:session|flask\.session|request\.session|httpSession)\s*\[.*(?:request\.|params\[|req\.)`)
+)
+
+type TrustBoundaryViolation struct{}
+
+func (r *TrustBoundaryViolation) ID() string                     { return "BATOU-SESS-011" }
+func (r *TrustBoundaryViolation) Name() string                   { return "TrustBoundaryViolation" }
+func (r *TrustBoundaryViolation) DefaultSeverity() rules.Severity { return rules.High }
+func (r *TrustBoundaryViolation) Description() string {
+	return "Detects trust boundary violations where user-controlled data is used as a session key or attribute name, allowing an attacker to manipulate session state."
+}
+func (r *TrustBoundaryViolation) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython, rules.LangJava, rules.LangPHP, rules.LangJavaScript, rules.LangTypeScript, rules.LangRuby}
+}
+
+func (r *TrustBoundaryViolation) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	// Check if there's a user-input source anywhere in the file
+	hasRequestSource := regexp.MustCompile(`(?:request\.|params\[|req\.|getParameter|GET\[|POST\[|args\.get|form\.get|cookies\.get)`).MatchString(ctx.Content)
+	if !hasRequestSource {
+		return nil
+	}
+
+	isPython := ctx.Language == rules.LangPython
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if isComment(trimmed) {
+			continue
+		}
+
+		var matched string
+
+		// Python: session[bar] — check if bar (key variable) is tainted
+		if isPython {
+			if m := rePySessionKeyUserInput.FindStringSubmatch(line); len(m) > 1 {
+				keyVar := m[1]
+				if !rules.PyLastAssignmentIsSafe(lines, i, keyVar) && !rules.PyHasAlwaysSafeBranch(lines, i, keyVar) {
+					matched = m[0]
+				}
+			}
+		}
+
+		if matched == "" {
+			for _, re := range []*regexp.Regexp{reJavaSessionSetAttr, reJavaSessionSetAttrBothVars, rePHPSessionUserInput, reSessionKeyFromRequest} {
+				if m := re.FindString(line); m != "" {
+					matched = m
+					break
+				}
+			}
+		}
+
+		// Python: flask.session['key'] = bar — check if bar (value) is tainted
+		if matched == "" && isPython {
+			if m := rePySessionValueUserInput.FindStringSubmatch(line); len(m) > 1 {
+				varName := m[1]
+				// Only flag if the value variable is tainted (not safe)
+				if !rules.PyLastAssignmentIsSafe(lines, i, varName) {
+					matched = rePySessionValueUserInput.FindString(line)
+				}
+			}
+		}
+
+		if matched == "" {
+			continue
+		}
+
+		// Python FP suppression: check if the sink variable was last
+		// assigned from a safe (non-tainted) source, or if there is
+		// an input validation guard nearby.
+		if isPython && rules.PySinkVarIsSafe(lines, i) {
+			continue
+		}
+
+		// Java: suppress if the setAttribute argument has safe data flow.
+		if ctx.Language == rules.LangJava && rules.JavaSinkVarIsSafe(lines, i) {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Trust boundary violation: user input in session key/value",
+			Description:   "User-controlled data is used as a session key or stored in a session attribute. An attacker can manipulate session state by controlling which session attributes are read or written, potentially escalating privileges or hijacking other users' data.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    i + 1,
+			MatchedText:   truncate(matched, 120),
+			Suggestion:    "Never use user-controlled data as session keys or attribute names. Validate and sanitize user data before storing in session.",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+			Language:      ctx.Language,
+			Confidence:    "high",
+			Tags:          []string{"session", "trust-boundary", "user-input"},
+		})
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -707,4 +822,5 @@ func init() {
 	rules.Register(&SessionNoLogoutInvalidation{})
 	rules.Register(&PredictableSessionID{})
 	rules.Register(&SensitiveSessionData{})
+	rules.Register(&TrustBoundaryViolation{})
 }

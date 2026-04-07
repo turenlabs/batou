@@ -685,3 +685,494 @@ var x = 42
 		t.Errorf("expected no flows for file with no functions, got %d", len(flows))
 	}
 }
+
+// =========================================================================
+// SnkFileRead (path traversal via file reads) tests
+// =========================================================================
+
+func TestAnalyzeGo_FileRead_FilepathWalk(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"path/filepath"
+	"os"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	dir := r.FormValue("dir")
+	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		return nil
+	})
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkFileRead) {
+		t.Error("expected file read taint flow for FormValue -> filepath.Walk")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_FileRead_OsStat(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	path := r.FormValue("path")
+	_, err := os.Stat(path)
+	if err != nil {
+		http.Error(w, "not found", 404)
+	}
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkFileRead) {
+		t.Error("expected file read taint flow for FormValue -> os.Stat")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_FileRead_ReadDir(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	dir := r.FormValue("dir")
+	entries, _ := os.ReadDir(dir)
+	_ = entries
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkFileRead) {
+		t.Error("expected file read taint flow for FormValue -> os.ReadDir")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_FileRead_TemplateParseGlob(t *testing.T) {
+	code := `package main
+
+import (
+	"html/template"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	pattern := r.FormValue("pattern")
+	tmpl, _ := template.ParseGlob(pattern)
+	tmpl.Execute(w, nil)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkFileRead) {
+		t.Error("expected file read taint flow for FormValue -> template.ParseGlob")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_FileRead_ReadDir_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	dir := r.FormValue("dir")
+	safe := filepath.Base(dir)
+	entries, _ := os.ReadDir(safe)
+	_ = entries
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkFileRead {
+			t.Error("expected filepath.Base to sanitize SnkFileRead, but found a flow")
+		}
+	}
+}
+
+// =========================================================================
+// New source tests: framework call-based sources
+// =========================================================================
+
+func TestAnalyzeGo_GinDefaultQuery_SQLi(t *testing.T) {
+	code := `package main
+
+import (
+	"database/sql"
+	"github.com/gin-gonic/gin"
+)
+
+func handler(c *gin.Context) {
+	name := c.DefaultQuery("name", "")
+	db.Query("SELECT * FROM users WHERE name = '" + name + "'")
+}
+
+var db *sql.DB
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkSQLQuery) {
+		t.Error("expected SQL injection flow for Gin DefaultQuery -> db.Query")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_FiberBodyParser_SQLi(t *testing.T) {
+	code := `package main
+
+import (
+	"database/sql"
+	"github.com/gofiber/fiber/v2"
+)
+
+func handler(c *fiber.Ctx) error {
+	name := c.Query("name")
+	db.Query("SELECT * FROM users WHERE name = '" + name + "'")
+	return nil
+}
+
+var db *sql.DB
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkSQLQuery) {
+		t.Error("expected SQL injection flow for Fiber c.Query -> db.Query")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+// =========================================================================
+// New sink tests: SSRF, header injection
+// =========================================================================
+
+func TestAnalyzeGo_SSRF_NewRequestWithContext(t *testing.T) {
+	code := `package main
+
+import (
+	"context"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	url := r.FormValue("url")
+	req, _ := http.NewRequestWithContext(context.Background(), "GET", url, nil)
+	_ = req
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkURLFetch) {
+		t.Error("expected SSRF flow for FormValue -> http.NewRequestWithContext")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_SSRF_HttpPost(t *testing.T) {
+	code := `package main
+
+import "net/http"
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	url := r.FormValue("callback")
+	http.Post(url, "application/json", nil)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkURLFetch) {
+		t.Error("expected SSRF flow for FormValue -> http.Post")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_GinHeaderInjection(t *testing.T) {
+	code := `package main
+
+import "github.com/gin-gonic/gin"
+
+func handler(c *gin.Context) {
+	origin := c.Query("origin")
+	c.Header("Access-Control-Allow-Origin", origin)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkHeader) {
+		t.Error("expected header injection flow for Gin c.Query -> c.Header")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_GinSetCookie(t *testing.T) {
+	code := `package main
+
+import "github.com/gin-gonic/gin"
+
+func handler(c *gin.Context) {
+	val := c.Query("theme")
+	c.SetCookie("pref", val, 3600, "/", "", false, true)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkHeader) {
+		t.Error("expected header injection flow for Gin c.Query -> c.SetCookie")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_SSRF_HttpPostForm(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"net/url"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	target := r.FormValue("webhook")
+	http.PostForm(target, url.Values{})
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkURLFetch) {
+		t.Error("expected SSRF flow for FormValue -> http.PostForm")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+// =========================================================================
+// Safe pattern tests (sanitizer verification)
+// =========================================================================
+
+func TestAnalyzeGo_SafeRedirect_URLParse(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"net/url"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	target := r.FormValue("redirect")
+	u, err := url.Parse(target)
+	if err != nil {
+		return
+	}
+	http.Redirect(w, r, u.Path, http.StatusFound)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkRedirect {
+			t.Error("expected url.Parse to sanitize redirect, but found a flow")
+		}
+	}
+}
+
+// =========================================================================
+// New sink category tests: deserialization, command injection, LDAP
+// =========================================================================
+
+func TestAnalyzeGo_YAMLDeserialization(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+
+	"gopkg.in/yaml.v3"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	input := r.FormValue("config")
+	var data map[string]interface{}
+	yaml.Unmarshal([]byte(input), &data)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkDeserialize) {
+		t.Error("expected deserialization taint flow for FormValue -> yaml.Unmarshal")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s", f.Source.Category, f.Sink.Category)
+		}
+	}
+}
+
+func TestAnalyzeGo_MsgpackDeserialization(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+
+	"github.com/vmihailenco/msgpack/v5"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	input := r.FormValue("data")
+	var result map[string]interface{}
+	msgpack.Unmarshal([]byte(input), &result)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkDeserialize) {
+		t.Error("expected deserialization taint flow for FormValue -> msgpack.Unmarshal")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s", f.Source.Category, f.Sink.Category)
+		}
+	}
+}
+
+func TestAnalyzeGo_SyscallExec(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"syscall"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	bin := r.FormValue("binary")
+	syscall.Exec(bin, []string{bin}, nil)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkCommand) {
+		t.Error("expected command injection taint flow for FormValue -> syscall.Exec")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s", f.Source.Category, f.Sink.Category)
+		}
+	}
+}
+
+func TestAnalyzeGo_OsStartProcess(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	prog := r.FormValue("program")
+	os.StartProcess(prog, []string{prog}, &os.ProcAttr{})
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkCommand) {
+		t.Error("expected command injection taint flow for FormValue -> os.StartProcess")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s", f.Source.Category, f.Sink.Category)
+		}
+	}
+}
+
+func TestAnalyzeGo_PluginOpen(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"plugin"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	path := r.FormValue("plugin_path")
+	plugin.Open(path)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	// plugin.Open matches both SnkEval (our new entry) and SnkFileWrite (go.os.open)
+	// due to shared "Open" method name in the matcher. Either flow confirms taint tracking works.
+	if len(flows) == 0 {
+		t.Error("expected taint flow for FormValue -> plugin.Open, got none")
+	}
+	found := false
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkEval || f.Sink.Category == taint.SnkFileWrite {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected eval or file_write taint flow for FormValue -> plugin.Open")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s", f.Source.Category, f.Sink.Category)
+		}
+	}
+}
+
+func TestAnalyzeGo_LDAPBind(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+
+	"github.com/go-ldap/ldap/v3"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	conn, _ := ldap.DialURL("ldap://localhost:389")
+	dn := "uid=" + username + ",ou=people,dc=example,dc=com"
+	conn.Bind(dn, "password")
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkLDAP) {
+		t.Error("expected LDAP injection taint flow for FormValue -> string concat -> Bind")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s", f.Source.Category, f.Sink.Category)
+		}
+	}
+}
+
+func TestAnalyzeGo_LDAPAddRequest(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+
+	"github.com/go-ldap/ldap/v3"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	cn := r.FormValue("cn")
+	dn := "cn=" + cn + ",ou=people,dc=example,dc=com"
+	addReq := ldap.NewAddRequest(dn, nil)
+	_ = addReq
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkLDAP) {
+		t.Error("expected LDAP injection taint flow for FormValue -> string concat -> ldap.NewAddRequest")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s", f.Source.Category, f.Sink.Category)
+		}
+	}
+}

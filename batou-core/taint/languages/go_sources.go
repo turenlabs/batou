@@ -89,6 +89,94 @@ func (c *GoCatalog) Sources() []taint.SourceDef {
 			Assigns:     "return",
 		},
 
+		// --- Standard library: net/http (additional) ---
+		{
+			ID:          "go.http.request.url.rawquery",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `r\.URL\.RawQuery|request\.URL\.RawQuery`,
+			ObjectType:  "*http.Request",
+			MethodName:  "URL.RawQuery",
+			Description: "Raw URL query string (unescaped, user-controlled)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "go.http.request.host",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `r\.Host\b|request\.Host\b`,
+			ObjectType:  "*http.Request",
+			MethodName:  "Host",
+			Description: "HTTP Host header (user-controlled, spoofable)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "go.http.request.form",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `r\.Form\b|request\.Form\b`,
+			ObjectType:  "*http.Request",
+			MethodName:  "Form",
+			Description: "Parsed form data (requires ParseForm call)",
+			Assigns:     "return",
+		},
+
+		// --- Gin framework (binding) ---
+		{
+			ID:          "go.gin.bindjson",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `c\.BindJSON\(|c\.ShouldBindJSON\(|c\.ShouldBind\(`,
+			ObjectType:  "*gin.Context",
+			MethodName:  "BindJSON/ShouldBindJSON/ShouldBind",
+			Description: "Gin request body binding (JSON/form deserialization)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "go.gin.defaultquery",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `c\.DefaultQuery\(`,
+			ObjectType:  "*gin.Context",
+			MethodName:  "DefaultQuery",
+			Description: "Gin query parameter with default value",
+			Assigns:     "return",
+		},
+
+		// --- Echo framework (additional) ---
+		{
+			ID:          "go.echo.bind",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `c\.Bind\(`,
+			ObjectType:  "echo.Context",
+			MethodName:  "Bind",
+			Description: "Echo request body binding (JSON/form/query deserialization)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "go.echo.cookie",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `c\.Cookie\(`,
+			ObjectType:  "echo.Context",
+			MethodName:  "Cookie",
+			Description: "Echo cookie value retrieval",
+			Assigns:     "return",
+		},
+
+		// --- Fiber framework (additional) ---
+		{
+			ID:          "go.fiber.bodyparser",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangGo,
+			Pattern:     `c\.BodyParser\(`,
+			ObjectType:  "*fiber.Ctx",
+			MethodName:  "BodyParser",
+			Description: "Fiber request body parsing (JSON/form deserialization)",
+			Assigns:     "return",
+		},
+
 		// --- Standard library: os ---
 		{
 			ID:          "go.os.args",

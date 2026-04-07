@@ -163,9 +163,21 @@ doc = minidom.parseString(xml_data)`
 	testutil.MustFindRule(t, result, "BATOU-XXE-003")
 }
 
-func TestXXE003_SAX(t *testing.T) {
+func TestXXE003_SAX_SafeDefaults(t *testing.T) {
+	// xml.sax.make_parser() with default settings is safe since Python 3.7.1
 	content := `import xml.sax
 parser = xml.sax.make_parser()
+parser.parse(input_file)`
+	result := testutil.ScanContent(t, "/app/parser.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-XXE-003")
+}
+
+func TestXXE003_SAX_ExternalEntitiesEnabled(t *testing.T) {
+	// Explicitly enabling external entities makes it vulnerable
+	content := `import xml.sax
+import xml.sax.handler
+parser = xml.sax.make_parser()
+parser.setFeature(xml.sax.handler.feature_external_ges, True)
 parser.parse(input_file)`
 	result := testutil.ScanContent(t, "/app/parser.py", content)
 	testutil.MustFindRule(t, result, "BATOU-XXE-003")

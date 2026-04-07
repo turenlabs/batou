@@ -73,10 +73,17 @@ var (
 	reNodeContentJSON = regexp.MustCompile(`(?:Content-Type|content-type).*application/json`)
 
 	// BATOU-XSS-013: Python f-string HTML building without escaping
-	rePyFStringHTML = regexp.MustCompile(`(?:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*f["'].*<.*\{`)
-	rePyFormatHTML  = regexp.MustCompile(`(?:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*["'].*<.*["']\s*\.format\s*\(`)
-	rePyPctHTML     = regexp.MustCompile(`(?:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*["'].*<.*%s`)
-	rePyEscape      = regexp.MustCompile(`(?:escape|html\.escape|markupsafe\.escape|cgi\.escape|bleach\.clean)\s*\(`)
+	// Match response-like variables with f-string interpolation (with or without HTML tags)
+	// Allow optional ( between += and f' for parenthesized multi-line expressions
+	rePyFStringHTML = regexp.MustCompile(`(?i:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*\(?\s*f["'].*\{`)
+	rePyFormatHTML  = regexp.MustCompile(`(?i:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*\(?\s*["'].*["']\s*\.format\s*\(`)
+	rePyPctHTML     = regexp.MustCompile(`(?i:html|response|output|body|page|content|markup|template_str)\s*(?:\+?=|=)\s*\(?\s*["'].*%s`)
+	rePyEscape      = regexp.MustCompile(`(?:escape_for_html|escape|html\.escape|markupsafe\.escape|cgi\.escape|bleach\.clean)\s*\(`)
+
+	// Multi-line f-string continuation: standalone f-string with interpolation
+	rePyFStringInterp  = regexp.MustCompile(`^f["'].*\{[a-zA-Z_]`)
+	// Response-like variable with += (for multi-line detection)
+	rePyResponseAppend = regexp.MustCompile(`(?i:html|response|output|body|page|content|markup|template_str)\s*\+=`)
 
 	// BATOU-XSS-011: Reflected XSS patterns
 	rePyReflected      = regexp.MustCompile(`(?:return|response)\s*.*(?:request\.args\.get|request\.form\.get|request\.values\.get|request\.args\[)`)
@@ -123,6 +130,14 @@ var (
 	reJavaResponseBodyAnnotation = regexp.MustCompile(`@ResponseBody`)
 	// @RestController annotation indicator
 	reJavaRestController = regexp.MustCompile(`@RestController`)
+
+	// BATOU-XSS-016: Java servlet reflected XSS (response.getWriter() writing variable data)
+	// Matches response.getWriter().print/println/write/format/printf with a variable (non-literal) first arg
+	reJavaServletWriterVar = regexp.MustCompile(`(?:response\.getWriter\s*\(\s*\))\s*\.\s*(?:print(?:ln|f)?|write|format)\s*\(\s*(?:java\.util\.Locale\.\w+\s*,\s*)?[a-zA-Z_]\w*`)
+	// Matches response.getWriter().print/println/write with string concat including a variable: "..." + var
+	reJavaServletWriterConcat = regexp.MustCompile(`(?:response\.getWriter\s*\(\s*\))\s*\.\s*(?:print(?:ln|f)?|write|format)\s*\(\s*"[^"]*"\s*\+\s*[a-zA-Z_]\w*`)
+	// File-level indicator of servlet request input
+	reJavaServletRequest = regexp.MustCompile(`HttpServletRequest`)
 )
 
 func init() {
@@ -140,6 +155,7 @@ func init() {
 	rules.Register(&PythonFStringHTML{})
 	rules.Register(&JavaHTMLStringConcat{})
 	rules.Register(&JavaResponseWriterXSS{})
+	rules.Register(&JavaServletReflectedXSS{})
 }
 
 // ---------- helpers ----------
@@ -183,6 +199,11 @@ func (r *InnerHTMLUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !isJSOrTS(ctx.Language) {
 		return nil
 	}
+
+	// If the file defines or uses a known HTML sanitizer/escape function
+	// and the innerHTML assignment uses the escaped value, suppress.
+	fileSanitized := rules.HasHTMLSanitizer(ctx.Content)
+
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 	for i, line := range lines {
@@ -192,6 +213,17 @@ func (r *InnerHTMLUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 			rhs := m[2]
 			// Skip static string assignments like .innerHTML = "" or .innerHTML = "<br>"
 			if reStaticString.MatchString(rhs) {
+				continue
+			}
+			// Skip if the RHS calls a known sanitizer on the same line.
+			if rules.HasHTMLSanitizer(rhs) {
+				continue
+			}
+			// Skip if the file uses sanitizers and the RHS references a
+			// variable that was likely sanitized (heuristic: file has
+			// sanitizer AND the RHS is a simple variable, not raw input).
+			if fileSanitized && !strings.Contains(rhs, "req.") && !strings.Contains(rhs, "request.") &&
+				!strings.Contains(rhs, "location.") && !strings.Contains(rhs, "document.cookie") {
 				continue
 			}
 			findings = append(findings, makeFinding(
@@ -816,6 +848,11 @@ func (r *ReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		switch ctx.Language {
 		case rules.LangPython:
 			if rePyReflected.MatchString(line) || rePyFStringReq.MatchString(line) {
+				// Check if the sink variable was last assigned a safe value,
+				// or if there is an input validation guard nearby.
+				if rules.PySinkVarIsSafe(lines, i) {
+					break
+				}
 				matched = true
 				desc = "Request parameters are reflected directly in the HTTP response without escaping, creating a reflected XSS vulnerability."
 				suggestion = "Escape user input with markupsafe.escape() or html.escape() before including in response. Use template rendering with auto-escaping instead of string formatting."
@@ -918,9 +955,24 @@ func (r *PythonFStringHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 			matched = m
 		} else if m := rePyPctHTML.FindString(line); m != "" {
 			matched = m
+		} else if rePyFStringInterp.MatchString(trimmed) {
+			// Standalone f-string with interpolation on a continuation line —
+			// check if a response-like variable += is within 3 lines above.
+			for back := 1; back <= 3 && i-back >= 0; back++ {
+				if rePyResponseAppend.MatchString(lines[i-back]) {
+					matched = trimmed
+					break
+				}
+			}
 		}
 
 		if matched == "" {
+			continue
+		}
+
+		// Python FP suppression: check if the interpolated variable was last
+		// assigned from a safe (non-tainted) source.
+		if rules.PySinkVarIsSafe(lines, i) {
 			continue
 		}
 
@@ -1022,6 +1074,10 @@ func (r *JavaHTMLStringConcat) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if matched {
+			// Suppress if the concatenated variable has safe data flow.
+			if rules.JavaSinkVarIsSafe(lines, i) {
+				continue
+			}
 			findings = append(findings, makeFinding(
 				r.ID(), "Java HTML string concatenation with user input",
 				desc, ctx.FilePath, i+1, trimmed,
@@ -1100,11 +1156,88 @@ func (r *JavaResponseWriterXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if matched {
+			// Suppress if the written variable has safe data flow.
+			if rules.JavaSinkVarIsSafe(lines, i) {
+				continue
+			}
 			findings = append(findings, makeFinding(
 				r.ID(), "Java response writer XSS",
 				desc, ctx.FilePath, i+1, trimmed,
 				"Use a template engine (Thymeleaf) for HTML responses. If raw response writing is needed, escape all user input with OWASP Java Encoder (Encode.forHtml()) or use Content-Type application/json.",
 				"CWE-79", string(ctx.Language), rules.High, "high",
+			))
+		}
+	}
+	return findings
+}
+
+// ---------- BATOU-XSS-016: JavaServletReflectedXSS ----------
+
+type JavaServletReflectedXSS struct{}
+
+func (r *JavaServletReflectedXSS) ID() string                      { return "BATOU-XSS-016" }
+func (r *JavaServletReflectedXSS) Name() string                    { return "JavaServletReflectedXSS" }
+func (r *JavaServletReflectedXSS) DefaultSeverity() rules.Severity { return rules.High }
+func (r *JavaServletReflectedXSS) Description() string {
+	return "Detects Java servlet response.getWriter() writing variable data that may originate from HTTP request input."
+}
+func (r *JavaServletReflectedXSS) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
+
+func (r *JavaServletReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if ctx.Language != rules.LangJava {
+		return nil
+	}
+
+	// Only apply in servlet context (file must reference HttpServletRequest)
+	if !reJavaServletRequest.MatchString(ctx.Content) {
+		return nil
+	}
+
+	var findings []rules.Finding
+	lines := strings.Split(ctx.Content, "\n")
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+
+		// Skip lines using encoders/escapers
+		if reJavaEncoder.MatchString(line) {
+			continue
+		}
+
+		var matched bool
+
+		// response.getWriter().print/println/write/format/printf(variable, ...)
+		if reJavaServletWriterVar.MatchString(line) {
+			matched = true
+		}
+
+		// response.getWriter().print/write("..." + variable)
+		if !matched && reJavaServletWriterConcat.MatchString(line) {
+			matched = true
+		}
+
+		if matched {
+			// Check for nearby encoder usage (within 3 lines)
+			if hasNearbyJavaEncoder(lines, i) {
+				continue
+			}
+
+			// Java: suppress if the written variable has safe data flow.
+			if rules.JavaSinkVarIsSafe(lines, i) {
+				continue
+			}
+
+			findings = append(findings, makeFinding(
+				r.ID(), "Java servlet reflected XSS",
+				"HttpServletResponse writer outputs variable data that may contain unsanitized user input from the HTTP request, creating a reflected XSS vulnerability.",
+				ctx.FilePath, i+1, trimmed,
+				"Escape user input with OWASP Java Encoder (Encode.forHtml()) before writing to the response, or use a template engine with auto-escaping like Thymeleaf.",
+				"CWE-79", string(ctx.Language), rules.High, "medium",
 			))
 		}
 	}

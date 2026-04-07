@@ -162,34 +162,8 @@ func (c *phpChecker) checkFunctionCall(n *ast.Node) {
 		if firstArg == nil || isPHPLiteral(firstArg) {
 			return
 		}
-		// Skip if the argument directly contains a sanitization call.
-		if containsPHPSanitizer(firstArg) {
-			return
-		}
-
-		// Determine confidence: if the argument is a binary expression
-		// with a string literal (e.g., "cmd " . $var), lower confidence
-		// since the variable may have been sanitized on a prior line.
-		// Taint analysis (Layer 3) is the authority on actual vulnerability.
-		confidence := "high"
-		confScore := 0.0 // let pipeline assign based on tier
-		if firstArg.Type() == "binary_expression" {
-			hasLiteral := false
-			firstArg.Walk(func(child *ast.Node) bool {
-				if isPHPLiteral(child) {
-					hasLiteral = true
-					return false
-				}
-				return true
-			})
-			if hasLiteral {
-				confidence = "medium"
-				confScore = 0.55 // below 0.7 block threshold
-			}
-		}
-
 		line := int(n.StartRow()) + 1
-		finding := rules.Finding{
+		c.findings = append(c.findings, rules.Finding{
 			RuleID:        info.ruleID,
 			Severity:      info.severity,
 			SeverityLabel: info.severity.String(),
@@ -202,14 +176,9 @@ func (c *phpChecker) checkFunctionCall(n *ast.Node) {
 			CWEID:         info.cwe,
 			OWASPCategory: "A03:2021-Injection",
 			Language:      rules.LangPHP,
-			Confidence:    confidence,
+			Confidence:    "high",
 			Tags:          info.tags,
-		}
-		if confScore > 0 {
-			finding.ConfidenceScore = confScore
-			finding.ConfidencePreset = true
-		}
-		c.findings = append(c.findings, finding)
+		})
 		return
 	}
 
@@ -231,17 +200,9 @@ func (c *phpChecker) checkInclude(n *ast.Node, keyword string) {
 	for _, child := range named {
 		if child.Type() == "parenthesized_expression" {
 			inner := firstNamedChild(child)
-			if inner != nil && !isPHPLiteral(inner) && !isPHPAllowlistAccess(inner) {
+			if inner != nil && !isPHPLiteral(inner) {
 				line := int(n.StartRow()) + 1
-				// If the inner expression is just a variable, it may have
-				// been sanitized on a prior line — lower confidence.
-				confidence := "high"
-				confScore := 0.0
-				if inner.Type() == "variable_name" {
-					confidence = "medium"
-					confScore = 0.55
-				}
-				finding := rules.Finding{
+				c.findings = append(c.findings, rules.Finding{
 					RuleID:        "BATOU-PHPAST-003",
 					Severity:      rules.Critical,
 					SeverityLabel: rules.Critical.String(),
@@ -254,44 +215,30 @@ func (c *phpChecker) checkInclude(n *ast.Node, keyword string) {
 					CWEID:         "CWE-98",
 					OWASPCategory: "A03:2021-Injection",
 					Language:      rules.LangPHP,
-					Confidence:    confidence,
+					Confidence:    "high",
 					Tags:          []string{"lfi", "file-inclusion", "ast"},
-				}
-				if confScore > 0 {
-					finding.ConfidenceScore = confScore
-					finding.ConfidencePreset = true
-				}
-				c.findings = append(c.findings, finding)
+				})
 				return
 			}
 		}
 		if child.Type() == "variable_name" || child.Type() == "member_access_expression" {
 			line := int(n.StartRow()) + 1
-			// A bare variable may have been sanitized on a prior line —
-			// lower confidence. Taint analysis is the authority.
 			c.findings = append(c.findings, rules.Finding{
-				RuleID:          "BATOU-PHPAST-003",
-				Severity:        rules.Critical,
-				SeverityLabel:   rules.Critical.String(),
-				Title:           "Local file inclusion via " + keyword + "()",
-				Description:     keyword + "() is called with a variable path. If the path is user-controlled, an attacker can include arbitrary files.",
-				FilePath:        c.filePath,
-				LineNumber:      line,
-				MatchedText:     truncate(n.Text(), 200),
-				Suggestion:      "Never pass user input directly to " + keyword + "(). Use an allowlist of permitted files.",
-				CWEID:           "CWE-98",
-				OWASPCategory:   "A03:2021-Injection",
-				Language:        rules.LangPHP,
-				Confidence:      "medium",
-				ConfidenceScore: 0.55,
-				ConfidencePreset: true,
-				Tags:            []string{"lfi", "file-inclusion", "ast"},
+				RuleID:        "BATOU-PHPAST-003",
+				Severity:      rules.Critical,
+				SeverityLabel: rules.Critical.String(),
+				Title:         "Local file inclusion via " + keyword + "()",
+				Description:   keyword + "() is called with a variable path. If the path is user-controlled, an attacker can include arbitrary files.",
+				FilePath:      c.filePath,
+				LineNumber:    line,
+				MatchedText:   truncate(n.Text(), 200),
+				Suggestion:    "Never pass user input directly to " + keyword + "(). Use an allowlist of permitted files.",
+				CWEID:         "CWE-98",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      rules.LangPHP,
+				Confidence:    "high",
+				Tags:          []string{"lfi", "file-inclusion", "ast"},
 			})
-			return
-		}
-		// Subscript expression (e.g., $allowed[$key]) is a common allowlist
-		// pattern — skip it as it's likely safe.
-		if child.Type() == "subscript_expression" {
 			return
 		}
 	}
@@ -505,39 +452,4 @@ func truncate(s string, maxLen int) string {
 		return s[:maxLen] + "..."
 	}
 	return s
-}
-
-// containsPHPSanitizer returns true if the argument expression contains a call
-// to a known sanitization function, indicating the input has been sanitized
-// before reaching the dangerous sink.
-func containsPHPSanitizer(n *ast.Node) bool {
-	if n == nil {
-		return false
-	}
-	found := false
-	n.Walk(func(child *ast.Node) bool {
-		if child.Type() == "function_call_expression" {
-			name := phpFuncName(child)
-			switch name {
-			case "escapeshellarg", "escapeshellcmd",
-				"intval", "floatval", "basename",
-				"realpath", "htmlspecialchars", "htmlentities",
-				"filter_var", "preg_replace", "addslashes",
-				"pg_escape_string", "mysqli_real_escape_string":
-				found = true
-				return false
-			}
-		}
-		return !found
-	})
-	return found
-}
-
-// isPHPAllowlistAccess returns true if the expression is a subscript
-// expression (e.g., $allowed[$key]) which is a common allowlist pattern.
-func isPHPAllowlistAccess(n *ast.Node) bool {
-	if n == nil {
-		return false
-	}
-	return n.Type() == "subscript_expression"
 }

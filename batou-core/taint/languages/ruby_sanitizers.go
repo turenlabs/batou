@@ -21,7 +21,7 @@ func (rubyCatalog) Sanitizers() []taint.SanitizerDef {
 		{ID: "ruby.to_f", Language: rules.LangRuby, Pattern: `\.to_f\b`, ObjectType: "", MethodName: "to_f", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand}, Description: "Float conversion"},
 
 		// Path sanitization
-		{ID: "ruby.file.basename", Language: rules.LangRuby, Pattern: `File\.basename\s*\(`, ObjectType: "File", MethodName: "basename", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Filename extraction"},
+		{ID: "ruby.file.basename", Language: rules.LangRuby, Pattern: `File\.basename\s*\(`, ObjectType: "File", MethodName: "basename", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "Filename extraction (strips directory traversal)"},
 
 		// SQL sanitization
 		{ID: "ruby.activerecord.sanitize_sql", Language: rules.LangRuby, Pattern: `ActiveRecord::Base\.sanitize_sql\s*\(`, ObjectType: "ActiveRecord::Base", MethodName: "sanitize_sql", Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery}, Description: "ActiveRecord SQL sanitization"},
@@ -41,7 +41,7 @@ func (rubyCatalog) Sanitizers() []taint.SanitizerDef {
 		{ID: "ruby.nokogiri.nonet", Language: rules.LangRuby, Pattern: `Nokogiri::XML\s*\(.*NONET`, ObjectType: "Nokogiri::XML", MethodName: "XML(NONET)", Neutralizes: []taint.SinkCategory{taint.SnkDeserialize, taint.SnkURLFetch}, Description: "Nokogiri XML parsing with NONET flag (prevents XXE)"},
 
 		// ActiveStorage sanitize_filename
-		{ID: "ruby.activestorage.sanitize_filename", Language: rules.LangRuby, Pattern: `ActiveStorage::Filename\.new\s*\(.*\.sanitized`, ObjectType: "ActiveStorage::Filename", MethodName: "sanitized", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "ActiveStorage filename sanitization"},
+		{ID: "ruby.activestorage.sanitize_filename", Language: rules.LangRuby, Pattern: `ActiveStorage::Filename\.new\s*\(.*\.sanitized`, ObjectType: "ActiveStorage::Filename", MethodName: "sanitized", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "ActiveStorage filename sanitization"},
 
 		// Rack::Utils.escape_html
 		{ID: "ruby.rack.utils.escape_html", Language: rules.LangRuby, Pattern: `Rack::Utils\.escape_html\s*\(`, ObjectType: "Rack::Utils", MethodName: "escape_html", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "Rack HTML escaping"},
@@ -74,8 +74,8 @@ func (rubyCatalog) Sanitizers() []taint.SanitizerDef {
 		{ID: "ruby.liquid.auto_escape", Language: rules.LangRuby, Pattern: `Liquid::Template\.parse\s*\(.*\.render\s*\(`, ObjectType: "Liquid::Template", MethodName: "parse.render", Neutralizes: []taint.SinkCategory{taint.SnkTemplate}, Description: "Liquid safe"},
 
 		// Path sanitization
-		{ID: "ruby.pathname.cleanpath", Language: rules.LangRuby, Pattern: `Pathname\.new\s*\(.*\.cleanpath`, ObjectType: "Pathname", MethodName: "cleanpath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Pathname cleanpath"},
-		{ID: "ruby.file.expand_path", Language: rules.LangRuby, Pattern: `File\.expand_path\s*\(`, ObjectType: "File", MethodName: "expand_path", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "File.expand_path"},
+		{ID: "ruby.pathname.cleanpath", Language: rules.LangRuby, Pattern: `Pathname\.new\s*\(.*\.cleanpath`, ObjectType: "Pathname", MethodName: "cleanpath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "Pathname cleanpath (collapses .. components)"},
+		{ID: "ruby.file.expand_path", Language: rules.LangRuby, Pattern: `File\.expand_path\s*\(`, ObjectType: "File", MethodName: "expand_path", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "File.expand_path (resolves relative paths)"},
 
 		// --- Regex escaping ---
 		{
@@ -106,7 +106,7 @@ func (rubyCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `Pathname\.new\(.*\)\.realpath|\.realpath\b`,
 			ObjectType:  "Pathname",
 			MethodName:  "realpath",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Pathname realpath resolution (resolves symlinks and .. components)",
 		},
 
@@ -119,6 +119,180 @@ func (rubyCatalog) Sanitizers() []taint.SanitizerDef {
 			MethodName:  "permit",
 			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
 			Description: "Rails strong parameters permit (allowlist filtering)",
+		},
+
+		// --- CGI HTML escaping (Ruby stdlib) ---
+		{
+			ID:          "ruby.cgi.escapehtml",
+			Language:    rules.LangRuby,
+			Pattern:     `CGI\.escapeHTML\s*\(|CGI\.escape_html\s*\(`,
+			ObjectType:  "CGI",
+			MethodName:  "escapeHTML",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "CGI HTML entity escaping (Ruby stdlib)",
+		},
+
+		// --- Psych safe YAML loading (Ruby stdlib since 2.3) ---
+		{
+			ID:          "ruby.psych.safe_load",
+			Language:    rules.LangRuby,
+			Pattern:     `Psych\.safe_load\s*\(`,
+			ObjectType:  "Psych",
+			MethodName:  "safe_load",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Psych safe YAML deserialization (disables arbitrary object creation)",
+		},
+
+		// --- Oj safe mode (JSON gem) ---
+		{
+			ID:          "ruby.oj.safe_load",
+			Language:    rules.LangRuby,
+			Pattern:     `Oj\.safe_load\s*\(`,
+			ObjectType:  "Oj",
+			MethodName:  "safe_load",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Oj safe JSON loading (disables object mode deserialization)",
+		},
+		{
+			ID:          "ruby.oj.strict_load",
+			Language:    rules.LangRuby,
+			Pattern:     `Oj\.strict_load\s*\(`,
+			ObjectType:  "Oj",
+			MethodName:  "strict_load",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Oj strict JSON loading (only basic JSON types, no object creation)",
+		},
+
+		// --- ActiveRecord connection.quote ---
+		{
+			ID:          "ruby.activerecord.connection.quote",
+			Language:    rules.LangRuby,
+			Pattern:     `connection\.quote\s*\(|\.connection\.quote\s*\(`,
+			ObjectType:  "ActiveRecord::ConnectionAdapters",
+			MethodName:  "quote",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "ActiveRecord SQL value quoting",
+		},
+
+		// --- Sanitize gem (widely used HTML sanitizer) ---
+		{
+			ID:          "ruby.sanitize.fragment",
+			Language:    rules.LangRuby,
+			Pattern:     `Sanitize\.fragment\s*\(|Sanitize\.clean\s*\(`,
+			ObjectType:  "Sanitize",
+			MethodName:  "fragment/clean",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "Sanitize gem HTML sanitization (whitelist-based)",
+		},
+
+		// --- Rails strip_tags helper ---
+		{
+			ID:          "ruby.rails.strip_tags",
+			Language:    rules.LangRuby,
+			Pattern:     `strip_tags\s*\(|ActionView::Helpers::SanitizeHelper\.strip_tags\s*\(`,
+			ObjectType:  "ActionView",
+			MethodName:  "strip_tags",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "Rails strip_tags helper (removes all HTML tags)",
+		},
+
+		// --- ERB URL encoding ---
+		{
+			ID:          "ruby.erb.url_encode",
+			Language:    rules.LangRuby,
+			Pattern:     `ERB::Util\.url_encode\s*\(`,
+			ObjectType:  "ERB::Util",
+			MethodName:  "url_encode",
+			Neutralizes: []taint.SinkCategory{taint.SnkRedirect, taint.SnkURLFetch},
+			Description: "ERB URL encoding for safe URL parameter embedding",
+		},
+
+		// --- JSON serialization (prevents XSS in JSON contexts) ---
+		{
+			ID:          "ruby.json.generate",
+			Language:    rules.LangRuby,
+			Pattern:     `JSON\.generate\s*\(|\.to_json\b`,
+			ObjectType:  "JSON",
+			MethodName:  "generate/to_json",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "JSON serialization (HTML-safe output encoding)",
+		},
+
+		// --- Shellwords.join (shell-safe array joining) ---
+		{
+			ID:          "ruby.shellwords.join",
+			Language:    rules.LangRuby,
+			Pattern:     `Shellwords\.join\s*\(`,
+			ObjectType:  "Shellwords",
+			MethodName:  "join",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand},
+			Description: "Shell-safe argument array joining (escapes each element)",
+		},
+
+		// --- Rails content_tag (auto-escapes values) ---
+		{
+			ID:          "ruby.rails.content_tag",
+			Language:    rules.LangRuby,
+			Pattern:     `content_tag\s*\(`,
+			ObjectType:  "ActionView",
+			MethodName:  "content_tag",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "Rails content_tag helper (auto-escapes content)",
+		},
+
+		// --- ActiveRecord parameterized .where with placeholder ---
+		{
+			ID:          "ruby.activerecord.where.placeholder",
+			Language:    rules.LangRuby,
+			Pattern:     `\.where\s*\(\s*['"].*\?\s*['"]`,
+			ObjectType:  "ActiveRecord",
+			MethodName:  "where(?)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "ActiveRecord placeholder-based where clause (parameterized)",
+		},
+
+		// --- Rack::Utils.escape_path ---
+		{
+			ID:          "ruby.rack.utils.escape_path",
+			Language:    rules.LangRuby,
+			Pattern:     `Rack::Utils\.escape_path\s*\(`,
+			ObjectType:  "Rack::Utils",
+			MethodName:  "escape_path",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead, taint.SnkRedirect},
+			Description: "Rack path component escaping",
+		},
+
+		// --- Addressable::URI (URL validation/parsing gem) ---
+		{
+			ID:          "ruby.addressable.uri.parse",
+			Language:    rules.LangRuby,
+			Pattern:     `Addressable::URI\.parse\s*\(.*\.host|Addressable::URI\.parse\s*\(.*\.hostname`,
+			ObjectType:  "Addressable::URI",
+			MethodName:  "parse.host",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "Addressable URI hostname extraction for allowlist validation",
+		},
+
+		// --- ActiveRecord LIKE sanitization ---
+		{
+			ID:          "ruby.activerecord.sanitize_sql_like",
+			Language:    rules.LangRuby,
+			Pattern:     `sanitize_sql_like\s*\(`,
+			ObjectType:  "ActiveRecord::Base",
+			MethodName:  "sanitize_sql_like",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "ActiveRecord LIKE clause sanitization (escapes %, _, \\)",
+		},
+
+		// --- URI.encode_www_form (hash/array to query string) ---
+		{
+			ID:          "ruby.uri.encode_www_form",
+			Language:    rules.LangRuby,
+			Pattern:     `URI\.encode_www_form\s*\(`,
+			ObjectType:  "URI",
+			MethodName:  "encode_www_form",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URI query string encoding for safe URL parameter construction",
 		},
 	}
 }

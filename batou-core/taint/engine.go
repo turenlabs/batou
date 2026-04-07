@@ -1,6 +1,8 @@
 package taint
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -56,6 +58,7 @@ func compilePattern(pattern string) *regexp.Regexp {
 	if err != nil {
 		// Store nil so we don't retry invalid patterns.
 		patternCacheM[pattern] = nil
+		fmt.Fprintf(os.Stderr, "batou: taint pattern compile error: %s: %v\n", pattern, err)
 		return nil
 	}
 	patternCacheM[pattern] = re

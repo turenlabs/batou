@@ -262,6 +262,12 @@ func (r BufferOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 		{reMemcpyVar, "medium", "memcpy/memmove with variable size — verify bounds", "Validate that the size argument does not exceed the destination buffer size before calling memcpy/memmove."},
 		{reStrncpyStrlen, "high", "strncpy with strlen(src) defeats bounds checking", "Use the destination buffer size as the length argument: strncpy(dst, src, sizeof(dst) - 1)."},
 		{reReadBuf, "medium", "read/recv into buffer — ensure size matches buffer capacity", "Verify the size argument matches the actual buffer capacity and check the return value."},
+		{reStrcpy, "high", "strcpy with unbounded source — use strncpy or strlcpy", "Replace strcpy with strncpy(dst, src, sizeof(dst)-1) or strlcpy(dst, src, sizeof(dst))."},
+		{reStrcat, "high", "strcat with unbounded source — use strncat or strlcat", "Replace strcat with strncat(dst, src, sizeof(dst)-strlen(dst)-1) or strlcat(dst, src, sizeof(dst))."},
+		{reGets, "high", "gets() has no bounds checking — use fgets", "Replace gets(buf) with fgets(buf, sizeof(buf), stdin). gets() was removed in C11."},
+		{reSprintf, "medium", "sprintf with no bounds — use snprintf", "Replace sprintf(buf, fmt, ...) with snprintf(buf, sizeof(buf), fmt, ...)."},
+		{reVsprintf, "medium", "vsprintf with no bounds — use vsnprintf", "Replace vsprintf(buf, fmt, args) with vsnprintf(buf, sizeof(buf), fmt, args)."},
+		{reScanfS, "medium", "scanf with %s has no bounds — use width specifier", "Replace scanf(\"%s\", buf) with scanf(\"%Ns\", buf) where N is sizeof(buf)-1."},
 	}
 
 	for i, line := range lines {

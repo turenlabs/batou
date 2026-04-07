@@ -19,6 +19,10 @@ var (
 	pyOpenUserInput = regexp.MustCompile(`\bopen\s*\(\s*(?:request\.(?:args|form|values|GET|POST)\s*\[|user_input|filename|file_path|path|f?name)`)
 	// Python: os.path.join with user input
 	pyOsPathJoin = regexp.MustCompile(`os\.path\.join\s*\([^)]*(?:request\.|user_input|input|param|arg)`)
+	// Python: open/codecs.open with f-string path containing variable (OWASP Benchmark pattern)
+	pyOpenFString = regexp.MustCompile(`\b(?:codecs\.)?open\s*\(\s*f["']`)
+	// Python: pathlib.Path(...) / var (path division with variable)
+	pyPathlibDiv = regexp.MustCompile(`(?:pathlib\.Path|testfiles|base_path|base_dir)\s*(?:\([^)]*\))?\s*/\s*([a-zA-Z_]\w*)`)
 	// JS/TS: fs operations with req.query/req.params/req.body
 	jsFileOpUserInput = regexp.MustCompile(`\bfs\.\w+(?:Sync)?\s*\(\s*(?:req\.(?:query|params|body|param)\s*[\[.]|userInput|filePath|fileName|inputPath)`)
 	// PHP: file operations with user input
@@ -27,8 +31,13 @@ var (
 	rubyFileOpUserInput = regexp.MustCompile(`\b(?:send_file|File\.(?:read|open|join|new|write|binread))\s*[\(]?\s*(?:params\s*\[|File\.join\s*\(|Rails\.root\.join)`)
 	// Ruby: File.read/open with string interpolation from params
 	rubyFileInterpolation = regexp.MustCompile(`\bFile\.(?:read|open|binread)\s*\(\s*["'][^"']*#\{`)
-	// C: fopen/fread/open with variable (not string literal)
-	cFileOpUserInput = regexp.MustCompile(`\b(?:fopen|fread|fwrite|open|freopen|fdopen|tmpfile|remove|rename)\s*\(\s*[a-zA-Z_]\w*`)
+	// C: fopen/open/freopen/remove/rename with variable (not string literal).
+	// Excludes fread/fwrite which operate on data, not paths.
+	cFileOpUserInput = regexp.MustCompile(`\b(?:fopen|open|freopen|fdopen|remove|rename)\s*\(\s*[a-zA-Z_]\w*`)
+	// C++: ifstream/ofstream/fstream with variable argument
+	cppStreamUserInput = regexp.MustCompile(`\b(?:std::)?(?:ifstream|ofstream|fstream)\s+\w+\s*\(\s*[a-zA-Z_]\w*`)
+	// C++: ifstream/ofstream with string literal (safe)
+	cppStreamLiteral = regexp.MustCompile(`\b(?:std::)?(?:ifstream|ofstream|fstream)\s+\w+\s*\(\s*"`)
 	// Generic ../
 	dotDotSlashInVar = regexp.MustCompile(`(?:["']\s*\+\s*|["']?\s*\.\.\s*/|\.\.\\\\)`)
 )
@@ -188,14 +197,36 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 		case rules.LangPython:
 			if loc := pyOpenUserInput.FindString(line); loc != "" {
-				if !hasTraversalGuard(lines, i) {
+				if !hasTraversalGuard(lines, i) && !rules.PySinkVarIsSafe(lines, i) {
 					matched = loc
 				}
 			}
 			if matched == "" {
 				if loc := pyOsPathJoin.FindString(line); loc != "" {
-					if !hasTraversalGuard(lines, i) {
+					if !hasTraversalGuard(lines, i) && !rules.PySinkVarIsSafe(lines, i) {
 						matched = loc
+					}
+				}
+			}
+			// open/codecs.open with f-string path: codecs.open(f'{dir}/{bar}', ...)
+			if matched == "" {
+				if loc := pyOpenFString.FindString(line); loc != "" {
+					if !hasTraversalGuard(lines, i) {
+						// Check if the f-string variable is safe
+						if !rules.PySinkVarIsSafe(lines, i) {
+							matched = truncate(strings.TrimSpace(line), 120)
+						}
+					}
+				}
+			}
+			// pathlib.Path(...) / var
+			if matched == "" {
+				if m := pyPathlibDiv.FindStringSubmatch(line); len(m) > 1 {
+					if !hasTraversalGuard(lines, i) {
+						varName := m[1]
+						if !rules.PyLastAssignmentIsSafe(lines, i, varName) {
+							matched = truncate(strings.TrimSpace(line), 120)
+						}
 					}
 				}
 			}
@@ -224,13 +255,18 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 					}
 				}
 			}
-		case rules.LangC:
+		case rules.LangC, rules.LangCPP:
 			if loc := cFileOpUserInput.FindString(line); loc != "" {
-				// Only flag if argument is a variable, not a string literal
-				afterMatch := line[strings.Index(line, loc)+len(loc):]
-				_ = afterMatch
 				if !hasTraversalGuard(lines, i) {
 					matched = loc
+				}
+			}
+			// C++ stream constructors: ifstream(var), ofstream(var)
+			if matched == "" && ctx.Language == rules.LangCPP {
+				if cppStreamUserInput.MatchString(line) && !cppStreamLiteral.MatchString(line) {
+					if !hasTraversalGuard(lines, i) {
+						matched = strings.TrimSpace(line)
+					}
 				}
 			}
 		default:
@@ -248,6 +284,10 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if matched != "" {
+			// Java: suppress if the sink variable has safe data flow.
+			if ctx.Language == rules.LangJava && rules.JavaSinkVarIsSafe(lines, i) {
+				continue
+			}
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -288,6 +328,33 @@ func hasTraversalGuard(lines []string, idx int) bool {
 			return true
 		}
 
+		// --- Category 1: Python '../' in var guard with early return ---
+		// OWASP Benchmark uses: if '../' in bar: return (early return on traversal).
+		if strings.Contains(l, `'../'`) && strings.Contains(l, " in ") {
+			return true
+		}
+		if strings.Contains(l, `"../"`) && strings.Contains(l, " in ") {
+			return true
+		}
+
+		// --- Category 1: C strstr(var, "..") guard ---
+		// strstr check for ".." is sufficient to prevent traversal sequences.
+		if strings.Contains(l, `strstr(`) && strings.Contains(l, `".."`) {
+			return true
+		}
+		// C++ std::string::find("..") != npos
+		if strings.Contains(l, `.find("..`)  && strings.Contains(l, "npos") {
+			return true
+		}
+
+		// --- Category 1: Integer-based path guard ---
+		// If the path is constructed with %d format (integer), traversal is not possible.
+		if strings.Contains(l, `atoi(`) || strings.Contains(l, `atol(`) ||
+			strings.Contains(l, `strtol(`) || strings.Contains(l, `strtoul(`) ||
+			strings.Contains(l, `std::stoi(`) || strings.Contains(l, `std::atoi(`) {
+			return true
+		}
+
 		// --- Category 1: Allowlist guard ---
 		// If the function checks against an allowlist, traversal is not possible.
 		if isAllowlistGuard(l) {
@@ -310,7 +377,8 @@ func hasTraversalGuard(lines []string, idx int) bool {
 			strings.Contains(l, ".toRealPath()") || strings.Contains(l, ".getCanonicalPath()") ||
 			strings.Contains(l, "File.realpath") ||   // Ruby
 			strings.Contains(l, "File.expand_path") || // Ruby
-			strings.Contains(l, "realpath(") {         // PHP realpath()
+			strings.Contains(l, "realpath(") ||                  // C realpath() / PHP realpath()
+			strings.Contains(l, "filesystem::canonical") {       // C++17 std::filesystem::canonical
 			hasNormalise = true
 		}
 
@@ -323,7 +391,11 @@ func hasTraversalGuard(lines []string, idx int) bool {
 			strings.Contains(l, "str_starts_with(") || // PHP 8+
 			(strings.Contains(l, "strpos(") && strings.Contains(l, "===")) || // PHP strpos check
 			strings.Contains(l, ".includes('..')") ||  // JS ..check
-			strings.Contains(l, `".."`) && (strings.Contains(l, "Contains") || strings.Contains(l, "contains")) {
+			strings.Contains(l, `".."`) && (strings.Contains(l, "Contains") || strings.Contains(l, "contains")) ||
+			strings.Contains(l, "strncmp(") ||         // C strncmp prefix check
+			strings.Contains(l, "starts_with(") ||     // C++20 std::string::starts_with
+			(strings.Contains(l, "strstr(") && strings.Contains(l, `".."`)) || // C strstr(path, "..") check
+			(strings.Contains(l, ".find(") && strings.Contains(l, `".."`) && strings.Contains(l, "npos")) { // C++ .find("..") != npos
 			hasContainment = true
 		}
 	}

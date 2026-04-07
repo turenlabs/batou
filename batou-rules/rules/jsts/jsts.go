@@ -1351,7 +1351,7 @@ func (r *FsPermissiveModes) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 func init() {
 	rules.Register(&PostMessageNoOrigin{})
-	rules.Register(&DOMClobberingRisk{})
+	// rules.Register(&DOMClobberingRisk{}) // Removed: low-value noise rule
 	rules.Register(&RegexDoS{})
 	rules.Register(&ExecShellInjection{})
 	rules.Register(&EvalTemplateLiteral{})

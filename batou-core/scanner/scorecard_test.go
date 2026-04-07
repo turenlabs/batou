@@ -209,14 +209,14 @@ func TestProductSecurityScorecard(t *testing.T) {
 	sb.WriteString("├──────────────────────┬──────────────┬───────────────────────────┤\n")
 	sb.WriteString("│  Metric              │  Batou+Claude │  Vanilla Claude Code      │\n")
 	sb.WriteString("├──────────────────────┼──────────────┼───────────────────────────┤\n")
-	sb.WriteString(fmt.Sprintf("│  Blocked (Critical)  │  %3d/%d %4.0f%% │  0/%d   0%%  (no scanner)  │\n",
-		blocked, totalVuln, pct(blocked, totalVuln), totalVuln))
-	sb.WriteString(fmt.Sprintf("│  Warned  (High+)     │  %3d/%d %4.0f%% │  0/%d   0%%                │\n",
-		warned, totalVuln, pct(warned, totalVuln), totalVuln))
-	sb.WriteString(fmt.Sprintf("│  Detected (Any)      │  %3d/%d %4.0f%% │  0/%d   0%%                │\n",
-		detected, totalVuln, pct(detected, totalVuln), totalVuln))
-	sb.WriteString(fmt.Sprintf("│  Pass-through        │  %3d/%d %4.0f%% │  %d/%d 100%%  (all pass)    │\n",
-		passthrough, totalVuln, pct(passthrough, totalVuln), totalVuln, totalVuln))
+	fmt.Fprintf(&sb, "│  Blocked (Critical)  │  %3d/%d %4.0f%% │  0/%d   0%%  (no scanner)  │\n",
+		blocked, totalVuln, pct(blocked, totalVuln), totalVuln)
+	fmt.Fprintf(&sb, "│  Warned  (High+)     │  %3d/%d %4.0f%% │  0/%d   0%%                │\n",
+		warned, totalVuln, pct(warned, totalVuln), totalVuln)
+	fmt.Fprintf(&sb, "│  Detected (Any)      │  %3d/%d %4.0f%% │  0/%d   0%%                │\n",
+		detected, totalVuln, pct(detected, totalVuln), totalVuln)
+	fmt.Fprintf(&sb, "│  Pass-through        │  %3d/%d %4.0f%% │  %d/%d 100%%  (all pass)    │\n",
+		passthrough, totalVuln, pct(passthrough, totalVuln), totalVuln, totalVuln)
 	sb.WriteString("└──────────────────────┴──────────────┴───────────────────────────┘\n")
 	sb.WriteString("\n")
 
@@ -225,10 +225,10 @@ func TestProductSecurityScorecard(t *testing.T) {
 	sb.WriteString("├──────────────────────┬──────────────┬───────────────────────────┤\n")
 	sb.WriteString("│  Metric              │  Batou+Claude │  Vanilla Claude Code      │\n")
 	sb.WriteString("├──────────────────────┼──────────────┼───────────────────────────┤\n")
-	sb.WriteString(fmt.Sprintf("│  False positives     │  %3d/%d %4.0f%% │  0/%d   0%%  (no scanner)  │\n",
-		safeFPs, totalSafe, pct(safeFPs, totalSafe), totalSafe))
-	sb.WriteString(fmt.Sprintf("│  Safe code blocked   │  %3d/%d %4.0f%% │  0/%d   0%%                │\n",
-		safeBlocked, totalSafe, pct(safeBlocked, totalSafe), totalSafe))
+	fmt.Fprintf(&sb, "│  False positives     │  %3d/%d %4.0f%% │  0/%d   0%%  (no scanner)  │\n",
+		safeFPs, totalSafe, pct(safeFPs, totalSafe), totalSafe)
+	fmt.Fprintf(&sb, "│  Safe code blocked   │  %3d/%d %4.0f%% │  0/%d   0%%                │\n",
+		safeBlocked, totalSafe, pct(safeBlocked, totalSafe), totalSafe)
 	sb.WriteString("└──────────────────────┴──────────────┴───────────────────────────┘\n")
 	sb.WriteString("\n")
 
@@ -268,8 +268,8 @@ func TestProductSecurityScorecard(t *testing.T) {
 		if len(label) > 8 {
 			label = label[:8]
 		}
-		sb.WriteString(fmt.Sprintf("│  %-8s│  %3d  │   %3d   │   %3d  │    %3d   │     %4.0f%%      │\n",
-			label, st.total, st.blocked, st.warned, st.detected, pct(st.detected, st.total)))
+		fmt.Fprintf(&sb, "│  %-8s│  %3d  │   %3d   │   %3d  │    %3d   │     %4.0f%%      │\n",
+			label, st.total, st.blocked, st.warned, st.detected, pct(st.detected, st.total))
 	}
 	sb.WriteString("└──────────┴───────┴─────────┴────────┴──────────┴────────────────┘\n")
 	sb.WriteString("\n")
@@ -293,9 +293,9 @@ func TestProductSecurityScorecard(t *testing.T) {
 		if st.safeTotal == 0 {
 			fpLabel = "n/a"
 		}
-		sb.WriteString(fmt.Sprintf("│  %-10s│  %3d  │   %3d   │   %3d  │   %3d %3.0f%% │ %-12s │\n",
+		fmt.Fprintf(&sb, "│  %-10s│  %3d  │   %3d   │   %3d  │   %3d %3.0f%% │ %-12s │\n",
 			lang, st.vulnTotal, st.vulnBlocked, st.vulnWarned, st.vulnDetected,
-			pct(st.vulnDetected, st.vulnTotal), fpLabel))
+			pct(st.vulnDetected, st.vulnTotal), fpLabel)
 	}
 	sb.WriteString("└────────────┴───────┴─────────┴────────┴──────────┴──────────────┘\n")
 	sb.WriteString("\n")
@@ -305,16 +305,16 @@ func TestProductSecurityScorecard(t *testing.T) {
 	sb.WriteString("│  NET SECURITY UPLIFT                                            │\n")
 	sb.WriteString("├─────────────────────────────────────────────────────────────────┤\n")
 	vulnCaught := blocked + (warned - blocked)
-	sb.WriteString(fmt.Sprintf("│  Vulnerabilities blocked before write:  %d/%d (%.0f%%)             │\n",
-		blocked, totalVuln, pct(blocked, totalVuln)))
-	sb.WriteString(fmt.Sprintf("│  Vulnerabilities warned + self-heal:    %d/%d (%.0f%%)             │\n",
-		warned, totalVuln, pct(warned, totalVuln)))
-	sb.WriteString(fmt.Sprintf("│  Total vulns with intervention:         %d/%d (%.0f%%)             │\n",
-		detected, totalVuln, pct(detected, totalVuln)))
+	fmt.Fprintf(&sb, "│  Vulnerabilities blocked before write:  %d/%d (%.0f%%)             │\n",
+		blocked, totalVuln, pct(blocked, totalVuln))
+	fmt.Fprintf(&sb, "│  Vulnerabilities warned + self-heal:    %d/%d (%.0f%%)             │\n",
+		warned, totalVuln, pct(warned, totalVuln))
+	fmt.Fprintf(&sb, "│  Total vulns with intervention:         %d/%d (%.0f%%)             │\n",
+		detected, totalVuln, pct(detected, totalVuln))
 	_ = vulnCaught
 	if passthrough > 0 {
-		sb.WriteString(fmt.Sprintf("│  Remaining gaps:                        %d/%d (%.0f%%)             │\n",
-			passthrough, totalVuln, pct(passthrough, totalVuln)))
+		fmt.Fprintf(&sb, "│  Remaining gaps:                        %d/%d (%.0f%%)             │\n",
+			passthrough, totalVuln, pct(passthrough, totalVuln))
 	}
 	sb.WriteString("├─────────────────────────────────────────────────────────────────┤\n")
 
@@ -327,8 +327,8 @@ func TestProductSecurityScorecard(t *testing.T) {
 	if precision+recall > 0 {
 		f1 = 2 * precision * recall / (precision + recall)
 	}
-	sb.WriteString(fmt.Sprintf("│  Precision: %.0f%%   Recall: %.0f%%   F1: %.0f%%                       │\n",
-		precision, recall, f1))
+	fmt.Fprintf(&sb, "│  Precision: %.0f%%   Recall: %.0f%%   F1: %.0f%%                       │\n",
+		precision, recall, f1)
 	sb.WriteString("└─────────────────────────────────────────────────────────────────┘\n")
 
 	// Missed vulnerabilities
@@ -340,9 +340,9 @@ func TestProductSecurityScorecard(t *testing.T) {
 	}
 	if len(missed) > 0 {
 		sb.WriteString("\n")
-		sb.WriteString(fmt.Sprintf("--- Missed Vulnerabilities (%d) ---\n", len(missed)))
+		fmt.Fprintf(&sb, "--- Missed Vulnerabilities (%d) ---\n", len(missed))
 		for _, vr := range missed {
-			sb.WriteString(fmt.Sprintf("  MISS: [%s] %s/%s\n", vr.owasp, vr.fixture.Lang, vr.fixture.FileName))
+			fmt.Fprintf(&sb, "  MISS: [%s] %s/%s\n", vr.owasp, vr.fixture.Lang, vr.fixture.FileName)
 		}
 	}
 
@@ -355,7 +355,7 @@ func TestProductSecurityScorecard(t *testing.T) {
 	}
 	if len(blockedSafe) > 0 {
 		sb.WriteString("\n")
-		sb.WriteString(fmt.Sprintf("--- Incorrectly Blocked Safe Code (%d) ---\n", len(blockedSafe)))
+		fmt.Fprintf(&sb, "--- Incorrectly Blocked Safe Code (%d) ---\n", len(blockedSafe))
 		for _, sr := range blockedSafe {
 			var criticals []string
 			for _, f := range sr.findings {
@@ -363,8 +363,8 @@ func TestProductSecurityScorecard(t *testing.T) {
 					criticals = append(criticals, fmt.Sprintf("%s L%d", f.RuleID, f.LineNumber))
 				}
 			}
-			sb.WriteString(fmt.Sprintf("  BLOCK: %s/%s  rules: %s\n",
-				sr.fixture.Lang, sr.fixture.FileName, strings.Join(criticals, ", ")))
+			fmt.Fprintf(&sb, "  BLOCK: %s/%s  rules: %s\n",
+				sr.fixture.Lang, sr.fixture.FileName, strings.Join(criticals, ", "))
 		}
 	}
 

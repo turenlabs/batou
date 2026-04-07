@@ -104,6 +104,11 @@ func (r *URLFromUserInput) Description() string {
 }
 
 func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Browser sandbox prevents SSRF — suppress for frontend JS.
+	if rules.IsFrontendJS(ctx) {
+		return nil
+	}
+
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -445,6 +450,9 @@ func (r *DNSRebinding) Description() string {
 }
 
 func (r *DNSRebinding) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if rules.IsFrontendJS(ctx) {
+		return nil
+	}
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 
@@ -525,6 +533,9 @@ func (r *RedirectFollowing) Description() string {
 }
 
 func (r *RedirectFollowing) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if rules.IsFrontendJS(ctx) {
+		return nil
+	}
 	var findings []rules.Finding
 	lines := strings.Split(ctx.Content, "\n")
 

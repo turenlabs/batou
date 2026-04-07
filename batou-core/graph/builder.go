@@ -98,16 +98,6 @@ func buildGoNodes(cg *CallGraph, filePath string, content string, parsed *astflo
 			continue
 		}
 
-		// Extract parameters.
-		var params []string
-		if funcDecl.Type.Params != nil {
-			for _, field := range funcDecl.Type.Params.List {
-				for _, name := range field.Names {
-					params = append(params, name.Name)
-				}
-			}
-		}
-
 		node := &FuncNode{
 			ID:          id,
 			FilePath:    filePath,

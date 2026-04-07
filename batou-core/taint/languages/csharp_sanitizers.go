@@ -83,7 +83,7 @@ func (c *CSharpCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `Path\.GetFileName\(`,
 			ObjectType:  "System.IO.Path",
 			MethodName:  "Path.GetFileName",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Extract filename only (strips directory traversal)",
 		},
 
@@ -94,7 +94,7 @@ func (c *CSharpCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `int\.Parse\(|int\.TryParse\(|Int32\.Parse\(|Int32\.TryParse\(|Convert\.ToInt32\(`,
 			ObjectType:  "System.Int32",
 			MethodName:  "int.Parse/TryParse",
-			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Integer parsing restricts to numeric values",
 		},
 
@@ -140,6 +140,26 @@ func (c *CSharpCatalog) Sanitizers() []taint.SanitizerDef {
 			MethodName:  "Url.IsLocalUrl",
 			Neutralizes: []taint.SinkCategory{taint.SnkRedirect},
 			Description: "URL validation ensuring local-only redirects (open redirect prevention)",
+		},
+		{
+			ID:          "csharp.controller.localredirect",
+			Language:    rules.LangCSharp,
+			Pattern:     `LocalRedirect\s*\(|LocalRedirectPermanent\s*\(`,
+			ObjectType:  "Controller",
+			MethodName:  "LocalRedirect/LocalRedirectPermanent",
+			Neutralizes: []taint.SinkCategory{taint.SnkRedirect},
+			Description: "ASP.NET LocalRedirect restricts to local URLs (prevents open redirect)",
+		},
+
+		// --- Trust boundary validation ---
+		{
+			ID:          "csharp.modelstate.isvalid",
+			Language:    rules.LangCSharp,
+			Pattern:     `ModelState\.IsValid|TryValidateModel\(`,
+			ObjectType:  "ModelStateDictionary",
+			MethodName:  "ModelState.IsValid/TryValidateModel",
+			Neutralizes: []taint.SinkCategory{taint.SnkTrustBoundary},
+			Description: "Model validation before storing in session/TempData (trust boundary protection)",
 		},
 
 		// --- Cryptographic sanitizers ---
@@ -202,7 +222,7 @@ func (c *CSharpCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `Path\.GetFullPath\s*\(`,
 			ObjectType:  "System.IO.Path",
 			MethodName:  "Path.GetFullPath",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Full path resolution for traversal detection",
 		},
 
@@ -257,7 +277,7 @@ func (c *CSharpCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `Path\.GetFullPath\s*\(.*Path\.Combine`,
 			ObjectType:  "Path",
 			MethodName:  "GetFullPath+Combine",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Full path resolution combined with path combination",
 		},
 
@@ -270,6 +290,242 @@ func (c *CSharpCatalog) Sanitizers() []taint.SanitizerDef {
 			MethodName:  "Parse",
 			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
 			Description: "Floating-point parsing (restricts to numeric values)",
+		},
+
+		// --- Entity Framework Core parameterized queries ---
+		{
+			ID:          "csharp.efcore.linq",
+			Language:    rules.LangCSharp,
+			Pattern:     `\.(Where|Select|OrderBy|GroupBy|Join)\(`,
+			ObjectType:  "IQueryable",
+			MethodName:  "Where/Select/OrderBy/GroupBy/Join",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "LINQ queries are automatically parameterized by EF Core",
+		},
+
+		// --- Dapper parameterized queries ---
+		{
+			ID:          "csharp.dapper.parameterized",
+			Language:    rules.LangCSharp,
+			Pattern:     `\.(Query|Execute)\([^,]+,\s*new\s*\{`,
+			ObjectType:  "IDbConnection (Dapper)",
+			MethodName:  "Query/Execute with params",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Dapper query with anonymous object parameters (parameterized)",
+		},
+		{
+			ID:          "csharp.dapper.dynamicparams",
+			Language:    rules.LangCSharp,
+			Pattern:     `new\s+DynamicParameters\(`,
+			ObjectType:  "DynamicParameters",
+			MethodName:  "DynamicParameters",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Dapper DynamicParameters binding (parameterized)",
+		},
+
+		// --- Safe deserialization ---
+		{
+			ID:          "csharp.serializationbinder",
+			Language:    rules.LangCSharp,
+			Pattern:     `SerializationBinder|ISerializationBinder|\.Binder\s*=|KnownTypesBinder`,
+			ObjectType:  "SerializationBinder",
+			MethodName:  "SerializationBinder/ISerializationBinder",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Custom SerializationBinder restricts allowed types during deserialization",
+		},
+		{
+			ID:          "csharp.json.contractresolver.safe",
+			Language:    rules.LangCSharp,
+			Pattern:     `TypeNameHandling\s*=\s*TypeNameHandling\.None|SerializationBinder\s*=`,
+			ObjectType:  "JsonSerializerSettings",
+			MethodName:  "TypeNameHandling.None + Binder",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Safe JSON deserialization settings (TypeNameHandling.None or custom binder)",
+		},
+		{
+			ID:          "csharp.system.text.json",
+			Language:    rules.LangCSharp,
+			Pattern:     `System\.Text\.Json\.JsonSerializer\.Deserialize|JsonSerializer\.Deserialize<`,
+			ObjectType:  "System.Text.Json",
+			MethodName:  "System.Text.Json.JsonSerializer",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "System.Text.Json is safe by default (no polymorphic deserialization without explicit opt-in)",
+		},
+
+		// --- Assembly loading validation ---
+		{
+			ID:          "csharp.assembly.strongname",
+			Language:    rules.LangCSharp,
+			Pattern:     `AssemblyName.*PublicKeyToken|StrongNameSignatureVerification`,
+			ObjectType:  "AssemblyName",
+			MethodName:  "PublicKeyToken/StrongName",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval},
+			Description: "Assembly strong name validation prevents loading untrusted assemblies",
+		},
+
+		// --- Log injection prevention (CWE-117) ---
+		{
+			ID:          "csharp.serilog.structured",
+			Language:    rules.LangCSharp,
+			Pattern:     `Log\.(Information|Warning|Error|Debug|Fatal|Verbose)\s*\(\s*"[^"]*\{`,
+			ObjectType:  "Serilog.ILogger",
+			MethodName:  "Log.Information/Warning/Error",
+			Neutralizes: []taint.SinkCategory{taint.SnkLog},
+			Description: "Serilog structured logging with message template placeholders",
+		},
+		{
+			ID:          "csharp.nlog.structured",
+			Language:    rules.LangCSharp,
+			Pattern:     `logger\.(Info|Warn|Error|Debug|Trace|Fatal)\s*\(\s*"[^"]*\{`,
+			ObjectType:  "NLog.ILogger",
+			MethodName:  "logger.Info/Warn/Error",
+			Neutralizes: []taint.SinkCategory{taint.SnkLog},
+			Description: "NLog structured logging with message template placeholders",
+		},
+		{
+			ID:          "csharp.ilogger.structured",
+			Language:    rules.LangCSharp,
+			Pattern:     `_logger\.Log(Information|Warning|Error|Debug|Critical)\s*\(\s*"[^"]*\{`,
+			ObjectType:  "ILogger",
+			MethodName:  "_logger.LogInformation/Warning/Error",
+			Neutralizes: []taint.SinkCategory{taint.SnkLog},
+			Description: "Microsoft.Extensions.Logging structured logging with template placeholders",
+		},
+		{
+			ID:          "csharp.string.replace.crlf",
+			Language:    rules.LangCSharp,
+			Pattern:     `\.Replace\s*\(\s*"\\r"\s*,|\.Replace\s*\(\s*"\\n"\s*,`,
+			ObjectType:  "string",
+			MethodName:  "Replace (CRLF removal)",
+			Neutralizes: []taint.SinkCategory{taint.SnkLog, taint.SnkHeader},
+			Description: "String CRLF removal to prevent log/header injection",
+		},
+
+		// --- SSRF prevention (CWE-918) ---
+		{
+			ID:          "csharp.uri.trycreate",
+			Language:    rules.LangCSharp,
+			Pattern:     `Uri\.TryCreate\s*\(`,
+			ObjectType:  "System.Uri",
+			MethodName:  "Uri.TryCreate",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URI validation via TryCreate (validates URL structure)",
+		},
+		{
+			ID:          "csharp.uri.escapedatastring",
+			Language:    rules.LangCSharp,
+			Pattern:     `Uri\.EscapeDataString\s*\(`,
+			ObjectType:  "System.Uri",
+			MethodName:  "Uri.EscapeDataString",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URI component escaping to prevent URL injection",
+		},
+		{
+			ID:          "csharp.ipaddress.tryparse",
+			Language:    rules.LangCSharp,
+			Pattern:     `IPAddress\.TryParse\s*\(`,
+			ObjectType:  "System.Net.IPAddress",
+			MethodName:  "IPAddress.TryParse",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch},
+			Description: "IP address validation for SSRF prevention",
+		},
+
+		// --- Deserialization safety ---
+		{
+			ID:          "csharp.xmldoc.resolver.null",
+			Language:    rules.LangCSharp,
+			Pattern:     `XmlResolver\s*=\s*null`,
+			ObjectType:  "XmlDocument/XmlReaderSettings",
+			MethodName:  "XmlResolver = null",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "XML resolver disabled to prevent XXE attacks",
+		},
+		{
+			ID:          "csharp.xdocument.parse",
+			Language:    rules.LangCSharp,
+			Pattern:     `XDocument\.Parse\s*\(|XDocument\.Load\s*\(`,
+			ObjectType:  "System.Xml.Linq.XDocument",
+			MethodName:  "XDocument.Parse/Load",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "XDocument is safe by default (ignores DTDs)",
+		},
+		{
+			ID:          "csharp.jsondocument.parse",
+			Language:    rules.LangCSharp,
+			Pattern:     `JsonDocument\.Parse\s*\(`,
+			ObjectType:  "System.Text.Json.JsonDocument",
+			MethodName:  "JsonDocument.Parse",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "JsonDocument safe read-only JSON parsing (no deserialization)",
+		},
+
+		// --- JavaScript encoding (XSS in JS contexts) ---
+		{
+			ID:          "csharp.jsencoder.encode",
+			Language:    rules.LangCSharp,
+			Pattern:     `JavaScriptEncoder\.Default\.Encode\s*\(|JavaScriptEncoder\.Create\s*\(`,
+			ObjectType:  "System.Text.Encodings.Web.JavaScriptEncoder",
+			MethodName:  "JavaScriptEncoder.Encode",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkTemplate},
+			Description: "JavaScript encoding to prevent XSS in JS contexts",
+		},
+
+		// --- Type-safe parsing (converts to non-injectable types) ---
+		{
+			ID:          "csharp.guid.parse",
+			Language:    rules.LangCSharp,
+			Pattern:     `Guid\.Parse\s*\(|Guid\.TryParse\s*\(`,
+			ObjectType:  "System.Guid",
+			MethodName:  "Guid.Parse/TryParse",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite, taint.SnkFileRead, taint.SnkLDAP},
+			Description: "GUID parsing restricts to UUID format (non-injectable)",
+		},
+		{
+			ID:          "csharp.enum.parse",
+			Language:    rules.LangCSharp,
+			Pattern:     `Enum\.TryParse\s*[<(]|Enum\.Parse\s*[<(]`,
+			ObjectType:  "System.Enum",
+			MethodName:  "Enum.Parse/TryParse",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Enum parsing restricts to predefined values",
+		},
+		{
+			ID:          "csharp.bool.parse",
+			Language:    rules.LangCSharp,
+			Pattern:     `bool\.Parse\s*\(|bool\.TryParse\s*\(|Boolean\.TryParse\s*\(`,
+			ObjectType:  "System.Boolean",
+			MethodName:  "bool.Parse/TryParse",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Boolean parsing restricts to true/false values",
+		},
+		{
+			ID:          "csharp.datetime.parse",
+			Language:    rules.LangCSharp,
+			Pattern:     `DateTime\.TryParse\s*\(|DateTime\.Parse\s*\(|DateTimeOffset\.TryParse\s*\(`,
+			ObjectType:  "System.DateTime",
+			MethodName:  "DateTime.Parse/TryParse",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "DateTime parsing restricts to date format (non-injectable)",
+		},
+		{
+			ID:          "csharp.long.parse",
+			Language:    rules.LangCSharp,
+			Pattern:     `long\.Parse\s*\(|long\.TryParse\s*\(|Int64\.Parse\s*\(|Int64\.TryParse\s*\(`,
+			ObjectType:  "System.Int64",
+			MethodName:  "long.Parse/TryParse",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkFileWrite, taint.SnkFileRead},
+			Description: "Long integer parsing restricts to numeric values",
+		},
+
+		// --- SecurityElement.Escape for XML ---
+		{
+			ID:          "csharp.securityelement.escape",
+			Language:    rules.LangCSharp,
+			Pattern:     `SecurityElement\.Escape\s*\(`,
+			ObjectType:  "System.Security.SecurityElement",
+			MethodName:  "SecurityElement.Escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize, taint.SnkXPath},
+			Description: "XML special character escaping",
 		},
 	}
 }

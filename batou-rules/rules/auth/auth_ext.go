@@ -63,7 +63,7 @@ func init() {
 	rules.Register(&MissingRateLimit{})
 	rules.Register(&TimingAttackComparison{})
 	rules.Register(&HardcodedAdminCreds{})
-	rules.Register(&MissingCSRF{})
+	// rules.Register(&MissingCSRF{}) // Removed: low-value noise rule
 	rules.Register(&AuthBypassParam{})
 	rules.Register(&BrokenAccessControl{})
 	rules.Register(&InsecurePasswordReset{})
@@ -260,6 +260,12 @@ func (r *MissingCSRF) Languages() []rules.Language {
 }
 
 func (r *MissingCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// JWT Bearer token auth is transmitted via Authorization header, not
+	// cookies, so it is inherently immune to CSRF.
+	if reJWTBearerAuth.MatchString(ctx.Content) {
+		return nil
+	}
+
 	hasCSRF := reExtCSRFToken.MatchString(ctx.Content)
 	if hasCSRF {
 		return nil
@@ -489,9 +495,7 @@ func (r *MissingMFA) Scan(ctx *rules.ScanContext) []rules.Finding {
 			// Only flag route definitions, not variable names
 			if strings.Contains(line, "(") && (strings.Contains(line, "/") || strings.Contains(line, "def ") || strings.Contains(line, "func ")) {
 				matched := m
-				if len(matched) > 120 {
-					matched = matched[:120] + "..."
-				}
+				_ = matched // used below in Finding
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),

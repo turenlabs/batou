@@ -50,10 +50,9 @@ func TestAssignBaseConfidenceScore_AST(t *testing.T) {
 func TestAssignBaseConfidenceScore_Taint(t *testing.T) {
 	// Taint findings already have a score set — preserve it.
 	f := rules.Finding{
-		RuleID:           "BATOU-TAINT-sqli",
-		Tags:             []string{"taint-analysis", "dataflow"},
-		ConfidenceScore:  0.85,
-		ConfidencePreset: true,
+		RuleID:          "BATOU-TAINT-sqli",
+		Tags:            []string{"taint-analysis", "dataflow"},
+		ConfidenceScore: 0.85,
 	}
 	AssignBaseConfidenceScore(&f)
 	if f.ConfidenceScore != 0.85 {
@@ -64,10 +63,9 @@ func TestAssignBaseConfidenceScore_Taint(t *testing.T) {
 func TestAssignBaseConfidenceScore_Interproc(t *testing.T) {
 	// Interprocedural findings already have ConfidenceScore set at creation.
 	f := rules.Finding{
-		RuleID:           "BATOU-INTERPROC-SQLI",
-		Tags:             []string{"interprocedural", "taint-analysis"},
-		ConfidenceScore:  0.8,
-		ConfidencePreset: true,
+		RuleID:          "BATOU-INTERPROC-SQLI",
+		Tags:            []string{"interprocedural", "taint-analysis"},
+		ConfidenceScore: 0.8,
 	}
 	AssignBaseConfidenceScore(&f)
 	if f.ConfidenceScore != 0.8 {

@@ -50,7 +50,7 @@ func (cppCatalog) Sanitizers() []taint.SanitizerDef {
 		{ID: "cpp.crow.mustache", Language: rules.LangCPP, Pattern: `crow::mustache::`, ObjectType: "crow::mustache", MethodName: "mustache", Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput}, Description: "Crow Mustache template engine (auto-escapes by default)"},
 
 		// ── Path sanitization ─────────────────────────────────────────
-		{ID: "cpp.basename", Language: rules.LangCPP, Pattern: `\bbasename\s*\(`, ObjectType: "", MethodName: "basename", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "Strip directory component from path (prevents traversal)"},
+		{ID: "cpp.basename", Language: rules.LangCPP, Pattern: `\bbasename\s*\(`, ObjectType: "", MethodName: "basename", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "Strip directory component from path (prevents traversal)"},
 
 		// ── Crypto sanitizers ─────────────────────────────────────────
 		{ID: "cpp.openssl.rand.bytes", Language: rules.LangCPP, Pattern: `RAND_bytes\s*\(`, ObjectType: "OpenSSL", MethodName: "RAND_bytes", Neutralizes: []taint.SinkCategory{taint.SnkCrypto}, Description: "OpenSSL cryptographically secure random bytes"},
@@ -69,8 +69,8 @@ func (cppCatalog) Sanitizers() []taint.SanitizerDef {
 		{ID: "cpp.lock_guard", Language: rules.LangCPP, Pattern: `std::lock_guard\s*<|std::scoped_lock\s*<|std::unique_lock\s*<`, ObjectType: "std", MethodName: "lock_guard/scoped_lock", Neutralizes: []taint.SinkCategory{taint.SnkCommand}, Description: "RAII lock guard prevents data races"},
 
 		// ── Path canonicalization ─────────────────────────────────────
-		{ID: "cpp.realpath", Language: rules.LangCPP, Pattern: `\brealpath\s*\(`, ObjectType: "", MethodName: "realpath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "POSIX realpath resolves symlinks and normalizes path (prevents traversal)"},
-		{ID: "cpp.std.filesystem.canonical", Language: rules.LangCPP, Pattern: `std::filesystem::canonical\s*\(|std::filesystem::weakly_canonical\s*\(`, ObjectType: "std::filesystem", MethodName: "canonical/weakly_canonical", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite}, Description: "C++17 filesystem canonical path resolution (prevents traversal)"},
+		{ID: "cpp.realpath", Language: rules.LangCPP, Pattern: `\brealpath\s*\(`, ObjectType: "", MethodName: "realpath", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "POSIX realpath resolves symlinks and normalizes path (prevents traversal)"},
+		{ID: "cpp.std.filesystem.canonical", Language: rules.LangCPP, Pattern: `std::filesystem::canonical\s*\(|std::filesystem::weakly_canonical\s*\(`, ObjectType: "std::filesystem", MethodName: "canonical/weakly_canonical", Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead}, Description: "C++17 filesystem canonical path resolution (prevents traversal)"},
 
 		// ── LDAP escaping ────────────────────────────────────────────
 		{ID: "cpp.ldap.escape.filter", Language: rules.LangCPP, Pattern: `ldap_simple_escape\s*\(|ldap_filter_escape\s*\(`, ObjectType: "", MethodName: "ldap_simple_escape/ldap_filter_escape", Neutralizes: []taint.SinkCategory{taint.SnkLDAP}, Description: "LDAP filter escaping prevents LDAP injection"},
@@ -102,7 +102,7 @@ func (cppCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `std::filesystem::weakly_canonical\s*\(`,
 			ObjectType:  "std::filesystem",
 			MethodName:  "weakly_canonical",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Filesystem weakly_canonical path resolution (resolves symlinks)",
 		},
 		{
@@ -111,7 +111,7 @@ func (cppCatalog) Sanitizers() []taint.SanitizerDef {
 			Pattern:     `std::filesystem::proximate\s*\(|std::filesystem::relative\s*\(`,
 			ObjectType:  "std::filesystem",
 			MethodName:  "proximate/relative",
-			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite},
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
 			Description: "Filesystem proximate/relative path computation (safe relative path)",
 		},
 
@@ -135,6 +135,103 @@ func (cppCatalog) Sanitizers() []taint.SanitizerDef {
 			MethodName:  "stod/stof/stold",
 			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
 			Description: "Floating-point string conversion (restricts to numeric values)",
+		},
+
+		// ── ODBC parameterized queries ────────────────────────────────
+		{
+			ID:          "cpp.odbc.sqlbindparameter",
+			Language:    rules.LangCPP,
+			Pattern:     `SQLBindParameter\s*\(`,
+			ObjectType:  "ODBC",
+			MethodName:  "SQLBindParameter",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "ODBC parameterized query binding (prevents SQL injection)",
+		},
+
+		// ── SOCI parameterized queries ────────────────────────────────
+		{
+			ID:          "cpp.soci.use",
+			Language:    rules.LangCPP,
+			Pattern:     `soci::use\s*\(`,
+			ObjectType:  "soci",
+			MethodName:  "use",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "SOCI parameter binding via soci::use() (prevents SQL injection)",
+		},
+
+		// ── nanodbc parameterized queries ─────────────────────────────
+		{
+			ID:          "cpp.nanodbc.statement.bind",
+			Language:    rules.LangCPP,
+			Pattern:     `nanodbc::statement.*\.bind\s*\(`,
+			ObjectType:  "nanodbc::statement",
+			MethodName:  "bind",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "nanodbc prepared statement parameter binding (prevents SQL injection)",
+		},
+
+		// ── Qt SQL parameterized queries ──────────────────────────────
+		{
+			ID:          "cpp.qt.qsqlquery.bindvalue",
+			Language:    rules.LangCPP,
+			Pattern:     `QSqlQuery.*\.(?:bindValue|addBindValue)\s*\(`,
+			ObjectType:  "QSqlQuery",
+			MethodName:  "bindValue/addBindValue",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Qt SQL parameterized query binding (prevents SQL injection)",
+		},
+
+		// ── POCO Data parameterized queries ───────────────────────────
+		{
+			ID:          "cpp.poco.data.bind",
+			Language:    rules.LangCPP,
+			Pattern:     `Poco::Data::Keywords::use\s*\(|Poco::Data::Keywords::bind\s*\(`,
+			ObjectType:  "Poco::Data",
+			MethodName:  "use/bind",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "POCO Data parameterized query binding (prevents SQL injection)",
+		},
+
+		// ── URL validation (SSRF prevention) ──────────────────────────
+		{
+			ID:          "cpp.poco.uri.parse",
+			Language:    rules.LangCPP,
+			Pattern:     `Poco::URI\s*\w+\s*\(`,
+			ObjectType:  "Poco::URI",
+			MethodName:  "URI",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch},
+			Description: "POCO URI parsing with validation (helps prevent SSRF when combined with allowlist)",
+		},
+
+		// ── Deserialization safety ────────────────────────────────────
+		{
+			ID:          "cpp.flatbuffers.verifier",
+			Language:    rules.LangCPP,
+			Pattern:     `flatbuffers::Verifier`,
+			ObjectType:  "flatbuffers",
+			MethodName:  "Verifier",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "FlatBuffers Verifier validates buffer integrity before access",
+		},
+		{
+			ID:          "cpp.protobuf.parsepartial.check",
+			Language:    rules.LangCPP,
+			Pattern:     `\.IsInitialized\s*\(\s*\)`,
+			ObjectType:  "google::protobuf::Message",
+			MethodName:  "IsInitialized",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Protobuf message validation check after deserialization",
+		},
+
+		// ── XSS sanitizers (framework-specific) ──────────────────────
+		{
+			ID:          "cpp.drogon.htmltranslate",
+			Language:    rules.LangCPP,
+			Pattern:     `HttpViewData::htmlTranslate\s*\(`,
+			ObjectType:  "",
+			MethodName:  "htmlTranslate",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "Drogon HTML entity escaping (prevents XSS)",
 		},
 	}
 }

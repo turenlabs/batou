@@ -202,5 +202,424 @@ func (c *SwiftCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
 			Description: "Swift numeric type initialization from string (restricts to numeric values)",
 		},
+
+		// --- NSPredicate parameterized (prevents predicate injection) ---
+		{
+			ID:          "swift.nspredicate.argumentarray",
+			Language:    rules.LangSwift,
+			Pattern:     `NSPredicate\(\s*format:.*argumentArray:|NSPredicate\(\s*format:.*,\s*\w+\)`,
+			ObjectType:  "NSPredicate",
+			MethodName:  "NSPredicate(format:argumentArray:)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "NSPredicate with parameterized arguments prevents injection",
+		},
+
+		// --- URLComponents safe construction ---
+		{
+			ID:          "swift.urlcomponents.safe",
+			Language:    rules.LangSwift,
+			Pattern:     `URLComponents\(\s*string:.*\.queryItems\s*=\s*\[URLQueryItem`,
+			ObjectType:  "URLComponents",
+			MethodName:  "URLComponents.queryItems",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URLComponents with URLQueryItem properly encodes query parameters",
+		},
+
+		// --- Swift Regex (5.7+) ---
+		{
+			ID:          "swift.regex.match",
+			Language:    rules.LangSwift,
+			Pattern:     `\.wholeMatch\(\s*of:|\.firstMatch\(\s*of:|\.matches\(\s*of:`,
+			ObjectType:  "Regex",
+			MethodName:  "wholeMatch(of:)/firstMatch(of:)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput},
+			Description: "Swift Regex validation (type-safe, compile-time checked)",
+		},
+
+		// --- Fluent parameterized query ---
+		{
+			ID:          "swift.fluent.filter",
+			Language:    rules.LangSwift,
+			Pattern:     `\.filter\(\s*\\\.`,
+			ObjectType:  "Fluent",
+			MethodName:  "filter(\\.field ==)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Fluent ORM type-safe filter uses parameterized queries",
+		},
+
+		// --- URL host validation ---
+		{
+			ID:          "swift.url.host.check",
+			Language:    rules.LangSwift,
+			Pattern:     `\.host\s*==\s*"|\.host\(\)\s*==\s*"|allowedHosts\.contains\(.*\.host`,
+			ObjectType:  "URL",
+			MethodName:  "url.host == / allowedHosts.contains",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URL host validation against expected domain",
+		},
+
+		// --- Data base64 encoding (neutralizes raw binary concerns) ---
+		{
+			ID:          "swift.data.base64",
+			Language:    rules.LangSwift,
+			Pattern:     `\.base64EncodedString\(|\.base64EncodedData\(`,
+			ObjectType:  "Data",
+			MethodName:  "base64EncodedString()",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkLog},
+			Description: "Base64 encoding produces safe alphanumeric output",
+		},
+
+		// --- URL scheme validation ---
+		{
+			ID:          "swift.url.scheme.check",
+			Language:    rules.LangSwift,
+			Pattern:     `\.scheme\s*==\s*"https"|\.scheme\s*==\s*"http"`,
+			ObjectType:  "URL",
+			MethodName:  "url.scheme == \"https\"",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URL scheme validation restricts to HTTP(S)",
+		},
+
+		// --- Process with array arguments (prevents shell injection) ---
+		{
+			ID:          "swift.process.array.arguments",
+			Language:    rules.LangSwift,
+			Pattern:     `\.arguments\s*=\s*\[`,
+			ObjectType:  "Process",
+			MethodName:  "arguments = [...]",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand},
+			Description: "Process with array arguments avoids shell interpretation",
+		},
+
+		// --- os_log privacy annotations ---
+		{
+			ID:          "swift.oslog.privacy",
+			Language:    rules.LangSwift,
+			Pattern:     `\.private\b|\.sensitive\b|OSLogPrivacy\.private|OSLogPrivacy\.sensitive`,
+			ObjectType:  "OSLog",
+			MethodName:  "OSLogPrivacy.private/sensitive",
+			Neutralizes: []taint.SinkCategory{taint.SnkLog},
+			Description: "os_log privacy annotation redacts sensitive data from logs",
+		},
+
+		// --- Logger with privacy metadata ---
+		{
+			ID:          "swift.logger.privacy.interpolation",
+			Language:    rules.LangSwift,
+			Pattern:     `\\\(\s*\w+\s*,\s*privacy:\s*\.`,
+			ObjectType:  "Logger",
+			MethodName:  "\\(value, privacy: .private)",
+			Neutralizes: []taint.SinkCategory{taint.SnkLog},
+			Description: "Swift Logger string interpolation with privacy annotation",
+		},
+
+		// --- JSON content-type response (not rendered as HTML) ---
+		{
+			ID:          "swift.vapor.response.json",
+			Language:    rules.LangSwift,
+			Pattern:     `\.json\s*\(|\.encodeResponse\(\s*for:.*\.json|Content-Type.*application/json`,
+			ObjectType:  "Response",
+			MethodName:  "response.json()",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput},
+			Description: "JSON response content-type prevents browser HTML rendering",
+		},
+
+		// --- Codable type-safe deserialization ---
+		{
+			ID:          "swift.codable.decode",
+			Language:    rules.LangSwift,
+			Pattern:     `\.decode\(\s*\w+\.self\s*,\s*from:`,
+			ObjectType:  "JSONDecoder",
+			MethodName:  "decode(T.self, from:)",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "Codable type-safe deserialization constrains output to known types",
+		},
+
+		// --- Container URL sandbox check ---
+		{
+			ID:          "swift.filemanager.containerurl",
+			Language:    rules.LangSwift,
+			Pattern:     `FileManager\.default\.containerURL\(\s*forSecurityApplicationGroupIdentifier:`,
+			ObjectType:  "FileManager",
+			MethodName:  "containerURL(forSecurityApplicationGroupIdentifier:)",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
+			Description: "App container URL provides sandboxed path root",
+		},
+
+		// --- Path starts-with containment check ---
+		{
+			ID:          "swift.path.hasprefix.check",
+			Language:    rules.LangSwift,
+			Pattern:     `\.hasPrefix\(\s*(?:documentsDir|baseDir|sandboxDir|containerPath|allowedPath)`,
+			ObjectType:  "String",
+			MethodName:  "path.hasPrefix(baseDir)",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileWrite, taint.SnkFileRead},
+			Description: "Path containment check using hasPrefix against known base directory",
+		},
+
+		// --- HTTP header value encoding ---
+		{
+			ID:          "swift.header.value.encoding",
+			Language:    rules.LangSwift,
+			Pattern:     `\.replacingOccurrences\(of:\s*"\\r\\n".*""|\.replacingOccurrences\(of:\s*"\\n".*""`,
+			ObjectType:  "String",
+			MethodName:  "header value CRLF stripping",
+			Neutralizes: []taint.SinkCategory{taint.SnkHeader},
+			Description: "Stripping CRLF from header values prevents header injection",
+		},
+
+		// --- String prefix/suffix for URL scheme ---
+		{
+			ID:          "swift.string.hasprefix.https",
+			Language:    rules.LangSwift,
+			Pattern:     `\.hasPrefix\(\s*"https://"|\.hasPrefix\(\s*"http://"`,
+			ObjectType:  "String",
+			MethodName:  "hasPrefix(\"https://\")",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkRedirect},
+			Description: "URL string prefix check constrains to HTTP(S) scheme",
+		},
+
+		// --- CharacterSet URL encoding ---
+		{
+			ID:          "swift.characterset.urlencode",
+			Language:    rules.LangSwift,
+			Pattern:     `\.addingPercentEncoding\(\s*withAllowedCharacters:\s*\.urlQueryAllowed|\.addingPercentEncoding\(\s*withAllowedCharacters:\s*\.urlPathAllowed`,
+			ObjectType:  "String",
+			MethodName:  "addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch, taint.SnkHeader},
+			Description: "URL percent encoding with standard CharacterSet for query/path safety",
+		},
+
+		// --- Vapor abort for validation ---
+		{
+			ID:          "swift.vapor.abort",
+			Language:    rules.LangSwift,
+			Pattern:     `throw\s+Abort\(\s*\.badRequest|throw\s+Abort\(\s*\.forbidden|throw\s+Abort\(\s*\.unauthorized`,
+			ObjectType:  "Abort",
+			MethodName:  "throw Abort(.badRequest)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand, taint.SnkHTMLOutput, taint.SnkFileWrite, taint.SnkURLFetch},
+			Description: "Vapor Abort thrown on validation failure terminates request processing",
+		},
+
+		// --- guard let with return/throw (early exit pattern) ---
+		{
+			ID:          "swift.guard.let.validation",
+			Language:    rules.LangSwift,
+			Pattern:     `guard\s+let\s+\w+\s*=\s*Int\(|guard\s+let\s+\w+\s*=\s*UUID\(`,
+			ObjectType:  "",
+			MethodName:  "guard let x = Int(input)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "Guard-let with type conversion validates input or exits early",
+		},
+
+		// --- HMAC/signature verification ---
+		{
+			ID:          "swift.cryptokit.hmac.verify",
+			Language:    rules.LangSwift,
+			Pattern:     `HMAC<SHA256>\.isValidAuthenticationCode\(|HMAC\.isValidAuthenticationCode\(`,
+			ObjectType:  "HMAC",
+			MethodName:  "HMAC.isValidAuthenticationCode",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize, taint.SnkTrustBoundary},
+			Description: "HMAC verification ensures data integrity before processing",
+		},
+
+		// --- Alamofire ServerTrustManager (certificate pinning) ---
+		{
+			ID:          "swift.alamofire.servertrustmanager",
+			Language:    rules.LangSwift,
+			Pattern:     `ServerTrustManager\s*\(|PinnedCertificatesTrustEvaluator\s*\(|PublicKeysTrustEvaluator\s*\(`,
+			ObjectType:  "Alamofire",
+			MethodName:  "ServerTrustManager",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch},
+			Description: "Alamofire certificate pinning restricts connections to trusted servers",
+		},
+
+		// --- Alamofire RequestInterceptor (URL validation) ---
+		{
+			ID:          "swift.alamofire.requestinterceptor",
+			Language:    rules.LangSwift,
+			Pattern:     `RequestInterceptor|RequestAdapter|\.adapt\s*\(\s*.*urlRequest`,
+			ObjectType:  "Alamofire",
+			MethodName:  "RequestInterceptor/adapt",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch},
+			Description: "Alamofire request interceptor can enforce URL allowlists",
+		},
+
+		// --- Alamofire URLEncodedFormParameterEncoder (auto-encodes params) ---
+		{
+			ID:          "swift.alamofire.parameterencoder",
+			Language:    rules.LangSwift,
+			Pattern:     `URLEncodedFormParameterEncoder\s*\(|JSONParameterEncoder\s*\(`,
+			ObjectType:  "Alamofire",
+			MethodName:  "URLEncodedFormParameterEncoder/JSONParameterEncoder",
+			Neutralizes: []taint.SinkCategory{taint.SnkHTMLOutput, taint.SnkHeader},
+			Description: "Alamofire parameter encoders properly encode values for transport",
+		},
+
+		// --- Secure random (neutralizes weak PRNG concerns) ---
+		{
+			ID:          "swift.securerandom.arc4random",
+			Language:    rules.LangSwift,
+			Pattern:     `arc4random_uniform\s*\(|arc4random\s*\(|arc4random_buf\s*\(`,
+			ObjectType:  "",
+			MethodName:  "arc4random/arc4random_uniform",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "arc4random family uses AES-CTR CSPRNG (secure since macOS 10.12/iOS 10)",
+		},
+		{
+			ID:          "swift.securerandom.systemrng",
+			Language:    rules.LangSwift,
+			Pattern:     `SystemRandomNumberGenerator\s*\(|\.random\(\s*in:`,
+			ObjectType:  "",
+			MethodName:  "SystemRandomNumberGenerator / Int.random(in:)",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "Swift SystemRandomNumberGenerator backed by arc4random_buf (CSPRNG)",
+		},
+		{
+			ID:          "swift.securerandom.secrandomcopybytes",
+			Language:    rules.LangSwift,
+			Pattern:     `SecRandomCopyBytes\s*\(`,
+			ObjectType:  "Security",
+			MethodName:  "SecRandomCopyBytes",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "Apple Security framework CSPRNG",
+		},
+
+		// --- TLS certificate pinning (neutralizes TLS bypass) ---
+		{
+			ID:          "swift.tls.pinning.evaluatewitherror",
+			Language:    rules.LangSwift,
+			Pattern:     `SecTrustEvaluateWithError\s*\(`,
+			ObjectType:  "Security",
+			MethodName:  "SecTrustEvaluateWithError",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "Proper TLS trust evaluation with error checking",
+		},
+		{
+			ID:          "swift.tls.pinning.publickeys",
+			Language:    rules.LangSwift,
+			Pattern:     `SecTrustCopyPublicKey\s*\(|pinnedCertificates|pinnedPublicKeys`,
+			ObjectType:  "Security",
+			MethodName:  "Certificate/public key pinning",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "TLS certificate or public key pinning prevents MITM",
+		},
+
+		// --- XXE prevention ---
+		{
+			ID:          "swift.xmlparser.xxe.disabled",
+			Language:    rules.LangSwift,
+			Pattern:     `shouldResolveExternalEntities\s*=\s*false`,
+			ObjectType:  "XMLParser",
+			MethodName:  "shouldResolveExternalEntities = false",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval},
+			Description: "XMLParser external entity resolution explicitly disabled (XXE prevention)",
+		},
+
+		// --- Bounds checking for unsafe memory ---
+		{
+			ID:          "swift.unsafe.precondition",
+			Language:    rules.LangSwift,
+			Pattern:     `precondition\(\s*\w+\s*<\s*\w+|precondition\(\s*\w+\s*<=\s*\w+|guard\s+\w+\s*<\s*capacity`,
+			ObjectType:  "",
+			MethodName:  "precondition(index < count)",
+			Neutralizes: []taint.SinkCategory{taint.SnkEval},
+			Description: "Bounds checking precondition/guard before unsafe memory access",
+		},
+
+		// --- Trust boundary: local-only pasteboard ---
+		{
+			ID:          "swift.pasteboard.localonly",
+			Language:    rules.LangSwift,
+			Pattern:     `\.localOnly\s*:\s*true|UIPasteboard\.withLocalOnly`,
+			ObjectType:  "UIPasteboard",
+			MethodName:  "localOnly: true",
+			Neutralizes: []taint.SinkCategory{taint.SnkTrustBoundary},
+			Description: "Pasteboard local-only flag prevents cross-device clipboard sharing",
+		},
+
+		// --- Trust boundary: exclude activity types ---
+		{
+			ID:          "swift.uiactivity.excludedtypes",
+			Language:    rules.LangSwift,
+			Pattern:     `excludedActivityTypes\s*=`,
+			ObjectType:  "UIActivityViewController",
+			MethodName:  "excludedActivityTypes",
+			Neutralizes: []taint.SinkCategory{taint.SnkTrustBoundary},
+			Description: "Restricting share sheet activity types limits data exposure",
+		},
+
+		// --- Path canonicalization for file read ---
+		{
+			ID:          "swift.url.standardized.fileread",
+			Language:    rules.LangSwift,
+			Pattern:     `\.standardizedFileURL\.path\.hasPrefix\(|\.resolvingSymlinksInPath\(\)\.hasPrefix\(`,
+			ObjectType:  "URL",
+			MethodName:  "standardizedFileURL.path.hasPrefix",
+			Neutralizes: []taint.SinkCategory{taint.SnkFileRead},
+			Description: "Path canonicalization + prefix check prevents path traversal on file reads",
+		},
+
+		// --- Realm type-safe filter (keypaths) ---
+		{
+			ID:          "swift.realm.filter.keypath",
+			Language:    rules.LangSwift,
+			Pattern:     `\.filter\(\s*\\\.`,
+			ObjectType:  "Realm",
+			MethodName:  "filter(\\.keypath ==)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Realm type-safe keypath filter prevents predicate injection",
+		},
+
+		// --- XPath parameterization ---
+		{
+			ID:          "swift.xpath.escaping",
+			Language:    rules.LangSwift,
+			Pattern:     `\.replacingOccurrences\(of:\s*"'".*"&apos;"`,
+			ObjectType:  "String",
+			MethodName:  "XPath string escaping",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "XPath value escaping prevents injection via single-quote replacement",
+		},
+
+		// --- MongoDB typed query builders (NoSQL injection prevention) ---
+		{
+			ID:          "swift.mongoswift.bsondocument.literal",
+			Language:    rules.LangSwift,
+			Pattern:     `BSONDocument\s*\(|let\s+\w+\s*:\s*BSONDocument\s*=\s*\[`,
+			ObjectType:  "MongoSwift.BSONDocument",
+			MethodName:  "BSONDocument literal",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "MongoSwift typed BSONDocument literal enforces structured queries",
+		},
+		{
+			ID:          "swift.mongokitten.mongoqueryfilter",
+			Language:    rules.LangSwift,
+			Pattern:     `MongoKitten\.QueryFilter|\.where\(\s*"[^"]+"\s*==`,
+			ObjectType:  "MongoKitten",
+			MethodName:  "QueryFilter / type-safe where",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "MongoKitten type-safe query filters prevent NoSQL injection",
+		},
+		{
+			ID:          "swift.mongodb.input.int.conversion",
+			Language:    rules.LangSwift,
+			Pattern:     `ObjectId\s*\(\s*\w+\s*\)|BSONObjectID\s*\(\s*\w+\s*\)`,
+			ObjectType:  "BSONObjectID",
+			MethodName:  "ObjectId/BSONObjectID",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Converting input to ObjectId/BSONObjectID constrains to valid 24-hex-char ID",
+		},
+
+		// --- Secure deserialization (NSSecureCoding) ---
+		{
+			ID:          "swift.nssecurecoding.conformance",
+			Language:    rules.LangSwift,
+			Pattern:     `NSSecureCoding|supportsSecureCoding\s*=\s*true`,
+			ObjectType:  "NSSecureCoding",
+			MethodName:  "NSSecureCoding conformance",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize},
+			Description: "NSSecureCoding protocol enforces type-safe deserialization",
+		},
 	}
 }

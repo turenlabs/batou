@@ -69,9 +69,7 @@ func TestMISC001_GenericDebugMode(t *testing.T) {
 	result := testutil.ScanContent(t, "/app/config.json", content)
 	// JSON files may or may not trigger depending on language detection
 	// This is a best-effort test
-	if testutil.HasFinding(result, "BATOU-MISC-001") {
-		// Good, it was detected
-	}
+	_ = testutil.HasFinding(result, "BATOU-MISC-001") // best-effort: JSON detection varies
 }
 
 func TestMISC001_Safe_DjangoDebugFalse(t *testing.T) {
@@ -186,71 +184,3 @@ def handle_error(e):
 	testutil.MustNotFindRule(t, result, "BATOU-MISC-002")
 }
 
-// --- BATOU-MISC-003: Missing Security Headers ---
-
-func TestMISC003_Go_NoHeaders(t *testing.T) {
-	content := `package main
-import "net/http"
-func handler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hello"))
-}`
-	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustFindRule(t, result, "BATOU-MISC-003")
-}
-
-func TestMISC003_Express_NoHeaders(t *testing.T) {
-	content := `app.get('/api/data', (req, res) => {
-	res.json({ data: 'hello' });
-});`
-	result := testutil.ScanContent(t, "/app/server.ts", content)
-	testutil.MustFindRule(t, result, "BATOU-MISC-003")
-}
-
-func TestMISC003_Python_NoHeaders(t *testing.T) {
-	content := `def index(request):
-    return HttpResponse("Hello World")`
-	result := testutil.ScanContent(t, "/app/views.py", content)
-	testutil.MustFindRule(t, result, "BATOU-MISC-003")
-}
-
-func TestMISC003_Java_NoHeaders(t *testing.T) {
-	content := `public class MyServlet extends HttpServlet {
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) {
-        response.getWriter().println("Hello");
-    }
-}`
-	result := testutil.ScanContent(t, "/app/MyServlet.java", content)
-	testutil.MustFindRule(t, result, "BATOU-MISC-003")
-}
-
-func TestMISC003_Safe_WithHelmet(t *testing.T) {
-	content := `const helmet = require('helmet');
-app.use(helmet());
-app.get('/api/data', (req, res) => {
-	res.json({ data: 'hello' });
-});`
-	result := testutil.ScanContent(t, "/app/server.ts", content)
-	testutil.MustNotFindRule(t, result, "BATOU-MISC-003")
-}
-
-func TestMISC003_Safe_WithAllHeaders(t *testing.T) {
-	content := `package main
-import "net/http"
-func handler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("X-Frame-Options", "DENY")
-	w.Header().Set("Content-Security-Policy", "default-src 'self'")
-	w.Header().Set("Strict-Transport-Security", "max-age=31536000")
-	w.Write([]byte("Hello"))
-}`
-	result := testutil.ScanContent(t, "/app/handler.go", content)
-	testutil.MustNotFindRule(t, result, "BATOU-MISC-003")
-}
-
-func TestMISC003_Safe_WithSecureHeaders(t *testing.T) {
-	content := `from django.middleware.security import SecurityMiddleware
-
-def index(request):
-    return HttpResponse("Hello World")`
-	result := testutil.ScanContent(t, "/app/views.py", content)
-	testutil.MustNotFindRule(t, result, "BATOU-MISC-003")
-}

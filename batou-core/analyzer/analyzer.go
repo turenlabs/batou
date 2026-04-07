@@ -20,6 +20,8 @@ var extToLanguage = map[string]rules.Language{
 	".ts":          rules.LangTypeScript,
 	".tsx":         rules.LangTypeScript,
 	".mts":         rules.LangTypeScript,
+	".svelte":      rules.LangTypeScript, // Svelte SFCs contain TS/JS in <script> blocks
+	".vue":         rules.LangJavaScript, // Vue SFCs contain JS/TS in <script> blocks
 	".java":        rules.LangJava,
 	".rb":          rules.LangRuby,
 	".erb":         rules.LangRuby,

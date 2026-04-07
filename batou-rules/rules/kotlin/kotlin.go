@@ -119,6 +119,7 @@ var (
 	reKtorCallParams     = regexp.MustCompile(`call\s*\.\s*parameters\s*\[\s*["'][^"']+["']\s*\]`)
 	reKtorParamInSQL     = regexp.MustCompile(`(?:execute|query|prepareStatement|createStatement)\s*\(`)
 	reKtorParamSafe      = regexp.MustCompile(`(?:prepareStatement|setString|setInt|bindString)`)
+	reKtorParamAllowlist = regexp.MustCompile(`(?i)(?:\bin\s+(?:allowed|valid|safe|whitelist)|(?:allowed|valid|safe|whitelist)\w*\s*\.\s*contains|when\s*\(|listOf\s*\([^)]*\)\s*$|\.toIntOrNull\s*\(|\.toInt\s*\()`)
 )
 
 // KT-016: Android broadcast receiver without permission
@@ -701,6 +702,12 @@ func (r *KotlinSerializationUntrusted) Scan(ctx *rules.ScanContext) []rules.Find
 		}
 
 		if matched != "" {
+			// Skip typed deserialization to a specific class (not Any/Object)
+			// e.g., Json.decodeFromString<UserRequest>(body) is safe
+			if isTypedDecodeFromString(line) {
+				continue
+			}
+
 			// Check if nearby code validates or sanitizes input
 			context := surroundingContext(lines, i, 5)
 			confidence := "medium"
@@ -1075,6 +1082,10 @@ func (r *KtorParameterInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if reKtorParamSafe.MatchString(context) {
 				continue
 			}
+			// Skip if allowlist/validation is used
+			if reKtorParamAllowlist.MatchString(context) {
+				continue
+			}
 
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
@@ -1152,6 +1163,34 @@ func (r *BroadcastReceiverNoPermission) Scan(ctx *rules.ScanContext) []rules.Fin
 }
 
 // --- Helpers ---
+
+// isTypedDecodeFromString checks if a Json.decodeFromString call uses a specific
+// type parameter (e.g., <UserRequest>) rather than <Any> or <Object>.
+// Typed deserialization to a known @Serializable class is safe in kotlinx.serialization.
+func isTypedDecodeFromString(line string) bool {
+	// Look for decodeFromString<Type> where Type is NOT Any/Object
+	idx := strings.Index(line, "decodeFromString")
+	if idx < 0 {
+		return false
+	}
+	rest := line[idx:]
+	// Check for type parameter: decodeFromString<SomeType>
+	ltIdx := strings.Index(rest, "<")
+	if ltIdx < 0 {
+		return false
+	}
+	gtIdx := strings.Index(rest[ltIdx:], ">")
+	if gtIdx < 0 {
+		return false
+	}
+	typeParam := strings.TrimSpace(rest[ltIdx+1 : ltIdx+gtIdx])
+	// Unsafe types: Any, Object, or empty
+	if typeParam == "" || typeParam == "Any" || typeParam == "Object" {
+		return false
+	}
+	// Has a specific type parameter -> typed deserialization is safe
+	return true
+}
 
 func isComment(line string) bool {
 	return strings.HasPrefix(line, "//") ||

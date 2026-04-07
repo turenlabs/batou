@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/turenlabs/batou-core/findings"
 	"github.com/turenlabs/batou-core/hints"
 	"github.com/turenlabs/batou-core/reporter"
 	"github.com/turenlabs/batou-rules/rules"
@@ -307,21 +308,21 @@ func TestFormatForClaudeStructure(t *testing.T) {
 	hintList := hints.GenerateHints(ctx)
 	output := hints.FormatForClaude(ctx, hintList)
 
-	// Verify structure.
-	if !strings.Contains(output, "=== Batou Security Copilot") {
-		t.Error("expected Batou Security Copilot header")
+	// Verify structure (compact format).
+	if !strings.Contains(output, "=== Batou [test.go]") {
+		t.Error("expected Batou header with filepath")
 	}
-	if !strings.Contains(output, "Language: go") {
-		t.Error("expected language in header")
+	if !strings.Contains(output, "go | 42ms") {
+		t.Error("expected language and scan time in header")
 	}
 	if !strings.Contains(output, "=== End Batou ===") {
 		t.Error("expected End Batou footer")
 	}
-	if !strings.Contains(output, "Hint 1") {
-		t.Error("expected at least Hint 1")
+	if !strings.Contains(output, "1. [") {
+		t.Error("expected at least hint #1")
 	}
-	if !strings.Contains(output, "Why:") {
-		t.Error("expected 'Why:' explanation section")
+	if !strings.Contains(output, "Fix:") {
+		t.Error("expected Fix section")
 	}
 }
 
@@ -515,6 +516,7 @@ func TestBlockMessageIsActionable(t *testing.T) {
 				CWEID:           "CWE-89",
 				OWASPCategory:   "A03:2021-Injection",
 				ConfidenceScore: 0.8,
+				RiskScore:       0.8,
 			},
 		},
 	}
@@ -548,19 +550,20 @@ func TestBlockMessageIsActionable(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestImpactDescriptionCoverage(t *testing.T) {
-	// Generate hints for different sink categories and verify Impact is specific
+	// Generate hints for different sink categories and verify output
+	// contains category-relevant keywords (in explanation, fix, or refs).
 	categories := []struct {
 		sinkCat  taint.SinkCategory
-		wantWord string // a word that should appear in the impact description
+		wantWord string // a word that should appear somewhere in the output
 	}{
-		{taint.SnkSQLQuery, "database"},
+		{taint.SnkSQLQuery, "query"},
 		{taint.SnkCommand, "command"},
-		{taint.SnkHTMLOutput, "script"},
+		{taint.SnkHTMLOutput, "html"},
 		{taint.SnkFileWrite, "file"},
 		{taint.SnkEval, "code"},
 		{taint.SnkRedirect, "redirect"},
-		{taint.SnkURLFetch, "internal"},
-		{taint.SnkDeserialize, "serialized"},
+		{taint.SnkURLFetch, "url"},
+		{taint.SnkDeserialize, "deserializ"},
 		{taint.SnkLog, "log"},
 	}
 
@@ -594,11 +597,8 @@ func TestImpactDescriptionCoverage(t *testing.T) {
 			hintList := hints.GenerateHints(ctx)
 			output := hints.FormatForClaude(ctx, hintList)
 
-			if !strings.Contains(output, "Impact:") {
-				t.Errorf("sink %s: expected Impact section", tt.sinkCat)
-			}
 			if !strings.Contains(strings.ToLower(output), strings.ToLower(tt.wantWord)) {
-				t.Errorf("sink %s: expected impact to mention %q, got:\n%s",
+				t.Errorf("sink %s: expected output to mention %q, got:\n%s",
 					tt.sinkCat, tt.wantWord, output)
 			}
 		})
@@ -614,10 +614,13 @@ func TestArchitecturalHintsOnRepeatedPatterns(t *testing.T) {
 	var findings []rules.Finding
 	for i := 0; i < 4; i++ {
 		findings = append(findings, rules.Finding{
-			RuleID:     "BATOU-INJ-001",
-			Title:      "SQL Injection",
-			Severity:   rules.Critical,
-			LineNumber: i + 1,
+			RuleID:          "BATOU-INJ-001",
+			Title:           "SQL Injection",
+			Severity:        rules.Critical,
+			LineNumber:      i + 1,
+			ConfidenceScore: 0.8,
+			RiskScore:       0.8,
+			Tags:            []string{"taint-analysis"},
 		})
 	}
 
@@ -685,5 +688,208 @@ func TestDefaultLanguageFallbackProducesHints(t *testing.T) {
 				t.Errorf("sink %s with LangC: expected Fix section, got:\n%s", cat, output)
 			}
 		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tier-based filtering: regex-only findings are omitted from hints
+// ---------------------------------------------------------------------------
+
+func TestRegexOnlyFindingsFiltered(t *testing.T) {
+	ctx := &hints.HintContext{
+		FilePath: "/app/handler.go",
+		Language: rules.LangGo,
+		Findings: []rules.Finding{
+			{RuleID: "BATOU-INJ-001", Severity: rules.High, ConfidenceScore: 0.4, Title: "SQL Injection", Description: "bad", LineNumber: 10},
+			{RuleID: "BATOU-HDR-002", Severity: rules.Medium, ConfidenceScore: 0.4, Title: "Missing header", Description: "bad", LineNumber: 20},
+		},
+		ScanTimeMs: 10,
+	}
+
+	hintList := hints.GenerateHints(ctx)
+	output := hints.FormatForClaude(ctx, hintList)
+
+	// Should say "clean" since all findings are regex-only
+	if !strings.Contains(output, "Code looks clean") {
+		t.Errorf("expected clean code message when only regex findings, got:\n%s", output)
+	}
+	// Should show the regex summary count
+	if !strings.Contains(output, "2 low-fidelity regex patterns omitted") {
+		t.Errorf("expected regex summary line, got:\n%s", output)
+	}
+	// Should NOT contain individual hint blocks
+	if strings.Contains(output, "Hint 1") {
+		t.Errorf("regex-only findings should not produce individual hints, got:\n%s", output)
+	}
+}
+
+func TestASTAndTaintFindingsSurvive(t *testing.T) {
+	ctx := &hints.HintContext{
+		FilePath: "/app/handler.go",
+		Language: rules.LangGo,
+		Findings: []rules.Finding{
+			// Regex-only — should be filtered
+			{RuleID: "BATOU-INJ-001", Severity: rules.High, ConfidenceScore: 0.4, Title: "SQL Injection", Description: "bad", LineNumber: 10},
+			// AST — should survive
+			{RuleID: "BATOU-AST-008", Severity: rules.Medium, ConfidenceScore: 0.7, Title: "Goroutine no context", Description: "bad", LineNumber: 20},
+			// Taint — should survive
+			{RuleID: "BATOU-TAINT-sqli", Severity: rules.Critical, ConfidenceScore: 0.85, Title: "Taint flow", Description: "bad", Tags: []string{"taint-analysis"}, LineNumber: 30},
+			// Interprocedural — should survive
+			{RuleID: "BATOU-INTERPROC-XSS", Severity: rules.High, ConfidenceScore: 0.8, Title: "Interproc", Description: "bad", Tags: []string{"interprocedural", "taint-analysis"}, LineNumber: 40},
+		},
+		ScanTimeMs: 10,
+	}
+
+	hintList := hints.GenerateHints(ctx)
+	output := hints.FormatForClaude(ctx, hintList)
+
+	// Should have individual hints for AST, taint, interproc
+	if !strings.Contains(output, "BATOU-AST-008") {
+		t.Error("expected AST finding in output")
+	}
+	if !strings.Contains(output, "BATOU-TAINT-sqli") {
+		t.Error("expected taint finding in output")
+	}
+	if !strings.Contains(output, "BATOU-INTERPROC-XSS") {
+		t.Error("expected interproc finding in output")
+	}
+	// Regex finding should NOT appear as individual hint
+	if strings.Contains(output, "BATOU-INJ-001") {
+		t.Error("regex-only finding should not appear in output")
+	}
+	// Summary should mention 1 regex pattern omitted
+	if !strings.Contains(output, "1 low-fidelity regex patterns omitted") {
+		t.Errorf("expected regex summary, got:\n%s", output)
+	}
+}
+
+func TestBlockingRegexFindingSurvives(t *testing.T) {
+	ctx := &hints.HintContext{
+		FilePath: "/app/handler.go",
+		Language: rules.LangGo,
+		Findings: []rules.Finding{
+			// Regex-only but blocking (Critical + high confidence)
+			{RuleID: "BATOU-INJ-001", Severity: rules.Critical, ConfidenceScore: 0.9, RiskScore: 0.9, Title: "SQL Injection", Description: "bad", LineNumber: 10},
+			// Regex-only non-blocking
+			{RuleID: "BATOU-HDR-002", Severity: rules.Medium, ConfidenceScore: 0.4, RiskScore: 0.2, Title: "Missing header", Description: "bad", LineNumber: 20},
+		},
+		ScanTimeMs: 10,
+	}
+
+	hintList := hints.GenerateHints(ctx)
+	output := hints.FormatForClaude(ctx, hintList)
+
+	// Blocking finding should show
+	if !strings.Contains(output, "BATOU-INJ-001") {
+		t.Error("blocking regex finding should survive tier filter")
+	}
+	// Non-blocking regex should be in summary
+	if !strings.Contains(output, "1 low-fidelity regex patterns omitted") {
+		t.Errorf("expected 1 regex pattern in summary, got:\n%s", output)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Finding lifecycle tags (NEW / seen Nx / fixed)
+// ---------------------------------------------------------------------------
+
+func TestInjectLifecycle_NewTag(t *testing.T) {
+	f := rules.Finding{
+		RuleID:      "BATOU-INJ-001",
+		FilePath:    "/app/handler.go",
+		LineNumber:  10,
+		Title:       "SQL injection",
+		Severity:    rules.Critical,
+		MatchedText: "exec(cmd)",
+	}
+
+	input := "1. [CRIT 95%] BATOU-INJ-001\n   SQL injection\n=== End Batou ===\n"
+	deltas := &findings.Deltas{
+		New: []rules.Finding{f},
+	}
+
+	output := hints.InjectLifecycle(input, deltas, []rules.Finding{f})
+
+	if !strings.Contains(output, "BATOU-INJ-001 (NEW)") {
+		t.Errorf("expected (NEW) tag, got:\n%s", output)
+	}
+}
+
+func TestInjectLifecycle_RecurringTag(t *testing.T) {
+	// Use the store to build proper deltas with recurring counts
+	dir := t.TempDir()
+	store, err := findings.Open(dir)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	f := rules.Finding{
+		RuleID:      "BATOU-INJ-001",
+		FilePath:    "/app/handler.go",
+		LineNumber:  10,
+		Title:       "SQL injection",
+		Severity:    rules.Critical,
+		MatchedText: "exec(cmd)",
+	}
+
+	// First scan
+	store.ComputeDeltas("/app/handler.go", []rules.Finding{f})
+	// Second scan
+	store.ComputeDeltas("/app/handler.go", []rules.Finding{f})
+	// Third scan — should show "seen 3x"
+	deltas := store.ComputeDeltas("/app/handler.go", []rules.Finding{f})
+
+	input := "1. [CRIT 95%] BATOU-INJ-001\n   SQL injection\n=== End Batou ===\n"
+	output := hints.InjectLifecycle(input, deltas, []rules.Finding{f})
+
+	if !strings.Contains(output, "seen 3x") {
+		t.Errorf("expected (seen 3x) tag, got:\n%s", output)
+	}
+}
+
+func TestInjectLifecycle_FixedFooter(t *testing.T) {
+	dir := t.TempDir()
+	store, err := findings.Open(dir)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	f1 := rules.Finding{
+		RuleID:      "BATOU-INJ-001",
+		FilePath:    "/app/handler.go",
+		LineNumber:  10,
+		Title:       "SQL injection",
+		Severity:    rules.Critical,
+		MatchedText: "exec(cmd)",
+	}
+	f2 := rules.Finding{
+		RuleID:      "BATOU-XSS-001",
+		FilePath:    "/app/handler.go",
+		LineNumber:  20,
+		Title:       "XSS",
+		Severity:    rules.High,
+		MatchedText: "fmt.Fprintf(w, name)",
+	}
+
+	// First scan — both findings
+	store.ComputeDeltas("/app/handler.go", []rules.Finding{f1, f2})
+
+	// Second scan — f2 removed (fixed)
+	deltas := store.ComputeDeltas("/app/handler.go", []rules.Finding{f1})
+
+	input := "1. [CRIT 95%] BATOU-INJ-001\n   SQL injection\n=== End Batou ===\n"
+	output := hints.InjectLifecycle(input, deltas, []rules.Finding{f1})
+
+	if !strings.Contains(output, "1 finding fixed since last scan") {
+		t.Errorf("expected fixed footer, got:\n%s", output)
+	}
+}
+
+func TestInjectLifecycle_NilDeltas(t *testing.T) {
+	input := "1. [CRIT 95%] BATOU-INJ-001\n   SQL injection\n=== End Batou ===\n"
+	output := hints.InjectLifecycle(input, nil, nil)
+
+	if output != input {
+		t.Errorf("nil deltas should return input unchanged, got:\n%s", output)
 	}
 }

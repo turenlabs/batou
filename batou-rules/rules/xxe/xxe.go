@@ -68,6 +68,9 @@ var (
 	reDefusedXML = regexp.MustCompile(`\bdefusedxml\b`)
 	// Safe: resolve_entities=False
 	rePyResolveEntitiesFalse = regexp.MustCompile(`resolve_entities\s*=\s*False`)
+	// Safe: xml.sax.make_parser() with default settings (external entities disabled since Python 3.7.1)
+	rePySAXMakeParser    = regexp.MustCompile(`xml\.sax\.make_parser`)
+	rePySAXExtEntEnabled = regexp.MustCompile(`feature_external_ges\s*,\s*True|feature_external_pes\s*,\s*True`)
 )
 
 // BATOU-XXE-004: C#/.NET XML Parser without Secure Configuration
@@ -303,6 +306,11 @@ func (r PythonXXE) Languages() []rules.Language {
 func (r PythonXXE) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Skip files that import defusedxml (safe replacement)
 	if reDefusedXML.MatchString(ctx.Content) {
+		return nil
+	}
+	// Python's xml.sax.make_parser() disables external entities by default (since 3.7.1).
+	// Only flag if external entities are explicitly enabled via setFeature().
+	if rePySAXMakeParser.MatchString(ctx.Content) && !rePySAXExtEntEnabled.MatchString(ctx.Content) {
 		return nil
 	}
 

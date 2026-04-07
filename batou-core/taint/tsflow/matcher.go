@@ -49,8 +49,10 @@ func newTSMatcher(sources []taint.SourceDef, sinks []taint.SinkDef, sanitizers [
 // extractMethodNames splits compound method names on "/" and extracts the
 // final component after any "." or "::" for each part.
 func extractMethodNames(methodName string) []string {
-	// Normalize "::" to "." for languages like Rust/C++ that use :: scope resolution.
+	// Normalize "::", "->", and ":" (Lua colon-call) to "." so all scope/member access is unified.
 	methodName = strings.ReplaceAll(methodName, "::", ".")
+	methodName = strings.ReplaceAll(methodName, "->", ".")
+	methodName = strings.ReplaceAll(methodName, ":", ".")
 	parts := strings.Split(methodName, "/")
 	var names []string
 	for _, p := range parts {
@@ -67,6 +69,17 @@ func extractMethodNames(methodName string) []string {
 	return names
 }
 
+// unqualifyName extracts the last component of a qualified name.
+// e.g., "java.io.File" → "File", "Runtime" → "Runtime".
+func unqualifyName(name string) string {
+	name = strings.ReplaceAll(name, "::", ".")
+	name = strings.ReplaceAll(name, "->", ".")
+	if idx := strings.LastIndex(name, "."); idx >= 0 {
+		return name[idx+1:]
+	}
+	return name
+}
+
 // matchSourceCall checks if a call node matches a known taint source.
 func (m *tsMatcher) matchSourceCall(n *ast.Node) *taint.SourceDef {
 	methodName := m.cfg.extractCallName(n)
@@ -75,6 +88,11 @@ func (m *tsMatcher) matchSourceCall(n *ast.Node) *taint.SourceDef {
 	}
 
 	candidates := m.sourcesByMethod[methodName]
+	// Also check unqualified name for qualified calls like java.io.File
+	short := unqualifyName(methodName)
+	if short != methodName {
+		candidates = append(candidates, m.sourcesByMethod[short]...)
+	}
 	receiver := m.cfg.extractCallReceiver(n)
 	for _, src := range candidates {
 		if matchesCatalogEntry(receiver, methodName, src.ObjectType, src.MethodName) {
@@ -111,6 +129,10 @@ func (m *tsMatcher) matchSinkCall(n *ast.Node) (*taint.SinkDef, []*ast.Node) {
 	}
 
 	candidates := m.sinksByMethod[methodName]
+	short := unqualifyName(methodName)
+	if short != methodName {
+		candidates = append(candidates, m.sinksByMethod[short]...)
+	}
 	receiver := m.cfg.extractCallReceiver(n)
 	for _, sink := range candidates {
 		if matchesCatalogEntry(receiver, methodName, sink.ObjectType, sink.MethodName) {
@@ -131,6 +153,10 @@ func (m *tsMatcher) matchSanitizer(n *ast.Node) (*taint.SanitizerDef, *ast.Node)
 	}
 
 	candidates := m.sanitizersByMethod[methodName]
+	short := unqualifyName(methodName)
+	if short != methodName {
+		candidates = append(candidates, m.sanitizersByMethod[short]...)
+	}
 	receiver := m.cfg.extractCallReceiver(n)
 	for _, san := range candidates {
 		if matchesCatalogEntry(receiver, methodName, san.ObjectType, san.MethodName) {
@@ -147,8 +173,10 @@ func (m *tsMatcher) matchSanitizer(n *ast.Node) (*taint.SanitizerDef, *ast.Node)
 // matchesCatalogEntry checks if a receiver+method pair plausibly matches
 // a catalog entry's objectType+methodName.
 func matchesCatalogEntry(receiver, callMethod, catObjectType, catMethodName string) bool {
-	// Normalize "::" to "." for languages like Rust/C++ that use :: scope resolution.
+	// Normalize "::", "->", and ":" (Lua colon-call) to "." so all scope/member access is unified.
 	catMethodName = strings.ReplaceAll(catMethodName, "::", ".")
+	catMethodName = strings.ReplaceAll(catMethodName, "->", ".")
+	catMethodName = strings.ReplaceAll(catMethodName, ":", ".")
 
 	// Check method name matches one of the compound parts
 	matched := false
@@ -156,7 +184,7 @@ func matchesCatalogEntry(receiver, callMethod, catObjectType, catMethodName stri
 		candidate = strings.TrimSpace(candidate)
 		dotParts := strings.Split(candidate, ".")
 		finalMethod := dotParts[len(dotParts)-1]
-		if callMethod == finalMethod || finalMethod == "*" {
+		if callMethod == finalMethod || unqualifyName(callMethod) == finalMethod || finalMethod == "*" {
 			matched = true
 			break
 		}
@@ -172,10 +200,17 @@ func matchesCatalogEntry(receiver, callMethod, catObjectType, catMethodName stri
 
 	// Check receiver heuristic
 	if receiver == "" {
-		return false
+		// Constructor pattern: callMethod IS the type (e.g., "FileOutputStream" or "java.io.FileOutputStream").
+		// Match when the unqualified call method matches the ObjectType.
+		shortCall := unqualifyName(callMethod)
+		catLastPart := unqualifyName(catObjectType)
+		return strings.EqualFold(shortCall, catLastPart)
 	}
 
 	lower := strings.ToLower(receiver)
+	// Strip PHP $ prefix and normalize -> to . for consistent matching.
+	lower = strings.TrimPrefix(lower, "$")
+	lower = strings.ReplaceAll(lower, "->", ".")
 	catLower := strings.ToLower(catObjectType)
 
 	// Direct name match
@@ -219,8 +254,28 @@ func matchesCatalogEntry(receiver, callMethod, catObjectType, catMethodName stri
 			return true
 		}
 	}
-	if strings.Contains(catLower, "database") {
-		if lower == "db" || lower == "database" || lower == "sqlite" || lower == "sqlitedb" {
+	if strings.Contains(catLower, "dircontext") || strings.Contains(catLower, "ldapcontext") || strings.Contains(catLower, "initialdircontext") {
+		if lower == "ctx" || lower == "idc" || lower == "dirctx" || lower == "ldapctx" || lower == "context" {
+			return true
+		}
+	}
+	if strings.Contains(catLower, "database") || catLower == "pdo" || catLower == "mysqli" {
+		if lower == "db" || lower == "database" || lower == "sqlite" || lower == "sqlitedb" || strings.HasSuffix(lower, ".db") || strings.HasSuffix(lower, ".database") {
+			return true
+		}
+	}
+	if strings.Contains(catLower, "context") && !strings.Contains(catLower, "dircontext") && !strings.Contains(catLower, "ldapcontext") {
+		if lower == "c" || lower == "ctx" || lower == "context" {
+			return true
+		}
+	}
+	if strings.Contains(catLower, "reply") {
+		if lower == "reply" || lower == "rep" {
+			return true
+		}
+	}
+	if strings.Contains(catLower, "applicationcall") {
+		if lower == "call" || lower == "call.request" || strings.HasPrefix(lower, "call.") {
 			return true
 		}
 	}
@@ -234,8 +289,41 @@ func matchesCatalogEntry(receiver, callMethod, catObjectType, catMethodName stri
 	}
 
 	// Abbreviation heuristic: receiver is a prefix of the type name
-	// (e.g., "stmt" is a prefix of "statement", "req" is a prefix of "request")
-	if len(lower) >= 2 && strings.HasPrefix(lastPart, lower) {
+	// (e.g., "stmt" is a prefix of "statement", "req" is a prefix of "request",
+	// "r" is a prefix of "runtime")
+	if len(lower) >= 1 && strings.HasPrefix(lastPart, lower) {
+		return true
+	}
+
+	// Qualified receiver heuristic: receiver contains dots (e.g., "java.security.MessageDigest")
+	// — check if the last component of the receiver matches the type.
+	if strings.Contains(lower, ".") {
+		recvParts := strings.Split(lower, ".")
+		recvLast := recvParts[len(recvParts)-1]
+		if recvLast == lastPart {
+			return true
+		}
+		// Also check abbreviation: "jdbctemplate" prefix of "jdbctemplate"
+		if len(recvLast) >= 2 && strings.HasPrefix(lastPart, recvLast) {
+			return true
+		}
+		// Check if any component of receiver contains the type (e.g., "DatabaseHelper.JDBCtemplate" contains "jdbctemplate")
+		for _, rp := range recvParts {
+			if strings.EqualFold(rp, lastPart) {
+				return true
+			}
+		}
+	}
+
+	// Chained call receiver: receiver text contains method calls that return
+	// the expected object type.
+	if strings.Contains(lower, "getsession") && strings.Contains(catLower, "session") {
+		return true
+	}
+	if strings.Contains(lower, "getwriter") && strings.Contains(catLower, "writer") {
+		return true
+	}
+	if strings.Contains(lower, "getconnection") && (strings.Contains(catLower, "connection") || strings.Contains(catLower, "conn")) {
 		return true
 	}
 

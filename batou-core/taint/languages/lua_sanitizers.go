@@ -185,5 +185,202 @@ func (c *LuaCatalog) Sanitizers() []taint.SanitizerDef {
 			Neutralizes: []taint.SinkCategory{taint.SnkEval, taint.SnkSQLQuery},
 			Description: "Lua pattern metacharacter escaping via gsub",
 		},
+
+		// --- pgmoon SQL escaping ---
+		{
+			ID:          "lua.pgmoon.escape_literal",
+			Language:    rules.LangLua,
+			Pattern:     `pg:escape_literal\s*\(|:escape_literal\s*\(`,
+			ObjectType:  "pgmoon",
+			MethodName:  "pg:escape_literal",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "pgmoon SQL literal escaping (quotes and escapes values)",
+		},
+		{
+			ID:          "lua.pgmoon.escape_identifier",
+			Language:    rules.LangLua,
+			Pattern:     `pg:escape_identifier\s*\(|:escape_identifier\s*\(`,
+			ObjectType:  "pgmoon",
+			MethodName:  "pg:escape_identifier",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "pgmoon SQL identifier escaping (double-quotes identifiers)",
+		},
+		{
+			ID:          "lua.pgmoon.parameterized",
+			Language:    rules.LangLua,
+			Pattern:     `pg:query\s*\([^,]+,\s*\w`,
+			ObjectType:  "pgmoon",
+			MethodName:  "pg:query (parameterized)",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "pgmoon parameterized query with $N placeholders (safe)",
+		},
+
+		// --- Shell metachar escaping ---
+		{
+			ID:          "lua.string.gsub.shell_escape",
+			Language:    rules.LangLua,
+			Pattern:     `string\.gsub\s*\([^,]+,\s*['"][\[\\]?[^'"]*shell|string\.gsub\s*\([^,]+,\s*['"][^a-zA-Z0-9]`,
+			ObjectType:  "",
+			MethodName:  "string.gsub (shell escape)",
+			Neutralizes: []taint.SinkCategory{taint.SnkCommand},
+			Description: "Shell metacharacter escaping via string.gsub",
+		},
+
+		// --- URL host validation for SSRF ---
+		{
+			ID:          "lua.url.parse.host_check",
+			Language:    rules.LangLua,
+			Pattern:     `url\.parse\s*\(.*\.host|socket\.dns\.toip\s*\(`,
+			ObjectType:  "",
+			MethodName:  "url.parse (host check)",
+			Neutralizes: []taint.SinkCategory{taint.SnkURLFetch},
+			Description: "URL parsing with host extraction for SSRF validation",
+		},
+
+		// --- tostring type coercion ---
+		{
+			ID:          "lua.tostring.sanitizer",
+			Language:    rules.LangLua,
+			Pattern:     `tostring\s*\(`,
+			ObjectType:  "",
+			MethodName:  "tostring",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery, taint.SnkCommand},
+			Description: "String coercion (may limit injection in numeric contexts)",
+		},
+
+		// --- Tarantool parameterized SQL ---
+		{
+			ID:          "lua.tarantool.box.execute.params",
+			Language:    rules.LangLua,
+			Pattern:     `box\.execute\s*\(\s*['"][^'"]*\?\s*[^'"]*['"]\s*,\s*\{`,
+			ObjectType:  "box",
+			MethodName:  "box.execute with params",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "Tarantool parameterized SQL query (bind variables via ? placeholders)",
+		},
+
+		// --- LuaSQL prepared statements ---
+		{
+			ID:          "lua.luasql.prepare",
+			Language:    rules.LangLua,
+			Pattern:     `conn:prepare\s*\(|:prepare\s*\(`,
+			ObjectType:  "luasql",
+			MethodName:  "conn:prepare",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "LuaSQL prepared statement (parameterized query)",
+		},
+
+		// --- LuaExpat threat parser (XXE prevention) ---
+		{
+			ID:          "lua.lxp.threat",
+			Language:    rules.LangLua,
+			Pattern:     `threat\s*=\s*\{|lxp%.new\s*\(.*threat`,
+			ObjectType:  "lxp",
+			MethodName:  "lxp.new with threat protection",
+			Neutralizes: []taint.SinkCategory{taint.SnkDeserialize, taint.SnkXPath},
+			Description: "LuaExpat threat parser with entity/DTD restrictions (XXE prevention)",
+		},
+
+		// --- String length truncation ---
+		{
+			ID:          "lua.string.sub.limit",
+			Language:    rules.LangLua,
+			Pattern:     `string\.sub\s*\(\s*\w+\s*,\s*1\s*,`,
+			ObjectType:  "",
+			MethodName:  "string.sub (length limit)",
+			Neutralizes: []taint.SinkCategory{taint.SnkLog, taint.SnkHeader},
+			Description: "String truncation via string.sub to limit input length",
+		},
+
+		// --- Cryptographically secure random ---
+		{
+			ID:          "lua.resty.random.bytes",
+			Language:    rules.LangLua,
+			Pattern:     `resty\.random\.bytes\s*\(`,
+			ObjectType:  "resty.random",
+			MethodName:  "resty.random.bytes",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "CSPRNG via lua-resty-random (OpenSSL RAND_bytes)",
+		},
+		{
+			ID:          "lua.openssl.rand.bytes",
+			Language:    rules.LangLua,
+			Pattern:     `rand\.bytes\s*\(|openssl\.rand\.bytes\s*\(`,
+			ObjectType:  "openssl.rand",
+			MethodName:  "rand.bytes",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "CSPRNG via lua-openssl RAND_bytes",
+		},
+
+		// --- Strong hash algorithms ---
+		{
+			ID:          "lua.resty.sha256.new",
+			Language:    rules.LangLua,
+			Pattern:     `(?:resty\.)?sha256:new\s*\(`,
+			ObjectType:  "resty.sha256",
+			MethodName:  "sha256:new",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "SHA-256 hash via lua-resty-string (strong replacement for MD5/SHA-1)",
+		},
+		{
+			ID:          "lua.resty.sha512.new",
+			Language:    rules.LangLua,
+			Pattern:     `(?:resty\.)?sha512:new\s*\(`,
+			ObjectType:  "resty.sha512",
+			MethodName:  "sha512:new",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "SHA-512 hash via lua-resty-string (strong replacement for MD5/SHA-1)",
+		},
+		{
+			ID:          "lua.resty.hmac.new",
+			Language:    rules.LangLua,
+			Pattern:     `(?:resty\.)?hmac:new\s*\(`,
+			ObjectType:  "resty.hmac",
+			MethodName:  "hmac:new",
+			Neutralizes: []taint.SinkCategory{taint.SnkCrypto},
+			Description: "HMAC via lua-resty-hmac (keyed hash for integrity/authentication)",
+		},
+
+		// --- XPath input sanitization ---
+		{
+			ID:          "lua.xpath.escape",
+			Language:    rules.LangLua,
+			Pattern:     `xpath_escape\s*\(|escape_xpath\s*\(|string\.gsub\s*\([^,]+,\s*['"]['\[\]@=]`,
+			ObjectType:  "",
+			MethodName:  "xpath_escape",
+			Neutralizes: []taint.SinkCategory{taint.SnkXPath},
+			Description: "XPath special character escaping (quotes, brackets, operators)",
+		},
+
+		// --- MongoDB input sanitization ---
+		{
+			ID:          "lua.mongol.sanitize",
+			Language:    rules.LangLua,
+			Pattern:     `mongo_sanitize\s*\(|sanitize_query\s*\(|string\.gsub\s*\([^,]+,\s*['"]%$`,
+			ObjectType:  "mongol",
+			MethodName:  "mongo_sanitize",
+			Neutralizes: []taint.SinkCategory{taint.SnkSQLQuery},
+			Description: "MongoDB query sanitization (strips $ operators to prevent NoSQL injection)",
+		},
+
+		// --- LDAP escaping ---
+		{
+			ID:          "lua.ldap.escape_filter",
+			Language:    rules.LangLua,
+			Pattern:     `ldap_escape_filter\s*\(|escape_filter_value\s*\(|ldap\.filter\.escape\s*\(`,
+			ObjectType:  "ldap",
+			MethodName:  "escape_filter",
+			Neutralizes: []taint.SinkCategory{taint.SnkLDAP},
+			Description: "LDAP filter value escaping (RFC 4515 special characters)",
+		},
+		{
+			ID:          "lua.ldap.escape_dn",
+			Language:    rules.LangLua,
+			Pattern:     `ldap_escape_dn\s*\(|escape_dn_value\s*\(|ldap\.dn\.escape\s*\(`,
+			ObjectType:  "ldap",
+			MethodName:  "escape_dn",
+			Neutralizes: []taint.SinkCategory{taint.SnkLDAP},
+			Description: "LDAP distinguished name escaping (RFC 4514 special characters)",
+		},
 	}
 }
