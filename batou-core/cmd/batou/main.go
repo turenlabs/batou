@@ -5,10 +5,12 @@ import (
 	"os"
 
 	"github.com/turenlabs/batou-core/findings"
+	"github.com/turenlabs/batou-core/hints"
 	"github.com/turenlabs/batou-core/hook"
 	"github.com/turenlabs/batou-core/ledger"
 	"github.com/turenlabs/batou-core/reporter"
 	"github.com/turenlabs/batou-core/scanner"
+	"github.com/turenlabs/batou-rules/rules"
 
 	// Import all rule packages to trigger init() registrations
 	_ "github.com/turenlabs/batou-rules/rules/injection"
@@ -91,10 +93,22 @@ func main() {
 
 	// Record to ledger synchronously — it's a single JSON line append, very fast.
 	// A fire-and-forget goroutine would be killed on os.Exit, losing blocked-write records.
-	ledger.Record(input.SessionID, result)
+	_ = ledger.Record(input.SessionID, result)
 
-	// Persist findings to project-local .batou/findings.json
-	persistFindings(result)
+	// Persist findings and compute lifecycle deltas for hint enrichment.
+	// Deltas track new/recurring/fixed findings so Claude gets feedback.
+	deltas := persistFindings(result)
+
+	// Tag each finding with lifecycle status so downstream consumers
+	// (external dashboards, metrics sinks) can track new/recurring/fixed.
+	if deltas != nil {
+		tagFindingsLifecycle(result.Findings, deltas)
+	}
+
+	// Inject lifecycle tags into the hints output if deltas are available.
+	if deltas != nil && result.HintsOutput != "" {
+		result.HintsOutput = hints.InjectLifecycle(result.HintsOutput, deltas, result.Findings)
+	}
 
 	// ALWAYS output hints as additionalContext — this is the key innovation.
 	// Even clean code gets a "looks good" message so Claude knows Batou is active.
@@ -109,52 +123,81 @@ func main() {
 		// Output context BEFORE a potential BlockWrite, since BlockWrite calls os.Exit(2).
 		// This ensures Claude always receives the additionalContext hints.
 		if context != "" {
-			hook.OutputPreTool("allow", "Batou: security analysis complete", context)
+			_ = hook.OutputPreTool("allow", "Batou: security analysis complete", context)
 		}
 
-		if result.ShouldBlock() {
-			// Block critical vulnerabilities BEFORE they're written
+		shouldBlock := result.ShouldBlock() || result.PreSuppressBlock
+		if shouldBlock && !result.SuppressOnlyEdit {
+			// Block critical vulnerabilities BEFORE they're written.
+			// PreSuppressBlock catches the bypass where an agent adds
+			// batou:ignore directives to hide blocking findings — the
+			// findings were blocking before suppression was applied.
+			// Exception: suppress-only edits (adding batou:ignore directives)
+			// are allowed through to break the chicken-and-egg deadlock.
 			hook.BlockWrite(reporter.FormatBlockMessage(result))
 		}
 	} else {
 		// PostToolUse: always provide hints
 		if context != "" {
-			hook.OutputPostTool(context)
+			_ = hook.OutputPostTool(context)
 		}
 	}
 }
 
-// persistFindings saves scan results to the project-local findings store.
+// persistFindings saves scan results to the project-local findings store
+// and returns lifecycle deltas (new/recurring/fixed) for hint enrichment.
 // Errors are logged but do not affect hook output — findings are best-effort.
-func persistFindings(result *reporter.ScanResult) {
-	batouDir, err := findings.FindRoot()
+func persistFindings(result *reporter.ScanResult) *findings.Deltas {
+	batouDir, err := findings.FindRoot(result.FilePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Batou: findings store: %v\n", err)
-		return
+		return nil
 	}
 
 	store, err := findings.Open(batouDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Batou: findings store: %v\n", err)
-		return
+		return nil
 	}
 
-	seenKeys := make(map[string]bool)
-	for _, f := range result.Findings {
-		store.Upsert(f)
-		seenKeys[findings.DedupKey(f)] = true
+	// ComputeDeltas upserts findings and marks resolved in one pass.
+	// Pass suppressed findings so they aren't incorrectly marked as resolved.
+	var deltas *findings.Deltas
+	if result.FilePath != "" {
+		deltas = store.ComputeDeltas(result.FilePath, result.Findings, result.SuppressedFindings)
 	}
+
+	// Record suppressed findings with their suppress status.
 	for _, f := range result.SuppressedFindings {
 		store.UpsertSuppressed(f, "batou:ignore")
-		seenKeys[findings.DedupKey(f)] = true
-	}
-
-	// Mark findings for this file that weren't seen in this scan as resolved
-	if result.FilePath != "" {
-		store.MarkResolved(result.FilePath, seenKeys)
 	}
 
 	if err := store.Save(); err != nil {
 		fmt.Fprintf(os.Stderr, "Batou: findings store: %v\n", err)
+	}
+
+	return deltas
+}
+
+// tagFindingsLifecycle annotates each finding with lifecycle metadata derived
+// from the findings store deltas. This ensures the fields are populated before
+// IPC serialization to external dashboards and metrics sinks.
+func tagFindingsLifecycle(allFindings []rules.Finding, deltas *findings.Deltas) {
+	newKeys := make(map[string]bool, len(deltas.New))
+	for _, f := range deltas.New {
+		newKeys[findings.DedupKey(f)] = true
+	}
+
+	for i := range allFindings {
+		key := findings.DedupKey(allFindings[i])
+		allFindings[i].DedupKey = key
+
+		if newKeys[key] {
+			allFindings[i].LifecycleStatus = "new"
+			allFindings[i].SeenCount = 1
+		} else {
+			allFindings[i].LifecycleStatus = "recurring"
+			allFindings[i].SeenCount = deltas.RecurringCount(allFindings[i])
+		}
 	}
 }
