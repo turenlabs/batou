@@ -1,6 +1,6 @@
 # Batou - Runtime SAST For Claude Code
 
-<img width="512" height="512" alt="logo_2" src="https://github.com/user-attachments/assets/a3157fb7-68cb-40af-878f-02dc54f62df9" />
+<img width="1200" height="820" alt="batou-demo" src="https://github.com/user-attachments/assets/41755ffe-e9a2-460f-81aa-7b8eacb9f165" />
 
 A security scanner that catches vulnerabilities in real-time as AI writes code. Built as a [Claude Code hook](https://docs.anthropic.com/en/docs/claude-code/hooks), Batou analyzes every file write across 17 languages using regex, AST, taint analysis, and interprocedural call graph tracking.
 
