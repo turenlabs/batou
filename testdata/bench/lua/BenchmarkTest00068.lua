@@ -1,0 +1,6 @@
+-- SSRF via cosocket TCP connect: safe (hardcoded host)
+local tcp = ngx.socket.tcp()
+tcp:connect("127.0.0.1", 6379)
+tcp:send("PING\r\n")
+local data = tcp:receive()
+ngx.say(data)

@@ -54,8 +54,8 @@ func init() {
 
 type CSQLInjection struct{}
 
-func (r *CSQLInjection) ID() string                     { return "BATOU-INJ-025" }
-func (r *CSQLInjection) Name() string                   { return "CSQLInjection" }
+func (r *CSQLInjection) ID() string                      { return "BATOU-INJ-025" }
+func (r *CSQLInjection) Name() string                    { return "CSQLInjection" }
 func (r *CSQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *CSQLInjection) Description() string {
 	return "Detects SQL queries built via sprintf, snprintf, strcat, or string concatenation in C/C++ code, which may allow SQL injection."
@@ -66,10 +66,11 @@ func (r *CSQLInjection) Languages() []rules.Language {
 
 func (r *CSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if the file uses parameterized queries (safe pattern).
-	hasSafeBind := reCSQLSafeBind.MatchString(ctx.Content)
+	hasSafeBind := rules.GMatchFile(reCSQLSafeBind, ctx)
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -92,7 +93,7 @@ func (r *CSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if p.lang != rules.LangAny && p.lang != ctx.Language {
 				continue
 			}
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				// If the entire file uses parameterized queries, reduce confidence.
 				conf := p.conf
 				if hasSafeBind {
@@ -126,7 +127,7 @@ func (r *CSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if isCommentLine(line) {
 				continue
 			}
-			if reCSQLAssignCpp.MatchString(line) {
+			if rules.GMatchLower(reCSQLAssignCpp, line, lowered[i]) {
 				// Look ahead for += with a variable (not a string literal) within 5 lines.
 				for j := i + 1; j < len(lines) && j <= i+5; j++ {
 					trimmed := strings.TrimSpace(lines[j])
@@ -163,8 +164,8 @@ func (r *CSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CCommandInjection struct{}
 
-func (r *CCommandInjection) ID() string                     { return "BATOU-INJ-026" }
-func (r *CCommandInjection) Name() string                   { return "CCommandInjection" }
+func (r *CCommandInjection) ID() string                      { return "BATOU-INJ-026" }
+func (r *CCommandInjection) Name() string                    { return "CCommandInjection" }
 func (r *CCommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *CCommandInjection) Description() string {
 	return "Detects OS command injection via system(), popen(), or command strings built with sprintf/snprintf in C/C++ code."
@@ -175,7 +176,8 @@ func (r *CCommandInjection) Languages() []rules.Language {
 
 func (r *CCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Track variables that hold sprintf-built strings (potential command buffers).
 	sprintfVars := make(map[string]int) // var name -> line number
@@ -187,12 +189,12 @@ func (r *CCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		trimmed := strings.TrimSpace(line)
 
 		// Track sprintf/snprintf destination buffers.
-		if m := reCCmdSprintf.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatchLower(reCCmdSprintf, line, lowered[i]); m != nil {
 			sprintfVars[m[1]] = i + 1
 		}
 
 		// system(variable) -- not a literal
-		if reCCmdSystem.MatchString(line) && !reCCmdSystemLiteral.MatchString(line) {
+		if rules.GMatchLower(reCCmdSystem, line, lowered[i]) && !rules.GMatchLower(reCCmdSystemLiteral, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -212,7 +214,7 @@ func (r *CCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// popen(variable) -- not a literal
-		if reCCmdPopen.MatchString(line) && !reCCmdPopenLiteral.MatchString(line) {
+		if rules.GMatchLower(reCCmdPopen, line, lowered[i]) && !rules.GMatchLower(reCCmdPopenLiteral, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

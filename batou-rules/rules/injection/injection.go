@@ -12,25 +12,47 @@ import (
 // ---------------------------------------------------------------------------
 
 // SQL Injection patterns (BATOU-INJ-001)
+//
+// Tightening note (2026-04-26): all the per-language patterns previously
+// used a bare SQL keyword alternation (`SELECT|INSERT|UPDATE|DELETE|...|
+// VALUES|SET|FROM|...`). Common English words (`values`, `set`, `from`,
+// `into`) inside error messages and log strings collided with these
+// keywords, producing 20 CRITICAL FPs in ocis on lines like:
+//
+//	"Make sure your %s config contains the proper values "+...
+//	fmt.Sprintf("user '%s' moved file '%s' from '%s' to '%s'", ...)
+//	f"file set: missing {...}"
+//
+// Replaced with sqlClauseShape — a multi-token-only pattern: real SQL
+// almost always has a distinctive shape like `SELECT ... FROM`,
+// `INSERT INTO`, `UPDATE x SET`, `DELETE FROM`, `WHERE col = ...`,
+// `VALUES (...)`, etc. Bare keyword + format/concat is no longer enough.
+const sqlClauseShape = `(?:SELECT\s+(?:\*|DISTINCT\s+|TOP\s+\d+\s+|[\w.,\s]+\s+FROM\b)|INSERT\s+INTO\b|UPDATE\s+[\w.]+\s+SET\b|DELETE\s+FROM\b|ALTER\s+TABLE\b|DROP\s+(?:TABLE|INDEX|DATABASE|VIEW|SCHEMA)\b|CREATE\s+(?:TABLE|INDEX|VIEW|DATABASE|SCHEMA)\b|WHERE\s+[\w.]+\s*(?:=|<|>|LIKE\b|IN\s*\(|IS\s+(?:NOT\s+)?NULL)|FROM\s+[\w.]+\s+(?:WHERE|JOIN|GROUP|ORDER|LIMIT|;|$)|UNION\s+(?:ALL\s+)?SELECT\b|VALUES\s*\()`
+
 var (
-	// Go: fmt.Sprintf with SQL keywords
-	reSQLSprintfGo = regexp.MustCompile(`(?i)fmt\.Sprintf\(\s*"[^"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"]*%[svdq]`)
-	// Go: string concat with SQL keywords
-	reSQLConcatGo = regexp.MustCompile(`(?i)(?:"[^"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"]*"\s*\+|\+\s*"[^"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b)`)
-	// Python: f-string with SQL keywords (allows escaped quotes like \' inside f-strings)
-	reSQLFStringPy = regexp.MustCompile(`(?i)f["'](?:[^"'\\]|\\.)*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b(?:[^"'\\]|\\.)*\{`)
-	// Python: % formatting with SQL keywords
-	reSQLPercentPy = regexp.MustCompile(`(?i)["'][^"']*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"']*["']\s*%\s*[(\w]`)
-	// Python: .format() with SQL keywords
-	reSQLFormatPy = regexp.MustCompile(`(?i)["'][^"']*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"']*["']\s*\.format\(`)
+	// Go: fmt.Sprintf with a real SQL clause shape
+	reSQLSprintfGo = regexp.MustCompile(`(?i)fmt\.Sprintf\(\s*"[^"]*` + sqlClauseShape + `[^"]*%[svdq]`)
+	// Go: string concat with SQL clause shape
+	reSQLConcatGo = regexp.MustCompile(`(?i)(?:"[^"]*` + sqlClauseShape + `[^"]*"\s*\+|\+\s*"[^"]*` + sqlClauseShape + `)`)
+	// Python: f-string with SQL clause shape (allows escaped quotes)
+	reSQLFStringPy = regexp.MustCompile(`(?i)f["'](?:[^"'\\]|\\.)*` + sqlClauseShape + `(?:[^"'\\]|\\.)*\{`)
+	// Python: % formatting with SQL clause shape
+	reSQLPercentPy = regexp.MustCompile(`(?i)["'][^"']*` + sqlClauseShape + `[^"']*["']\s*%\s*[(\w]`)
+	// Python: .format() with SQL clause shape
+	reSQLFormatPy = regexp.MustCompile(`(?i)["'][^"']*` + sqlClauseShape + `[^"']*["']\s*\.format\(`)
 	// Python: cursor.execute with string concat/format
 	reSQLExecConcatPy = regexp.MustCompile(`(?i)(?:cursor|conn|connection|db)\s*\.\s*execute\(\s*(?:f["']|["'][^"']*["']\s*%|["'][^"']*["']\s*\.format|[^"',)]+\+)`)
-	// Java/JS/C#: string concat with SQL keywords
-	reSQLConcatGeneric = regexp.MustCompile(`(?i)["'][^"']*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"']*["']\s*\+\s*\w`)
-	// JS/Java: .query() / .execute() with concat
-	reSQLQueryConcat = regexp.MustCompile(`(?i)\.(?:query|execute|exec|prepare)\(\s*["'][^"']*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"']*["']\s*\+`)
-	// JS template literal with SQL keywords
-	reSQLTemplateLiteral = regexp.MustCompile("(?i)`[^`]*\\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\\b[^`]*\\$\\{")
+	// Java/JS/C#: string concat with SQL clause shape
+	reSQLConcatGeneric = regexp.MustCompile(`(?i)["'][^"']*` + sqlClauseShape + `[^"']*["']\s*\+\s*\w`)
+	// JS/Java: .query() / .execute() with concat + SQL shape
+	reSQLQueryConcat = regexp.MustCompile(`(?i)\.(?:query|execute|exec|prepare)\(\s*["'][^"']*` + sqlClauseShape + `[^"']*["']\s*\+`)
+	// JS template literal with a real SQL clause shape (not just a bare
+	// keyword). The previous pattern fired on every backtick string
+	// containing common English words like SET, DELETE, DROP, UPDATE
+	// (e.g. `delete psec file ${id}`, `oc-button-drop-btn-${i}`,
+	// `set according to ${state}`) — 11 FPs in owncloud/web alone.
+	// SQL has distinctive multi-token shapes; require one of them.
+	reSQLTemplateLiteral = regexp.MustCompile("(?i)`[^`]*(?:SELECT\\s+[^`]+?\\s+FROM\\b|INSERT\\s+INTO\\b|UPDATE\\s+[\\w.]+\\s+SET\\b|DELETE\\s+FROM\\b|WHERE\\s+[\\w.]+\\s*(?:=|<|>|LIKE\\b|IN\\s*\\()|UNION\\s+(?:ALL\\s+)?SELECT\\b|VALUES\\s*\\()[^`]*\\$\\{")
 	// PHP: SQL with variable interpolation (double-quoted strings)
 	reSQLPHP = regexp.MustCompile(`(?i)"[^"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|FROM|WHERE|SET|INTO|VALUES)\b[^"]*\$\w+`)
 	// Ruby: SQL with interpolation (double-quoted strings)
@@ -51,16 +73,35 @@ var (
 	reCmdExecCommandShell = regexp.MustCompile(`(?i)\bexec\.Command(?:Context)?\(\s*["'](?:sh|bash|cmd|/bin/sh|/bin/bash|cmd\.exe)["']\s*,\s*["']-c["']`)
 	// Go: exec.Command with variable concat
 	reCmdExecCommandConcat = regexp.MustCompile(`(?i)\bexec\.Command(?:Context)?\(\s*[^"'\s)][^,)]*[+]`)
-	// JS: child_process.exec/execSync with variable
-	reCmdChildProcess = regexp.MustCompile(`(?i)\b(?:child_process\s*\.\s*)?(?:exec|execSync|spawn|spawnSync)\s*\(\s*(?:` + "`[^`]*\\$\\{" + `|[^"'\x60\s,)]+\s*[+]|f?["'][^"']*["']\s*\+)`)
+	// JS: child_process.exec/execSync with variable. The `child_process.`
+	// prefix is REQUIRED (not optional) so this doesn't match Go's
+	// xorm.Engine.Exec("ALTER ..." + col), Java's
+	// statement.exec("..." + x), or other ORM/JDBC patterns where a
+	// method named Exec/exec exists. Verified against gitea — without
+	// the required prefix this rule fired 18× on Go database code.
+	// Case-sensitive (no (?i)) so capital `Exec` (Go convention) doesn't match.
+	reCmdChildProcess = regexp.MustCompile(`\bchild_process\s*\.\s*(?:exec|execSync|spawn|spawnSync)\s*\(\s*(?:` + "`[^`]*\\$\\{" + `|[^"'\x60\s,)]+\s*[+]|f?["'][^"']*["']\s*\+)`)
 	// JS: require("child_process").exec with concat
 	reCmdChildProcessExec = regexp.MustCompile(`(?i)require\(\s*["']child_process["']\s*\)\s*\.exec\s*\(`)
 	// Shell: backtick or $() with variable
 	reCmdShellInterp = regexp.MustCompile("(?i)(?:`[^`]*\\$[{(]|\\$\\([^)]*\\$[{(])")
 	// Java: Runtime.exec with concat
 	reCmdRuntimeExec = regexp.MustCompile(`(?i)\bRuntime\s*\.\s*getRuntime\s*\(\s*\)\s*\.exec\s*\(\s*(?:["'][^"']*["']\s*\+|\w+[^"')]+\+)`)
-	// Java: ProcessBuilder with concat
-	reCmdProcessBuilder = regexp.MustCompile(`(?i)\bnew\s+ProcessBuilder\s*\(`)
+	// Java: ProcessBuilder with inline string concatenation in the constructor
+	// args (e.g. `new ProcessBuilder("cmd " + userInput)`). A bare
+	// `new ProcessBuilder()` or `new ProcessBuilder(argList)` / `(args)` is NOT
+	// matched here: the constructor name alone carries no injection signal (the
+	// dangerous content is the command string, set later via .command(...) or
+	// built through a List/array), and those variable-fed forms are covered
+	// precisely by the taint engine. Matching the bare constructor fired
+	// identically on safe and vulnerable code, producing only low-confidence
+	// noise. Requiring an inline `+` mirrors reCmdRuntimeExec's behaviour and
+	// matches this rule's own "with concat" intent.
+	// The `[^)\n]*` before the concat lets the `+` land on ANY constructor arg,
+	// not just the first — the idiomatic shell form is
+	// `new ProcessBuilder("sh", "-c", "cmd " + input)`. Still requires an actual
+	// `+`, so the bare `new ProcessBuilder(argList)` false-positive shape stays out.
+	reCmdProcessBuilder = regexp.MustCompile(`(?i)\bnew\s+ProcessBuilder\s*\([^)\n]*(?:["'][^"'\n]*["']\s*\+|\w+\s*\+)`)
 	// PHP: system/exec/passthru/shell_exec with variable
 	reCmdPHP = regexp.MustCompile(`(?i)\b(?:system|exec|passthru|shell_exec|popen|proc_open)\s*\(\s*\$`)
 	// Ruby: system/exec/backtick with interpolation
@@ -97,14 +138,10 @@ var (
 
 // Python false-positive reduction patterns (shared by BATOU-INJ-003 and BATOU-INJ-004)
 var (
-	// Known sanitizer that returns safe values (e.g., OWASP benchmark get_safe_value)
-	rePySafeInputSource = regexp.MustCompile(`get_safe_value\s*\(`)
 	// Validation guard before eval/exec: checking string literal format
 	rePyEvalGuard = regexp.MustCompile(`(?i)\bnot\s+\w+\.startswith\s*\(\s*['"]`)
 	// Extract first f-string interpolation variable: {varName}
-	rePyFStringVar = regexp.MustCompile(`\{(\w+)\}`)
 	// Python user-input taint source indicators
-	rePyTaintKeywords = regexp.MustCompile(`\bparam\b|\brequest\b|\bwrapped\b`)
 )
 
 // Template Injection patterns (BATOU-INJ-005)
@@ -217,7 +254,7 @@ var (
 var reLineComment = regexp.MustCompile(`^\s*(?://|#|--|;|%|/\*)`)
 
 func isCommentLine(line string) bool {
-	return reLineComment.MatchString(line)
+	return rules.GMatch(reLineComment, line)
 }
 
 // ---------------------------------------------------------------------------
@@ -233,11 +270,28 @@ func truncate(s string, maxLen int) string {
 	return s
 }
 
-// pyHasSafeInputSource checks if the Python file's user input comes from a known
-// sanitizer (e.g., get_safe_value) rather than raw request data. When the input
-// is pre-sanitized, injection patterns in the same file are false positives.
-func pyHasSafeInputSource(content string) bool {
-	return rePySafeInputSource.MatchString(content)
+// Callers that obviously do NOT execute SQL — error responders, loggers,
+// formatters. When the line's outer call is one of these AND no DB-exec
+// call is present, the SQL keyword in the string is English prose, not
+// a query fragment.
+var (
+	// Only include helpers that are unambiguously NOT SQL-adjacent. `fmt.Sprintf`
+	// is deliberately excluded — it's the standard way to BUILD SQL strings in Go.
+	// `fmt.Fprintf` is excluded because `fmt.Fprintf(w, ...)` is an HTTP response
+	// writer but SQL-builder usage also exists; rely on proximity to DB calls.
+	reNonSQLCaller = regexp.MustCompile(`(?i)\b(?:WriteError|WriteJSON|WriteHeader|respond(?:Error|JSON|With)?|http\.Error|json\.Marshal|json\.NewEncoder|fmt\.Errorf|errors\.New|errors\.Wrap|panic\s*\(|log\.|logger\.|logging\.|slog\.|logrus\.|zap\.|klog\.|console\.(?:log|error|warn)|raise\s+\w*Error)`)
+	reSQLExecCall  = regexp.MustCompile(`(?i)\.(?:Query|QueryRow|QueryContext|QueryRowContext|Exec|ExecContext|Prepare|PrepareContext|Scan|ScanContext|Select|SelectContext|Get|GetContext|NamedExec|NamedQuery|Raw|Unsafe)\s*\(|(?:cursor\.execute|db\.execute|connection\.execute|execute_query|raw_query|mysqli_query|pg_query|PDO->\w+|\bquery\s*\(|->prepare\s*\()`)
+)
+
+// isNonSQLErrorOrLogCall reports whether the line's visible call shape is an
+// error/log/format helper rather than a SQL execution. Used by the SQL
+// injection rule to drop false positives where SQL keywords appear in human
+// prose (e.g., `WriteError(w, "cannot update seats while ..." + status)`).
+func isNonSQLErrorOrLogCall(line string) bool {
+	if rules.GMatch(reSQLExecCall, line) {
+		return false
+	}
+	return rules.GMatch(reNonSQLCaller, line)
 }
 
 // pyHasEvalGuard checks if there's a validation guard (e.g., startswith check)
@@ -248,7 +302,7 @@ func pyHasEvalGuard(lines []string, sinkIdx int) bool {
 		start = 0
 	}
 	for _, l := range lines[start:sinkIdx] {
-		if rePyEvalGuard.MatchString(l) {
+		if rules.GMatch(rePyEvalGuard, l) {
 			return true
 		}
 	}
@@ -256,18 +310,14 @@ func pyHasEvalGuard(lines []string, sinkIdx int) bool {
 }
 
 // pyLastAssignmentIsSafe delegates to the shared implementation in rules.PyLastAssignmentIsSafe.
-func pyLastAssignmentIsSafe(lines []string, lineIdx int, varName string) bool {
-	return rules.PyLastAssignmentIsSafe(lines, lineIdx, varName)
-}
-
 // ---------------------------------------------------------------------------
 // BATOU-INJ-001: SQL Injection
 // ---------------------------------------------------------------------------
 
 type SQLInjection struct{}
 
-func (r SQLInjection) ID() string              { return "BATOU-INJ-001" }
-func (r SQLInjection) Name() string            { return "SQL Injection" }
+func (r SQLInjection) ID() string                      { return "BATOU-INJ-001" }
+func (r SQLInjection) Name() string                    { return "SQL Injection" }
 func (r SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r SQLInjection) Description() string {
 	return "Detects SQL queries constructed via string concatenation or formatting, which may allow SQL injection attacks."
@@ -286,7 +336,8 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -317,9 +368,18 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if p.lang != rules.LangAny && p.lang != ctx.Language {
 				continue
 			}
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				// Java: suppress if the concatenated variable has a safe data flow.
 				if ctx.Language == rules.LangJava && rules.JavaSinkVarIsSafe(lines, i) {
+					continue
+				}
+				// Skip obvious non-SQL sinks. A string like
+				// `WriteError(w, "cannot update seats while subscription is "+status, ...)`
+				// contains the SQL keyword "update" (or "from", "where") as
+				// regular English, not a query. If the line's call target is
+				// clearly an error/log/format helper and has no DB-exec call,
+				// this isn't an injection.
+				if isNonSQLErrorOrLogCall(line) {
 					continue
 				}
 				matched := truncate(line[loc[0]:loc[1]], 120)
@@ -352,8 +412,8 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CommandInjection struct{}
 
-func (r CommandInjection) ID() string              { return "BATOU-INJ-002" }
-func (r CommandInjection) Name() string            { return "Command Injection" }
+func (r CommandInjection) ID() string                      { return "BATOU-INJ-002" }
+func (r CommandInjection) Name() string                    { return "Command Injection" }
 func (r CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r CommandInjection) Description() string {
 	return "Detects shell command construction with unsanitized variables, which may allow OS command injection."
@@ -367,13 +427,9 @@ func (r CommandInjection) Languages() []rules.Language {
 
 func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	isPython := ctx.Language == rules.LangPython
-
-	// Python-specific: if user input comes from a known sanitizer, skip.
-	if isPython && pyHasSafeInputSource(ctx.Content) {
-		return nil
-	}
 
 	type pattern struct {
 		re      *regexp.Regexp
@@ -391,7 +447,7 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		{re: reCmdChildProcessExec, conf: "medium", desc: "child_process.exec usage (verify input is sanitized)"},
 		{re: reCmdShellInterp, conf: "high", desc: "shell command with variable interpolation inside backticks/$()", skipFor: []rules.Language{rules.LangJavaScript, rules.LangTypeScript}},
 		{re: reCmdRuntimeExec, conf: "high", desc: "Runtime.exec with string concatenation"},
-		{re: reCmdProcessBuilder, conf: "low", desc: "ProcessBuilder usage (verify arguments are sanitized)"},
+		{re: reCmdProcessBuilder, conf: "medium", desc: "ProcessBuilder with string concatenation in constructor args"},
 		{re: reCmdPHP, conf: "high", desc: "PHP shell function with variable argument"},
 		{re: reCmdRuby, conf: "high", desc: "Ruby shell execution with string interpolation"},
 		{re: reCmdSubprocessStr, conf: "medium", desc: "subprocess with string command (use list form instead)"},
@@ -414,7 +470,7 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 					continue
 				}
 			}
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				// Java: suppress if the sink variable has safe data flow.
 				if ctx.Language == rules.LangJava && rules.JavaSinkVarIsSafe(lines, i) {
 					continue
@@ -454,8 +510,8 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CodeInjection struct{}
 
-func (r CodeInjection) ID() string              { return "BATOU-INJ-003" }
-func (r CodeInjection) Name() string            { return "Code Injection" }
+func (r CodeInjection) ID() string                      { return "BATOU-INJ-003" }
+func (r CodeInjection) Name() string                    { return "Code Injection" }
 func (r CodeInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r CodeInjection) Description() string {
 	return "Detects use of eval(), exec(), Function() constructor, and similar dynamic code execution with potentially untrusted input."
@@ -469,13 +525,9 @@ func (r CodeInjection) Languages() []rules.Language {
 
 func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
-
-	// Python-specific: if user input comes from a known sanitizer, skip injection checks.
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	isPython := ctx.Language == rules.LangPython
-	if isPython && pyHasSafeInputSource(ctx.Content) {
-		return nil
-	}
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -496,17 +548,31 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		// Skip safe patterns
-		if reCodeSafeAstLiteral.MatchString(line) {
+		if rules.GMatchLower(reCodeSafeAstLiteral, line, lowered[i]) {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				// Additional filter: skip JSON.parse inside eval detection
-				if p.re == reCodeEval && reCodeSafeJsonParse.MatchString(line) {
+				if p.re == reCodeEval && rules.GMatchLower(reCodeSafeJsonParse, line, lowered[i]) {
 					continue
 				}
 				// Skip re.compile/regex.compile/pattern.compile — regex compilation, not code execution
-				if p.re == reCodeCompile && reCodeSafeCompile.MatchString(line) {
+				if p.re == reCodeCompile && rules.GMatchLower(reCodeSafeCompile, line, lowered[i]) {
+					continue
+				}
+				// reCodeExecPy is Python's exec() builtin — in JS/TS,
+				// `regex.exec(str)` and `RegExp.prototype.exec` are
+				// innocuous regex methods, not code execution. Apply
+				// this pattern only to Python (PHP's exec is shell
+				// execution, handled by BATOU-INJ-002).
+				if p.re == reCodeExecPy && !isPython {
+					continue
+				}
+				// reCodeCompile is also Python-specific (compile() builtin).
+				// JS/TS .compile() is regex/proto compilation — already
+				// covered by reCodeSafeCompile but be defensive.
+				if p.re == reCodeCompile && !isPython {
 					continue
 				}
 				// Python: skip if a validation guard or safe assignment precedes eval/exec
@@ -548,8 +614,8 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LDAPInjection struct{}
 
-func (r LDAPInjection) ID() string              { return "BATOU-INJ-004" }
-func (r LDAPInjection) Name() string            { return "LDAP Injection" }
+func (r LDAPInjection) ID() string                      { return "BATOU-INJ-004" }
+func (r LDAPInjection) Name() string                    { return "LDAP Injection" }
 func (r LDAPInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r LDAPInjection) Description() string {
 	return "Detects LDAP queries built with string concatenation or formatting, which may allow LDAP injection."
@@ -563,13 +629,9 @@ func (r LDAPInjection) Languages() []rules.Language {
 
 func (r LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
-
-	// Python-specific: if user input comes from a known sanitizer, skip LDAP injection checks.
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	isPython := ctx.Language == rules.LangPython
-	if isPython && pyHasSafeInputSource(ctx.Content) {
-		return nil
-	}
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -587,7 +649,7 @@ func (r LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				// Java: suppress if the sink variable has safe data flow.
 				if ctx.Language == rules.LangJava && rules.JavaSinkVarIsSafe(lines, i) {
 					continue
@@ -627,8 +689,8 @@ func (r LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TemplateInjection struct{}
 
-func (r TemplateInjection) ID() string              { return "BATOU-INJ-005" }
-func (r TemplateInjection) Name() string            { return "Server-Side Template Injection" }
+func (r TemplateInjection) ID() string                      { return "BATOU-INJ-005" }
+func (r TemplateInjection) Name() string                    { return "Server-Side Template Injection" }
 func (r TemplateInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r TemplateInjection) Description() string {
 	return "Detects server-side template injection where user input is rendered directly in templates."
@@ -642,7 +704,8 @@ func (r TemplateInjection) Languages() []rules.Language {
 
 func (r TemplateInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -666,7 +729,7 @@ func (r TemplateInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -697,8 +760,8 @@ func (r TemplateInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XPathInjection struct{}
 
-func (r XPathInjection) ID() string              { return "BATOU-INJ-006" }
-func (r XPathInjection) Name() string            { return "XPath Injection" }
+func (r XPathInjection) ID() string                      { return "BATOU-INJ-006" }
+func (r XPathInjection) Name() string                    { return "XPath Injection" }
 func (r XPathInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r XPathInjection) Description() string {
 	return "Detects XPath queries built with string concatenation, which may allow XPath injection."
@@ -712,13 +775,9 @@ func (r XPathInjection) Languages() []rules.Language {
 
 func (r XPathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	isPython := ctx.Language == rules.LangPython
-
-	// Python-specific: if user input comes from a known sanitizer, skip.
-	if isPython && pyHasSafeInputSource(ctx.Content) {
-		return nil
-	}
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -738,7 +797,7 @@ func (r XPathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				// Python: check if the sink variable was last assigned a safe value,
 				// or if there is an XPath injection guard (apostrophe check).
 				if isPython && (rules.PySinkVarIsSafe(lines, i) || rules.PyHasXPathGuard(lines, i)) {
@@ -775,8 +834,8 @@ func (r XPathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NoSQLInjection struct{}
 
-func (r NoSQLInjection) ID() string              { return "BATOU-INJ-007" }
-func (r NoSQLInjection) Name() string            { return "NoSQL Injection" }
+func (r NoSQLInjection) ID() string                      { return "BATOU-INJ-007" }
+func (r NoSQLInjection) Name() string                    { return "NoSQL Injection" }
 func (r NoSQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r NoSQLInjection) Description() string {
 	return "Detects NoSQL/MongoDB queries with unsafe patterns such as $where with string concatenation, unsanitized $regex, or JSON.parse of user input in queries."
@@ -790,7 +849,8 @@ func (r NoSQLInjection) Languages() []rules.Language {
 
 func (r NoSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -817,7 +877,7 @@ func (r NoSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -848,7 +908,7 @@ func (r NoSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if flaggedLines[i+1] || isCommentLine(line) {
 				continue
 			}
-			if reNoSQLQueryMethodBrace.MatchString(line) && hasNearbyReqInput(lines, i) {
+			if rules.GMatchLower(reNoSQLQueryMethodBrace, line, lowered[i]) && hasNearbyReqInput(lines, i) {
 				matched := truncate(strings.TrimSpace(line), 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -881,7 +941,7 @@ func hasNearbyReqInput(lines []string, idx int) bool {
 		start = 0
 	}
 	for _, l := range lines[start : idx+1] {
-		if reNoSQLReqInputNearby.MatchString(l) {
+		if rules.GMatch(reNoSQLReqInputNearby, l) {
 			return true
 		}
 	}
@@ -894,8 +954,8 @@ func hasNearbyReqInput(lines []string, idx int) bool {
 
 type GraphQLInjection struct{}
 
-func (r GraphQLInjection) ID() string              { return "BATOU-INJ-008" }
-func (r GraphQLInjection) Name() string            { return "GraphQL Injection" }
+func (r GraphQLInjection) ID() string                      { return "BATOU-INJ-008" }
+func (r GraphQLInjection) Name() string                    { return "GraphQL Injection" }
 func (r GraphQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r GraphQLInjection) Description() string {
 	return "Detects GraphQL queries constructed via string concatenation or formatting instead of using parameterized variables, which may allow GraphQL injection attacks."
@@ -909,7 +969,8 @@ func (r GraphQLInjection) Languages() []rules.Language {
 
 func (r GraphQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -937,7 +998,7 @@ func (r GraphQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if p.lang != rules.LangAny && p.lang != ctx.Language {
 				continue
 			}
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -971,11 +1032,9 @@ var (
 	// Go: w.Header().Set/Add with r.URL.Query/r.FormValue/r.Header.Get
 	reHeaderGoSet = regexp.MustCompile(`\bw\.Header\(\)\.(?:Set|Add)\s*\([^,]+,\s*r\.(?:URL\.Query\(\)\.Get|FormValue|Header\.Get|PostFormValue)\s*\(`)
 	// Go: http.SetCookie or w.Header().Set("Set-Cookie", ...) with user input
-	reHeaderGoSetCookie = regexp.MustCompile(`\bw\.Header\(\)\.(?:Set|Add)\s*\(\s*["']Set-Cookie["']`)
 	// Node/Express: res.set/res.header/res.setHeader with req.query/req.params/req.body
 	reHeaderJSSet = regexp.MustCompile(`\bres\.(?:set|header|setHeader)\s*\(\s*[^,]+,\s*req\.(?:query|params|body|headers)\s*[\[.]`)
 	// Node/Express: res.set/header with variable that may come from request
-	reHeaderJSSetVar = regexp.MustCompile(`\bres\.(?:set|header|setHeader)\s*\(\s*[^,]+,\s*[a-zA-Z_]\w*\s*\)`)
 	// Python: response[header] = request.GET/POST/etc
 	reHeaderPySet = regexp.MustCompile(`\bresponse\s*\[\s*["'][^"']+["']\s*\]\s*=\s*request\.(?:GET|POST|META|headers|args|form|values)\s*[\[.]`)
 	// Python: Django/Flask set header with user input
@@ -983,15 +1042,14 @@ var (
 	// Java: response.setHeader/addHeader with request.getParameter
 	reHeaderJavaSet = regexp.MustCompile(`\bresponse\.(?:setHeader|addHeader)\s*\(\s*["'][^"']+["']\s*,\s*request\.(?:getParameter|getHeader)\s*\(`)
 	// Java: HttpServletResponse header with user input
-	reHeaderJavaSetVar = regexp.MustCompile(`\bresponse\.(?:setHeader|addHeader)\s*\(\s*["'][^"']+["']\s*,\s*[a-zA-Z_]\w*\s*\)`)
 	// PHP: header() with user input
 	reHeaderPHPSet = regexp.MustCompile(`\bheader\s*\(\s*(?:["'][^"']*["']\s*\.\s*\$(?:_GET|_POST|_REQUEST|_SERVER|input|param)|.*\$(?:_GET|_POST|_REQUEST)\s*\[)`)
 )
 
 type HTTPHeaderInjection struct{}
 
-func (r HTTPHeaderInjection) ID() string              { return "BATOU-INJ-009" }
-func (r HTTPHeaderInjection) Name() string            { return "HTTP Header Injection" }
+func (r HTTPHeaderInjection) ID() string                      { return "BATOU-INJ-009" }
+func (r HTTPHeaderInjection) Name() string                    { return "HTTP Header Injection" }
 func (r HTTPHeaderInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r HTTPHeaderInjection) Description() string {
 	return "Detects HTTP response headers set with user-controlled input, which may allow header injection or response splitting via CRLF sequences."
@@ -1005,7 +1063,8 @@ func (r HTTPHeaderInjection) Languages() []rules.Language {
 
 func (r HTTPHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -1031,7 +1090,7 @@ func (r HTTPHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if p.lang != rules.LangAny && p.lang != ctx.Language {
 				continue
 			}
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				// Check for CRLF sanitization nearby
 				if hasHeaderSanitization(lines, i) {
 					continue

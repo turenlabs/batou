@@ -13,7 +13,6 @@ import (
 var (
 	stringExecute    = regexp.MustCompile(`"[^"]*"\s*\.execute\s*\(`)
 	gstringExecute   = regexp.MustCompile(`"[^"]*\$\{[^}]+\}[^"]*"\s*\.execute\s*\(`)
-	varExecute       = regexp.MustCompile(`\w+\s*\.execute\s*\(`)
 	listExecute      = regexp.MustCompile(`\[.*\]\s*\.execute\s*\(`)
 	runtimeExec      = regexp.MustCompile(`Runtime\.(?:getRuntime\s*\(\s*\)\s*\.)?exec\s*\(`)
 	processBuilderRe = regexp.MustCompile(`new\s+ProcessBuilder\s*\(`)
@@ -110,15 +109,18 @@ func init() {
 
 type CommandInjection struct{}
 
-func (r *CommandInjection) ID() string                      { return "BATOU-GVY-001" }
-func (r *CommandInjection) Name() string                    { return "GroovyCommandInjection" }
-func (r *CommandInjection) Description() string             { return "Detects command injection via Groovy's String.execute(), Runtime.exec, or ProcessBuilder with user-controlled input." }
+func (r *CommandInjection) ID() string   { return "BATOU-GVY-001" }
+func (r *CommandInjection) Name() string { return "GroovyCommandInjection" }
+func (r *CommandInjection) Description() string {
+	return "Detects command injection via Groovy's String.execute(), Runtime.exec, or ProcessBuilder with user-controlled input."
+}
 func (r *CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *CommandInjection) Languages() []rules.Language     { return []rules.Language{rules.LangGroovy} }
 
 func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -129,19 +131,19 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := gstringExecute.FindString(line); loc != "" {
+		if loc := rules.GFindLower(gstringExecute, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "GString interpolation in .execute()"
-		} else if loc := listExecute.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(listExecute, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "List.execute() command execution"
-		} else if loc := runtimeExec.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(runtimeExec, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Runtime.exec() command execution"
-		} else if loc := processBuilderRe.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(processBuilderRe, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "ProcessBuilder command execution"
-		} else if loc := stringExecute.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(stringExecute, line, lowered[i]); loc != "" {
 			// Static string execute is lower risk, check for variable involvement
 			context := surroundingContext(lines, i, 3)
 			if strings.Contains(context, "+") || strings.Contains(context, "${") {
@@ -177,15 +179,18 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CodeInjection struct{}
 
-func (r *CodeInjection) ID() string                      { return "BATOU-GVY-002" }
-func (r *CodeInjection) Name() string                    { return "GroovyCodeInjection" }
-func (r *CodeInjection) Description() string             { return "Detects code injection via GroovyShell.evaluate, Eval.me, and GroovyScriptEngine with user-controlled input." }
+func (r *CodeInjection) ID() string   { return "BATOU-GVY-002" }
+func (r *CodeInjection) Name() string { return "GroovyCodeInjection" }
+func (r *CodeInjection) Description() string {
+	return "Detects code injection via GroovyShell.evaluate, Eval.me, and GroovyScriptEngine with user-controlled input."
+}
 func (r *CodeInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *CodeInjection) Languages() []rules.Language     { return []rules.Language{rules.LangGroovy} }
 
 func (r *CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -196,16 +201,16 @@ func (r *CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := groovyShellEvaluate.FindString(line); loc != "" {
+		if loc := rules.GFindLower(groovyShellEvaluate, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "GroovyShell.evaluate()"
-		} else if loc := groovyShellParse.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(groovyShellParse, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "GroovyShell.parse()"
-		} else if loc := evalMe.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(evalMe, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Eval.me()"
-		} else if loc := groovyScriptEngine.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(groovyScriptEngine, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "GroovyScriptEngine/ScriptEngine eval"
 		}
@@ -237,15 +242,18 @@ func (r *CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SQLInjection struct{}
 
-func (r *SQLInjection) ID() string                      { return "BATOU-GVY-003" }
-func (r *SQLInjection) Name() string                    { return "GroovySQLInjection" }
-func (r *SQLInjection) Description() string             { return "Detects SQL injection via GString interpolation or string concatenation in Groovy SQL methods." }
+func (r *SQLInjection) ID() string   { return "BATOU-GVY-003" }
+func (r *SQLInjection) Name() string { return "GroovySQLInjection" }
+func (r *SQLInjection) Description() string {
+	return "Detects SQL injection via GString interpolation or string concatenation in Groovy SQL methods."
+}
 func (r *SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *SQLInjection) Languages() []rules.Language     { return []rules.Language{rules.LangGroovy} }
 
 func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -256,28 +264,28 @@ func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := sqlExecuteGString.FindString(line); loc != "" {
+		if loc := rules.GFindLower(sqlExecuteGString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sql.execute() with GString interpolation"
-		} else if loc := sqlRowsGString.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(sqlRowsGString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sql.rows() with GString interpolation"
-		} else if loc := sqlFirstRowGString.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(sqlFirstRowGString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sql.firstRow() with GString interpolation"
-		} else if loc := sqlEachRowGString.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(sqlEachRowGString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sql.eachRow() with GString interpolation"
-		} else if loc := sqlUpdateGString.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(sqlUpdateGString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sql.executeUpdate() with GString interpolation"
-		} else if loc := sqlExecuteConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(sqlExecuteConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sql.execute() with string concatenation"
-		} else if loc := sqlRowsConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(sqlRowsConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sql.rows() with string concatenation"
-		} else if loc := sqlFirstRowConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(sqlFirstRowConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sql.firstRow() with string concatenation"
 		}
@@ -309,15 +317,20 @@ func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JenkinsPipelineInjection struct{}
 
-func (r *JenkinsPipelineInjection) ID() string                      { return "BATOU-GVY-004" }
-func (r *JenkinsPipelineInjection) Name() string                    { return "JenkinsPipelineInjection" }
-func (r *JenkinsPipelineInjection) Description() string             { return "Detects Jenkins pipeline script injection via GString interpolation in sh/bat steps or unsafe load." }
+func (r *JenkinsPipelineInjection) ID() string   { return "BATOU-GVY-004" }
+func (r *JenkinsPipelineInjection) Name() string { return "JenkinsPipelineInjection" }
+func (r *JenkinsPipelineInjection) Description() string {
+	return "Detects Jenkins pipeline script injection via GString interpolation in sh/bat steps or unsafe load."
+}
 func (r *JenkinsPipelineInjection) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *JenkinsPipelineInjection) Languages() []rules.Language     { return []rules.Language{rules.LangGroovy} }
+func (r *JenkinsPipelineInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangGroovy}
+}
 
 func (r *JenkinsPipelineInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -328,19 +341,19 @@ func (r *JenkinsPipelineInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 		var matched string
 		var desc string
 
-		if loc := shTripleGString.FindString(line); loc != "" {
+		if loc := rules.GFindLower(shTripleGString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sh step with GString interpolation (triple-quoted)"
-		} else if loc := shScriptGString.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(shScriptGString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sh script parameter with GString interpolation"
-		} else if loc := shGString.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(shGString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "sh step with GString interpolation"
-		} else if loc := batGString.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(batGString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "bat step with GString interpolation"
-		} else if loc := loadVariable.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(loadVariable, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "load step with variable path"
 		}
@@ -372,15 +385,18 @@ func (r *JenkinsPipelineInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type GStringInjection struct{}
 
-func (r *GStringInjection) ID() string                      { return "BATOU-GVY-005" }
-func (r *GStringInjection) Name() string                    { return "GStringInjection" }
-func (r *GStringInjection) Description() string             { return "Detects GString interpolation used in security-sensitive contexts like SQL, shell commands, or LDAP queries." }
+func (r *GStringInjection) ID() string   { return "BATOU-GVY-005" }
+func (r *GStringInjection) Name() string { return "GStringInjection" }
+func (r *GStringInjection) Description() string {
+	return "Detects GString interpolation used in security-sensitive contexts like SQL, shell commands, or LDAP queries."
+}
 func (r *GStringInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GStringInjection) Languages() []rules.Language     { return []rules.Language{rules.LangGroovy} }
 
 func (r *GStringInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -391,21 +407,21 @@ func (r *GStringInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := gstringInLDAP.FindString(line); loc != "" {
+		if loc := rules.GFindLower(gstringInLDAP, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "LDAP query with GString interpolation"
 		}
 
 		// Only flag GString in SQL if not already caught by GVY-003
 		// This catches patterns like variable assignment then use
-		if matched == "" && gstringInSQL.MatchString(line) {
+		if matched == "" && rules.GMatchLower(gstringInSQL, line, lowered[i]) {
 			// Skip if GVY-003 would catch this (direct Sql method calls)
-			if !sqlExecuteGString.MatchString(line) &&
-				!sqlRowsGString.MatchString(line) &&
-				!sqlFirstRowGString.MatchString(line) &&
-				!sqlEachRowGString.MatchString(line) &&
-				!sqlUpdateGString.MatchString(line) {
-				matched = gstringInSQL.FindString(line)
+			if !rules.GMatchLower(sqlExecuteGString, line, lowered[i]) &&
+				!rules.GMatchLower(sqlRowsGString, line, lowered[i]) &&
+				!rules.GMatchLower(sqlFirstRowGString, line, lowered[i]) &&
+				!rules.GMatchLower(sqlEachRowGString, line, lowered[i]) &&
+				!rules.GMatchLower(sqlUpdateGString, line, lowered[i]) {
+				matched = rules.GFindLower(gstringInSQL, line, lowered[i])
 				desc = "SQL-like context with GString interpolation"
 			}
 		}
@@ -437,21 +453,26 @@ func (r *GStringInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GrailsMassAssignment struct{}
 
-func (r *GrailsMassAssignment) ID() string                      { return "BATOU-GVY-006" }
-func (r *GrailsMassAssignment) Name() string                    { return "GrailsMassAssignment" }
-func (r *GrailsMassAssignment) Description() string             { return "Detects Grails mass assignment via direct params binding without allowed fields or command objects." }
+func (r *GrailsMassAssignment) ID() string   { return "BATOU-GVY-006" }
+func (r *GrailsMassAssignment) Name() string { return "GrailsMassAssignment" }
+func (r *GrailsMassAssignment) Description() string {
+	return "Detects Grails mass assignment via direct params binding without allowed fields or command objects."
+}
 func (r *GrailsMassAssignment) DefaultSeverity() rules.Severity { return rules.High }
-func (r *GrailsMassAssignment) Languages() []rules.Language     { return []rules.Language{rules.LangGroovy} }
+func (r *GrailsMassAssignment) Languages() []rules.Language {
+	return []rules.Language{rules.LangGroovy}
+}
 
 func (r *GrailsMassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if file uses command objects or allowedFields
-	if allowedFieldsCheck.MatchString(ctx.Content) || commandObject.MatchString(ctx.Content) {
+	if rules.GMatchFile(allowedFieldsCheck, ctx) || rules.GMatchFile(commandObject, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -462,13 +483,13 @@ func (r *GrailsMassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := newDomainParams.FindString(line); loc != "" {
+		if loc := rules.GFindLower(newDomainParams, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "domain object created with params"
-		} else if loc := domainProperties.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(domainProperties, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "domain properties assigned from params"
-		} else if loc := bindDataParams.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(bindDataParams, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "bindData with unfiltered params"
 		}
@@ -500,9 +521,11 @@ func (r *GrailsMassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XXEViaXmlSlurper struct{}
 
-func (r *XXEViaXmlSlurper) ID() string                      { return "BATOU-GVY-007" }
-func (r *XXEViaXmlSlurper) Name() string                    { return "XXEViaXmlSlurper" }
-func (r *XXEViaXmlSlurper) Description() string             { return "Detects XML parsing via XmlSlurper/XmlParser without disabling external entities (XXE)." }
+func (r *XXEViaXmlSlurper) ID() string   { return "BATOU-GVY-007" }
+func (r *XXEViaXmlSlurper) Name() string { return "XXEViaXmlSlurper" }
+func (r *XXEViaXmlSlurper) Description() string {
+	return "Detects XML parsing via XmlSlurper/XmlParser without disabling external entities (XXE)."
+}
 func (r *XXEViaXmlSlurper) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XXEViaXmlSlurper) Languages() []rules.Language     { return []rules.Language{rules.LangGroovy} }
 
@@ -510,11 +533,12 @@ func (r *XXEViaXmlSlurper) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if XXE protections are present
-	if xxeProtection.MatchString(ctx.Content) {
+	if rules.GMatchFile(xxeProtection, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -525,10 +549,10 @@ func (r *XXEViaXmlSlurper) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := xmlSlurperNew.FindString(line); loc != "" {
+		if loc := rules.GFindLower(xmlSlurperNew, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "XmlSlurper"
-		} else if loc := xmlParserNew.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(xmlParserNew, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "XmlParser"
 		}
@@ -560,15 +584,20 @@ func (r *XXEViaXmlSlurper) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureDeserialization struct{}
 
-func (r *InsecureDeserialization) ID() string                      { return "BATOU-GVY-008" }
-func (r *InsecureDeserialization) Name() string                    { return "GroovyInsecureDeserialization" }
-func (r *InsecureDeserialization) Description() string             { return "Detects insecure deserialization via ObjectInputStream, XStream, or SnakeYAML in Groovy context." }
+func (r *InsecureDeserialization) ID() string   { return "BATOU-GVY-008" }
+func (r *InsecureDeserialization) Name() string { return "GroovyInsecureDeserialization" }
+func (r *InsecureDeserialization) Description() string {
+	return "Detects insecure deserialization via ObjectInputStream, XStream, or SnakeYAML in Groovy context."
+}
 func (r *InsecureDeserialization) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *InsecureDeserialization) Languages() []rules.Language     { return []rules.Language{rules.LangGroovy} }
+func (r *InsecureDeserialization) Languages() []rules.Language {
+	return []rules.Language{rules.LangGroovy}
+}
 
 func (r *InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -579,13 +608,13 @@ func (r *InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := objectInputStream.FindString(line); loc != "" {
+		if loc := rules.GFindLower(objectInputStream, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "ObjectInputStream deserialization"
-		} else if loc := xstreamFromXML.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(xstreamFromXML, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "XStream XML deserialization"
-		} else if loc := snakeYAMLLoad.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(snakeYAMLLoad, line, lowered[i]); loc != "" {
 			// Skip if SafeConstructor is used nearby
 			context := surroundingContext(lines, i, 3)
 			if !strings.Contains(context, "SafeConstructor") {
@@ -621,21 +650,26 @@ func (r *InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JenkinsCredentialsLeak struct{}
 
-func (r *JenkinsCredentialsLeak) ID() string                      { return "BATOU-GVY-009" }
-func (r *JenkinsCredentialsLeak) Name() string                    { return "JenkinsCredentialsLeak" }
-func (r *JenkinsCredentialsLeak) Description() string             { return "Detects Jenkins credentials leaked via sh/echo steps or print statements in pipeline scripts." }
+func (r *JenkinsCredentialsLeak) ID() string   { return "BATOU-GVY-009" }
+func (r *JenkinsCredentialsLeak) Name() string { return "JenkinsCredentialsLeak" }
+func (r *JenkinsCredentialsLeak) Description() string {
+	return "Detects Jenkins credentials leaked via sh/echo steps or print statements in pipeline scripts."
+}
 func (r *JenkinsCredentialsLeak) DefaultSeverity() rules.Severity { return rules.High }
-func (r *JenkinsCredentialsLeak) Languages() []rules.Language     { return []rules.Language{rules.LangGroovy} }
+func (r *JenkinsCredentialsLeak) Languages() []rules.Language {
+	return []rules.Language{rules.LangGroovy}
+}
 
 func (r *JenkinsCredentialsLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only flag in files that use withCredentials (indicating credential usage)
-	if !withCredentials.MatchString(ctx.Content) && !strings.Contains(ctx.Content, "credentials(") {
+	if !rules.GMatchFile(withCredentials, ctx) && !strings.Contains(ctx.Content, "credentials(") {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -646,13 +680,13 @@ func (r *JenkinsCredentialsLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := credentialsInSh.FindString(line); loc != "" {
+		if loc := rules.GFindLower(credentialsInSh, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "credential variable in sh step"
-		} else if loc := credentialsInEcho.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(credentialsInEcho, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "credential variable in echo"
-		} else if loc := credentialsPrint.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(credentialsPrint, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "credential variable in print statement"
 		}
@@ -684,9 +718,11 @@ func (r *JenkinsCredentialsLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GrailsXSS struct{}
 
-func (r *GrailsXSS) ID() string                      { return "BATOU-GVY-010" }
-func (r *GrailsXSS) Name() string                    { return "GrailsXSS" }
-func (r *GrailsXSS) Description() string             { return "Detects XSS via unescaped output in Grails GSP views using ${} without encodeAsHTML or raw()." }
+func (r *GrailsXSS) ID() string   { return "BATOU-GVY-010" }
+func (r *GrailsXSS) Name() string { return "GrailsXSS" }
+func (r *GrailsXSS) Description() string {
+	return "Detects XSS via unescaped output in Grails GSP views using ${} without encodeAsHTML or raw()."
+}
 func (r *GrailsXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GrailsXSS) Languages() []rules.Language     { return []rules.Language{rules.LangGroovy} }
 
@@ -704,11 +740,12 @@ func (r *GrailsXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// If default codec is HTML, ${} is auto-escaped
-	if gspDefaultCodec.MatchString(ctx.Content) {
+	if rules.GMatchFile(gspDefaultCodec, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -717,7 +754,7 @@ func (r *GrailsXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Check for raw() usage
-		if loc := gspRawMethod.FindString(line); loc != "" {
+		if loc := rules.GFindLower(gspRawMethod, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -737,7 +774,7 @@ func (r *GrailsXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Check for ${} in HTML context without encoding
-		if gspRawOutput.MatchString(line) && !encodeAsHTML.MatchString(line) {
+		if rules.GMatchLower(gspRawOutput, line, lowered[i]) && !rules.GMatchLower(encodeAsHTML, line, lowered[i]) {
 			// Only in HTML context (check for HTML tags nearby)
 			if strings.Contains(line, "<") || strings.Contains(line, ">") {
 				findings = append(findings, rules.Finding{

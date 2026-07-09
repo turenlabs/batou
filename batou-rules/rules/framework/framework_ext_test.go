@@ -193,6 +193,188 @@ def get_items(params = Depends(get_query_params)):
 }
 
 // ---------------------------------------------------------------------------
+// BATOU-FW-FASTAPI-002: CORS wildcard with credentials escalates to Critical
+// ---------------------------------------------------------------------------
+
+func TestFastAPI002_WildcardWithCredentials_Critical(t *testing.T) {
+	content := `from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+)`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustFindRule(t, result, "BATOU-FW-FASTAPI-002")
+	got := testutil.FindingsByRule(result, "BATOU-FW-FASTAPI-002")
+	if len(got) == 0 || got[0].SeverityLabel != "CRITICAL" {
+		t.Fatalf("expected critical severity for wildcard+credentials, got %+v", got)
+	}
+}
+
+func TestFastAPI002_WildcardWithoutCredentials_High(t *testing.T) {
+	content := `from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+)`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustFindRule(t, result, "BATOU-FW-FASTAPI-002")
+	got := testutil.FindingsByRule(result, "BATOU-FW-FASTAPI-002")
+	if len(got) == 0 || got[0].SeverityLabel != "HIGH" {
+		t.Fatalf("expected high severity for plain wildcard, got %+v", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// BATOU-FW-FASTAPI-012: APIKeyQuery
+// ---------------------------------------------------------------------------
+
+func TestFastAPI012_APIKeyQuery(t *testing.T) {
+	content := `from fastapi.security import APIKeyQuery
+api_key = APIKeyQuery(name="api_key")`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustFindRule(t, result, "BATOU-FW-FASTAPI-012")
+}
+
+func TestFastAPI012_APIKeyHeader_Safe(t *testing.T) {
+	content := `from fastapi.security import APIKeyHeader
+api_key = APIKeyHeader(name="X-API-Key")`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-FW-FASTAPI-012")
+}
+
+// ---------------------------------------------------------------------------
+// BATOU-FW-FASTAPI-013: TrustedHostMiddleware wildcard
+// ---------------------------------------------------------------------------
+
+func TestFastAPI013_TrustedHostWildcard(t *testing.T) {
+	content := `from fastapi import FastAPI
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+app = FastAPI()
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["*"],
+)`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustFindRule(t, result, "BATOU-FW-FASTAPI-013")
+}
+
+func TestFastAPI013_TrustedHostExplicit_Safe(t *testing.T) {
+	content := `from fastapi import FastAPI
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+app = FastAPI()
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["example.com", "*.example.com"],
+)`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-FW-FASTAPI-013")
+}
+
+func TestFastAPI013_UnrelatedAllowedHosts_Safe(t *testing.T) {
+	// allowed_hosts=["*"] in a context without TrustedHostMiddleware nearby
+	// should not fire.
+	content := `# generic config bag, not host-header middleware
+config = {
+    "allowed_hosts": ["*"],
+    "redis": "localhost",
+}`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-FW-FASTAPI-013")
+}
+
+// ---------------------------------------------------------------------------
+// BATOU-FW-FASTAPI-008: Depends() without error handling
+// ---------------------------------------------------------------------------
+
+func TestFastAPI008_LocalDepWithHTTPException_Safe(t *testing.T) {
+	content := `from fastapi import FastAPI, Depends, HTTPException
+
+app = FastAPI()
+
+def get_current_user(token: str):
+    user = decode(token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="invalid token")
+    return user
+
+@app.get("/me")
+def me(user = Depends(get_current_user)):
+    return user`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-FW-FASTAPI-008")
+}
+
+func TestFastAPI008_LocalDepWithTryExcept_Safe(t *testing.T) {
+	content := `from fastapi import FastAPI, Depends
+
+app = FastAPI()
+
+def get_db():
+    try:
+        return open_session()
+    except Exception:
+        return None
+
+@app.get("/items")
+def items(db = Depends(get_db)):
+    return db.query()`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-FW-FASTAPI-008")
+}
+
+func TestFastAPI008_LocalDepNoErrorHandling(t *testing.T) {
+	content := `from fastapi import FastAPI, Depends
+
+app = FastAPI()
+
+def get_db():
+    return open_session()
+
+@app.get("/items")
+def items(db = Depends(get_db)):
+    return db.query()`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustFindRule(t, result, "BATOU-FW-FASTAPI-008")
+}
+
+func TestFastAPI008_ImportedDep_Safe(t *testing.T) {
+	content := `from fastapi import FastAPI, Depends
+from .deps import get_current_user
+
+app = FastAPI()
+
+@app.get("/me")
+def me(user = Depends(get_current_user)):
+    return user`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-FW-FASTAPI-008")
+}
+
+func TestFastAPI008_AsyncDepWithRaise_Safe(t *testing.T) {
+	content := `from fastapi import FastAPI, Depends, HTTPException
+
+app = FastAPI()
+
+async def get_current_user(token: str):
+    user = await decode(token)
+    if not user:
+        raise HTTPException(status_code=401)
+    return user
+
+@app.get("/me")
+async def me(user = Depends(get_current_user)):
+    return user`
+	result := testutil.ScanContent(t, "/app/main.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-FW-FASTAPI-008")
+}
+
+// ---------------------------------------------------------------------------
 // BATOU-FW-GIN-011: Gin db.Raw/db.Exec with fmt.Sprintf
 // ---------------------------------------------------------------------------
 

@@ -64,6 +64,11 @@ var csScJsonResult = regexp.MustCompile(`(?i)(?:return\s+Json\s*\(|JsonResult|re
 var csScRazorView = regexp.MustCompile(`(?i)return\s+View\s*\(`)
 var csScIntParseXSS = regexp.MustCompile(`int\.Parse|long\.Parse|\.ToString\s*\(\s*\)`)
 
+// csScRawHTMLSink marks lines that write raw, unencoded HTML. On such a line a
+// trailing .ToString() is NOT a safety guard (the output is still raw HTML), so
+// csScIntParseXSS must not suppress a finding here.
+var csScRawHTMLSink = regexp.MustCompile(`(?:Html\.Raw|new\s+(?:Mvc)?HtmlString|Response\.Write|WriteLiteral)`)
+
 // Command injection safety
 var csScRegexValidate = regexp.MustCompile(`Regex\.IsMatch\s*\(`)
 var csScAllowedTools = regexp.MustCompile(`(?i)(?:AllowedTools|AllowedCommands|permitted)\w*\s*[\[.]`)
@@ -97,6 +102,7 @@ var csScStringEquals = regexp.MustCompile(`(?:==\s*"|lang\s*==)`)
 // Deserialization safety
 // Typed deserialization patterns (safe when deserializing to a concrete type).
 var csScTypedDeser = regexp.MustCompile(`(?:Deserialize<\w|DeserializeObject<\w|DeserializeAsync<\w)`)
+
 // Unsafe "typed" deser with object/dynamic is not really typed.
 var csScUnsafeTypedDeser = regexp.MustCompile(`(?:Deserialize<object>|DeserializeObject<object>|DeserializeAsync<object>|Deserialize<dynamic>|DeserializeObject<dynamic>)`)
 var csScSerializationBinder = regexp.MustCompile(`(?i)SerializationBinder|ISerializationBinder`)
@@ -145,7 +151,12 @@ func csScanHasXSSGuard(lines []string, sinkLine int) bool {
 		if csScJsonResult.MatchString(line) {
 			return true
 		}
-		if csScIntParseXSS.MatchString(line) {
+		// .ToString()/int.Parse on the SINK line is a weak "safe primitive"
+		// signal, but it does NOT make a raw-HTML write safe: Html.Raw(x),
+		// new HtmlString(x), and Response.Write(x) emit unencoded output even
+		// when the value is stringified. Don't let a trailing .ToString() on a
+		// raw-HTML sink mask a real reflected-XSS finding.
+		if csScIntParseXSS.MatchString(line) && !csScRawHTMLSink.MatchString(line) {
 			return true
 		}
 	}

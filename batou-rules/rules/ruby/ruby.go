@@ -21,10 +21,10 @@ var (
 
 // RB-002: system/exec/backtick with user input
 var (
-	reRubySystemUser = regexp.MustCompile(`\b(?:system|exec)\s*\(\s*["'][^"']*#\{\s*(?:params|request|session|cookies)`)
-	reRubySystemVar  = regexp.MustCompile(`\b(?:system|exec)\s*\(\s*(?:params|request|ARGV)`)
+	reRubySystemUser   = regexp.MustCompile(`\b(?:system|exec)\s*\(\s*["'][^"']*#\{\s*(?:params|request|session|cookies)`)
+	reRubySystemVar    = regexp.MustCompile(`\b(?:system|exec)\s*\(\s*(?:params|request|ARGV)`)
 	reRubyBacktickUser = regexp.MustCompile("`[^`]*#\\{\\s*(?:params|request|session|ARGV)")
-	reRubySpawnUser  = regexp.MustCompile(`\b(?:spawn|IO\.popen|Open3\.capture[23]?|Open3\.popen[23]?)\s*\(\s*(?:["'][^"']*#\{|params|request)`)
+	reRubySpawnUser    = regexp.MustCompile(`\b(?:spawn|IO\.popen|Open3\.capture[23]?|Open3\.popen[23]?)\s*\(\s*(?:["'][^"']*#\{|params|request)`)
 )
 
 // RB-003: YAML.load (use YAML.safe_load)
@@ -59,23 +59,22 @@ var (
 
 // RB-007: Regex injection (Regexp.new with user input)
 var (
-	reRegexpNewUser = regexp.MustCompile(`\bRegexp\.new\s*\(\s*(?:params|request|session|cookies|gets|readline)`)
-	reRegexpNewVar  = regexp.MustCompile(`\bRegexp\.new\s*\(\s*[a-z_]\w*\s*[,)]`)
-	reRegexpCompile = regexp.MustCompile(`\bRegexp\.compile\s*\(\s*(?:params|request|gets)`)
+	reRegexpNewUser   = regexp.MustCompile(`\bRegexp\.new\s*\(\s*(?:params|request|session|cookies|gets|readline)`)
+	reRegexpNewVar    = regexp.MustCompile(`\bRegexp\.new\s*\(\s*[a-z_]\w*\s*[,)]`)
+	reRegexpCompile   = regexp.MustCompile(`\bRegexp\.compile\s*\(\s*(?:params|request|gets)`)
 	reUserInputSource = regexp.MustCompile(`\b(?:params|request|session|cookies)\s*\[`)
 )
 
 // RB-008: Insecure SSL (verify_mode = VERIFY_NONE)
 var (
-	reSSLVerifyNone  = regexp.MustCompile(`verify_mode\s*=\s*OpenSSL::SSL::VERIFY_NONE`)
-	reSSLVerifyNone2 = regexp.MustCompile(`ssl_verify_mode\s*=?\s*(?:OpenSSL::SSL::VERIFY_NONE|0)`)
+	reSSLVerifyNone   = regexp.MustCompile(`verify_mode\s*=\s*OpenSSL::SSL::VERIFY_NONE`)
+	reSSLVerifyNone2  = regexp.MustCompile(`ssl_verify_mode\s*=?\s*(?:OpenSSL::SSL::VERIFY_NONE|0)`)
 	reSSLNoPeerVerify = regexp.MustCompile(`verify_peer\s*[:=]\s*false`)
 )
 
 // RB-009: Marshal.load from untrusted source
 var (
-	reMarshalLoad     = regexp.MustCompile(`\bMarshal\.(?:load|restore)\s*\(`)
-	reMarshalSafe     = regexp.MustCompile(`\bMarshal\.(?:load|restore)\s*\(\s*(?:File\.read|IO\.read|File\.open)`)
+	reMarshalLoad = regexp.MustCompile(`\bMarshal\.(?:load|restore)\s*\(`)
 )
 
 // RB-010: Mass assignment (legacy patterns)
@@ -95,8 +94,7 @@ var (
 
 // RB-012: Insecure cookie settings
 var (
-	reCookieNoHTTPOnly = regexp.MustCompile(`cookies\s*\[.*\]\s*=\s*\{[^}]*\}`)
-	reCookieDirect     = regexp.MustCompile(`cookies\s*\[\s*:[a-z_]+\s*\]\s*=\s*(?:params|request|session)`)
+	reCookieDirect = regexp.MustCompile(`cookies\s*\[\s*:[a-z_]+\s*\]\s*=\s*(?:params|request|session)`)
 )
 
 // ---------------------------------------------------------------------------
@@ -126,7 +124,10 @@ func hasNearbyPattern(lines []string, idx int, pat *regexp.Regexp) bool {
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if pat.MatchString(l) {
+		// Fold-aware OR-set pre-gate: GMatch skips the backtracking regex on any
+		// line lacking pat's required literals. Finding-identical to
+		// pat.MatchString(l) — the gate never skips a line the regex matches.
+		if rules.GMatch(pat, l) {
 			return true
 		}
 	}
@@ -139,9 +140,11 @@ func hasNearbyPattern(lines []string, idx int, pat *regexp.Regexp) bool {
 
 type ERBUnescapedOutput struct{}
 
-func (r *ERBUnescapedOutput) ID() string                      { return "BATOU-RB-001" }
-func (r *ERBUnescapedOutput) Name() string                    { return "RubyERBUnescapedOutput" }
-func (r *ERBUnescapedOutput) Description() string             { return "Detects raw() and .html_safe on user input in Ruby/Rails, bypassing XSS auto-escaping." }
+func (r *ERBUnescapedOutput) ID() string   { return "BATOU-RB-001" }
+func (r *ERBUnescapedOutput) Name() string { return "RubyERBUnescapedOutput" }
+func (r *ERBUnescapedOutput) Description() string {
+	return "Detects raw() and .html_safe on user input in Ruby/Rails, bypassing XSS auto-escaping."
+}
 func (r *ERBUnescapedOutput) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ERBUnescapedOutput) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -150,7 +153,8 @@ func (r *ERBUnescapedOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -159,15 +163,15 @@ func (r *ERBUnescapedOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched bool
 		var title, desc string
 
-		if reERBRawCall.MatchString(line) || reERBRawMethod.MatchString(line) {
+		if rules.GMatchLower(reERBRawCall, line, lowered[i]) || rules.GMatchLower(reERBRawMethod, line, lowered[i]) {
 			matched = true
 			title = "raw() with user input disables XSS escaping"
 			desc = "raw() marks content as safe HTML, bypassing Rails auto-escaping. When applied to user input (params, request, session), it creates an XSS vulnerability."
-		} else if reHTMLSafeUser.MatchString(line) {
+		} else if rules.GMatchLower(reHTMLSafeUser, line, lowered[i]) {
 			matched = true
 			title = ".html_safe on user-controlled input"
 			desc = "Calling .html_safe on data derived from params, request, session, or instance variables bypasses Rails auto-escaping, creating an XSS vulnerability."
-		} else if reHTMLSafeInterp.MatchString(line) {
+		} else if rules.GMatchLower(reHTMLSafeInterp, line, lowered[i]) {
 			matched = true
 			title = ".html_safe on interpolated string"
 			desc = "Calling .html_safe on a string with interpolation bypasses Rails auto-escaping. If any interpolated value contains user input, this creates an XSS vulnerability."
@@ -201,9 +205,11 @@ func (r *ERBUnescapedOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RubyCommandInjection struct{}
 
-func (r *RubyCommandInjection) ID() string                      { return "BATOU-RB-002" }
-func (r *RubyCommandInjection) Name() string                    { return "RubyCommandInjection" }
-func (r *RubyCommandInjection) Description() string             { return "Detects Ruby system/exec/backtick/spawn with user input, enabling command injection." }
+func (r *RubyCommandInjection) ID() string   { return "BATOU-RB-002" }
+func (r *RubyCommandInjection) Name() string { return "RubyCommandInjection" }
+func (r *RubyCommandInjection) Description() string {
+	return "Detects Ruby system/exec/backtick/spawn with user input, enabling command injection."
+}
 func (r *RubyCommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RubyCommandInjection) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -212,7 +218,8 @@ func (r *RubyCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -221,16 +228,16 @@ func (r *RubyCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reRubySystemUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reRubySystemUser, line, lowered[i]); m != "" {
 			matched = m
 			desc = "system/exec with user input interpolation"
-		} else if m := reRubySystemVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRubySystemVar, line, lowered[i]); m != "" {
 			matched = m
 			desc = "system/exec with params/request/ARGV"
-		} else if m := reRubyBacktickUser.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRubyBacktickUser, line, lowered[i]); m != "" {
 			matched = m
 			desc = "backtick with user input interpolation"
-		} else if m := reRubySpawnUser.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRubySpawnUser, line, lowered[i]); m != "" {
 			matched = m
 			desc = "spawn/IO.popen/Open3 with user input"
 		}
@@ -263,9 +270,11 @@ func (r *RubyCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type YAMLUnsafeLoad struct{}
 
-func (r *YAMLUnsafeLoad) ID() string                      { return "BATOU-RB-003" }
-func (r *YAMLUnsafeLoad) Name() string                    { return "RubyYAMLUnsafeLoad" }
-func (r *YAMLUnsafeLoad) Description() string             { return "Detects Ruby YAML.load which deserializes arbitrary objects, enabling RCE." }
+func (r *YAMLUnsafeLoad) ID() string   { return "BATOU-RB-003" }
+func (r *YAMLUnsafeLoad) Name() string { return "RubyYAMLUnsafeLoad" }
+func (r *YAMLUnsafeLoad) Description() string {
+	return "Detects Ruby YAML.load which deserializes arbitrary objects, enabling RCE."
+}
 func (r *YAMLUnsafeLoad) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *YAMLUnsafeLoad) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -274,11 +283,12 @@ func (r *YAMLUnsafeLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	// Skip files that use safe_load (likely aware of the issue)
-	if reYAMLSafeLoad.MatchString(ctx.Content) && !reYAMLLoad.MatchString(ctx.Content) {
+	if rules.GMatchFile(reYAMLSafeLoad, ctx) && !rules.GMatchFile(reYAMLLoad, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -288,15 +298,15 @@ func (r *YAMLUnsafeLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 		sev := r.DefaultSeverity()
 
-		if m := reYAMLLoad.FindString(line); m != "" {
+		if m := rules.GFindLower(reYAMLLoad, line, lowered[i]); m != "" {
 			// Skip if it's safe_load
-			if reYAMLSafeLoad.MatchString(line) || reYAMLSafeLoadFile.MatchString(line) {
+			if rules.GMatchLower(reYAMLSafeLoad, line, lowered[i]) || rules.GMatchLower(reYAMLSafeLoadFile, line, lowered[i]) {
 				continue
 			}
 			matched = m
 			desc = "YAML.load() deserializes arbitrary Ruby objects. An attacker can craft YAML payloads that instantiate arbitrary classes and execute code via gadget chains (e.g., ERB, Gem::Requirement)."
-		} else if m := reYAMLLoadFile.FindString(line); m != "" {
-			if reYAMLSafeLoadFile.MatchString(line) {
+		} else if m := rules.GFindLower(reYAMLLoadFile, line, lowered[i]); m != "" {
+			if rules.GMatchLower(reYAMLSafeLoadFile, line, lowered[i]) {
 				continue
 			}
 			matched = m
@@ -332,18 +342,23 @@ func (r *YAMLUnsafeLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SinatraParamsInjection struct{}
 
-func (r *SinatraParamsInjection) ID() string                      { return "BATOU-RB-004" }
-func (r *SinatraParamsInjection) Name() string                    { return "RubySinatraParamsInjection" }
-func (r *SinatraParamsInjection) Description() string             { return "Detects Sinatra params interpolated directly into SQL or shell commands." }
+func (r *SinatraParamsInjection) ID() string   { return "BATOU-RB-004" }
+func (r *SinatraParamsInjection) Name() string { return "RubySinatraParamsInjection" }
+func (r *SinatraParamsInjection) Description() string {
+	return "Detects Sinatra params interpolated directly into SQL or shell commands."
+}
 func (r *SinatraParamsInjection) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *SinatraParamsInjection) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
+func (r *SinatraParamsInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangRuby}
+}
 
 func (r *SinatraParamsInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if ctx.Language != rules.LangRuby {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -352,15 +367,15 @@ func (r *SinatraParamsInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var title, desc string
 
-		if m := reSinatraSQL.FindString(line); m != "" {
+		if m := rules.GFindLower(reSinatraSQL, line, lowered[i]); m != "" {
 			matched = m
 			title = "Sinatra params interpolated into SQL query"
 			desc = "Sinatra params are interpolated directly into a SQL query string, allowing SQL injection. An attacker can modify query logic, extract data, or execute administrative operations."
-		} else if m := reSinatraShell.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSinatraShell, line, lowered[i]); m != "" {
 			matched = m
 			title = "Sinatra params interpolated into shell command"
 			desc = "Sinatra params are interpolated directly into a shell command, allowing OS command injection."
-		} else if m := reSinatraDB.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSinatraDB, line, lowered[i]); m != "" {
 			matched = m
 			title = "Sinatra params in Sequel/DB query"
 			desc = "Sinatra params are interpolated into a Sequel database query, allowing SQL injection."
@@ -394,9 +409,11 @@ func (r *SinatraParamsInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KernelOpenPipe struct{}
 
-func (r *KernelOpenPipe) ID() string                      { return "BATOU-RB-005" }
-func (r *KernelOpenPipe) Name() string                    { return "RubyKernelOpenPipe" }
-func (r *KernelOpenPipe) Description() string             { return "Detects Ruby Kernel#open / URI.open with user input, which allows command injection via pipe prefix." }
+func (r *KernelOpenPipe) ID() string   { return "BATOU-RB-005" }
+func (r *KernelOpenPipe) Name() string { return "RubyKernelOpenPipe" }
+func (r *KernelOpenPipe) Description() string {
+	return "Detects Ruby Kernel#open / URI.open with user input, which allows command injection via pipe prefix."
+}
 func (r *KernelOpenPipe) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *KernelOpenPipe) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -405,7 +422,8 @@ func (r *KernelOpenPipe) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -415,16 +433,16 @@ func (r *KernelOpenPipe) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 		confidence := "high"
 
-		if m := reKernelOpenPipe.FindString(line); m != "" {
+		if m := rules.GFindLower(reKernelOpenPipe, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Kernel#open with explicit pipe prefix executes shell commands. This is always dangerous."
-		} else if m := reKernelOpen.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reKernelOpen, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Kernel#open with user input (params, request, ARGV) allows command injection. If the input starts with |, Ruby executes it as a shell command."
-		} else if m := reURIOpen.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reURIOpen, line, lowered[i]); m != "" {
 			matched = m
 			desc = "URI.open with user input allows SSRF and (in older Ruby versions) command injection via pipe prefix."
-		} else if m := reKernelOpenVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reKernelOpenVar, line, lowered[i]); m != "" {
 			// Only flag if user input sources are nearby
 			if hasNearbyPattern(lines, i, reUserInputSource) {
 				matched = m
@@ -461,9 +479,11 @@ func (r *KernelOpenPipe) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SendMethodInjection struct{}
 
-func (r *SendMethodInjection) ID() string                      { return "BATOU-RB-006" }
-func (r *SendMethodInjection) Name() string                    { return "RubySendMethodInjection" }
-func (r *SendMethodInjection) Description() string             { return "Detects Ruby send/public_send with user-controlled method name, enabling arbitrary method invocation." }
+func (r *SendMethodInjection) ID() string   { return "BATOU-RB-006" }
+func (r *SendMethodInjection) Name() string { return "RubySendMethodInjection" }
+func (r *SendMethodInjection) Description() string {
+	return "Detects Ruby send/public_send with user-controlled method name, enabling arbitrary method invocation."
+}
 func (r *SendMethodInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SendMethodInjection) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -472,7 +492,8 @@ func (r *SendMethodInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -481,9 +502,9 @@ func (r *SendMethodInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		confidence := "high"
 
-		if m := reSendUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reSendUser, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSendDynamic.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSendDynamic, line, lowered[i]); m != "" {
 			// Only flag if user input is nearby
 			if hasNearbyPattern(lines, i, reUserInputSource) {
 				matched = m
@@ -519,9 +540,11 @@ func (r *SendMethodInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RegexpInjection struct{}
 
-func (r *RegexpInjection) ID() string                      { return "BATOU-RB-007" }
-func (r *RegexpInjection) Name() string                    { return "RubyRegexpInjection" }
-func (r *RegexpInjection) Description() string             { return "Detects Regexp.new/compile with user input, enabling ReDoS or regex injection." }
+func (r *RegexpInjection) ID() string   { return "BATOU-RB-007" }
+func (r *RegexpInjection) Name() string { return "RubyRegexpInjection" }
+func (r *RegexpInjection) Description() string {
+	return "Detects Regexp.new/compile with user input, enabling ReDoS or regex injection."
+}
 func (r *RegexpInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RegexpInjection) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -530,7 +553,8 @@ func (r *RegexpInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -539,11 +563,11 @@ func (r *RegexpInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		confidence := "high"
 
-		if m := reRegexpNewUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reRegexpNewUser, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reRegexpCompile.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRegexpCompile, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reRegexpNewVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRegexpNewVar, line, lowered[i]); m != "" {
 			if hasNearbyPattern(lines, i, reUserInputSource) {
 				matched = m
 				confidence = "medium"
@@ -578,9 +602,11 @@ func (r *RegexpInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureSSL struct{}
 
-func (r *InsecureSSL) ID() string                      { return "BATOU-RB-008" }
-func (r *InsecureSSL) Name() string                    { return "RubyInsecureSSL" }
-func (r *InsecureSSL) Description() string             { return "Detects Ruby SSL verification disabled (VERIFY_NONE), enabling MITM attacks." }
+func (r *InsecureSSL) ID() string   { return "BATOU-RB-008" }
+func (r *InsecureSSL) Name() string { return "RubyInsecureSSL" }
+func (r *InsecureSSL) Description() string {
+	return "Detects Ruby SSL verification disabled (VERIFY_NONE), enabling MITM attacks."
+}
 func (r *InsecureSSL) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureSSL) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -589,7 +615,8 @@ func (r *InsecureSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -598,13 +625,13 @@ func (r *InsecureSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched bool
 		var desc string
 
-		if reSSLVerifyNone.MatchString(line) {
+		if rules.GMatchLower(reSSLVerifyNone, line, lowered[i]) {
 			matched = true
 			desc = "Setting verify_mode to OpenSSL::SSL::VERIFY_NONE disables SSL certificate verification, allowing man-in-the-middle attacks. Network traffic can be intercepted and modified."
-		} else if reSSLVerifyNone2.MatchString(line) {
+		} else if rules.GMatchLower(reSSLVerifyNone2, line, lowered[i]) {
 			matched = true
 			desc = "SSL verification is disabled, allowing man-in-the-middle attacks. All certificate errors will be silently ignored."
-		} else if reSSLNoPeerVerify.MatchString(line) {
+		} else if rules.GMatchLower(reSSLNoPeerVerify, line, lowered[i]) {
 			matched = true
 			desc = "Peer SSL verification is disabled (verify_peer: false), allowing man-in-the-middle attacks."
 		}
@@ -637,9 +664,11 @@ func (r *InsecureSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MarshalUnsafeLoad struct{}
 
-func (r *MarshalUnsafeLoad) ID() string                      { return "BATOU-RB-009" }
-func (r *MarshalUnsafeLoad) Name() string                    { return "RubyMarshalUnsafeLoad" }
-func (r *MarshalUnsafeLoad) Description() string             { return "Detects Ruby Marshal.load which deserializes arbitrary objects, enabling RCE." }
+func (r *MarshalUnsafeLoad) ID() string   { return "BATOU-RB-009" }
+func (r *MarshalUnsafeLoad) Name() string { return "RubyMarshalUnsafeLoad" }
+func (r *MarshalUnsafeLoad) Description() string {
+	return "Detects Ruby Marshal.load which deserializes arbitrary objects, enabling RCE."
+}
 func (r *MarshalUnsafeLoad) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *MarshalUnsafeLoad) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -648,13 +677,14 @@ func (r *MarshalUnsafeLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 
-		if !reMarshalLoad.MatchString(line) {
+		if !rules.GMatchLower(reMarshalLoad, line, lowered[i]) {
 			continue
 		}
 
@@ -684,9 +714,11 @@ func (r *MarshalUnsafeLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MassAssignment struct{}
 
-func (r *MassAssignment) ID() string                      { return "BATOU-RB-010" }
-func (r *MassAssignment) Name() string                    { return "RubyMassAssignment" }
-func (r *MassAssignment) Description() string             { return "Detects Ruby/Rails mass assignment vulnerabilities via update_attributes(params) or legacy attr_accessible/attr_protected." }
+func (r *MassAssignment) ID() string   { return "BATOU-RB-010" }
+func (r *MassAssignment) Name() string { return "RubyMassAssignment" }
+func (r *MassAssignment) Description() string {
+	return "Detects Ruby/Rails mass assignment vulnerabilities via update_attributes(params) or legacy attr_accessible/attr_protected."
+}
 func (r *MassAssignment) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MassAssignment) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -695,7 +727,8 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -704,23 +737,23 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched bool
 		var title, desc string
 
-		if reUpdateAttrs.MatchString(line) {
+		if rules.GMatchLower(reUpdateAttrs, line, lowered[i]) {
 			matched = true
 			title = "Rails update_attributes with raw params (mass assignment)"
 			desc = "update_attributes/update_attribute with raw params allows an attacker to set any model attribute, including admin flags, roles, or foreign keys."
-		} else if reNewParams.MatchString(line) {
+		} else if rules.GMatchLower(reNewParams, line, lowered[i]) {
 			matched = true
 			title = "Rails Model.new with raw params (mass assignment)"
 			desc = "Creating a model with raw params allows an attacker to set any model attribute."
-		} else if reCreateParams.MatchString(line) {
+		} else if rules.GMatchLower(reCreateParams, line, lowered[i]) {
 			matched = true
 			title = "Rails Model.create with raw params (mass assignment)"
 			desc = "Creating a model with raw params allows an attacker to set any model attribute."
-		} else if reAttrAccessible.MatchString(line) {
+		} else if rules.GMatchLower(reAttrAccessible, line, lowered[i]) {
 			matched = true
 			title = "Legacy attr_accessible (mass assignment allowlist)"
 			desc = "attr_accessible is a legacy Rails 3 pattern. It was replaced by strong parameters in Rails 4. Using attr_accessible may indicate the application relies on deprecated mass assignment protection."
-		} else if reAttrProtected.MatchString(line) {
+		} else if rules.GMatchLower(reAttrProtected, line, lowered[i]) {
 			matched = true
 			title = "Legacy attr_protected (mass assignment blocklist)"
 			desc = "attr_protected is a legacy Rails 3 pattern that uses a blocklist approach to mass assignment protection. Blocklists are inherently weaker than allowlists as new attributes are unprotected by default."
@@ -754,9 +787,11 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OpenRedirect struct{}
 
-func (r *OpenRedirect) ID() string                      { return "BATOU-RB-011" }
-func (r *OpenRedirect) Name() string                    { return "RubyOpenRedirect" }
-func (r *OpenRedirect) Description() string             { return "Detects Rails redirect_to with user-controlled URLs, enabling open redirect attacks." }
+func (r *OpenRedirect) ID() string   { return "BATOU-RB-011" }
+func (r *OpenRedirect) Name() string { return "RubyOpenRedirect" }
+func (r *OpenRedirect) Description() string {
+	return "Detects Rails redirect_to with user-controlled URLs, enabling open redirect attacks."
+}
 func (r *OpenRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OpenRedirect) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -765,7 +800,8 @@ func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -774,10 +810,10 @@ func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched bool
 		var desc string
 
-		if reRedirectParams.MatchString(line) {
+		if rules.GMatchLower(reRedirectParams, line, lowered[i]) {
 			matched = true
 			desc = "redirect_to with params or request.referer allows an attacker to redirect users to malicious sites for phishing or credential theft."
-		} else if reRedirectInterp.MatchString(line) {
+		} else if rules.GMatchLower(reRedirectInterp, line, lowered[i]) {
 			matched = true
 			desc = "redirect_to with interpolated params allows an attacker to control the redirect URL."
 		}
@@ -810,9 +846,11 @@ func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CookieSecurity struct{}
 
-func (r *CookieSecurity) ID() string                      { return "BATOU-RB-012" }
-func (r *CookieSecurity) Name() string                    { return "RubyCookieSecurity" }
-func (r *CookieSecurity) Description() string             { return "Detects Rails cookies set directly from user input without security flags." }
+func (r *CookieSecurity) ID() string   { return "BATOU-RB-012" }
+func (r *CookieSecurity) Name() string { return "RubyCookieSecurity" }
+func (r *CookieSecurity) Description() string {
+	return "Detects Rails cookies set directly from user input without security flags."
+}
 func (r *CookieSecurity) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *CookieSecurity) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
@@ -821,13 +859,14 @@ func (r *CookieSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 
-		if reCookieDirect.MatchString(line) {
+		if rules.GMatchLower(reCookieDirect, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

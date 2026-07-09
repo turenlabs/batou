@@ -12,6 +12,11 @@ import (
 // --- Compiled regex patterns ---
 
 // BATOU-SEC-001: Hardcoded password patterns per language family.
+// reSensitiveEnvVars matches a sensitive KEY=value line in a .env file. Static
+// — lifted to a package var so it is not recompiled on every Scan() (DN3).
+var reSensitiveEnvVars = regexp.MustCompile(
+	`(?i)^(.*(?:SECRET|KEY|TOKEN|PASSWORD|PASS|PWD|CREDENTIAL|AUTH|PRIVATE).*)=["']?([^\s"']+)`)
+
 var (
 	// Variable names commonly used for secrets.
 	secretVarNames = `(?i)(password|passwd|pwd|pass|secret|api_key|apikey|token|auth_token|access_token|private_key)`
@@ -97,9 +102,6 @@ var (
 
 // BATOU-SEC-006: Environment variable leak patterns.
 var (
-	reEnvFileContent = regexp.MustCompile(
-		`(?i)^[A-Z_]{2,50}=["']?[^\s"']+["']?`)
-
 	reEnvLogJS = regexp.MustCompile(
 		`(?i)console\.(?:log|info|warn|error|debug)\s*\(.*process\.env\.[A-Z_]*(?:SECRET|KEY|TOKEN|PASSWORD|PASS|PWD|CREDENTIAL|AUTH)`)
 
@@ -115,6 +117,26 @@ var (
 // isTestFile returns true if the file path looks like a test / fixture / example file.
 func isTestFile(path string) bool {
 	return reTestFile.MatchString(path)
+}
+
+// isConcatenatedAssembly returns true when the string-literal assignment
+// captured by `match` is immediately followed by a concatenation operator on
+// the same line. A line like `token = "rt_" + sessionID + "." + validator`
+// assembles a token format, not a hardcoded credential — the literal is a
+// prefix, not a secret.
+func isConcatenatedAssembly(line, match string) bool {
+	idx := strings.Index(line, match)
+	if idx < 0 {
+		return false
+	}
+	rest := strings.TrimSpace(line[idx+len(match):])
+	// Trailing ` + var`, ` . $var` (PHP), ` << var` (Ruby), ` ${var}` template
+	// — these all indicate the literal is part of a larger assembly.
+	if strings.HasPrefix(rest, "+") || strings.HasPrefix(rest, ".") ||
+		strings.HasPrefix(rest, "<<") || strings.HasPrefix(rest, "${") {
+		return true
+	}
+	return false
 }
 
 // isPlaceholder checks if the value is a common placeholder / example that should be excluded.
@@ -226,8 +248,8 @@ func isCommentLine(line string) bool {
 // HardcodedPassword detects password and secret values assigned as string literals.
 type HardcodedPassword struct{}
 
-func (r *HardcodedPassword) ID() string          { return "BATOU-SEC-001" }
-func (r *HardcodedPassword) Name() string         { return "HardcodedPassword" }
+func (r *HardcodedPassword) ID() string                      { return "BATOU-SEC-001" }
+func (r *HardcodedPassword) Name() string                    { return "HardcodedPassword" }
 func (r *HardcodedPassword) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *HardcodedPassword) Description() string {
 	return "Detects hardcoded passwords, secrets, and credentials assigned as string literals in source code."
@@ -245,7 +267,8 @@ func (r *HardcodedPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Choose pattern set based on language.
 	patterns := []*regexp.Regexp{rePasswordGeneric}
@@ -265,7 +288,7 @@ func (r *HardcodedPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, pat := range patterns {
-			matches := pat.FindStringSubmatch(line)
+			matches := rules.GFindSubmatchLower(pat, line, lowered[lineNum])
 			if matches == nil || seen[lineNum+1] {
 				continue
 			}
@@ -277,6 +300,13 @@ func (r *HardcodedPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 			value := matches[2]
 
 			if isPlaceholder(value) {
+				continue
+			}
+
+			// Concatenated assembly: `token = "rt_" + sessionID + ...`
+			// is building a token format string with a literal PREFIX, not
+			// a hardcoded credential. The literal on its own isn't a secret.
+			if isConcatenatedAssembly(line, matches[0]) {
 				continue
 			}
 
@@ -317,8 +347,8 @@ func (r *HardcodedPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 // APIKeyExposure detects hardcoded API keys with known provider formats.
 type APIKeyExposure struct{}
 
-func (r *APIKeyExposure) ID() string          { return "BATOU-SEC-002" }
-func (r *APIKeyExposure) Name() string         { return "APIKeyExposure" }
+func (r *APIKeyExposure) ID() string                      { return "BATOU-SEC-002" }
+func (r *APIKeyExposure) Name() string                    { return "APIKeyExposure" }
 func (r *APIKeyExposure) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *APIKeyExposure) Description() string {
 	return "Detects hardcoded API keys from known providers (AWS, GitHub, Slack, Stripe, Google, SendGrid, Twilio) and generic high-entropy API key patterns."
@@ -350,7 +380,8 @@ func (r *APIKeyExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	seen := make(map[int]bool)
 
 	for lineNum, line := range lines {
@@ -360,7 +391,7 @@ func (r *APIKeyExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Check known provider patterns.
 		for _, kp := range knownAPIKeyPatterns {
-			matches := kp.re.FindStringSubmatch(line)
+			matches := rules.GFindSubmatchLower(kp.re, line, lowered[lineNum])
 			if matches == nil || seen[lineNum+1] {
 				continue
 			}
@@ -387,7 +418,7 @@ func (r *APIKeyExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Check generic API key pattern with entropy validation.
 		if !seen[lineNum+1] {
-			matches := reGenericAPIKey.FindStringSubmatch(line)
+			matches := rules.GFindSubmatchLower(reGenericAPIKey, line, lowered[lineNum])
 			if matches != nil {
 				value := matches[1]
 				if hasHighEntropy(value, 3.5) && hasCharacterDiversity(value) {
@@ -422,8 +453,8 @@ func (r *APIKeyExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 // PrivateKeyInCode detects embedded PEM-encoded private keys.
 type PrivateKeyInCode struct{}
 
-func (r *PrivateKeyInCode) ID() string          { return "BATOU-SEC-003" }
-func (r *PrivateKeyInCode) Name() string         { return "PrivateKeyInCode" }
+func (r *PrivateKeyInCode) ID() string                      { return "BATOU-SEC-003" }
+func (r *PrivateKeyInCode) Name() string                    { return "PrivateKeyInCode" }
 func (r *PrivateKeyInCode) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PrivateKeyInCode) Description() string {
 	return "Detects PEM-encoded private keys (RSA, EC, DSA, OpenSSH, Ed25519) embedded in source code."
@@ -434,12 +465,13 @@ func (r *PrivateKeyInCode) Languages() []rules.Language {
 
 func (r *PrivateKeyInCode) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for lineNum, line := range lines {
-		if rePrivateKey.MatchString(line) {
+		if rules.GMatchLower(rePrivateKey, line, lowered[lineNum]) {
 			keyType := "Private Key"
-			match := rePrivateKey.FindString(line)
+			match := rules.GFindLower(rePrivateKey, line, lowered[lineNum])
 			if strings.Contains(match, "RSA") {
 				keyType = "RSA Private Key"
 			} else if strings.Contains(match, "EC") {
@@ -480,8 +512,8 @@ func (r *PrivateKeyInCode) Scan(ctx *rules.ScanContext) []rules.Finding {
 // ConnectionString detects database connection strings with embedded credentials.
 type ConnectionString struct{}
 
-func (r *ConnectionString) ID() string          { return "BATOU-SEC-004" }
-func (r *ConnectionString) Name() string         { return "ConnectionString" }
+func (r *ConnectionString) ID() string                      { return "BATOU-SEC-004" }
+func (r *ConnectionString) Name() string                    { return "ConnectionString" }
 func (r *ConnectionString) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ConnectionString) Description() string {
 	return "Detects database connection strings (PostgreSQL, MySQL, MongoDB, Redis, MSSQL) containing embedded credentials."
@@ -496,7 +528,8 @@ func (r *ConnectionString) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	seen := make(map[int]bool)
 
 	connPatterns := []struct {
@@ -514,7 +547,7 @@ func (r *ConnectionString) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, cp := range connPatterns {
-			if !cp.re.MatchString(line) || seen[lineNum+1] {
+			if !rules.GMatchLower(cp.re, line, lowered[lineNum]) || seen[lineNum+1] {
 				continue
 			}
 
@@ -559,8 +592,8 @@ func (r *ConnectionString) Scan(ctx *rules.ScanContext) []rules.Finding {
 // JWTSecret detects hardcoded JWT signing secrets and keys.
 type JWTSecret struct{}
 
-func (r *JWTSecret) ID() string          { return "BATOU-SEC-005" }
-func (r *JWTSecret) Name() string         { return "JWTSecret" }
+func (r *JWTSecret) ID() string                      { return "BATOU-SEC-005" }
+func (r *JWTSecret) Name() string                    { return "JWTSecret" }
 func (r *JWTSecret) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JWTSecret) Description() string {
 	return "Detects hardcoded JWT signing secrets and keys used in jwt.sign(), jwt.encode(), and SECRET_KEY assignments."
@@ -578,7 +611,8 @@ func (r *JWTSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	seen := make(map[int]bool)
 
 	jwtPatterns := []*regexp.Regexp{reJWTSign, reJWTSecret}
@@ -589,7 +623,7 @@ func (r *JWTSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, pat := range jwtPatterns {
-			matches := pat.FindStringSubmatch(line)
+			matches := rules.GFindSubmatchLower(pat, line, lowered[lineNum])
 			if matches == nil || seen[lineNum+1] {
 				continue
 			}
@@ -628,8 +662,8 @@ func (r *JWTSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 // EnvironmentLeak detects .env file contents and sensitive env vars being logged.
 type EnvironmentLeak struct{}
 
-func (r *EnvironmentLeak) ID() string          { return "BATOU-SEC-006" }
-func (r *EnvironmentLeak) Name() string         { return "EnvironmentLeak" }
+func (r *EnvironmentLeak) ID() string                      { return "BATOU-SEC-006" }
+func (r *EnvironmentLeak) Name() string                    { return "EnvironmentLeak" }
 func (r *EnvironmentLeak) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *EnvironmentLeak) Description() string {
 	return "Detects .env file contents being committed and sensitive environment variables being logged or printed."
@@ -640,19 +674,18 @@ func (r *EnvironmentLeak) Languages() []rules.Language {
 
 func (r *EnvironmentLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if this is a .env file with real content.
 	if isEnvFile(ctx.FilePath) {
-		sensitiveEnvVars := regexp.MustCompile(
-			`(?i)^(.*(?:SECRET|KEY|TOKEN|PASSWORD|PASS|PWD|CREDENTIAL|AUTH|PRIVATE).*)=["']?([^\s"']+)`)
 		for lineNum, line := range lines {
 			trimmed := strings.TrimSpace(line)
 			if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 				continue
 			}
-			if sensitiveEnvVars.MatchString(line) {
-				matches := sensitiveEnvVars.FindStringSubmatch(line)
+			if rules.GMatchLower(reSensitiveEnvVars, line, lowered[lineNum]) {
+				matches := rules.GFindSubmatchLower(reSensitiveEnvVars, line, lowered[lineNum])
 				varName := ""
 				if len(matches) >= 2 {
 					varName = matches[1]
@@ -688,7 +721,7 @@ func (r *EnvironmentLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, pat := range logPatterns {
-			if !pat.MatchString(line) || seen[lineNum+1] {
+			if !rules.GMatchLower(pat, line, lowered[lineNum]) || seen[lineNum+1] {
 				continue
 			}
 

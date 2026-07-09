@@ -1,0 +1,80 @@
+# Go CVE Ground-Truth Corpus Manifest
+#
+# Each entry describes one Go CVE: where to fetch the vulnerable and fixed
+# source, which file(s) carry the bug, and what CWE the harness should expect.
+#
+# Two modes are supported:
+#
+#   mode: stage    -- copy hand-crafted fixtures from `staged_path/{vuln,safe}`
+#                     in this repo into testdata/gocve-bench/CVE-*/{vuln,safe}.
+#                     Used when an authoritative reduced reproducer is easier
+#                     to vet than cloning a full upstream repo.
+#
+#   mode: clone    -- shallow-clone `repo`, check out `vuln_commit` and
+#                     `fixed_commit`, copy the listed files into the vuln
+#                     and safe trees respectively. Skipped if `git` or the
+#                     network is unavailable.
+#
+# Either way, the script writes expected.json with the CWE the harness looks
+# for. The harness in batou-core/scanner/gocve_bench_test.go does not assert
+# specific detection rates — it just measures.
+
+- cve: CVE-2024-24786
+  description: >-
+    Infinite loop in google.golang.org/protobuf/encoding/protojson.Unmarshal
+    when unmarshaling certain invalid JSON. The downstream pattern is a Go
+    HTTP handler that calls protojson.Unmarshal on attacker-controlled
+    request body without timeout/size guards.
+  cwe: CWE-835
+  category: loop
+  reference: https://pkg.go.dev/vuln/GO-2024-2611
+  mode: stage
+  staged_path: tools/gocve_fixtures/CVE-2024-24786
+
+- cve: CVE-2023-39325
+  description: >-
+    HTTP/2 rapid reset (golang.org/x/net/http2). Servers without an explicit
+    MaxConcurrentStreams cap let an attacker exhaust handler goroutines by
+    repeatedly opening and resetting streams. Affected pattern: http2.Server
+    constructed without MaxConcurrentStreams, ServeConn wired up directly.
+  cwe: CWE-770
+  category: dos
+  reference: https://pkg.go.dev/vuln/GO-2023-2102
+  mode: stage
+  staged_path: tools/gocve_fixtures/CVE-2023-39325
+
+- cve: CVE-2022-2880
+  description: >-
+    net/http/httputil ReverseProxy forwarded raw query parameters from the
+    inbound request — including ones rejected by net/http — enabling
+    query-parameter smuggling to the backend. Vulnerable pattern: ReverseProxy
+    Director that does not normalize/parse req.URL.RawQuery.
+  cwe: CWE-444
+  category: smuggling
+  reference: https://pkg.go.dev/vuln/GO-2022-1038
+  mode: stage
+  staged_path: tools/gocve_fixtures/CVE-2022-2880
+
+- cve: CVE-2023-49569
+  description: >-
+    Path traversal in go-git's ChrootOS billy filesystem: a crafted Git
+    repository can write files outside its work tree (../../etc/cron.d/...).
+    Downstream pattern: a Go service that clones an attacker-supplied
+    repository URL into a per-user directory.
+  cwe: CWE-22
+  category: traversal
+  reference: https://pkg.go.dev/vuln/GO-2023-2400
+  mode: stage
+  staged_path: tools/gocve_fixtures/CVE-2023-49569
+
+- cve: CVE-2023-29400
+  description: >-
+    html/template attribute injection when an action in an unquoted HTML
+    attribute (attr={{.}}) is rendered with empty input. The downstream
+    pattern is a Go HTTP handler rendering a template with user-controlled
+    data into unquoted attributes.
+  cwe: CWE-79
+  category: xss
+  reference: https://pkg.go.dev/vuln/GO-2023-1753
+  mode: stage
+  staged_path: tools/gocve_fixtures/CVE-2023-29400

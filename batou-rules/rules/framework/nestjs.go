@@ -30,7 +30,6 @@ var reNestValidationPipe = regexp.MustCompile(`(?:ValidationPipe|ValidateNested|
 
 // BATOU-FW-NESTJS-005: JWT secret in source code
 var reNestJWTSecret = regexp.MustCompile(`(?:secret|secretOrKey|secretKey)\s*:\s*['"][^'"]{4,}['"]`)
-var reNestJWTModule = regexp.MustCompile(`JwtModule\.register`)
 
 // BATOU-FW-NESTJS-006: GraphQL introspection
 var reNestGraphQLIntrospection = regexp.MustCompile(`introspection\s*:\s*true`)
@@ -81,21 +80,22 @@ func (r *NestJSNoGuard) Languages() []rules.Language {
 }
 
 func (r *NestJSNoGuard) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reNestController.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNestController, ctx) {
 		return nil
 	}
-	if reNestUseGuards.MatchString(ctx.Content) && reNestAuthGuard.MatchString(ctx.Content) {
+	if rules.GMatchFile(reNestUseGuards, ctx) && rules.GMatchFile(reNestAuthGuard, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reNestController.MatchString(line) {
+		if rules.GMatchLower(reNestController, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -140,7 +140,8 @@ func (r *NestJSCORSWildcard) Languages() []rules.Language {
 
 func (r *NestJSCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -149,9 +150,9 @@ func (r *NestJSCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reNestCORSWildcard.FindString(line); m != "" {
+		if m := rules.GFindLower(reNestCORSWildcard, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reNestCORSNoArgs.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reNestCORSNoArgs, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -197,7 +198,8 @@ func (r *NestJSRawQuery) Languages() []rules.Language {
 
 func (r *NestJSRawQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -206,9 +208,9 @@ func (r *NestJSRawQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reNestTypeORMRaw.FindString(line); m != "" {
+		if m := rules.GFindLower(reNestTypeORMRaw, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reNestTypeORMConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reNestTypeORMConcat, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -253,21 +255,22 @@ func (r *NestJSBodyNoValidation) Languages() []rules.Language {
 }
 
 func (r *NestJSBodyNoValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reNestBodyDecorator.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNestBodyDecorator, ctx) {
 		return nil
 	}
-	if reNestValidationPipe.MatchString(ctx.Content) {
+	if rules.GMatchFile(reNestValidationPipe, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reNestBodyDecorator.MatchString(line) {
+		if rules.GMatchLower(reNestBodyDecorator, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -311,14 +314,15 @@ func (r *NestJSJWTSecret) Languages() []rules.Language {
 
 func (r *NestJSJWTSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reNestJWTSecret.FindString(line); m != "" {
+		if m := rules.GFindLower(reNestJWTSecret, line, lowered[i]); m != "" {
 			// Skip if using env variables
 			if strings.Contains(line, "process.env") || strings.Contains(line, "configService") || strings.Contains(line, "ConfigService") {
 				continue
@@ -366,7 +370,8 @@ func (r *NestJSGraphQLIntrospection) Languages() []rules.Language {
 
 func (r *NestJSGraphQLIntrospection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -381,10 +386,10 @@ func (r *NestJSGraphQLIntrospection) Scan(ctx *rules.ScanContext) []rules.Findin
 
 		var matched string
 		var title string
-		if m := reNestGraphQLIntrospection.FindString(line); m != "" {
+		if m := rules.GFindLower(reNestGraphQLIntrospection, line, lowered[i]); m != "" {
 			matched = m
 			title = "NestJS GraphQL introspection enabled"
-		} else if m := reNestGraphQLPlayground.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reNestGraphQLPlayground, line, lowered[i]); m != "" {
 			matched = m
 			title = "NestJS GraphQL playground enabled"
 		}
@@ -434,12 +439,12 @@ func (r *NestJSNoHelmet) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "NestFactory.create") {
 		return nil
 	}
-	if reNestHelmetImport.MatchString(ctx.Content) || reNestAppUseHelmet.MatchString(ctx.Content) {
+	if rules.GMatchFile(reNestHelmetImport, ctx) || rules.GMatchFile(reNestAppUseHelmet, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
@@ -496,12 +501,12 @@ func (r *NestJSNoRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "NestFactory") && !strings.Contains(ctx.FilePath, "app.module") {
 		return nil
 	}
-	if reNestThrottler.MatchString(ctx.Content) {
+	if rules.GMatchFile(reNestThrottler, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
@@ -551,21 +556,22 @@ func (r *NestJSFileUpload) Languages() []rules.Language {
 }
 
 func (r *NestJSFileUpload) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reNestFileUpload.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNestFileUpload, ctx) {
 		return nil
 	}
-	if reNestFileFilter.MatchString(ctx.Content) {
+	if rules.GMatchFile(reNestFileFilter, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reNestFileUpload.MatchString(line) {
+		if rules.GMatchLower(reNestFileUpload, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -608,18 +614,19 @@ func (r *NestJSExceptionExpose) Languages() []rules.Language {
 }
 
 func (r *NestJSExceptionExpose) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reNestExceptionFilter.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNestExceptionFilter, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reNestExceptionExpose.FindString(line); m != "" {
+		if m := rules.GFindLower(reNestExceptionExpose, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

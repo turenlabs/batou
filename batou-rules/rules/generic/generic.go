@@ -15,7 +15,6 @@ var (
 	reFlaskDebug    = regexp.MustCompile(`(?i)app\.debug\s*=\s*True`)
 	reFlaskRunDebug = regexp.MustCompile(`app\.run\s*\([^)]*debug\s*=\s*True`)
 	reGinDebugMode  = regexp.MustCompile(`gin\.SetMode\s*\(\s*gin\.DebugMode\s*\)`)
-	reNodeDebug     = regexp.MustCompile(`(?i)NODE_ENV\s*(?:!==?|!=)\s*['"]production['"]`)
 	reRailsDevMode  = regexp.MustCompile(`(?i)config\.consider_all_requests_local\s*=\s*true`)
 	reLaravelDebug  = regexp.MustCompile(`(?i)APP_DEBUG\s*=\s*true`)
 	reSpringDebug   = regexp.MustCompile(`(?i)spring\.profiles\.active\s*=\s*dev`)
@@ -23,27 +22,38 @@ var (
 
 // BATOU-GEN-002: Unsafe deserialization patterns
 var (
-	rePickleLoads       = regexp.MustCompile(`(?:c?[Pp]ickle|_pickle|dill|cloudpickle)\.loads?\s*\(`)
-	reYAMLUnsafe        = regexp.MustCompile(`yaml\.load\s*\(`)
-	reYAMLSafeLoader    = regexp.MustCompile(`Loader\s*=\s*(?:yaml\.)?SafeLoader`)
-	reYAMLFullLoader    = regexp.MustCompile(`Loader\s*=\s*(?:yaml\.)?FullLoader`)
-	reJavaObjectStream  = regexp.MustCompile(`(?:new\s+)?ObjectInputStream\s*\(`)
-	reRubyMarshalLoad   = regexp.MustCompile(`Marshal\.load\s*\(`)
-	rePHPUnserialize    = regexp.MustCompile(`unserialize\s*\(`)
-	reNodeSerialize     = regexp.MustCompile(`(?:node-serialize|serialize)\.unserialize\s*\(`)
-	rePickleUnpickler   = regexp.MustCompile(`Unpickler\s*\(`)
+	rePickleLoads      = regexp.MustCompile(`(?:c?[Pp]ickle|_pickle|dill|cloudpickle)\.loads?\s*\(`)
+	reYAMLUnsafe       = regexp.MustCompile(`yaml\.load\s*\(`)
+	reYAMLSafeLoader   = regexp.MustCompile(`Loader\s*=\s*(?:yaml\.)?SafeLoader`)
+	reYAMLFullLoader   = regexp.MustCompile(`Loader\s*=\s*(?:yaml\.)?FullLoader`)
+	reJavaObjectStream = regexp.MustCompile(`(?:new\s+)?ObjectInputStream\s*\(`)
+	reRubyMarshalLoad  = regexp.MustCompile(`Marshal\.load\s*\(`)
+	rePHPUnserialize   = regexp.MustCompile(`unserialize\s*\(`)
+	reNodeSerialize    = regexp.MustCompile(`(?:node-serialize|serialize)\.unserialize\s*\(`)
+	rePickleUnpickler  = regexp.MustCompile(`Unpickler\s*\(`)
 	// JS/TS: eval() with variable (not string literal) — code injection/deserialization
-	reJSEval            = regexp.MustCompile(`\beval\s*\(\s*[a-zA-Z_]\w*`)
+	reJSEval = regexp.MustCompile(`\beval\s*\(\s*[a-zA-Z_]\w*`)
 	// JS/TS: new Function() with variable — code injection
-	reJSNewFunction     = regexp.MustCompile(`\bnew\s+Function\s*\(`)
+	reJSNewFunction = regexp.MustCompile(`\bnew\s+Function\s*\(`)
 	// JS/TS: vm.runInNewContext / vm.runInThisContext with variable
-	reJSVMRun           = regexp.MustCompile(`\bvm\.run(?:In(?:New|This)?Context)\s*\(\s*[a-zA-Z_]\w*`)
+	reJSVMRun = regexp.MustCompile(`\bvm\.run(?:In(?:New|This)?Context)\s*\(\s*[a-zA-Z_]\w*`)
 )
 
 // BATOU-GEN-003: XXE patterns
 var (
-	rePythonXMLParse     = regexp.MustCompile(`xml\.(?:etree|dom|sax|parsers)`)
-	reDefusedXML         = regexp.MustCompile(`defusedxml`)
+	// rePythonXMLParse matches an actual XML *parse sink* that consumes a data
+	// argument — not bare imports (`import xml.dom.minidom`) or node-type
+	// comparisons (`xml.dom.Node.TEXT_NODE`), which the old broad
+	// `xml\.(?:etree|dom|sax|parsers)` pattern matched and over-flagged. Landing
+	// on the real sink line (e.g. `parseString(bar, parser)`) lets the
+	// per-line PySinkVarIsSafe guard evaluate the data argument and distinguish
+	// safe constants from tainted input.
+	rePythonXMLParse = regexp.MustCompile(`\.(?:parseString|fromstring)\s*\(|xml\.[\w.]*\.(?:parse|XML)\s*\(|\b\w+\.parse\s*\(`)
+	// rePythonXMLImport detects presence of a built-in XML library import, used
+	// to gate the generic `<obj>.parse(` sink form (e.g. `ET.parse(...)` where
+	// ET is an alias) so it only fires in files that actually parse XML.
+	rePythonXMLImport = regexp.MustCompile(`\b(?:import\s+xml\b|from\s+xml\b|import\s+lxml\b|from\s+lxml\b|xml\.(?:etree|dom|sax|parsers))`)
+	reDefusedXML      = regexp.MustCompile(`defusedxml`)
 	// Python SAX parser: safe defaults since Python 3.7.1 (external entities disabled by default)
 	rePySAXMakeParser    = regexp.MustCompile(`xml\.sax\.make_parser`)
 	rePySAXExtEntEnabled = regexp.MustCompile(`feature_external_ges\s*,\s*True|feature_external_pes\s*,\s*True`)
@@ -58,17 +68,17 @@ var (
 
 // BATOU-GEN-004: Open redirect patterns
 var (
-	rePyRedirect    = regexp.MustCompile(`redirect\s*\(\s*request\.(?:args|GET|POST|params)`)
-	reJSRedirect    = regexp.MustCompile(`res\.redirect\s*\(\s*req\.(?:query|params|body)`)
+	rePyRedirect = regexp.MustCompile(`redirect\s*\(\s*request\.(?:args|GET|POST|params)`)
+	reJSRedirect = regexp.MustCompile(`res\.redirect\s*\(\s*req\.(?:query|params|body)`)
 	// Go: http.Redirect with direct user input reference
-	reGoRedirect    = regexp.MustCompile(`http\.Redirect\s*\([^,]+,[^,]+,\s*r\.(?:URL\.Query\(\)|FormValue|Form\.Get)`)
+	reGoRedirect = regexp.MustCompile(`http\.Redirect\s*\([^,]+,[^,]+,\s*r\.(?:URL\.Query\(\)|FormValue|Form\.Get)`)
 	// Go: http.Redirect with variable — needs nearby user input source
 	reGoRedirectVar = regexp.MustCompile(`http\.Redirect\s*\([^,]+,[^,]+,\s*[a-zA-Z_]\w*`)
 	// JS: res.redirect with variable — needs nearby user input source
-	reJSRedirectVar = regexp.MustCompile(`res\.redirect\s*\(\s*[a-zA-Z_]\w*`)
-	rePHPRedirect   = regexp.MustCompile(`header\s*\(\s*['"]Location:\s*['"]?\s*\.\s*\$_(?:GET|POST|REQUEST)`)
-	reRubyRedirect  = regexp.MustCompile(`redirect_to\s+params\[`)
-	reJavaRedirect  = regexp.MustCompile(`sendRedirect\s*\(\s*request\.getParameter`)
+	reJSRedirectVar   = regexp.MustCompile(`res\.redirect\s*\(\s*[a-zA-Z_]\w*`)
+	rePHPRedirect     = regexp.MustCompile(`header\s*\(\s*['"]Location:\s*['"]?\s*\.\s*\$_(?:GET|POST|REQUEST)`)
+	reRubyRedirect    = regexp.MustCompile(`redirect_to\s+params\[`)
+	reJavaRedirect    = regexp.MustCompile(`sendRedirect\s*\(\s*request\.getParameter`)
 	reGenericRedirect = regexp.MustCompile(`(?i)(?:redirect|location)\s*(?:=|:)\s*(?:req|request)\.(?:query|params|body|args|GET|POST)`)
 	// Patterns indicating user input source nearby
 	reGoUserInputSource = regexp.MustCompile(`r\.(?:URL\.Query\(\)\.Get|FormValue|PostFormValue|Form\.Get)\s*\(`)
@@ -85,10 +95,10 @@ var (
 
 // BATOU-GEN-006: Race condition (TOCTOU) patterns
 var (
-	reFileExistsCheck   = regexp.MustCompile(`(?:os\.(?:Stat|Lstat|Access)|os\.path\.exists|fs\.(?:exists|existsSync|access|accessSync)|File\.exist\?|file_exists)\s*\(`)
-	reFileOperation     = regexp.MustCompile(`(?:os\.(?:Open|Create|Remove|Rename|Chmod|WriteFile|ReadFile)|open\s*\(|fs\.(?:readFile|writeFile|unlink|rename)|File\.(?:open|delete|rename))\s*\(`)
-	reGoMutexLock       = regexp.MustCompile(`\.(?:Lock|RLock)\(\)`)
-	rePermCheck         = regexp.MustCompile(`(?i)(?:has_?perm|check_?perm|is_?allowed|can_?access|authorize)\s*\(`)
+	reFileExistsCheck = regexp.MustCompile(`(?:os\.(?:Stat|Lstat|Access)|os\.path\.exists|fs\.(?:exists|existsSync|access|accessSync)|File\.exist\?|file_exists)\s*\(`)
+	reFileOperation   = regexp.MustCompile(`(?:os\.(?:Open|Create|Remove|Rename|Chmod|WriteFile|ReadFile)|open\s*\(|fs\.(?:readFile|writeFile|unlink|rename)|File\.(?:open|delete|rename))\s*\(`)
+	reGoMutexLock     = regexp.MustCompile(`\.(?:Lock|RLock)\(\)`)
+	rePermCheck       = regexp.MustCompile(`(?i)(?:has_?perm|check_?perm|is_?allowed|can_?access|authorize)\s*\(`)
 )
 
 // BATOU-GEN-007: Mass assignment patterns
@@ -101,7 +111,6 @@ var (
 	reDjangoExcludeNone = regexp.MustCompile(`exclude\s*=\s*\[\s*\]`)
 	reDjangoFieldsAll   = regexp.MustCompile(`fields\s*=\s*['"]__all__['"]`)
 	reJSSpreadBody      = regexp.MustCompile(`\{\s*\.\.\.req\.body\s*\}`)
-	reGoStructTag       = regexp.MustCompile(`json:"-"`)
 )
 
 // BATOU-GEN-008: Code-as-string analysis — dangerous calls inside eval/vm string args
@@ -118,21 +127,21 @@ var (
 // BATOU-GEN-009: XML parser misconfiguration (XXE enablement)
 var (
 	// noent: true in libxml/XML parsing options — enables external entity substitution
-	reXMLNoentTrue        = regexp.MustCompile(`(?i)noent\s*:\s*true`)
+	reXMLNoentTrue = regexp.MustCompile(`(?i)noent\s*:\s*true`)
 	// resolveExternals set to true (.NET / general)
-	reResolveExternals    = regexp.MustCompile(`(?i)resolveExternals\s*(?:=|:)\s*true`)
+	reResolveExternals = regexp.MustCompile(`(?i)resolveExternals\s*(?:=|:)\s*true`)
 	// Java: FEATURE with external-general-entities set to true
-	reFeatureExtEntities  = regexp.MustCompile(`(?i)FEATURE.*external-general-entities.*true|setFeature\s*\([^)]*external-general-entities[^)]*,\s*true`)
+	reFeatureExtEntities = regexp.MustCompile(`(?i)FEATURE.*external-general-entities.*true|setFeature\s*\([^)]*external-general-entities[^)]*,\s*true`)
 	// libxml context: parseXml/parseXmlString with noent
-	reLibxmlParseNoent    = regexp.MustCompile(`(?i)(?:parseXml|parseXmlString|libxml)\s*\([^)]*noent\s*:\s*true`)
+	reLibxmlParseNoent = regexp.MustCompile(`(?i)(?:parseXml|parseXmlString|libxml)\s*\([^)]*noent\s*:\s*true`)
 )
 
 // --- Rule 1: Debug Mode Enabled ---
 
 type DebugModeEnabled struct{}
 
-func (r *DebugModeEnabled) ID() string                     { return "BATOU-GEN-001" }
-func (r *DebugModeEnabled) Name() string                   { return "DebugModeEnabled" }
+func (r *DebugModeEnabled) ID() string                      { return "BATOU-GEN-001" }
+func (r *DebugModeEnabled) Name() string                    { return "DebugModeEnabled" }
 func (r *DebugModeEnabled) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DebugModeEnabled) Description() string {
 	return "Detects debug or development mode configurations that should not be enabled in production, exposing detailed error messages and internal state."
@@ -147,7 +156,8 @@ func (r *DebugModeEnabled) Languages() []rules.Language {
 
 func (r *DebugModeEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	patterns := []*regexp.Regexp{
 		reDjangoDebug, reFlaskDebug, reFlaskRunDebug, reGinDebugMode,
@@ -161,7 +171,7 @@ func (r *DebugModeEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, pat := range patterns {
-			if m := pat.FindString(line); m != "" {
+			if m := rules.GFindLower(pat, line, lowered[i]); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -189,8 +199,8 @@ func (r *DebugModeEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeDeserialization struct{}
 
-func (r *UnsafeDeserialization) ID() string                     { return "BATOU-GEN-002" }
-func (r *UnsafeDeserialization) Name() string                   { return "UnsafeDeserialization" }
+func (r *UnsafeDeserialization) ID() string                      { return "BATOU-GEN-002" }
+func (r *UnsafeDeserialization) Name() string                    { return "UnsafeDeserialization" }
 func (r *UnsafeDeserialization) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *UnsafeDeserialization) Description() string {
 	return "Detects deserialization of untrusted data using dangerous functions that can lead to remote code execution."
@@ -204,7 +214,8 @@ func (r *UnsafeDeserialization) Languages() []rules.Language {
 
 func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -221,46 +232,46 @@ func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if rules.PySinkVarIsSafe(lines, i) {
 				break
 			}
-			if m := rePickleLoads.FindString(line); m != "" {
+			if m := rules.GFindLower(rePickleLoads, line, lowered[i]); m != "" {
 				matched = m
 				detail = "pickle deserialization can execute arbitrary code. Use JSON or a safe serialization format."
-			} else if m := rePickleUnpickler.FindString(line); m != "" {
+			} else if m := rules.GFindLower(rePickleUnpickler, line, lowered[i]); m != "" {
 				matched = m
 				detail = "Unpickler can execute arbitrary code during deserialization."
-			} else if reYAMLUnsafe.MatchString(line) && !reYAMLSafeLoader.MatchString(line) {
-				matched = reYAMLUnsafe.FindString(line)
-				if reYAMLFullLoader.MatchString(line) {
+			} else if rules.GMatchLower(reYAMLUnsafe, line, lowered[i]) && !rules.GMatchLower(reYAMLSafeLoader, line, lowered[i]) {
+				matched = rules.GFindLower(reYAMLUnsafe, line, lowered[i])
+				if rules.GMatchLower(reYAMLFullLoader, line, lowered[i]) {
 					detail = "yaml.load() with FullLoader is NOT safe for untrusted input — it can still instantiate arbitrary Python objects via !!python/object tags. Use yaml.safe_load() or Loader=SafeLoader."
 				} else {
 					detail = "yaml.load() without SafeLoader can execute arbitrary Python code. Use yaml.safe_load() or specify Loader=SafeLoader."
 				}
 			}
 		case rules.LangJava:
-			if m := reJavaObjectStream.FindString(line); m != "" {
+			if m := rules.GFindLower(reJavaObjectStream, line, lowered[i]); m != "" {
 				matched = m
 				detail = "ObjectInputStream deserializes untrusted data which can lead to RCE. Use allowlists or safe alternatives like JSON."
 			}
 		case rules.LangRuby:
-			if m := reRubyMarshalLoad.FindString(line); m != "" {
+			if m := rules.GFindLower(reRubyMarshalLoad, line, lowered[i]); m != "" {
 				matched = m
 				detail = "Marshal.load can execute arbitrary code. Use JSON.parse for untrusted data."
 			}
 		case rules.LangPHP:
-			if m := rePHPUnserialize.FindString(line); m != "" {
+			if m := rules.GFindLower(rePHPUnserialize, line, lowered[i]); m != "" {
 				matched = m
 				detail = "unserialize() can lead to object injection and RCE. Use json_decode() for untrusted data."
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if m := reNodeSerialize.FindString(line); m != "" {
+			if m := rules.GFindLower(reNodeSerialize, line, lowered[i]); m != "" {
 				matched = m
 				detail = "node-serialize unserialize() executes arbitrary code. Use JSON.parse() instead."
-			} else if m := reJSEval.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reJSEval, line, lowered[i]); m != "" {
 				matched = m
 				detail = "eval() executes arbitrary code from a string. If the input is user-controlled, this leads to remote code execution. Use JSON.parse() for data or a safe sandbox."
-			} else if m := reJSNewFunction.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reJSNewFunction, line, lowered[i]); m != "" {
 				matched = m
 				detail = "new Function() constructor creates executable code from strings. If arguments include user input, this leads to code injection. Use safe alternatives."
-			} else if m := reJSVMRun.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reJSVMRun, line, lowered[i]); m != "" {
 				matched = m
 				detail = "vm.runInNewContext/runInThisContext executes arbitrary code. If the code string is user-controlled, this leads to remote code execution."
 			}
@@ -292,8 +303,8 @@ func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XXEVulnerability struct{}
 
-func (r *XXEVulnerability) ID() string                     { return "BATOU-GEN-003" }
-func (r *XXEVulnerability) Name() string                   { return "XXEVulnerability" }
+func (r *XXEVulnerability) ID() string                      { return "BATOU-GEN-003" }
+func (r *XXEVulnerability) Name() string                    { return "XXEVulnerability" }
 func (r *XXEVulnerability) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XXEVulnerability) Description() string {
 	return "Detects XML parsing configurations that do not disable external entity processing, enabling XXE attacks for file disclosure and SSRF."
@@ -307,21 +318,28 @@ func (r *XXEVulnerability) Languages() []rules.Language {
 
 func (r *XXEVulnerability) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	switch ctx.Language {
 	case rules.LangPython:
+		// Only scan files that actually import a built-in XML library. This
+		// gates the generic `<obj>.parse(` sink form so it can't match
+		// unrelated `.parse(` calls (e.g. dateutil) in non-XML files.
+		if !rules.GMatchFile(rePythonXMLImport, ctx) {
+			break
+		}
 		// Check if defusedxml is imported anywhere in the file
-		if reDefusedXML.MatchString(ctx.Content) {
+		if rules.GMatchFile(reDefusedXML, ctx) {
 			break
 		}
 		// Python's xml.sax.make_parser() disables external entities by default (since 3.7.1).
 		// Only flag if external entities are explicitly enabled via setFeature().
-		if rePySAXMakeParser.MatchString(ctx.Content) && !rePySAXExtEntEnabled.MatchString(ctx.Content) {
+		if rules.GMatchFile(rePySAXMakeParser, ctx) && !rules.GMatchFile(rePySAXExtEntEnabled, ctx) {
 			break
 		}
 		for i, line := range lines {
-			if m := rePythonXMLParse.FindString(line); m != "" {
+			if m := rules.GFindLower(rePythonXMLParse, line, lowered[i]); m != "" {
 				// Python FP suppression: check if the sink variable was
 				// last assigned a safe value.
 				if rules.PySinkVarIsSafe(lines, i) {
@@ -333,10 +351,10 @@ func (r *XXEVulnerability) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 	case rules.LangJava:
-		hasProtection := reJavaDisallowDTD.MatchString(ctx.Content)
+		hasProtection := rules.GMatchFile(reJavaDisallowDTD, ctx)
 		if !hasProtection {
 			for i, line := range lines {
-				if m := reJavaDocBuilder.FindString(line); m != "" {
+				if m := rules.GFindLower(reJavaDocBuilder, line, lowered[i]); m != "" {
 					findings = append(findings, r.makeFinding(ctx, i+1, m,
 						"DocumentBuilderFactory without disabling external entities is vulnerable to XXE. Set FEATURE_SECURE_PROCESSING or disallow-doctype-decl."))
 				}
@@ -345,17 +363,17 @@ func (r *XXEVulnerability) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 	case rules.LangGo:
 		for i, line := range lines {
-			if m := reGoXMLDecoder.FindString(line); m != "" {
+			if m := rules.GFindLower(reGoXMLDecoder, line, lowered[i]); m != "" {
 				findings = append(findings, r.makeFinding(ctx, i+1, m,
 					"Go xml.NewDecoder does not restrict external entities by default. Consider validating XML input and restricting entity expansion."))
 			}
 		}
 
 	case rules.LangPHP:
-		hasProtection := rePHPDisableEntities.MatchString(ctx.Content)
+		hasProtection := rules.GMatchFile(rePHPDisableEntities, ctx)
 		if !hasProtection {
 			for i, line := range lines {
-				if m := rePHPLoadXML.FindString(line); m != "" {
+				if m := rules.GFindLower(rePHPLoadXML, line, lowered[i]); m != "" {
 					findings = append(findings, r.makeFinding(ctx, i+1, m,
 						"XML parsing without libxml_disable_entity_loader(true) is vulnerable to XXE."))
 				}
@@ -363,10 +381,10 @@ func (r *XXEVulnerability) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 	case rules.LangCSharp:
-		hasProtection := reCSharpDtdProhibit.MatchString(ctx.Content)
+		hasProtection := rules.GMatchFile(reCSharpDtdProhibit, ctx)
 		if !hasProtection {
 			for i, line := range lines {
-				if m := reCSharpXMLReader.FindString(line); m != "" {
+				if m := rules.GFindLower(reCSharpXMLReader, line, lowered[i]); m != "" {
 					findings = append(findings, r.makeFinding(ctx, i+1, m,
 						"XML reader without DtdProcessing.Prohibit is vulnerable to XXE."))
 				}
@@ -400,8 +418,8 @@ func (r *XXEVulnerability) makeFinding(ctx *rules.ScanContext, line int, matched
 
 type OpenRedirect struct{}
 
-func (r *OpenRedirect) ID() string                     { return "BATOU-GEN-004" }
-func (r *OpenRedirect) Name() string                   { return "OpenRedirect" }
+func (r *OpenRedirect) ID() string                      { return "BATOU-GEN-004" }
+func (r *OpenRedirect) Name() string                    { return "OpenRedirect" }
 func (r *OpenRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OpenRedirect) Description() string {
 	return "Detects HTTP redirects to user-controlled URLs without validation, enabling phishing and credential theft through open redirect attacks."
@@ -415,7 +433,8 @@ func (r *OpenRedirect) Languages() []rules.Language {
 
 func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	patterns := map[rules.Language][]*regexp.Regexp{
 		rules.LangPython:     {rePyRedirect},
@@ -440,7 +459,7 @@ func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		matched := ""
 		for _, pat := range langPatterns {
-			if m := pat.FindString(line); m != "" {
+			if m := rules.GFindLower(pat, line, lowered[i]); m != "" {
 				matched = m
 				break
 			}
@@ -448,7 +467,7 @@ func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Fallback: for Go, check http.Redirect with a variable if user input is nearby
 		if matched == "" && ctx.Language == rules.LangGo {
-			if m := reGoRedirectVar.FindString(line); m != "" {
+			if m := rules.GFindLower(reGoRedirectVar, line, lowered[i]); m != "" {
 				if hasNearbyUserInput(lines, i, reGoUserInputSource) {
 					matched = m
 				}
@@ -457,7 +476,7 @@ func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Fallback: for JS/TS, check res.redirect with a variable if user input is nearby
 		if matched == "" && (ctx.Language == rules.LangJavaScript || ctx.Language == rules.LangTypeScript) {
-			if m := reJSRedirectVar.FindString(line); m != "" {
+			if m := rules.GFindLower(reJSRedirectVar, line, lowered[i]); m != "" {
 				if hasNearbyUserInput(lines, i, reJSUserInputSource) {
 					matched = m
 				}
@@ -497,7 +516,7 @@ func hasNearbyUserInput(lines []string, idx int, sourcePattern *regexp.Regexp) b
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if sourcePattern.MatchString(l) {
+		if rules.GMatch(sourcePattern, l) {
 			return true
 		}
 	}
@@ -508,8 +527,8 @@ func hasNearbyUserInput(lines []string, idx int, sourcePattern *regexp.Regexp) b
 
 type LogInjection struct{}
 
-func (r *LogInjection) ID() string                     { return "BATOU-GEN-005" }
-func (r *LogInjection) Name() string                   { return "LogInjection" }
+func (r *LogInjection) ID() string                      { return "BATOU-GEN-005" }
+func (r *LogInjection) Name() string                    { return "LogInjection" }
 func (r *LogInjection) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LogInjection) Description() string {
 	return "Detects logging of unsanitized user input that could contain newlines or control characters for log forging attacks."
@@ -523,7 +542,8 @@ func (r *LogInjection) Languages() []rules.Language {
 
 func (r *LogInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	var langPatterns []*regexp.Regexp
 	switch ctx.Language {
@@ -544,7 +564,7 @@ func (r *LogInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, pat := range langPatterns {
-			if m := pat.FindString(line); m != "" {
+			if m := rules.GFindLower(pat, line, lowered[i]); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -572,8 +592,8 @@ func (r *LogInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RaceCondition struct{}
 
-func (r *RaceCondition) ID() string                     { return "BATOU-GEN-006" }
-func (r *RaceCondition) Name() string                   { return "RaceCondition" }
+func (r *RaceCondition) ID() string                      { return "BATOU-GEN-006" }
+func (r *RaceCondition) Name() string                    { return "RaceCondition" }
 func (r *RaceCondition) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RaceCondition) Description() string {
 	return "Detects time-of-check-time-of-use (TOCTOU) patterns where a check is performed and the resource is used in separate steps without proper synchronization."
@@ -587,10 +607,11 @@ func (r *RaceCondition) Languages() []rules.Language {
 
 func (r *RaceCondition) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if file has mutex/lock usage (reduces false positives)
-	hasLocking := reGoMutexLock.MatchString(ctx.Content) ||
+	hasLocking := rules.GMatchFile(reGoMutexLock, ctx) ||
 		strings.Contains(ctx.Content, "synchronized") ||
 		strings.Contains(ctx.Content, "threading.Lock") ||
 		strings.Contains(ctx.Content, "flock")
@@ -600,7 +621,7 @@ func (r *RaceCondition) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	for i, line := range lines {
-		if !reFileExistsCheck.MatchString(line) && !rePermCheck.MatchString(line) {
+		if !rules.GMatchLower(reFileExistsCheck, line, lowered[i]) && !rules.GMatchLower(rePermCheck, line, lowered[i]) {
 			continue
 		}
 
@@ -639,8 +660,8 @@ func (r *RaceCondition) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MassAssignment struct{}
 
-func (r *MassAssignment) ID() string                     { return "BATOU-GEN-007" }
-func (r *MassAssignment) Name() string                   { return "MassAssignment" }
+func (r *MassAssignment) ID() string                      { return "BATOU-GEN-007" }
+func (r *MassAssignment) Name() string                    { return "MassAssignment" }
 func (r *MassAssignment) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MassAssignment) Description() string {
 	return "Detects patterns where all fields from user input are accepted for model or struct updates without field restrictions, enabling privilege escalation."
@@ -654,7 +675,8 @@ func (r *MassAssignment) Languages() []rules.Language {
 
 func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -667,10 +689,10 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if m := reGoBindJSON.FindString(line); m != "" {
+			if m := rules.GFindLower(reGoBindJSON, line, lowered[i]); m != "" {
 				matched = m
 				detail = "Binding all JSON fields directly to a struct without restricting allowed fields. Use a dedicated input DTO or explicitly select fields."
-			} else if m := reGoDecodeBody.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reGoDecodeBody, line, lowered[i]); m != "" {
 				// Only flag .Decode(&) when r.Body is used as the decoder source nearby
 				start := i - 5
 				if start < 0 {
@@ -689,23 +711,23 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangRuby:
-			if m := reRailsPermitAll.FindString(line); m != "" {
+			if m := rules.GFindLower(reRailsPermitAll, line, lowered[i]); m != "" {
 				matched = m
 				detail = "params.permit! allows all parameters, enabling mass assignment of any attribute including admin flags."
-			} else if m := reRailsPermitLax.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reRailsPermitLax, line, lowered[i]); m != "" {
 				matched = m
 				detail = "Permitting all parameters enables mass assignment attacks."
 			}
 		case rules.LangPython:
-			if m := reDjangoExcludeNone.FindString(line); m != "" {
+			if m := rules.GFindLower(reDjangoExcludeNone, line, lowered[i]); m != "" {
 				matched = m
 				detail = "Empty exclude list on a ModelForm allows all model fields to be set from user input."
-			} else if m := reDjangoFieldsAll.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reDjangoFieldsAll, line, lowered[i]); m != "" {
 				matched = m
 				detail = "fields = '__all__' on a ModelForm exposes all model fields to user input. Explicitly list allowed fields."
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if m := reJSSpreadBody.FindString(line); m != "" {
+			if m := rules.GFindLower(reJSSpreadBody, line, lowered[i]); m != "" {
 				matched = m
 				detail = "Spreading req.body directly into an object passes all user-supplied fields without filtering. Destructure only the fields you need."
 			}
@@ -737,8 +759,8 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CodeAsStringEval struct{}
 
-func (r *CodeAsStringEval) ID() string                     { return "BATOU-GEN-008" }
-func (r *CodeAsStringEval) Name() string                   { return "CodeAsStringEval" }
+func (r *CodeAsStringEval) ID() string                      { return "BATOU-GEN-008" }
+func (r *CodeAsStringEval) Name() string                    { return "CodeAsStringEval" }
 func (r *CodeAsStringEval) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CodeAsStringEval) Description() string {
 	return "Detects dangerous function calls (deserialization, command execution, XML parsing) hidden inside string arguments to eval(), vm.runInContext(), or new Function()."
@@ -752,7 +774,8 @@ func (r *CodeAsStringEval) Languages() []rules.Language {
 
 func (r *CodeAsStringEval) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -774,7 +797,7 @@ func (r *CodeAsStringEval) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, p := range patterns {
-			if m := p.re.FindString(line); m != "" {
+			if m := rules.GFindLower(p.re, line, lowered[i]); m != "" {
 				if len(m) > 120 {
 					m = m[:120] + "..."
 				}
@@ -805,8 +828,8 @@ func (r *CodeAsStringEval) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XMLParserMisconfig struct{}
 
-func (r *XMLParserMisconfig) ID() string                     { return "BATOU-GEN-009" }
-func (r *XMLParserMisconfig) Name() string                   { return "XMLParserMisconfig" }
+func (r *XMLParserMisconfig) ID() string                      { return "BATOU-GEN-009" }
+func (r *XMLParserMisconfig) Name() string                    { return "XMLParserMisconfig" }
 func (r *XMLParserMisconfig) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XMLParserMisconfig) Description() string {
 	return "Detects XML parser configurations that explicitly enable external entity processing (noent: true, resolveExternals, external-general-entities), leading to XXE vulnerabilities."
@@ -821,7 +844,8 @@ func (r *XMLParserMisconfig) Languages() []rules.Language {
 
 func (r *XMLParserMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -842,7 +866,7 @@ func (r *XMLParserMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, p := range patterns {
-			if m := p.re.FindString(line); m != "" {
+			if m := rules.GFindLower(p.re, line, lowered[i]); m != "" {
 				if len(m) > 120 {
 					m = m[:120] + "..."
 				}
@@ -872,16 +896,16 @@ func (r *XMLParserMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 // BATOU-GEN-010: VM/Sandbox escape patterns (Node.js)
 var (
 	// vm.runInContext / vm.runInNewContext / vm.runInThisContext with any argument
-	reVMRunInContext     = regexp.MustCompile(`\bvm\.run(?:In(?:New|This)?Context)\s*\(`)
+	reVMRunInContext = regexp.MustCompile(`\bvm\.run(?:In(?:New|This)?Context)\s*\(`)
 	// vm.createScript / vm.Script / vm.compileFunction
-	reVMCreateScript     = regexp.MustCompile(`\bvm\.(?:createScript|Script|compileFunction)\s*\(`)
+	reVMCreateScript = regexp.MustCompile(`\bvm\.(?:createScript|Script|compileFunction)\s*\(`)
 	// vm2 sandbox: new VM / new NodeVM / new VMScript
-	reVM2Sandbox         = regexp.MustCompile(`\bnew\s+(?:VM|NodeVM|VMScript)\s*\(`)
+	reVM2Sandbox = regexp.MustCompile(`\bnew\s+(?:VM|NodeVM|VMScript)\s*\(`)
 	// new Function() constructor with variable argument (code generation from string)
-	reNewFunctionCtor    = regexp.MustCompile(`\bnew\s+Function\s*\(\s*[^)]*[a-zA-Z_]\w*`)
+	reNewFunctionCtor = regexp.MustCompile(`\bnew\s+Function\s*\(\s*[^)]*[a-zA-Z_]\w*`)
 	// child_process.exec with template literal interpolation
-	reChildProcExecTpl   = regexp.MustCompile("\\bchild_process\\.exec\\s*\\(\\s*`")
-	reExecTpl            = regexp.MustCompile("\\b(?:exec|execSync)\\s*\\(\\s*`[^`]*\\$\\{")
+	reChildProcExecTpl = regexp.MustCompile("\\bchild_process\\.exec\\s*\\(\\s*`")
+	reExecTpl          = regexp.MustCompile("\\b(?:exec|execSync)\\s*\\(\\s*`[^`]*\\$\\{")
 	// User input source patterns for JS/TS sandbox context
 	reJSSandboxUserInput = regexp.MustCompile(`req\.(?:query|params|body|headers)\b|process\.argv|\.(?:readFileSync|readFile)\s*\(`)
 )
@@ -890,8 +914,8 @@ var (
 
 type VMSandboxEscape struct{}
 
-func (r *VMSandboxEscape) ID() string                     { return "BATOU-GEN-010" }
-func (r *VMSandboxEscape) Name() string                   { return "VMSandboxEscape" }
+func (r *VMSandboxEscape) ID() string                      { return "BATOU-GEN-010" }
+func (r *VMSandboxEscape) Name() string                    { return "VMSandboxEscape" }
 func (r *VMSandboxEscape) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *VMSandboxEscape) Description() string {
 	return "Detects use of Node.js vm module, vm2, new Function(), or child_process.exec with user-controlled input, which can lead to sandbox escape and remote code execution."
@@ -902,10 +926,11 @@ func (r *VMSandboxEscape) Languages() []rules.Language {
 
 func (r *VMSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if file has user input sources for higher confidence
-	hasUserInput := reJSSandboxUserInput.MatchString(ctx.Content)
+	hasUserInput := rules.GMatchFile(reJSSandboxUserInput, ctx)
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -919,7 +944,7 @@ func (r *VMSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var confidence string
 
 		// vm.runInContext / vm.runInNewContext / vm.runInThisContext
-		if m := reVMRunInContext.FindString(line); m != "" {
+		if m := rules.GFindLower(reVMRunInContext, line, lowered[i]); m != "" {
 			matched = m
 			detail = "vm.runInContext/runInNewContext/runInThisContext executes code in a sandbox that can be trivially escaped. The Node.js vm module is NOT a security mechanism. If the code string is user-controlled, this leads to full remote code execution."
 			if hasUserInput {
@@ -931,7 +956,7 @@ func (r *VMSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// vm.createScript / vm.Script / vm.compileFunction
 		if matched == "" {
-			if m := reVMCreateScript.FindString(line); m != "" {
+			if m := rules.GFindLower(reVMCreateScript, line, lowered[i]); m != "" {
 				matched = m
 				detail = "vm.createScript/Script/compileFunction compiles code for sandbox execution. The Node.js vm module sandbox is trivially escapable and is NOT a security boundary."
 				if hasUserInput {
@@ -944,7 +969,7 @@ func (r *VMSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// vm2 sandbox: new VM / new NodeVM / new VMScript
 		if matched == "" {
-			if m := reVM2Sandbox.FindString(line); m != "" {
+			if m := rules.GFindLower(reVM2Sandbox, line, lowered[i]); m != "" {
 				// Avoid false positives: VM could be a generic class name
 				if strings.Contains(ctx.Content, "vm2") || strings.Contains(ctx.Content, "require('vm") || strings.Contains(ctx.Content, "require(\"vm") || strings.Contains(ctx.Content, "from 'vm") || strings.Contains(ctx.Content, "from \"vm") {
 					matched = m
@@ -956,7 +981,7 @@ func (r *VMSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// new Function() with variable argument
 		if matched == "" {
-			if m := reNewFunctionCtor.FindString(line); m != "" {
+			if m := rules.GFindLower(reNewFunctionCtor, line, lowered[i]); m != "" {
 				if hasUserInput || hasNearbyUserInput(lines, i, reJSSandboxUserInput) {
 					matched = m
 					detail = "new Function() constructor creates executable code from strings. If arguments include user input, this leads to arbitrary code execution with full process privileges."
@@ -967,11 +992,11 @@ func (r *VMSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// child_process.exec with template literal interpolation
 		if matched == "" {
-			if m := reChildProcExecTpl.FindString(line); m != "" {
+			if m := rules.GFindLower(reChildProcExecTpl, line, lowered[i]); m != "" {
 				matched = m
 				detail = "child_process.exec() with template literal interpolation can lead to command injection if any interpolated value comes from user input."
 				confidence = "medium"
-			} else if m := reExecTpl.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reExecTpl, line, lowered[i]); m != "" {
 				matched = m
 				detail = "exec/execSync with template literal interpolation containing ${} can lead to command injection."
 				confidence = "medium"
@@ -1007,24 +1032,24 @@ func (r *VMSandboxEscape) Scan(ctx *rules.ScanContext) []rules.Finding {
 // BATOU-GEN-011: Unsafe YAML deserialization patterns
 var (
 	// Python: yaml.load() without SafeLoader — unsafe by default in PyYAML
-	rePyYAMLLoad     = regexp.MustCompile(`\byaml\.load\s*\(`)
-	rePyYAMLSafe     = regexp.MustCompile(`Loader\s*=\s*(?:yaml\.)?SafeLoader|yaml\.safe_load`)
+	rePyYAMLLoad = regexp.MustCompile(`\byaml\.load\s*\(`)
+	rePyYAMLSafe = regexp.MustCompile(`Loader\s*=\s*(?:yaml\.)?SafeLoader|yaml\.safe_load`)
 	// Python: yaml.unsafe_load() — explicitly unsafe
-	rePyYAMLUnsafe   = regexp.MustCompile(`\byaml\.unsafe_load\s*\(`)
+	rePyYAMLUnsafe = regexp.MustCompile(`\byaml\.unsafe_load\s*\(`)
 	// Node.js (js-yaml): yaml.load() — unsafe by default in js-yaml < 4.0
 	reJSYAMLLoad     = regexp.MustCompile(`\byaml\.load\s*\(`)
 	reJSYAMLSafeLoad = regexp.MustCompile(`\byaml\.(?:safeLoad|safe_load)\s*\(`)
 	// Ruby: YAML.load() — unsafe by default, allows arbitrary object instantiation
-	reRubyYAMLLoad   = regexp.MustCompile(`\bYAML\.load\s*\(`)
-	reRubyYAMLSafe   = regexp.MustCompile(`\bYAML\.safe_load\s*\(`)
+	reRubyYAMLLoad = regexp.MustCompile(`\bYAML\.load\s*\(`)
+	reRubyYAMLSafe = regexp.MustCompile(`\bYAML\.safe_load\s*\(`)
 )
 
 // --- Rule 11: Unsafe YAML Deserialization ---
 
 type UnsafeYAMLDeserialization struct{}
 
-func (r *UnsafeYAMLDeserialization) ID() string                     { return "BATOU-GEN-011" }
-func (r *UnsafeYAMLDeserialization) Name() string                   { return "UnsafeYAMLDeserialization" }
+func (r *UnsafeYAMLDeserialization) ID() string                      { return "BATOU-GEN-011" }
+func (r *UnsafeYAMLDeserialization) Name() string                    { return "UnsafeYAMLDeserialization" }
 func (r *UnsafeYAMLDeserialization) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnsafeYAMLDeserialization) Description() string {
 	return "Detects unsafe YAML deserialization that can lead to arbitrary code execution via object instantiation in Python (PyYAML), Node.js (js-yaml), and Ruby."
@@ -1037,7 +1062,8 @@ func (r *UnsafeYAMLDeserialization) Languages() []rules.Language {
 
 func (r *UnsafeYAMLDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	switch ctx.Language {
 	case rules.LangPython:
@@ -1048,12 +1074,12 @@ func (r *UnsafeYAMLDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding
 				continue
 			}
 
-			if m := rePyYAMLUnsafe.FindString(line); m != "" {
+			if m := rules.GFindLower(rePyYAMLUnsafe, line, lowered[i]); m != "" {
 				findings = append(findings, r.makeFinding(ctx, i+1, m,
 					"yaml.unsafe_load() explicitly deserializes YAML without safety restrictions. Arbitrary Python objects can be instantiated, leading to remote code execution.",
 					"high"))
-			} else if rePyYAMLLoad.MatchString(line) && !rePyYAMLSafe.MatchString(line) {
-				m := rePyYAMLLoad.FindString(line)
+			} else if rules.GMatchLower(rePyYAMLLoad, line, lowered[i]) && !rules.GMatchLower(rePyYAMLSafe, line, lowered[i]) {
+				m := rules.GFindLower(rePyYAMLLoad, line, lowered[i])
 				findings = append(findings, r.makeFinding(ctx, i+1, m,
 					"yaml.load() without Loader=SafeLoader can execute arbitrary Python code via !!python/object tags. Use yaml.safe_load() or specify Loader=SafeLoader.",
 					"high"))
@@ -1068,11 +1094,11 @@ func (r *UnsafeYAMLDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding
 			}
 
 			// Skip yaml.safeLoad / yaml.safe_load calls
-			if reJSYAMLSafeLoad.MatchString(line) {
+			if rules.GMatchLower(reJSYAMLSafeLoad, line, lowered[i]) {
 				continue
 			}
 
-			if m := reJSYAMLLoad.FindString(line); m != "" {
+			if m := rules.GFindLower(reJSYAMLLoad, line, lowered[i]); m != "" {
 				findings = append(findings, r.makeFinding(ctx, i+1, m,
 					"yaml.load() in js-yaml (versions < 4.0) can execute arbitrary JavaScript via !!js/function tags. Use yaml.safeLoad() or upgrade to js-yaml >= 4.0 where load() is safe by default.",
 					"medium"))
@@ -1087,11 +1113,11 @@ func (r *UnsafeYAMLDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding
 			}
 
 			// Skip YAML.safe_load calls
-			if reRubyYAMLSafe.MatchString(line) {
+			if rules.GMatchLower(reRubyYAMLSafe, line, lowered[i]) {
 				continue
 			}
 
-			if m := reRubyYAMLLoad.FindString(line); m != "" {
+			if m := rules.GFindLower(reRubyYAMLLoad, line, lowered[i]); m != "" {
 				findings = append(findings, r.makeFinding(ctx, i+1, m,
 					"YAML.load() in Ruby can instantiate arbitrary objects, leading to remote code execution. Use YAML.safe_load() or Psych.safe_load() instead.",
 					"high"))
@@ -1124,25 +1150,25 @@ func (r *UnsafeYAMLDeserialization) makeFinding(ctx *rules.ScanContext, line int
 // BATOU-GEN-012: Insecure download patterns (CWE-494)
 var (
 	// curl/wget piped to shell
-	reCurlPipeBash    = regexp.MustCompile(`\bcurl\b[^|]*\|\s*(?:ba)?sh\b`)
-	reCurlPipeSudo    = regexp.MustCompile(`\bcurl\b[^|]*\|\s*sudo\s+(?:ba)?sh\b`)
-	reWgetPipeBash    = regexp.MustCompile(`\bwget\b[^|]*\|\s*(?:ba)?sh\b`)
+	reCurlPipeBash = regexp.MustCompile(`\bcurl\b[^|]*\|\s*(?:ba)?sh\b`)
+	reCurlPipeSudo = regexp.MustCompile(`\bcurl\b[^|]*\|\s*sudo\s+(?:ba)?sh\b`)
+	reWgetPipeBash = regexp.MustCompile(`\bwget\b[^|]*\|\s*(?:ba)?sh\b`)
 	// curl/wget over HTTP (not HTTPS)
-	reCurlHTTP        = regexp.MustCompile(`\bcurl\b[^|]*\bhttp://`)
-	reWgetHTTP        = regexp.MustCompile(`\bwget\b[^|]*\bhttp://`)
+	reCurlHTTP = regexp.MustCompile(`\bcurl\b[^|]*\bhttp://`)
+	reWgetHTTP = regexp.MustCompile(`\bwget\b[^|]*\bhttp://`)
 	// Insecure package install flags
-	rePipTrustedHost  = regexp.MustCompile(`\bpip3?\s+install\b[^#\n]*--trusted-host\b`)
-	reNpmUnsafePerm   = regexp.MustCompile(`\bnpm\s+install\b[^#\n]*--unsafe-perm\b`)
+	rePipTrustedHost = regexp.MustCompile(`\bpip3?\s+install\b[^#\n]*--trusted-host\b`)
+	reNpmUnsafePerm  = regexp.MustCompile(`\bnpm\s+install\b[^#\n]*--unsafe-perm\b`)
 	// curl with --insecure / -k
-	reCurlInsecure    = regexp.MustCompile(`\bcurl\b[^|]*(?:--insecure|-k)\b`)
+	reCurlInsecure = regexp.MustCompile(`\bcurl\b[^|]*(?:--insecure|-k)\b`)
 )
 
 // --- Rule 12: Insecure Download Patterns ---
 
 type InsecureDownload struct{}
 
-func (r *InsecureDownload) ID() string                     { return "BATOU-GEN-012" }
-func (r *InsecureDownload) Name() string                   { return "InsecureDownload" }
+func (r *InsecureDownload) ID() string                      { return "BATOU-GEN-012" }
+func (r *InsecureDownload) Name() string                    { return "InsecureDownload" }
 func (r *InsecureDownload) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureDownload) Description() string {
 	return "Detects insecure download and install patterns such as piping curl to shell, downloading over HTTP, and using insecure package manager flags."
@@ -1155,7 +1181,8 @@ func (r *InsecureDownload) Languages() []rules.Language {
 
 func (r *InsecureDownload) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -1181,7 +1208,7 @@ func (r *InsecureDownload) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, p := range patterns {
-			if m := p.re.FindString(line); m != "" {
+			if m := rules.GFindLower(p.re, line, lowered[i]); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),

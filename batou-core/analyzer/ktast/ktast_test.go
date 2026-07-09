@@ -1,11 +1,10 @@
 package ktast
 
 import (
-	"strings"
-	"testing"
-
 	"github.com/turenlabs/batou-core/ast"
 	"github.com/turenlabs/batou-rules/rules"
+	"strings"
+	"testing"
 )
 
 func scanKt(t *testing.T, code string) []rules.Finding {
@@ -131,6 +130,138 @@ fun runCommand(cmd: String) {
 	}
 	if !found {
 		t.Error("expected command injection finding for Runtime.exec")
+	}
+}
+
+func hasRule(findings []rules.Finding, id string) bool {
+	for _, f := range findings {
+		if f.RuleID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func TestUnsafeDeserialization(t *testing.T) {
+	code := `
+fun handle(req: HttpServletRequest): Any {
+    val ois = ObjectInputStream(req.inputStream)
+    return ois.readObject()
+}
+`
+	findings := scanKt(t, code)
+	if !hasRule(findings, "BATOU-KT-AST-005") {
+		t.Error("expected CWE-502 finding for ObjectInputStream constructor")
+	}
+}
+
+func TestUnsafeDeserializationXMLDecoder(t *testing.T) {
+	code := `
+fun handle(req: HttpServletRequest): Any {
+    val dec = XMLDecoder(req.inputStream)
+    return dec.readObject()
+}
+`
+	findings := scanKt(t, code)
+	if !hasRule(findings, "BATOU-KT-AST-005") {
+		t.Error("expected CWE-502 finding for XMLDecoder constructor")
+	}
+}
+
+func TestDeserializationNoFalsePositiveOnReadValue(t *testing.T) {
+	// A typed readValue without default typing is not flagged structurally.
+	code := `
+fun parse(mapper: ObjectMapper, data: String): MyDto {
+    return mapper.readValue(data, MyDto::class.java)
+}
+`
+	findings := scanKt(t, code)
+	if hasRule(findings, "BATOU-KT-AST-005") || hasRule(findings, "BATOU-KT-AST-006") {
+		t.Error("unexpected deserialization finding for safe typed readValue")
+	}
+}
+
+func TestJacksonDefaultTyping(t *testing.T) {
+	code := `
+fun config(mapper: ObjectMapper) {
+    mapper.enableDefaultTyping()
+}
+`
+	findings := scanKt(t, code)
+	if !hasRule(findings, "BATOU-KT-AST-006") {
+		t.Error("expected CWE-502 finding for Jackson enableDefaultTyping")
+	}
+}
+
+func TestJacksonActivateDefaultTyping(t *testing.T) {
+	code := `
+fun config(mapper: ObjectMapper, ptv: PolymorphicTypeValidator) {
+    mapper.activateDefaultTyping(ptv)
+}
+`
+	findings := scanKt(t, code)
+	if !hasRule(findings, "BATOU-KT-AST-006") {
+		t.Error("expected CWE-502 finding for Jackson activateDefaultTyping")
+	}
+}
+
+func TestSSTIConcat(t *testing.T) {
+	code := `
+fun render(engine: TemplateEngine, ctx: Context, name: String): String {
+    return engine.process("Hello " + name, ctx)
+}
+`
+	findings := scanKt(t, code)
+	if !hasRule(findings, "BATOU-KT-AST-007") {
+		t.Error("expected CWE-1336 SSTI finding for concatenated template source")
+	}
+}
+
+func TestSSTIInterpolation(t *testing.T) {
+	code := `
+fun render(handlebars: Handlebars, name: String) {
+    handlebars.compileInline("Hi ${name}")
+}
+`
+	findings := scanKt(t, code)
+	if !hasRule(findings, "BATOU-KT-AST-007") {
+		t.Error("expected CWE-1336 SSTI finding for interpolated template source")
+	}
+}
+
+func TestSSTISafeStaticTemplate(t *testing.T) {
+	code := `
+fun render(engine: TemplateEngine, ctx: Context): String {
+    return engine.process("welcome-page", ctx)
+}
+`
+	findings := scanKt(t, code)
+	if hasRule(findings, "BATOU-KT-AST-007") {
+		t.Error("unexpected SSTI finding for static literal template name")
+	}
+}
+
+func TestSSRFDynamicURL(t *testing.T) {
+	code := `
+fun fetch(target: String): String {
+    return URL(target).openConnection().getInputStream().bufferedReader().readText()
+}
+`
+	findings := scanKt(t, code)
+	if !hasRule(findings, "BATOU-KT-AST-008") {
+		t.Error("expected CWE-918 SSRF finding for URL built from variable")
+	}
+}
+
+func TestSSRFSafeLiteralURL(t *testing.T) {
+	code := `
+fun health(): String {
+    return URL("https://internal.example.com/health").readText()
+}
+`
+	findings := scanKt(t, code)
+	if hasRule(findings, "BATOU-KT-AST-008") {
+		t.Error("unexpected SSRF finding for hardcoded literal URL")
 	}
 }
 

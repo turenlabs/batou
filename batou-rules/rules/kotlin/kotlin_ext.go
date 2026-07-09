@@ -13,29 +13,29 @@ import (
 
 // KT-017: Runtime.exec with string concatenation
 var (
-	reRuntimeExecConcat  = regexp.MustCompile(`Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(\s*(?:"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+|\$\{|\$[a-zA-Z_])`)
-	reRuntimeExecInterp  = regexp.MustCompile(`Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(\s*"[^"]*\$\{`)
+	reRuntimeExecConcat    = regexp.MustCompile(`Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(\s*(?:"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+|\$\{|\$[a-zA-Z_])`)
+	reRuntimeExecInterp    = regexp.MustCompile(`Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(\s*"[^"]*\$\{`)
 	reProcessBuilderConcat = regexp.MustCompile(`ProcessBuilder\s*\(\s*(?:listOf|arrayOf)?\s*\(?\s*(?:"[^"]*"\s*\+|\$\{|\$[a-zA-Z_])`)
 )
 
 // KT-018: WebView JavaScript enabled without protection
 var (
-	reWebViewJSEnabled     = regexp.MustCompile(`\.settings\s*\.\s*javaScriptEnabled\s*=\s*true`)
+	reWebViewJSEnabled       = regexp.MustCompile(`\.settings\s*\.\s*javaScriptEnabled\s*=\s*true`)
 	reAddJavascriptInterface = regexp.MustCompile(`\.addJavascriptInterface\s*\(`)
-	reWebViewClientSafe    = regexp.MustCompile(`\.webViewClient\s*=|setWebViewClient\s*\(`)
+	reWebViewClientSafe      = regexp.MustCompile(`\.webViewClient\s*=|setWebViewClient\s*\(`)
 )
 
 // KT-019: SharedPreferences storing sensitive data
 var (
-	reSharedPrefEdit     = regexp.MustCompile(`(?:getSharedPreferences|PreferenceManager\.getDefaultSharedPreferences)\s*\(`)
-	reSharedPrefPutSens  = regexp.MustCompile(`\.(?:putString|putInt|putBoolean)\s*\(\s*"[^"]*(?i:password|token|secret|key|auth|credential|pin|ssn|credit|session)[^"]*"`)
+	reSharedPrefEdit    = regexp.MustCompile(`(?:getSharedPreferences|PreferenceManager\.getDefaultSharedPreferences)\s*\(`)
+	reSharedPrefPutSens = regexp.MustCompile(`\.(?:putString|putInt|putBoolean)\s*\(\s*"[^"]*(?i:password|token|secret|key|auth|credential|pin|ssn|credit|session)[^"]*"`)
 )
 
 // KT-020: Intent with user-controlled component
 var (
-	reIntentSetComponent  = regexp.MustCompile(`(?:intent|Intent)\s*(?:\(\s*\))?\s*\.?\s*(?:setComponent|setClassName|setClass)\s*\(`)
-	reIntentComponentVar  = regexp.MustCompile(`\.(?:setComponent|setClassName|setClass)\s*\(\s*[a-zA-Z_]\w*`)
-	reIntentFromExtra     = regexp.MustCompile(`getStringExtra\s*\([^)]*\)\s*.*\.(?:setComponent|setClassName|setClass)`)
+	reIntentSetComponent = regexp.MustCompile(`(?:intent|Intent)\s*(?:\(\s*\))?\s*\.?\s*(?:setComponent|setClassName|setClass)\s*\(`)
+	reIntentComponentVar = regexp.MustCompile(`\.(?:setComponent|setClassName|setClass)\s*\(\s*[a-zA-Z_]\w*`)
+	reIntentFromExtra    = regexp.MustCompile(`getStringExtra\s*\([^)]*\)\s*.*\.(?:setComponent|setClassName|setClass)`)
 )
 
 // KT-021: Exported ContentProvider without permissions
@@ -53,7 +53,6 @@ var (
 
 // KT-023: SQL injection in Room raw query
 var (
-	reRoomRawQueryAnnot  = regexp.MustCompile(`@RawQuery`)
 	reSupportSQLiteQuery = regexp.MustCompile(`SimpleSQLiteQuery\s*\(\s*(?:"[^"]*"\s*\+|"[^"]*\$\{|\$"[^"]*\$\{|[a-zA-Z_]\w*\s*\+)`)
 	reRoomQueryRaw       = regexp.MustCompile(`\.query\s*\(\s*(?:SimpleSQLiteQuery|SupportSQLiteQuery)\s*\(\s*(?:"[^"]*"\s*\+|"[^"]*\$\{)`)
 )
@@ -63,7 +62,6 @@ var (
 	reTrustAllCerts    = regexp.MustCompile(`TrustManager|X509TrustManager`)
 	reCheckServerEmpty = regexp.MustCompile(`checkServerTrusted\s*\([^)]*\)\s*\{?\s*\}?`)
 	reHostnameVerifier = regexp.MustCompile(`HostnameVerifier\s*\{?\s*(?:_\s*,\s*_\s*->|.*->)\s*true`)
-	reSSLSocketFactory = regexp.MustCompile(`sslSocketFactory\s*\(|SSLContext\.getInstance`)
 )
 
 func init() {
@@ -83,15 +81,18 @@ func init() {
 
 type KotlinRuntimeExec struct{}
 
-func (r *KotlinRuntimeExec) ID() string                      { return "BATOU-KT-017" }
-func (r *KotlinRuntimeExec) Name() string                    { return "KotlinRuntimeExec" }
-func (r *KotlinRuntimeExec) Description() string             { return "Detects Kotlin Runtime.exec or ProcessBuilder with string concatenation or template interpolation, enabling command injection." }
+func (r *KotlinRuntimeExec) ID() string   { return "BATOU-KT-017" }
+func (r *KotlinRuntimeExec) Name() string { return "KotlinRuntimeExec" }
+func (r *KotlinRuntimeExec) Description() string {
+	return "Detects Kotlin Runtime.exec or ProcessBuilder with string concatenation or template interpolation, enabling command injection."
+}
 func (r *KotlinRuntimeExec) DefaultSeverity() rules.Severity { return rules.High }
 func (r *KotlinRuntimeExec) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
 
 func (r *KotlinRuntimeExec) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
@@ -101,13 +102,13 @@ func (r *KotlinRuntimeExec) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reRuntimeExecConcat.FindString(line); m != "" {
+		if m := rules.GFindLower(reRuntimeExecConcat, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Runtime.exec() with string concatenation or template"
-		} else if m := reRuntimeExecInterp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRuntimeExecInterp, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Runtime.exec() with string template interpolation"
-		} else if m := reProcessBuilderConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reProcessBuilderConcat, line, lowered[i]); m != "" {
 			matched = m
 			desc = "ProcessBuilder with string concatenation or template"
 		}
@@ -143,28 +144,31 @@ func (r *KotlinRuntimeExec) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KotlinWebViewJS struct{}
 
-func (r *KotlinWebViewJS) ID() string                      { return "BATOU-KT-018" }
-func (r *KotlinWebViewJS) Name() string                    { return "KotlinWebViewJS" }
-func (r *KotlinWebViewJS) Description() string             { return "Detects Kotlin WebView with JavaScript enabled and addJavascriptInterface without proper WebViewClient protection." }
+func (r *KotlinWebViewJS) ID() string   { return "BATOU-KT-018" }
+func (r *KotlinWebViewJS) Name() string { return "KotlinWebViewJS" }
+func (r *KotlinWebViewJS) Description() string {
+	return "Detects Kotlin WebView with JavaScript enabled and addJavascriptInterface without proper WebViewClient protection."
+}
 func (r *KotlinWebViewJS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *KotlinWebViewJS) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
 
 func (r *KotlinWebViewJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Only flag if JavaScript is enabled
-	if !reWebViewJSEnabled.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reWebViewJSEnabled, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
 
-		if reAddJavascriptInterface.MatchString(line) {
-			matched := reAddJavascriptInterface.FindString(line)
+		if rules.GMatchLower(reAddJavascriptInterface, line, lowered[i]) {
+			matched := rules.GFindLower(reAddJavascriptInterface, line, lowered[i])
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
 			}
@@ -186,8 +190,8 @@ func (r *KotlinWebViewJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if reWebViewJSEnabled.MatchString(line) && !reWebViewClientSafe.MatchString(ctx.Content) {
-			matched := reWebViewJSEnabled.FindString(line)
+		if rules.GMatchLower(reWebViewJSEnabled, line, lowered[i]) && !rules.GMatchFile(reWebViewClientSafe, ctx) {
+			matched := rules.GFindLower(reWebViewJSEnabled, line, lowered[i])
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
 			}
@@ -218,27 +222,32 @@ func (r *KotlinWebViewJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KotlinSharedPrefSensitive struct{}
 
-func (r *KotlinSharedPrefSensitive) ID() string                      { return "BATOU-KT-019" }
-func (r *KotlinSharedPrefSensitive) Name() string                    { return "KotlinSharedPrefSensitive" }
-func (r *KotlinSharedPrefSensitive) Description() string             { return "Detects Kotlin SharedPreferences storing sensitive data (passwords, tokens, keys) in plaintext." }
+func (r *KotlinSharedPrefSensitive) ID() string   { return "BATOU-KT-019" }
+func (r *KotlinSharedPrefSensitive) Name() string { return "KotlinSharedPrefSensitive" }
+func (r *KotlinSharedPrefSensitive) Description() string {
+	return "Detects Kotlin SharedPreferences storing sensitive data (passwords, tokens, keys) in plaintext."
+}
 func (r *KotlinSharedPrefSensitive) DefaultSeverity() rules.Severity { return rules.High }
-func (r *KotlinSharedPrefSensitive) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *KotlinSharedPrefSensitive) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *KotlinSharedPrefSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Quick bail: no SharedPreferences usage
-	if !reSharedPrefEdit.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reSharedPrefEdit, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
 
-		if m := reSharedPrefPutSens.FindString(line); m != "" {
+		if m := rules.GFindLower(reSharedPrefPutSens, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -270,26 +279,31 @@ func (r *KotlinSharedPrefSensitive) Scan(ctx *rules.ScanContext) []rules.Finding
 
 type KotlinIntentRedirect struct{}
 
-func (r *KotlinIntentRedirect) ID() string                      { return "BATOU-KT-020" }
-func (r *KotlinIntentRedirect) Name() string                    { return "KotlinIntentRedirect" }
-func (r *KotlinIntentRedirect) Description() string             { return "Detects Kotlin Intent with user-controlled component class, enabling intent redirect attacks to access private activities." }
+func (r *KotlinIntentRedirect) ID() string   { return "BATOU-KT-020" }
+func (r *KotlinIntentRedirect) Name() string { return "KotlinIntentRedirect" }
+func (r *KotlinIntentRedirect) Description() string {
+	return "Detects Kotlin Intent with user-controlled component class, enabling intent redirect attacks to access private activities."
+}
 func (r *KotlinIntentRedirect) DefaultSeverity() rules.Severity { return rules.High }
-func (r *KotlinIntentRedirect) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *KotlinIntentRedirect) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *KotlinIntentRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reIntentSetComponent.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reIntentSetComponent, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
 
-		if reIntentComponentVar.MatchString(line) || reIntentFromExtra.MatchString(line) {
+		if rules.GMatchLower(reIntentComponentVar, line, lowered[i]) || rules.GMatchLower(reIntentFromExtra, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -321,20 +335,25 @@ func (r *KotlinIntentRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KotlinExportedProvider struct{}
 
-func (r *KotlinExportedProvider) ID() string                      { return "BATOU-KT-021" }
-func (r *KotlinExportedProvider) Name() string                    { return "KotlinExportedProvider" }
-func (r *KotlinExportedProvider) Description() string             { return "Detects Android exported ContentProvider without read/write permissions in manifest files." }
+func (r *KotlinExportedProvider) ID() string   { return "BATOU-KT-021" }
+func (r *KotlinExportedProvider) Name() string { return "KotlinExportedProvider" }
+func (r *KotlinExportedProvider) Description() string {
+	return "Detects Android exported ContentProvider without read/write permissions in manifest files."
+}
 func (r *KotlinExportedProvider) DefaultSeverity() rules.Severity { return rules.High }
-func (r *KotlinExportedProvider) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *KotlinExportedProvider) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *KotlinExportedProvider) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// This rule targets AndroidManifest.xml or similar Kotlin config
-	if !reProviderTag.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reProviderTag, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inProvider := false
 	providerStartLine := 0
@@ -345,12 +364,12 @@ func (r *KotlinExportedProvider) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reProviderTag.MatchString(line) {
+		if rules.GMatchLower(reProviderTag, line, lowered[i]) {
 			inProvider = true
 			providerStartLine = i
 		}
 
-		if inProvider && reContentProviderExported.MatchString(line) {
+		if inProvider && rules.GMatchLower(reContentProviderExported, line, lowered[i]) {
 			// Check if there's a permission in the provider block
 			hasPermission := false
 			end := i + 10
@@ -404,15 +423,20 @@ func (r *KotlinExportedProvider) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KotlinInsecureBroadcast struct{}
 
-func (r *KotlinInsecureBroadcast) ID() string                      { return "BATOU-KT-022" }
-func (r *KotlinInsecureBroadcast) Name() string                    { return "KotlinInsecureBroadcast" }
-func (r *KotlinInsecureBroadcast) Description() string             { return "Detects Kotlin sendBroadcast or registerReceiver without permission protection." }
+func (r *KotlinInsecureBroadcast) ID() string   { return "BATOU-KT-022" }
+func (r *KotlinInsecureBroadcast) Name() string { return "KotlinInsecureBroadcast" }
+func (r *KotlinInsecureBroadcast) Description() string {
+	return "Detects Kotlin sendBroadcast or registerReceiver without permission protection."
+}
 func (r *KotlinInsecureBroadcast) DefaultSeverity() rules.Severity { return rules.Medium }
-func (r *KotlinInsecureBroadcast) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *KotlinInsecureBroadcast) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *KotlinInsecureBroadcast) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
@@ -422,10 +446,10 @@ func (r *KotlinInsecureBroadcast) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reSendBroadcastNoPermission.FindString(line); m != "" {
+		if m := rules.GFindLower(reSendBroadcastNoPermission, line, lowered[i]); m != "" {
 			matched = m
 			desc = "sendBroadcast() is called without a receiver permission parameter. Any app can receive this broadcast, potentially leaking sensitive data."
-		} else if m := reRegisterReceiverInsecure.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRegisterReceiverInsecure, line, lowered[i]); m != "" {
 			matched = m
 			desc = "registerReceiver() is called without a sender permission parameter. Any app can send intents to this receiver, potentially injecting malicious data."
 		}
@@ -461,15 +485,18 @@ func (r *KotlinInsecureBroadcast) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KotlinRoomRawQuery struct{}
 
-func (r *KotlinRoomRawQuery) ID() string                      { return "BATOU-KT-023" }
-func (r *KotlinRoomRawQuery) Name() string                    { return "KotlinRoomRawQuery" }
-func (r *KotlinRoomRawQuery) Description() string             { return "Detects Kotlin SQL injection via Room @RawQuery with SimpleSQLiteQuery built from string concatenation." }
+func (r *KotlinRoomRawQuery) ID() string   { return "BATOU-KT-023" }
+func (r *KotlinRoomRawQuery) Name() string { return "KotlinRoomRawQuery" }
+func (r *KotlinRoomRawQuery) Description() string {
+	return "Detects Kotlin SQL injection via Room @RawQuery with SimpleSQLiteQuery built from string concatenation."
+}
 func (r *KotlinRoomRawQuery) DefaultSeverity() rules.Severity { return rules.High }
 func (r *KotlinRoomRawQuery) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
 
 func (r *KotlinRoomRawQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
@@ -478,9 +505,9 @@ func (r *KotlinRoomRawQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reSupportSQLiteQuery.FindString(line); m != "" {
+		if m := rules.GFindLower(reSupportSQLiteQuery, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reRoomQueryRaw.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRoomQueryRaw, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -515,15 +542,18 @@ func (r *KotlinRoomRawQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KotlinTrustAllCerts struct{}
 
-func (r *KotlinTrustAllCerts) ID() string                      { return "BATOU-KT-024" }
-func (r *KotlinTrustAllCerts) Name() string                    { return "KotlinTrustAllCerts" }
-func (r *KotlinTrustAllCerts) Description() string             { return "Detects Kotlin TLS bypasses: custom TrustManager that trusts all certs, HostnameVerifier that always returns true, disabling SSL verification." }
+func (r *KotlinTrustAllCerts) ID() string   { return "BATOU-KT-024" }
+func (r *KotlinTrustAllCerts) Name() string { return "KotlinTrustAllCerts" }
+func (r *KotlinTrustAllCerts) Description() string {
+	return "Detects Kotlin TLS bypasses: custom TrustManager that trusts all certs, HostnameVerifier that always returns true, disabling SSL verification."
+}
 func (r *KotlinTrustAllCerts) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *KotlinTrustAllCerts) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
 
 func (r *KotlinTrustAllCerts) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
@@ -533,11 +563,11 @@ func (r *KotlinTrustAllCerts) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var title, desc string
 
-		if m := reHostnameVerifier.FindString(line); m != "" {
+		if m := rules.GFindLower(reHostnameVerifier, line, lowered[i]); m != "" {
 			matched = m
 			title = "Kotlin HostnameVerifier always returns true"
 			desc = "A HostnameVerifier is configured to always return true, disabling hostname verification. Any valid TLS certificate will be accepted regardless of the hostname, enabling man-in-the-middle attacks."
-		} else if reCheckServerEmpty.MatchString(line) && reTrustAllCerts.MatchString(ctx.Content) {
+		} else if rules.GMatchLower(reCheckServerEmpty, line, lowered[i]) && rules.GMatchFile(reTrustAllCerts, ctx) {
 			matched = strings.TrimSpace(line)
 			title = "Kotlin TrustManager with empty checkServerTrusted"
 			desc = "A custom X509TrustManager with an empty or permissive checkServerTrusted method trusts all server certificates, including self-signed and expired ones. This completely disables TLS certificate verification."

@@ -1,11 +1,10 @@
 package gvyast
 
 import (
-	"strings"
-	"testing"
-
 	"github.com/turenlabs/batou-core/ast"
 	"github.com/turenlabs/batou-rules/rules"
+	"strings"
+	"testing"
 )
 
 func scanGvy(t *testing.T, code string) []rules.Finding {
@@ -61,6 +60,29 @@ class Foo {
 	}
 	if !found {
 		t.Error("expected command injection finding for variable.execute()")
+	}
+}
+
+// TestNonShellExecuteIsNotFlagged covers the FP shape that dominated the
+// scan-harness Groovy sample: .execute() on receivers that obviously
+// aren't shell strings (statement.execute(sql), future.execute(),
+// task.execute(), etc.). The name heuristic should refuse to fire.
+func TestNonShellExecuteIsNotFlagged(t *testing.T) {
+	code := `
+class Foo {
+    def doStuff(statement, future, task, request) {
+        statement.execute()
+        future.execute()
+        task.execute()
+        request.execute()
+    }
+}
+`
+	findings := scanGvy(t, code)
+	for _, f := range findings {
+		if f.RuleID == "BATOU-GVY-AST-001" {
+			t.Errorf("non-shell .execute() should not produce BATOU-GVY-AST-001; got: %s", f.MatchedText)
+		}
 	}
 }
 
@@ -187,5 +209,171 @@ func TestWrongLanguage(t *testing.T) {
 	findings := a.Scan(ctx)
 	if len(findings) != 0 {
 		t.Error("expected no findings for wrong language")
+	}
+}
+
+// hasRuleCWE reports whether findings contain a finding with the given rule
+// ID and CWE.
+func hasRuleCWE(findings []rules.Finding, ruleID, cwe string) bool {
+	for _, f := range findings {
+		if f.RuleID == ruleID && f.CWEID == cwe {
+			return true
+		}
+	}
+	return false
+}
+
+// --- XXE (CWE-611) ---
+
+func TestXXEXmlSlurperParse(t *testing.T) {
+	code := `
+class Foo {
+    def parse(userInput) {
+        return new XmlSlurper().parse(userInput)
+    }
+}
+`
+	findings := scanGvy(t, code)
+	if !hasRuleCWE(findings, "BATOU-GVY-AST-006", "CWE-611") {
+		t.Error("expected XXE finding for new XmlSlurper().parse(userInput)")
+	}
+}
+
+func TestXXEXmlParserParseText(t *testing.T) {
+	code := `
+class Foo {
+    def parse(xml) {
+        return new XmlParser().parseText(xml)
+    }
+}
+`
+	findings := scanGvy(t, code)
+	if !hasRuleCWE(findings, "BATOU-GVY-AST-006", "CWE-611") {
+		t.Error("expected XXE finding for new XmlParser().parseText(xml)")
+	}
+}
+
+func TestXXEVariableTracked(t *testing.T) {
+	code := `
+class Foo {
+    def parse(xml) {
+        def slurper = new XmlSlurper()
+        return slurper.parse(xml)
+    }
+}
+`
+	findings := scanGvy(t, code)
+	if !hasRuleCWE(findings, "BATOU-GVY-AST-006", "CWE-611") {
+		t.Error("expected XXE finding for var-tracked slurper.parse(xml)")
+	}
+}
+
+func TestXXESuppressedWhenHardened(t *testing.T) {
+	code := `
+class Foo {
+    def parse(xml) {
+        def slurper = new XmlSlurper()
+        slurper.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+        return slurper.parse(xml)
+    }
+}
+`
+	findings := scanGvy(t, code)
+	if hasRuleCWE(findings, "BATOU-GVY-AST-006", "CWE-611") {
+		t.Error("XXE finding should be suppressed when disallow-doctype-decl is set")
+	}
+}
+
+func TestXXENotFiredOnNonParser(t *testing.T) {
+	// .parse() on a non-XML-parser receiver must not fire XXE.
+	code := `
+class Foo {
+    def run(data) {
+        def n = Integer.parse(data)
+        return n
+    }
+}
+`
+	findings := scanGvy(t, code)
+	if hasRuleCWE(findings, "BATOU-GVY-AST-006", "CWE-611") {
+		t.Error("XXE should not fire on Integer.parse")
+	}
+}
+
+// --- Unsafe deserialization (CWE-502) ---
+
+func TestDeserObjectInputStream(t *testing.T) {
+	code := `
+class Foo {
+    def load(stream) {
+        def ois = new ObjectInputStream(stream)
+        return ois.readObject()
+    }
+}
+`
+	findings := scanGvy(t, code)
+	if !hasRuleCWE(findings, "BATOU-GVY-AST-007", "CWE-502") {
+		t.Error("expected deserialization finding for ObjectInputStream.readObject()")
+	}
+}
+
+func TestDeserYamlLoad(t *testing.T) {
+	code := `
+class Foo {
+    def load(input) {
+        def yaml = new Yaml()
+        return yaml.load(input)
+    }
+}
+`
+	findings := scanGvy(t, code)
+	if !hasRuleCWE(findings, "BATOU-GVY-AST-007", "CWE-502") {
+		t.Error("expected deserialization finding for Yaml.load()")
+	}
+}
+
+func TestDeserYamlSafeConstructorNotFlagged(t *testing.T) {
+	code := `
+class Foo {
+    def load(input) {
+        def yaml = new Yaml(new SafeConstructor())
+        return yaml.load(input)
+    }
+}
+`
+	findings := scanGvy(t, code)
+	if hasRuleCWE(findings, "BATOU-GVY-AST-007", "CWE-502") {
+		t.Error("Yaml(new SafeConstructor()).load() must not be flagged as unsafe deserialization")
+	}
+}
+
+// --- SSRF (CWE-918) ---
+
+func TestSSRFUrlOpenConnection(t *testing.T) {
+	code := `
+class Foo {
+    def fetch(target) {
+        return new URL(target).openConnection()
+    }
+}
+`
+	findings := scanGvy(t, code)
+	if !hasRuleCWE(findings, "BATOU-GVY-AST-008", "CWE-918") {
+		t.Error("expected SSRF finding for new URL(target).openConnection()")
+	}
+}
+
+func TestSSRFLiteralUrlNotFlagged(t *testing.T) {
+	// A hardcoded literal URL is not SSRF.
+	code := `
+class Foo {
+    def fetch() {
+        return new URL("https://example.com/static").openConnection()
+    }
+}
+`
+	findings := scanGvy(t, code)
+	if hasRuleCWE(findings, "BATOU-GVY-AST-008", "CWE-918") {
+		t.Error("literal-URL openConnection must not be flagged as SSRF")
 	}
 }

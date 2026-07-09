@@ -3,12 +3,10 @@ package scanner_test
 import (
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/graph"
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
 	"github.com/turenlabs/batou-core/testutil"
-
 	// Register rule packages so the full pipeline runs.
 	_ "github.com/turenlabs/batou-rules/rules/injection"
 	_ "github.com/turenlabs/batou-rules/rules/secrets"
@@ -639,5 +637,342 @@ func TestInterproc_FlowInformedSignature(t *testing.T) {
 			ruleIDs[i] = f.RuleID
 		}
 		t.Errorf("flow-informed interprocedural should detect SQL injection, got %d findings: %v", len(findings), ruleIDs)
+	}
+}
+
+// =========================================================================
+// Scenario 9 (PR-FF): Precise (caller-arg → callee-sink) positional pairing
+//
+// When the callee has two distinct sinks at different parameter positions
+// and the caller passes a mix of tainted/clean args, only the precisely
+// matched (arg position → sink param) pair should fire.
+//
+// Setup: callee Process(req *http.Request, conn net.Conn) has two sinks:
+//   * SQL sink with ArgFromParam=0  (taint enters at param 0 → SQL)
+//   * Command sink with ArgFromParam=1 (taint enters at param 1 → cmd)
+// Caller passes (taintedHTTP, "literal"): only the SQL pair fires.
+// Caller passing ("literal", taintedConn): only the command pair fires.
+// =========================================================================
+
+func TestInterproc_PrecisePair_TwoArgsTwoSinks(t *testing.T) {
+	cg := graph.NewCallGraph("/project", "test-session")
+
+	calleeFile := "/app/svc.go"
+	callerFile := "/app/api.go"
+
+	calleeNode := &graph.FuncNode{
+		ID:        graph.FuncID(calleeFile, "Process"),
+		FilePath:  calleeFile,
+		Name:      "Process",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	// Synthetic signature: two sinks, one per param position. This is the
+	// canonical "multiple positional sinks" shape that the precise-pairing
+	// improvement targets — building it via regex would require an unusual
+	// callee body, but the matching contract is what we want to assert.
+	calleeNode.TaintSig = graph.TaintSignature{
+		SourceParams: map[int]taint.SourceCategory{
+			0: taint.SrcUserInput,
+			1: taint.SrcNetwork,
+		},
+		SinkCalls: []graph.SinkRef{
+			{
+				SinkCategory: taint.SnkSQLQuery,
+				MethodName:   "db.Query",
+				Line:         2,
+				ArgFromParam: 0,
+			},
+			{
+				SinkCategory: taint.SnkCommand,
+				MethodName:   "exec.Command",
+				Line:         3,
+				ArgFromParam: 1,
+			},
+		},
+	}
+
+	callerNode := &graph.FuncNode{
+		ID:        graph.FuncID(callerFile, "Handler"),
+		FilePath:  callerFile,
+		Name:      "Handler",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	cg.AddNode(calleeNode)
+	cg.AddNode(callerNode)
+	cg.AddEdge(callerNode.ID, calleeNode.ID)
+
+	// Caller passes a tainted *http.Request expression at position 0 and a
+	// string literal at position 1. Only the SQL sink (ArgFromParam=0)
+	// should match.
+	callerContent := `func Handler(w http.ResponseWriter, r *http.Request) {
+	val := r.FormValue("q")
+	Process(val, "literal-not-tainted")
+}`
+
+	findings := graph.AnalyzeCallerImpact(cg, callerNode, calleeNode, callerContent)
+
+	sqlCount, cmdCount := 0, 0
+	for _, f := range findings {
+		if !strings.HasPrefix(f.RuleID, "BATOU-INTERPROC") {
+			continue
+		}
+		switch f.SinkCategory {
+		case string(taint.SnkSQLQuery):
+			sqlCount++
+		case string(taint.SnkCommand):
+			cmdCount++
+		}
+	}
+	if sqlCount != 1 {
+		t.Errorf("expected exactly 1 SQL interproc finding (tainted arg 0 → SQL sink), got %d", sqlCount)
+	}
+	if cmdCount != 0 {
+		t.Errorf("expected 0 command-injection findings (arg 1 was a literal), got %d; "+
+			"this means a clean arg matched a sink at its position, indicating loose pairing",
+			cmdCount)
+	}
+}
+
+// =========================================================================
+// Scenario 10 (PR-FF): Cross-position no-match
+//
+// When the callee has a single sink at param 0 and the caller passes a
+// clean value at position 0 and a tainted value at position 1, no finding
+// should be emitted — the tainted arg's position (1) does NOT correspond
+// to any sink's ArgFromParam.
+//
+// This is the key precision guarantee: a tainted arg at position N never
+// "spills over" into sinks at OTHER positions just because they exist on
+// the same callee.
+// =========================================================================
+
+func TestInterproc_PrecisePair_NoCrossMatch(t *testing.T) {
+	cg := graph.NewCallGraph("/project", "test-session")
+
+	calleeFile := "/app/svc.go"
+	callerFile := "/app/api.go"
+
+	calleeNode := &graph.FuncNode{
+		ID:        graph.FuncID(calleeFile, "Process"),
+		FilePath:  calleeFile,
+		Name:      "Process",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	// Callee has a single SQL sink at param 0. Param 1 is declared as a
+	// source-typed param (so calleeHasSources is true and the -1
+	// wildcard fallback is disabled), but no sink references it.
+	calleeNode.TaintSig = graph.TaintSignature{
+		SourceParams: map[int]taint.SourceCategory{
+			0: taint.SrcUserInput,
+			1: taint.SrcNetwork,
+		},
+		SinkCalls: []graph.SinkRef{
+			{
+				SinkCategory: taint.SnkSQLQuery,
+				MethodName:   "db.Query",
+				Line:         2,
+				ArgFromParam: 0,
+			},
+		},
+	}
+
+	callerNode := &graph.FuncNode{
+		ID:        graph.FuncID(callerFile, "Handler"),
+		FilePath:  callerFile,
+		Name:      "Handler",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	cg.AddNode(calleeNode)
+	cg.AddNode(callerNode)
+	cg.AddEdge(callerNode.ID, calleeNode.ID)
+
+	// Caller: literal at position 0, tainted r.FormValue at position 1.
+	// The single sink wants param 0; the tainted arg is at position 1.
+	// Expected: NO interprocedural findings.
+	callerContent := `func Handler(w http.ResponseWriter, r *http.Request) {
+	taintedAtOne := r.FormValue("q")
+	Process("literal-arg-zero", taintedAtOne)
+}`
+
+	findings := graph.AnalyzeCallerImpact(cg, callerNode, calleeNode, callerContent)
+
+	for _, f := range findings {
+		if strings.HasPrefix(f.RuleID, "BATOU-INTERPROC") {
+			t.Errorf(
+				"expected no interproc findings (tainted arg at position 1, sink wants position 0), "+
+					"got %s for %s", f.RuleID, f.MatchedText,
+			)
+		}
+	}
+}
+
+// =========================================================================
+// Scenario 11 (PR-FF): TaintPath propagation step includes the matched
+// callee parameter index.
+//
+// The middle step of the TaintPath should name the specific param that
+// receives the tainted arg, e.g. "caller's val flows to Process as param 0",
+// rather than the older generic "passed to Process(...)".
+// =========================================================================
+
+func TestInterproc_TaintPathIncludesParamIndex(t *testing.T) {
+	cg := graph.NewCallGraph("/project", "test-session")
+
+	calleeFile := "/app/svc.go"
+	callerFile := "/app/api.go"
+
+	calleeNode := &graph.FuncNode{
+		ID:        graph.FuncID(calleeFile, "Process"),
+		FilePath:  calleeFile,
+		Name:      "Process",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+	calleeNode.TaintSig = graph.TaintSignature{
+		SourceParams: map[int]taint.SourceCategory{
+			0: taint.SrcUserInput,
+		},
+		SinkCalls: []graph.SinkRef{
+			{
+				SinkCategory: taint.SnkSQLQuery,
+				MethodName:   "db.Query",
+				Line:         2,
+				ArgFromParam: 0,
+			},
+		},
+	}
+
+	callerNode := &graph.FuncNode{
+		ID:        graph.FuncID(callerFile, "Handler"),
+		FilePath:  callerFile,
+		Name:      "Handler",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	cg.AddNode(calleeNode)
+	cg.AddNode(callerNode)
+	cg.AddEdge(callerNode.ID, calleeNode.ID)
+
+	callerContent := `func Handler(w http.ResponseWriter, r *http.Request) {
+	val := r.FormValue("q")
+	Process(val)
+}`
+
+	findings := graph.AnalyzeCallerImpact(cg, callerNode, calleeNode, callerContent)
+
+	var interproc *rules.Finding
+	for i := range findings {
+		if strings.HasPrefix(findings[i].RuleID, "BATOU-INTERPROC") {
+			interproc = &findings[i]
+			break
+		}
+	}
+	if interproc == nil {
+		t.Fatalf("expected an interprocedural finding, got none (findings=%d)", len(findings))
+	}
+	if len(interproc.TaintPath) < 3 {
+		t.Fatalf("TaintPath should have 3 steps (source/propagation/sink), got %d: %+v",
+			len(interproc.TaintPath), interproc.TaintPath)
+	}
+
+	prop := interproc.TaintPath[1]
+	if prop.Kind != rules.TaintStepPropagation {
+		t.Fatalf("step 1 should be propagation, got %s", prop.Kind)
+	}
+	// PR-FF requires the propagation step to include the matched callee
+	// param index. The label format is
+	// "caller's <arg> flows to <callee> as param <N>".
+	if !strings.Contains(prop.Label, "param 0") {
+		t.Errorf("propagation Label should include the matched callee param index "+
+			"(e.g. 'param 0'), got: %q", prop.Label)
+	}
+	if !strings.Contains(prop.Label, "Process") {
+		t.Errorf("propagation Label should mention the callee name 'Process', got: %q", prop.Label)
+	}
+}
+
+// =========================================================================
+// Scenario 12 (PR-FF): The ExecuteCmd(cmd string) wildcard fallback still
+// fires when the callee has NO SourceParams. This is the PR-P scope that
+// must remain working — the precise-pairing change must not regress it.
+// =========================================================================
+
+func TestInterproc_WildcardFallback_NoCalleeSources(t *testing.T) {
+	cg := graph.NewCallGraph("/project", "test-session")
+
+	calleeFile := "/app/cmd.go"
+	callerFile := "/app/api.go"
+
+	calleeNode := &graph.FuncNode{
+		ID:        graph.FuncID(calleeFile, "ExecuteCmd"),
+		FilePath:  calleeFile,
+		Name:      "ExecuteCmd",
+		StartLine: 1,
+		EndLine:   3,
+		Language:  rules.LangGo,
+	}
+	// Callee has NO SourceParams (cmd is a plain string) — ArgFromParam=-1
+	// is the wildcard fallback. This is the canonical PR-P case.
+	calleeNode.TaintSig = graph.TaintSignature{
+		SinkCalls: []graph.SinkRef{
+			{
+				SinkCategory: taint.SnkCommand,
+				MethodName:   "exec.Command",
+				Line:         2,
+				ArgFromParam: -1,
+			},
+		},
+	}
+
+	callerNode := &graph.FuncNode{
+		ID:        graph.FuncID(callerFile, "Handler"),
+		FilePath:  callerFile,
+		Name:      "Handler",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+
+	cg.AddNode(calleeNode)
+	cg.AddNode(callerNode)
+	cg.AddEdge(callerNode.ID, calleeNode.ID)
+
+	callerContent := `func Handler(w http.ResponseWriter, r *http.Request) {
+	userCmd := r.FormValue("cmd")
+	ExecuteCmd(userCmd)
+}`
+
+	findings := graph.AnalyzeCallerImpact(cg, callerNode, calleeNode, callerContent)
+
+	foundCmd := false
+	for _, f := range findings {
+		if strings.HasPrefix(f.RuleID, "BATOU-INTERPROC") &&
+			f.SinkCategory == string(taint.SnkCommand) {
+			foundCmd = true
+			break
+		}
+	}
+	if !foundCmd {
+		ids := make([]string, len(findings))
+		for i, f := range findings {
+			ids[i] = f.RuleID
+		}
+		t.Errorf("wildcard -1 fallback (no callee sources) should still produce a "+
+			"command-injection finding, got %d findings: %v", len(findings), ids)
 	}
 }

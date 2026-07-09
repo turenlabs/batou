@@ -17,9 +17,9 @@ import (
 
 var (
 	// BATOU-FW-REACT-001: React SSR renderToString with unsanitized data
-	reReactRenderToString  = regexp.MustCompile(`\brenderToString\s*\(`)
-	reReactRenderToStatic  = regexp.MustCompile(`\brenderToStaticMarkup\s*\(`)
-	reReactSSRUserInput    = regexp.MustCompile(`(?:req\.(?:query|params|body|cookies)|request\.(?:query|params|body)|props\.\w*[Uu]ser|props\.\w*[Ii]nput|props\.\w*[Dd]ata)`)
+	reReactRenderToString = regexp.MustCompile(`\brenderToString\s*\(`)
+	reReactRenderToStatic = regexp.MustCompile(`\brenderToStaticMarkup\s*\(`)
+	reReactSSRUserInput   = regexp.MustCompile(`(?:req\.(?:query|params|body|cookies)|request\.(?:query|params|body)|props\.\w*[Uu]ser|props\.\w*[Ii]nput|props\.\w*[Dd]ata)`)
 
 	// BATOU-FW-REACT-002: React ref-based innerHTML assignment
 	reReactRefInnerHTML = regexp.MustCompile(`\.\s*current\s*\.\s*innerHTML\s*=`)
@@ -54,18 +54,19 @@ func (r *ReactSSRUnsanitized) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Only flag if the file also handles user input
-	hasUserInput := reReactSSRUserInput.MatchString(ctx.Content)
+	hasUserInput := rules.GMatchFile(reReactSSRUserInput, ctx)
 	if !hasUserInput {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reReactRenderToString.MatchString(line) || reReactRenderToStatic.MatchString(line) {
+		if rules.GMatchLower(reReactRenderToString, line, lowered[i]) || rules.GMatchLower(reReactRenderToStatic, line, lowered[i]) {
 			// Check if there's a DOMPurify or escape call nearby
 			if hasSSRSanitizer(lines, i) {
 				continue
@@ -133,12 +134,13 @@ func (r *ReactRefInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reReactRefInnerHTML.MatchString(line) {
+		if rules.GMatchLower(reReactRefInnerHTML, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -181,12 +183,13 @@ func (r *ReactPropSpreading) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reReactSpreadProps.MatchString(line) {
+		if rules.GMatchLower(reReactSpreadProps, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -229,12 +232,13 @@ func (r *ReactDynamicScriptIframe) Scan(ctx *rules.ScanContext) []rules.Finding 
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reReactCreateScript.MatchString(line) || reReactDangerousTag.MatchString(line) {
+		if rules.GMatchLower(reReactCreateScript, line, lowered[i]) || rules.GMatchLower(reReactDangerousTag, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

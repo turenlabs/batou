@@ -14,32 +14,28 @@ import (
 // RS-001: Unsafe block usage
 var (
 	reUnsafeBlock    = regexp.MustCompile(`\bunsafe\s*\{`)
-	reRawPtrDeref    = regexp.MustCompile(`\*\s*(?:mut\s+|const\s+)?\w+|(?:\*\w+)\s*[.=;]`)
 	reTransmute      = regexp.MustCompile(`(?:std::mem::)?transmute\s*[:<(]`)
 	reTransmuteBytes = regexp.MustCompile(`(?:std::mem::)?transmute_copy\s*[:<(]`)
 )
 
 // RS-002: Command injection
 var (
-	reCommandNew      = regexp.MustCompile(`Command::new\s*\(\s*(?:format!\s*\(|&?\s*[a-zA-Z_]\w*)`)
 	reCommandNewShell = regexp.MustCompile(`Command::new\s*\(\s*["'](?:sh|bash|cmd|powershell)["']\s*\)`)
 	reCommandArg      = regexp.MustCompile(`\.arg\s*\(\s*(?:format!\s*\(|&?\s*[a-zA-Z_]\w*)`)
-	reCommandArgs     = regexp.MustCompile(`\.args\s*\(\s*(?:\[|vec!\s*\[|&?\s*[a-zA-Z_]\w*)`)
 )
 
 // RS-003: SQL injection
 var (
-	reSQLFormat     = regexp.MustCompile(`(?:sqlx::query|diesel::sql_query|\.execute)\s*\(\s*&?\s*format!\s*\(`)
-	reSQLConcat     = regexp.MustCompile(`(?:sqlx::query|diesel::sql_query|\.execute)\s*\(\s*&?\s*(?:\w+\s*\+|[a-zA-Z_]\w*\s*\.\s*as_str)`)
-	reSQLQueryVar   = regexp.MustCompile(`(?:sqlx::query|diesel::sql_query)\s*\(\s*&?\s*[a-zA-Z_]\w*\s*\)`)
-	reSQLKeywords   = regexp.MustCompile(`(?i)(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s+`)
+	reSQLFormat   = regexp.MustCompile(`(?:sqlx::query|diesel::sql_query|\.execute)\s*\(\s*&?\s*format!\s*\(`)
+	reSQLConcat   = regexp.MustCompile(`(?:sqlx::query|diesel::sql_query|\.execute)\s*\(\s*&?\s*(?:\w+\s*\+|[a-zA-Z_]\w*\s*\.\s*as_str)`)
+	reSQLQueryVar = regexp.MustCompile(`(?:sqlx::query|diesel::sql_query)\s*\(\s*&?\s*[a-zA-Z_]\w*\s*\)`)
+	reSQLKeywords = regexp.MustCompile(`(?i)(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s+`)
 )
 
 // RS-004: Path traversal
 var (
 	rePathFromUser = regexp.MustCompile(`(?:std::)?fs::(?:read|write|read_to_string|read_dir|remove_file|remove_dir_all|create_dir_all|copy|rename|metadata)\s*\(\s*(?:format!\s*\(|&?\s*[a-zA-Z_]\w*)`)
 	reTokioFS      = regexp.MustCompile(`tokio::fs::(?:read|write|read_to_string|remove_file|remove_dir_all|create_dir_all|copy|rename)\s*\(\s*(?:format!\s*\(|&?\s*[a-zA-Z_]\w*)`)
-	rePathJoin     = regexp.MustCompile(`\.join\s*\(\s*(?:&?\s*[a-zA-Z_]\w*|format!\s*\()`)
 )
 
 // RS-005: Insecure deserialization
@@ -55,8 +51,6 @@ var (
 var (
 	reDangerAcceptInvalidCerts = regexp.MustCompile(`\.danger_accept_invalid_certs\s*\(\s*true\s*\)`)
 	reDangerAcceptInvalidHosts = regexp.MustCompile(`\.danger_accept_invalid_hostnames\s*\(\s*true\s*\)`)
-	reTLSNativeNoVerify        = regexp.MustCompile(`TlsConnector::builder\s*\(\s*\)\s*(?:.*\n)*?.*\.danger_accept_invalid_certs\s*\(\s*true\s*\)`)
-	reRustlsNoVerify           = regexp.MustCompile(`\.with_custom_certificate_verifier\s*\(`)
 )
 
 // RS-007: Panic in web handler
@@ -71,8 +65,8 @@ var (
 
 // RS-008: Insecure random
 var (
-	reThreadRng      = regexp.MustCompile(`\bthread_rng\s*\(\s*\)`)
-	reRandGeneric    = regexp.MustCompile(`\brand::random\s*(?:::<|[(])`)
+	reThreadRng       = regexp.MustCompile(`\bthread_rng\s*\(\s*\)`)
+	reRandGeneric     = regexp.MustCompile(`\brand::random\s*(?:::<|[(])`)
 	reSecurityContext = regexp.MustCompile(`(?i)(?:token|secret|key|nonce|iv|salt|password|csrf|session|otp|api.?key|auth)`)
 )
 
@@ -81,9 +75,7 @@ var (
 	reFromRawParts = regexp.MustCompile(`(?:slice::)?from_raw_parts(?:_mut)?\s*\(`)
 	reMemForget    = regexp.MustCompile(`(?:std::mem::)?forget\s*\(`)
 	reBoxFromRaw   = regexp.MustCompile(`Box::from_raw\s*\(`)
-	reAsPtr        = regexp.MustCompile(`\.as_(?:mut_)?ptr\s*\(\s*\)`)
 	rePtrWrite     = regexp.MustCompile(`(?:std::ptr::)?(?:write|read|copy|copy_nonoverlapping)\s*\(`)
-	rePtrNull      = regexp.MustCompile(`(?:std::ptr::)?(?:null|null_mut)\s*\(\s*\)`)
 )
 
 // RS-010: CORS misconfiguration
@@ -91,7 +83,6 @@ var (
 	reCorsPermissive  = regexp.MustCompile(`CorsLayer::(?:permissive|very_permissive)\s*\(\s*\)`)
 	reCorsAnyOrigin   = regexp.MustCompile(`\.allow_origin\s*\(\s*(?:Any|HeaderValue::from_static\s*\(\s*"\*"\s*\))`)
 	reCorsCredentials = regexp.MustCompile(`\.allow_credentials\s*\(\s*true\s*\)`)
-	reActixCorsAny    = regexp.MustCompile(`Cors::(?:permissive|default)\s*\(\s*\)\s*(?:.*\n)*?.*\.allow_any_origin\s*\(\s*\)`)
 	reActixCorsOpen   = regexp.MustCompile(`\.allow_any_origin\s*\(\s*\)`)
 )
 
@@ -102,7 +93,7 @@ var (
 var reLineComment = regexp.MustCompile(`^\s*(?://|/\*|\*)`)
 
 func isCommentLine(line string) bool {
-	return reLineComment.MatchString(line)
+	return rules.GMatch(reLineComment, line)
 }
 
 func truncate(s string, maxLen int) string {
@@ -119,8 +110,8 @@ func truncate(s string, maxLen int) string {
 
 type UnsafeBlock struct{}
 
-func (r UnsafeBlock) ID() string                    { return "BATOU-RS-001" }
-func (r UnsafeBlock) Name() string                  { return "Unsafe Block Usage" }
+func (r UnsafeBlock) ID() string                      { return "BATOU-RS-001" }
+func (r UnsafeBlock) Name() string                    { return "Unsafe Block Usage" }
 func (r UnsafeBlock) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r UnsafeBlock) Description() string {
 	return "Detects unsafe blocks containing raw pointer dereferences, transmute, or other memory-unsafe operations that bypass Rust's safety guarantees."
@@ -131,7 +122,8 @@ func (r UnsafeBlock) Languages() []rules.Language {
 
 func (r UnsafeBlock) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inUnsafe := false
 	unsafeBraceDepth := 0
@@ -142,7 +134,7 @@ func (r UnsafeBlock) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reUnsafeBlock.MatchString(line) {
+		if rules.GMatchLower(reUnsafeBlock, line, lowered[i]) {
 			inUnsafe = true
 			unsafeStartLine = i
 			unsafeBraceDepth = strings.Count(line, "{") - strings.Count(line, "}")
@@ -156,11 +148,11 @@ func (r UnsafeBlock) Scan(ctx *rules.ScanContext) []rules.Finding {
 			severity := r.DefaultSeverity()
 			var title, desc string
 
-			if reTransmute.MatchString(line) || reTransmuteBytes.MatchString(line) {
+			if rules.GMatchLower(reTransmute, line, lowered[i]) || rules.GMatchLower(reTransmuteBytes, line, lowered[i]) {
 				severity = rules.High
 				title = "Unsafe transmute in unsafe block"
 				desc = "std::mem::transmute reinterprets bits of one type as another, bypassing all type safety. Incorrect use causes undefined behavior, memory corruption, and potential code execution."
-			} else if reFromRawParts.MatchString(line) {
+			} else if rules.GMatchLower(reFromRawParts, line, lowered[i]) {
 				severity = rules.High
 				title = "Unsafe from_raw_parts in unsafe block"
 				desc = "slice::from_raw_parts constructs a slice from a raw pointer and length. Invalid pointer or length causes undefined behavior."
@@ -202,8 +194,8 @@ func (r UnsafeBlock) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CommandInjection struct{}
 
-func (r CommandInjection) ID() string                    { return "BATOU-RS-002" }
-func (r CommandInjection) Name() string                  { return "Command Injection" }
+func (r CommandInjection) ID() string                      { return "BATOU-RS-002" }
+func (r CommandInjection) Name() string                    { return "Command Injection" }
 func (r CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r CommandInjection) Description() string {
 	return "Detects Command::new with format! or user-controlled input, and shell invocations (sh -c, bash -c) with dynamic arguments."
@@ -214,7 +206,8 @@ func (r CommandInjection) Languages() []rules.Language {
 
 func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -222,7 +215,7 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Shell invocation: Command::new("sh") / Command::new("bash")
-		if reCommandNewShell.MatchString(line) {
+		if rules.GMatchLower(reCommandNewShell, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -264,7 +257,7 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// .arg() with format! macro
-		if reCommandArg.MatchString(line) && strings.Contains(line, "format!") {
+		if rules.GMatchLower(reCommandArg, line, lowered[i]) && strings.Contains(line, "format!") {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -292,8 +285,8 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SQLInjection struct{}
 
-func (r SQLInjection) ID() string                    { return "BATOU-RS-003" }
-func (r SQLInjection) Name() string                  { return "SQL Injection" }
+func (r SQLInjection) ID() string                      { return "BATOU-RS-003" }
+func (r SQLInjection) Name() string                    { return "SQL Injection" }
 func (r SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r SQLInjection) Description() string {
 	return "Detects SQL queries built with format! or string concatenation in sqlx::query, diesel::sql_query, or rusqlite execute calls."
@@ -304,7 +297,8 @@ func (r SQLInjection) Languages() []rules.Language {
 
 func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -312,7 +306,7 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// SQL query with format! macro
-		if reSQLFormat.MatchString(line) {
+		if rules.GMatchLower(reSQLFormat, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -333,7 +327,7 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// SQL query with string concatenation
-		if reSQLConcat.MatchString(line) {
+		if rules.GMatchLower(reSQLConcat, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -354,7 +348,7 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// SQL query with variable that might contain format! result
-		if reSQLQueryVar.MatchString(line) {
+		if rules.GMatchLower(reSQLQueryVar, line, lowered[i]) {
 			// Check nearby lines for format! building the query string
 			hasFormat := false
 			start := i - 5
@@ -396,8 +390,8 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PathTraversal struct{}
 
-func (r PathTraversal) ID() string                    { return "BATOU-RS-004" }
-func (r PathTraversal) Name() string                  { return "Path Traversal" }
+func (r PathTraversal) ID() string                      { return "BATOU-RS-004" }
+func (r PathTraversal) Name() string                    { return "Path Traversal" }
 func (r PathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r PathTraversal) Description() string {
 	return "Detects std::fs and tokio::fs operations with user-controlled paths, and Path::join with user input without canonicalize/starts_with guards."
@@ -408,7 +402,8 @@ func (r PathTraversal) Languages() []rules.Language {
 
 func (r PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check for path validation guards in the file
 	hasCanonicalize := strings.Contains(ctx.Content, ".canonicalize()")
@@ -422,7 +417,7 @@ func (r PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Direct fs operations with variable path
-		if rePathFromUser.MatchString(line) || reTokioFS.MatchString(line) {
+		if rules.GMatchLower(rePathFromUser, line, lowered[i]) || rules.GMatchLower(reTokioFS, line, lowered[i]) {
 			if hasGuard {
 				continue
 			}
@@ -453,8 +448,8 @@ func (r PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureDeserialization struct{}
 
-func (r InsecureDeserialization) ID() string                    { return "BATOU-RS-005" }
-func (r InsecureDeserialization) Name() string                  { return "Insecure Deserialization" }
+func (r InsecureDeserialization) ID() string                      { return "BATOU-RS-005" }
+func (r InsecureDeserialization) Name() string                    { return "Insecure Deserialization" }
 func (r InsecureDeserialization) DefaultSeverity() rules.Severity { return rules.High }
 func (r InsecureDeserialization) Description() string {
 	return "Detects deserialization of untrusted data using serde_json, bincode, rmp_serde, or ciborium from potentially user-controlled sources."
@@ -465,7 +460,8 @@ func (r InsecureDeserialization) Languages() []rules.Language {
 
 func (r InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if file has user input sources (web framework extractors, stdin, etc.)
 	hasUserInput := strings.Contains(ctx.Content, "web::Json") ||
@@ -484,7 +480,7 @@ func (r InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Binary deserialization is always risky with untrusted input
-		if reBincodeDe.MatchString(line) || reRmpDe.MatchString(line) || reCborDe.MatchString(line) {
+		if rules.GMatchLower(reBincodeDe, line, lowered[i]) || rules.GMatchLower(reRmpDe, line, lowered[i]) || rules.GMatchLower(reCborDe, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -505,7 +501,7 @@ func (r InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// JSON deserialization in context with user input
-		if hasUserInput && (reSerdeFromStr.MatchString(line) || reSerdeFromSlice.MatchString(line)) {
+		if hasUserInput && (rules.GMatchLower(reSerdeFromStr, line, lowered[i]) || rules.GMatchLower(reSerdeFromSlice, line, lowered[i])) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Medium,
@@ -533,8 +529,8 @@ func (r InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureTLS struct{}
 
-func (r InsecureTLS) ID() string                    { return "BATOU-RS-006" }
-func (r InsecureTLS) Name() string                  { return "Insecure TLS Configuration" }
+func (r InsecureTLS) ID() string                      { return "BATOU-RS-006" }
+func (r InsecureTLS) Name() string                    { return "Insecure TLS Configuration" }
 func (r InsecureTLS) DefaultSeverity() rules.Severity { return rules.High }
 func (r InsecureTLS) Description() string {
 	return "Detects TLS configurations that disable certificate verification via danger_accept_invalid_certs(true) or danger_accept_invalid_hostnames(true)."
@@ -545,14 +541,15 @@ func (r InsecureTLS) Languages() []rules.Language {
 
 func (r InsecureTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if reDangerAcceptInvalidCerts.MatchString(line) {
+		if rules.GMatchLower(reDangerAcceptInvalidCerts, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -571,7 +568,7 @@ func (r InsecureTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if reDangerAcceptInvalidHosts.MatchString(line) {
+		if rules.GMatchLower(reDangerAcceptInvalidHosts, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -599,8 +596,8 @@ func (r InsecureTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PanicInHandler struct{}
 
-func (r PanicInHandler) ID() string                    { return "BATOU-RS-007" }
-func (r PanicInHandler) Name() string                  { return "Panic in Web Handler" }
+func (r PanicInHandler) ID() string                      { return "BATOU-RS-007" }
+func (r PanicInHandler) Name() string                    { return "Panic in Web Handler" }
 func (r PanicInHandler) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r PanicInHandler) Description() string {
 	return "Detects .unwrap() and .expect() calls inside web request handlers. Panics in handlers can crash the server or cause denial of service."
@@ -613,14 +610,15 @@ func (r PanicInHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only check files that look like web handlers
-	isWebFile := reActixHandler.MatchString(ctx.Content) ||
-		reAxumHandler.MatchString(ctx.Content) ||
-		reRouteAttr.MatchString(ctx.Content)
+	isWebFile := rules.GMatchFile(reActixHandler, ctx) ||
+		rules.GMatchFile(reAxumHandler, ctx) ||
+		rules.GMatchFile(reRouteAttr, ctx)
 	if !isWebFile {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	inHandler := false
 	handlerBraceDepth := 0
 
@@ -630,7 +628,7 @@ func (r PanicInHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Detect handler function start
-		if reActixHandler.MatchString(line) || reAxumHandler.MatchString(line) {
+		if rules.GMatchLower(reActixHandler, line, lowered[i]) || rules.GMatchLower(reAxumHandler, line, lowered[i]) {
 			inHandler = true
 			handlerBraceDepth = strings.Count(line, "{") - strings.Count(line, "}")
 			continue
@@ -646,7 +644,7 @@ func (r PanicInHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if inHandler {
 			handlerBraceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 
-			if reUnwrapCall.MatchString(line) {
+			if rules.GMatchLower(reUnwrapCall, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -665,7 +663,7 @@ func (r PanicInHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 				})
 			}
 
-			if reExpectCall.MatchString(line) {
+			if rules.GMatchLower(reExpectCall, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -698,8 +696,8 @@ func (r PanicInHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureRandom struct{}
 
-func (r InsecureRandom) ID() string                    { return "BATOU-RS-008" }
-func (r InsecureRandom) Name() string                  { return "Insecure Random for Security Context" }
+func (r InsecureRandom) ID() string                      { return "BATOU-RS-008" }
+func (r InsecureRandom) Name() string                    { return "Insecure Random for Security Context" }
 func (r InsecureRandom) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r InsecureRandom) Description() string {
 	return "Detects use of rand::thread_rng() or rand::random() in security-sensitive contexts (token generation, key derivation, CSRF tokens) instead of OsRng or a CSPRNG."
@@ -712,7 +710,7 @@ func (r InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only flag if the file has security-sensitive context
-	if !reSecurityContext.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reSecurityContext, ctx) {
 		return nil
 	}
 
@@ -721,13 +719,14 @@ func (r InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if reThreadRng.MatchString(line) || reRandGeneric.MatchString(line) {
+		if rules.GMatchLower(reThreadRng, line, lowered[i]) || rules.GMatchLower(reRandGeneric, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -755,8 +754,8 @@ func (r InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MemoryUnsafety struct{}
 
-func (r MemoryUnsafety) ID() string                    { return "BATOU-RS-009" }
-func (r MemoryUnsafety) Name() string                  { return "Memory Unsafety Patterns" }
+func (r MemoryUnsafety) ID() string                      { return "BATOU-RS-009" }
+func (r MemoryUnsafety) Name() string                    { return "Memory Unsafety Patterns" }
 func (r MemoryUnsafety) DefaultSeverity() rules.Severity { return rules.High }
 func (r MemoryUnsafety) Description() string {
 	return "Detects dangerous memory operations: transmute, from_raw_parts, mem::forget with manual Drop, Box::from_raw, and raw pointer operations that can cause memory corruption."
@@ -767,7 +766,8 @@ func (r MemoryUnsafety) Languages() []rules.Language {
 
 func (r MemoryUnsafety) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re         *regexp.Regexp
@@ -827,7 +827,7 @@ func (r MemoryUnsafety) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, p := range patterns {
-			if p.re.MatchString(line) {
+			if rules.GMatchLower(p.re, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -857,8 +857,8 @@ func (r MemoryUnsafety) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CORSMisconfig struct{}
 
-func (r CORSMisconfig) ID() string                    { return "BATOU-RS-010" }
-func (r CORSMisconfig) Name() string                  { return "CORS Misconfiguration" }
+func (r CORSMisconfig) ID() string                      { return "BATOU-RS-010" }
+func (r CORSMisconfig) Name() string                    { return "CORS Misconfiguration" }
 func (r CORSMisconfig) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r CORSMisconfig) Description() string {
 	return "Detects overly permissive CORS configurations: CorsLayer::permissive(), any origin with credentials, or Cors::permissive() in Actix."
@@ -869,7 +869,8 @@ func (r CORSMisconfig) Languages() []rules.Language {
 
 func (r CORSMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -877,7 +878,7 @@ func (r CORSMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// CorsLayer::permissive() (tower-http)
-		if reCorsPermissive.MatchString(line) {
+		if rules.GMatchLower(reCorsPermissive, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -919,7 +920,7 @@ func (r CORSMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Any origin with credentials
-		if reActixCorsOpen.MatchString(line) || reCorsAnyOrigin.MatchString(line) {
+		if rules.GMatchLower(reActixCorsOpen, line, lowered[i]) || rules.GMatchLower(reCorsAnyOrigin, line, lowered[i]) {
 			// Check if credentials are also enabled nearby
 			start := i - 5
 			if start < 0 {

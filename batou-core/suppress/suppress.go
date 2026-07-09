@@ -9,9 +9,10 @@ import (
 // unsuppressibleRules are rule IDs that cannot be suppressed via batou:ignore.
 // SUPPRESS-REVIEW must remain visible so agents fix code instead of suppressing.
 var unsuppressibleRules = map[string]bool{
-	"BATOU-SUPPRESS-REVIEW": true,
-	"BATOU-TIMEOUT":         true,
-	"BATOU-PANIC":           true,
+	"BATOU-SUPPRESS-REVIEW":      true,
+	"BATOU-SUPPRESS-UNJUSTIFIED": true,
+	"BATOU-TIMEOUT":              true,
+	"BATOU-PANIC":                true,
 }
 
 // IsSuppressed returns true if the given finding is suppressed by any
@@ -31,6 +32,20 @@ func (s *Suppressions) IsSuppressed(f rules.Finding) bool {
 		return false
 	}
 	return matchesTargets(f, targets)
+}
+
+// isGosecSuppressed reports whether the finding sits on a line that a gosec /
+// nolint:gosec annotation suppressed. Such suppressions carry the developer's
+// out-of-band gosec rationale, which Adjudicate must not machine-check.
+func (s *Suppressions) isGosecSuppressed(f rules.Finding) bool {
+	if s == nil || s.gosecLines == nil {
+		return false
+	}
+	line := f.LineNumber
+	if line == 0 {
+		line = 1
+	}
+	return s.gosecLines[line]
 }
 
 // Apply partitions findings into kept and suppressed slices.

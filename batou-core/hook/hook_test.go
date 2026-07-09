@@ -3,7 +3,6 @@ package hook_test
 import (
 	"encoding/json"
 	"testing"
-
 	"github.com/turenlabs/batou-core/hook"
 )
 
@@ -612,5 +611,72 @@ func TestInputJSONUnicodeContent(t *testing.T) {
 	}
 	if input.ResolveContent() != "message = \"Привет мир! 你好世界! 🌍\"" {
 		t.Errorf("ResolveContent() = %q", input.ResolveContent())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// "Is this stdin a real Claude Code hook event?" — the predicate used by
+// cmd/batou to reject accidental misuse (`echo '{"repo_path":"x"}' | batou`).
+// JSON like that unmarshals cleanly into an Input with all the meaningful
+// fields empty, so the guard checks HookEventName / ResolvePath / ResolveContent.
+// ---------------------------------------------------------------------------
+
+// looksLikeHookEvent mirrors the guard in cmd/batou/main.go: a genuine hook
+// event always carries at least a hook_event_name or a touched file path/content.
+func looksLikeHookEvent(i *hook.Input) bool {
+	return i.HookEventName != "" || i.ResolvePath() != "" || i.ResolveContent() != ""
+}
+
+func TestLooksLikeHookEvent_NonHookJSON(t *testing.T) {
+	var input hook.Input
+	if err := json.Unmarshal([]byte(`{"repo_path":"/some/repo"}`), &input); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if input.HookEventName != "" {
+		t.Errorf("HookEventName = %q, want empty", input.HookEventName)
+	}
+	if input.ResolvePath() != "" {
+		t.Errorf("ResolvePath() = %q, want empty", input.ResolvePath())
+	}
+	if input.ResolveContent() != "" {
+		t.Errorf("ResolveContent() = %q, want empty", input.ResolveContent())
+	}
+	if looksLikeHookEvent(&input) {
+		t.Error("looksLikeHookEvent() = true for {\"repo_path\":...}; want false")
+	}
+}
+
+func TestLooksLikeHookEvent_EmptyJSON(t *testing.T) {
+	var input hook.Input
+	if err := json.Unmarshal([]byte(`{}`), &input); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if looksLikeHookEvent(&input) {
+		t.Error("looksLikeHookEvent() = true for {}; want false")
+	}
+}
+
+func TestLooksLikeHookEvent_RealHookEvent(t *testing.T) {
+	var input hook.Input
+	raw := `{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"a.py","content":"x"}}`
+	if err := json.Unmarshal([]byte(raw), &input); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if input.HookEventName != "PostToolUse" {
+		t.Errorf("HookEventName = %q, want PostToolUse", input.HookEventName)
+	}
+	if !looksLikeHookEvent(&input) {
+		t.Error("looksLikeHookEvent() = false for a real PostToolUse event; want true")
+	}
+}
+
+func TestLooksLikeHookEvent_FilePathOnly(t *testing.T) {
+	// Even without hook_event_name, a touched file path makes it a hook-shaped event.
+	var input hook.Input
+	if err := json.Unmarshal([]byte(`{"tool_input":{"file_path":"x.go"}}`), &input); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !looksLikeHookEvent(&input) {
+		t.Error("looksLikeHookEvent() = false when file_path is set; want true")
 	}
 }

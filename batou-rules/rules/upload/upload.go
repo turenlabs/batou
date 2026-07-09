@@ -13,26 +13,32 @@ import (
 
 // BATOU-UPLOAD-001: File upload without type validation
 var (
-	reUploadNoValidationPy    = regexp.MustCompile(`(?i)(?:request\.files|upload|uploaded_file|file_upload)\s*[\[.]\s*["']?\w+["']?\s*\]?\s*\.save\s*\(`)
-	reUploadNoValidationPHP   = regexp.MustCompile(`(?i)move_uploaded_file\s*\(\s*\$_FILES`)
-	reUploadNoValidationJS    = regexp.MustCompile(`(?i)(?:multer|upload|formidable|busboy)\s*[\({]`)
-	reUploadNoValidationJava  = regexp.MustCompile(`(?i)(?:MultipartFile|Part)\s+\w+.*\.transferTo\s*\(`)
-	reUploadNoValidationRuby  = regexp.MustCompile(`(?i)(?:params\s*\[\s*:?\w*file\w*\s*\]|uploaded_io)\.(?:read|path|original_filename)`)
-	reUploadNoValidationGo    = regexp.MustCompile(`(?i)r\.FormFile\s*\(\s*["']\w+["']\s*\)`)
-	reUploadTypeCheck         = regexp.MustCompile(`(?i)(?:content.?type|mime.?type|file.?type|extension|\.endswith|\.ends_with|getContentType|content_type|mimetype|ALLOWED_EXTENSIONS|allowed_types|accept|file_filter|fileFilter)`)
+	reUploadNoValidationPy  = regexp.MustCompile(`(?i)(?:request\.files|upload|uploaded_file|file_upload)\s*[\[.]\s*["']?\w+["']?\s*\]?\s*\.save\s*\(`)
+	reUploadNoValidationPHP = regexp.MustCompile(`(?i)move_uploaded_file\s*\(\s*\$_FILES`)
+	// Tightened 2026-04-25: dropped bare `upload` from the alternation —
+	// it matched any function/class containing "upload" in its name
+	// (HandleUpload, useUpload, etc.), producing 32 FPs in owncloud/web.
+	// The library names below are specific enough; custom upload handlers
+	// not using one of these libraries are intentional FNs (better than
+	// firing on every TS identifier).
+	reUploadNoValidationJS   = regexp.MustCompile(`(?i)\b(?:multer|formidable|busboy)\s*[\({]`)
+	reUploadNoValidationJava = regexp.MustCompile(`(?i)(?:MultipartFile|Part)\s+\w+.*\.transferTo\s*\(`)
+	reUploadNoValidationRuby = regexp.MustCompile(`(?i)(?:params\s*\[\s*:?\w*file\w*\s*\]|uploaded_io)\.(?:read|path|original_filename)`)
+	reUploadNoValidationGo   = regexp.MustCompile(`(?i)r\.FormFile\s*\(\s*["']\w+["']\s*\)`)
+	reUploadTypeCheck        = regexp.MustCompile(`(?i)(?:content.?type|mime.?type|file.?type|extension|\.endswith|\.ends_with|getContentType|content_type|mimetype|ALLOWED_EXTENSIONS|allowed_types|accept|file_filter|fileFilter)`)
 )
 
 // BATOU-UPLOAD-002: File upload path traversal
 var (
-	reUploadPathTraversalConcat   = regexp.MustCompile(`(?i)(?:os\.path\.join|Path\.Combine|filepath\.Join|path\.join|File\.join)\s*\([^,)]*,\s*(?:request\.|req\.|params|filename|original_filename|getOriginalFilename|originalname|\$_FILES)`)
-	reUploadPathTraversalDirect   = regexp.MustCompile(`(?i)(?:upload_dir|upload_path|save_path|dest|destination)\s*[=+]\s*[^;]*(?:filename|original_filename|originalname|\$_FILES\s*\[\s*["']\w+["']\s*\]\s*\[\s*["']name["']\])`)
-	reUploadPathTraversalUnsafe   = regexp.MustCompile(`(?i)(?:open|fopen|File\.new|os\.Create|ioutil\.WriteFile)\s*\([^)]*(?:filename|original_filename|originalname|getOriginalFilename)`)
-	reUploadPathSanitize          = regexp.MustCompile(`(?i)(?:secure_filename|basename|File\.basename|filepath\.Base|path\.basename|Path\.GetFileName|sanitize|strip_path)`)
+	reUploadPathTraversalConcat = regexp.MustCompile(`(?i)(?:os\.path\.join|Path\.Combine|filepath\.Join|path\.join|File\.join)\s*\([^,)]*,\s*(?:request\.|req\.|params|filename|original_filename|getOriginalFilename|originalname|\$_FILES)`)
+	reUploadPathTraversalDirect = regexp.MustCompile(`(?i)(?:upload_dir|upload_path|save_path|dest|destination)\s*[=+]\s*[^;]*(?:filename|original_filename|originalname|\$_FILES\s*\[\s*["']\w+["']\s*\]\s*\[\s*["']name["']\])`)
+	reUploadPathTraversalUnsafe = regexp.MustCompile(`(?i)(?:open|fopen|File\.new|os\.Create|ioutil\.WriteFile)\s*\([^)]*(?:filename|original_filename|originalname|getOriginalFilename)`)
+	reUploadPathSanitize        = regexp.MustCompile(`(?i)(?:secure_filename|basename|File\.basename|filepath\.Base|path\.basename|Path\.GetFileName|sanitize|strip_path)`)
 )
 
 // BATOU-UPLOAD-003: Upload to publicly accessible directory
 var (
-	reUploadPublicDir = regexp.MustCompile(`(?i)(?:upload_dir|upload_path|save_path|dest|destination|upload_folder)\s*[=:]\s*["'](?:[^"']*(?:public|static|www|wwwroot|htdocs|webroot|assets|media|uploads)/?)["']`)
+	reUploadPublicDir  = regexp.MustCompile(`(?i)(?:upload_dir|upload_path|save_path|dest|destination|upload_folder)\s*[=:]\s*["'](?:[^"']*(?:public|static|www|wwwroot|htdocs|webroot|assets|media|uploads)/?)["']`)
 	reUploadPublicJoin = regexp.MustCompile(`(?i)(?:os\.path\.join|Path\.Combine|filepath\.Join|path\.join)\s*\([^)]*(?:public|static|www|wwwroot|htdocs|webroot|assets)`)
 )
 
@@ -47,9 +53,22 @@ var (
 )
 
 // BATOU-UPLOAD-005: Upload without magic byte/content verification
+//
+// Tightening note (2026-04-25): the previous reUploadExtensionOnly
+// pattern matched bare `.endswith` / `.extension` etc. anywhere on a
+// line, regardless of whether the file actually handled uploads. In
+// frontend repos like owncloud/web (1,194 files, 77 FPs), every
+// `resource.extension` reference for file metadata triggered.
+//
+// Added reUploadContext as a file-level positive gate — the rule
+// only fires in files that actually handle uploads (multer, multipart,
+// req.files, MultipartFile, request.FILES, getPart(...), etc.). This
+// eliminates frontend metadata utilities while keeping detection on
+// real upload handlers.
 var (
 	reUploadExtensionOnly = regexp.MustCompile(`(?i)(?:\.endswith|\.ends_with|\.toLowerCase\(\)\s*===?\s*["']\.\w+["']|\.extension|getOriginalFilename\(\)\.(?:split|substring|endsWith)|\.split\s*\(\s*["']\.\s*["']\s*\)\s*\.pop)`)
 	reUploadMagicCheck    = regexp.MustCompile(`(?i)(?:magic|python-magic|file.?type|imghdr|filetype|mime\.magic|FileTypeDetector|content.?inspection|magic_bytes|file_header|read\s*\(\s*\d+\s*\)|fileTypeFromBuffer|fromBuffer)`)
+	reUploadContext       = regexp.MustCompile(`(?i)(?:\bmulter\b|\bformidable\b|\bbusboy\b|\bmultipart\b|\bformData\b|\bMultipartFile\b|\bUploadedFile\b|\bFileUpload\b|\brequest\.files\b|\brequest\.FILES\b|\breq\.files?\b|\bfiles?\.upload\b|\btransferTo\s*\(|\bgetPart\s*\(|\bgetOriginalFilename\b|\@RequestParam\s*\(\s*"file"|\bfile_get_contents\b.*\$_FILES|\$_FILES\b|\baccept\s*=\s*["']\.|<input[^>]+type\s*=\s*["']file["']|enctype\s*=\s*["']multipart)`)
 )
 
 // BATOU-UPLOAD-006: Executable file extension allowed
@@ -101,7 +120,7 @@ func hasNearbyPattern(lines []string, idx, before, after int, re *regexp.Regexp)
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if re.MatchString(l) {
+		if rules.GMatch(re, l) {
 			return true
 		}
 	}
@@ -114,8 +133,8 @@ func hasNearbyPattern(lines []string, idx, before, after int, re *regexp.Regexp)
 
 type UploadNoTypeValidation struct{}
 
-func (r *UploadNoTypeValidation) ID() string                     { return "BATOU-UPLOAD-001" }
-func (r *UploadNoTypeValidation) Name() string                   { return "UploadNoTypeValidation" }
+func (r *UploadNoTypeValidation) ID() string                      { return "BATOU-UPLOAD-001" }
+func (r *UploadNoTypeValidation) Name() string                    { return "UploadNoTypeValidation" }
 func (r *UploadNoTypeValidation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UploadNoTypeValidation) Description() string {
 	return "Detects file upload handlers that save or process uploaded files without validating the file type, potentially allowing upload of malicious files."
@@ -126,7 +145,7 @@ func (r *UploadNoTypeValidation) Languages() []rules.Language {
 
 func (r *UploadNoTypeValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	var uploadPatterns []*regexp.Regexp
 	switch ctx.Language {
@@ -152,7 +171,7 @@ func (r *UploadNoTypeValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, re := range uploadPatterns {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				// Check if type validation exists nearby
 				if hasNearbyPattern(lines, i, 10, 10, reUploadTypeCheck) {
 					continue
@@ -186,8 +205,8 @@ func (r *UploadNoTypeValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UploadPathTraversal struct{}
 
-func (r *UploadPathTraversal) ID() string                     { return "BATOU-UPLOAD-002" }
-func (r *UploadPathTraversal) Name() string                   { return "UploadPathTraversal" }
+func (r *UploadPathTraversal) ID() string                      { return "BATOU-UPLOAD-002" }
+func (r *UploadPathTraversal) Name() string                    { return "UploadPathTraversal" }
 func (r *UploadPathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UploadPathTraversal) Description() string {
 	return "Detects file upload operations that use the original filename from the user without path sanitization, enabling path traversal attacks."
@@ -198,7 +217,7 @@ func (r *UploadPathTraversal) Languages() []rules.Language {
 
 func (r *UploadPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	isPython := ctx.Language == rules.LangPython
 
 	for i, line := range lines {
@@ -207,7 +226,7 @@ func (r *UploadPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reUploadPathTraversalConcat, reUploadPathTraversalDirect, reUploadPathTraversalUnsafe} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				// Check for path sanitization nearby
 				if hasNearbyPattern(lines, i, 5, 5, reUploadPathSanitize) {
 					continue
@@ -245,8 +264,8 @@ func (r *UploadPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UploadPublicDir struct{}
 
-func (r *UploadPublicDir) ID() string                     { return "BATOU-UPLOAD-003" }
-func (r *UploadPublicDir) Name() string                   { return "UploadPublicDir" }
+func (r *UploadPublicDir) ID() string                      { return "BATOU-UPLOAD-003" }
+func (r *UploadPublicDir) Name() string                    { return "UploadPublicDir" }
 func (r *UploadPublicDir) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UploadPublicDir) Description() string {
 	return "Detects file upload configurations that save files to publicly accessible directories (public/, static/, www/), which may allow direct execution of uploaded files."
@@ -257,14 +276,14 @@ func (r *UploadPublicDir) Languages() []rules.Language {
 
 func (r *UploadPublicDir) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reUploadPublicDir, reUploadPublicJoin} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -294,8 +313,8 @@ func (r *UploadPublicDir) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UploadNoSizeLimit struct{}
 
-func (r *UploadNoSizeLimit) ID() string                     { return "BATOU-UPLOAD-004" }
-func (r *UploadNoSizeLimit) Name() string                   { return "UploadNoSizeLimit" }
+func (r *UploadNoSizeLimit) ID() string                      { return "BATOU-UPLOAD-004" }
+func (r *UploadNoSizeLimit) Name() string                    { return "UploadNoSizeLimit" }
 func (r *UploadNoSizeLimit) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UploadNoSizeLimit) Description() string {
 	return "Detects file upload configurations that do not enforce a size limit, enabling denial-of-service via large file uploads."
@@ -306,7 +325,7 @@ func (r *UploadNoSizeLimit) Languages() []rules.Language {
 
 func (r *UploadNoSizeLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	var patterns []*regexp.Regexp
 	switch ctx.Language {
@@ -328,7 +347,7 @@ func (r *UploadNoSizeLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, re := range patterns {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				// For multer(...{...}), skip if the config object contains "limits"
 				if re == reUploadNoSizeJS && reUploadHasLimits.MatchString(m) {
 					continue
@@ -362,8 +381,8 @@ func (r *UploadNoSizeLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UploadNoMagicBytes struct{}
 
-func (r *UploadNoMagicBytes) ID() string                     { return "BATOU-UPLOAD-005" }
-func (r *UploadNoMagicBytes) Name() string                   { return "UploadNoMagicBytes" }
+func (r *UploadNoMagicBytes) ID() string                      { return "BATOU-UPLOAD-005" }
+func (r *UploadNoMagicBytes) Name() string                    { return "UploadNoMagicBytes" }
 func (r *UploadNoMagicBytes) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UploadNoMagicBytes) Description() string {
 	return "Detects file upload validation that only checks the file extension without verifying actual file content via magic bytes, allowing extension spoofing."
@@ -373,14 +392,22 @@ func (r *UploadNoMagicBytes) Languages() []rules.Language {
 }
 
 func (r *UploadNoMagicBytes) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// File-level upload-context gate: only inspect files that contain
+	// upload-handler indicators. A bare `.extension` access is fine in
+	// generic file-metadata utilities; it's only a finding when the
+	// surrounding code actually handles user-uploaded files.
+	if !rules.GMatchFile(reUploadContext, ctx) {
+		return nil
+	}
+
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reUploadExtensionOnly.FindString(line); m != "" {
+		if m := rules.GFind(reUploadExtensionOnly, line); m != "" {
 			// Check if magic byte verification exists nearby
 			if hasNearbyPattern(lines, i, 15, 15, reUploadMagicCheck) {
 				continue
@@ -412,8 +439,8 @@ func (r *UploadNoMagicBytes) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UploadExecutableExt struct{}
 
-func (r *UploadExecutableExt) ID() string                     { return "BATOU-UPLOAD-006" }
-func (r *UploadExecutableExt) Name() string                   { return "UploadExecutableExt" }
+func (r *UploadExecutableExt) ID() string                      { return "BATOU-UPLOAD-006" }
+func (r *UploadExecutableExt) Name() string                    { return "UploadExecutableExt" }
 func (r *UploadExecutableExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UploadExecutableExt) Description() string {
 	return "Detects file upload configurations that explicitly allow executable file extensions (php, jsp, asp, exe, sh, etc.), enabling remote code execution."
@@ -424,14 +451,14 @@ func (r *UploadExecutableExt) Languages() []rules.Language {
 
 func (r *UploadExecutableExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reUploadExecutableExt, reUploadNoExtBlock} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -461,8 +488,8 @@ func (r *UploadExecutableExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UploadSVGNoSanitize struct{}
 
-func (r *UploadSVGNoSanitize) ID() string                     { return "BATOU-UPLOAD-007" }
-func (r *UploadSVGNoSanitize) Name() string                   { return "UploadSVGNoSanitize" }
+func (r *UploadSVGNoSanitize) ID() string                      { return "BATOU-UPLOAD-007" }
+func (r *UploadSVGNoSanitize) Name() string                    { return "UploadSVGNoSanitize" }
 func (r *UploadSVGNoSanitize) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UploadSVGNoSanitize) Description() string {
 	return "Detects SVG file upload acceptance without sanitization. SVG files can contain embedded JavaScript (<script> tags, event handlers) that execute as XSS when rendered."
@@ -473,14 +500,14 @@ func (r *UploadSVGNoSanitize) Languages() []rules.Language {
 
 func (r *UploadSVGNoSanitize) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reUploadSVGAllow, reUploadSVGMime} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				// Check for SVG sanitization nearby
 				if hasNearbyPattern(lines, i, 15, 15, reUploadSVGSanitize) {
 					continue
@@ -514,8 +541,8 @@ func (r *UploadSVGNoSanitize) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UploadClientSideOnly struct{}
 
-func (r *UploadClientSideOnly) ID() string                     { return "BATOU-UPLOAD-008" }
-func (r *UploadClientSideOnly) Name() string                   { return "UploadClientSideOnly" }
+func (r *UploadClientSideOnly) ID() string                      { return "BATOU-UPLOAD-008" }
+func (r *UploadClientSideOnly) Name() string                    { return "UploadClientSideOnly" }
 func (r *UploadClientSideOnly) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UploadClientSideOnly) Description() string {
 	return "Detects file upload validation performed only on the client side (JavaScript), which can be trivially bypassed by modifying the request directly."
@@ -526,7 +553,7 @@ func (r *UploadClientSideOnly) Languages() []rules.Language {
 
 func (r *UploadClientSideOnly) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Detect client-side file validation patterns
 	for i, line := range lines {
@@ -534,11 +561,11 @@ func (r *UploadClientSideOnly) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reClientSideTypeCheck.FindString(line); m != "" {
+		if m := rules.GFind(reClientSideTypeCheck, line); m != "" {
 			// Also check for size validation on the same or nearby lines
-			hasSizeCheck := reClientSideSizeCheck.MatchString(line) ||
+			hasSizeCheck := rules.GMatch(reClientSideSizeCheck, line) ||
 				hasNearbyPattern(lines, i, 3, 3, reClientSideSizeCheck)
-			if hasSizeCheck || reClientSideValidation.MatchString(line) {
+			if hasSizeCheck || rules.GMatch(reClientSideValidation, line) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),

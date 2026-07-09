@@ -1,6 +1,7 @@
 package jsast
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/turenlabs/batou-core/ast"
@@ -38,6 +39,7 @@ func (j *JSASTAnalyzer) Scan(ctx *rules.ScanContext) []rules.Finding {
 		tree:     tree,
 	}
 	c.walk()
+	c.checkDynamicProperty()
 	return c.findings
 }
 
@@ -128,25 +130,26 @@ func (c *jsChecker) checkAssignment(n *ast.Node) {
 	if left.Type() == "member_expression" {
 		propName := memberProperty(left)
 		if propName == "innerHTML" || propName == "outerHTML" {
-			if !isJSLiteral(right) {
-				line := int(n.StartRow()) + 1
-				c.findings = append(c.findings, rules.Finding{
-					RuleID:        "BATOU-JSAST-002",
-					Severity:      rules.High,
-					SeverityLabel: rules.High.String(),
-					Title:         "XSS via " + propName + " assignment",
-					Description:   propName + " is assigned a non-literal value. If the value contains user input, this enables cross-site scripting (XSS) attacks.",
-					FilePath:      c.filePath,
-					LineNumber:    line,
-					MatchedText:   truncate(n.Text(), 200),
-					Suggestion:    "Use textContent instead of " + propName + " for text content, or use DOMPurify.sanitize() before setting HTML.",
-					CWEID:         "CWE-79",
-					OWASPCategory: "A03:2021-Injection",
-					Language:      c.language,
-					Confidence:    "high",
-					Tags:          []string{"xss", "dom", "ast"},
-				})
+			if isJSSafeHTMLExpression(right) {
+				return
 			}
+			line := int(n.StartRow()) + 1
+			c.findings = append(c.findings, rules.Finding{
+				RuleID:        "BATOU-JSAST-002",
+				Severity:      rules.High,
+				SeverityLabel: rules.High.String(),
+				Title:         "XSS via " + propName + " assignment",
+				Description:   propName + " is assigned a non-literal value. If the value contains user input, this enables cross-site scripting (XSS) attacks.",
+				FilePath:      c.filePath,
+				LineNumber:    line,
+				MatchedText:   truncate(n.Text(), 200),
+				Suggestion:    "Use textContent instead of " + propName + " for text content, or use DOMPurify.sanitize() before setting HTML.",
+				CWEID:         "CWE-79",
+				OWASPCategory: "A03:2021-Injection",
+				Language:      c.language,
+				Confidence:    "high",
+				Tags:          []string{"xss", "dom", "ast"},
+			})
 		}
 	}
 }
@@ -266,19 +269,25 @@ func (c *jsChecker) checkVariableDeclarator(n *ast.Node) {
 }
 
 func (c *jsChecker) checkSQLTemplateString(n *ast.Node) {
-	text := n.Text()
-	if !containsSQLKeyword(text) {
-		return
-	}
+	// Only the *literal* parts of the template — `string_fragment` children —
+	// count as the "SQL text". The interpolated `${...}` parts are the
+	// dynamic values; including them in the keyword scan was the source of
+	// FPs (`\`done ${SELECT_OPTION}\``-style identifiers, etc.).
+	var litParts []string
 	hasInterpolation := false
 	n.Walk(func(child *ast.Node) bool {
-		if child.Type() == "template_substitution" {
+		switch child.Type() {
+		case "string_fragment":
+			litParts = append(litParts, child.Text())
+		case "template_substitution":
 			hasInterpolation = true
-			return false
 		}
 		return true
 	})
 	if !hasInterpolation {
+		return
+	}
+	if !looksLikeSQLFragment(strings.Join(litParts, " ")) {
 		return
 	}
 	line := int(n.StartRow()) + 1
@@ -300,24 +309,46 @@ func (c *jsChecker) checkSQLTemplateString(n *ast.Node) {
 	})
 }
 
+// checkSQLBinaryExpression flags `+`-concatenation that builds a SQL string.
+// E6-T5: this used to call strings.Contains-style keyword checks on the whole
+// expression text, which fired on numeric addition like
+// `latestSelectedResourceIndex + step` (the `Selected` substring) and on log
+// messages like `"Update failed for " + id`. The check is now AST-grounded:
+//
+//   - the binary operator must be `+`;
+//   - the operands are flattened (a `+`-chain nests as nested
+//     binary_expressions), and only `string` literal operands contribute to
+//     the "SQL text" — their literal value (sans quotes), not identifiers or
+//     calls;
+//   - that concatenated literal text must look like a SQL fragment
+//     (looksLikeSQLFragment: a DML verb paired with a structural keyword, or
+//     a standalone structural keyword that's rare in prose) — a bare verb
+//     like "Update"/"Delete" in an English sentence does not qualify;
+//   - at least one operand must be non-literal (the dynamic value being
+//     concatenated in) — a `+` between two numeric/identifier operands never
+//     fires.
 func (c *jsChecker) checkSQLBinaryExpression(n *ast.Node) {
-	text := n.Text()
-	if !containsSQLKeyword(text) {
+	if jsBinaryOperator(n) != "+" {
 		return
 	}
-	if !strings.Contains(text, "+") {
-		return
-	}
-	// Check at least one part is not a literal
-	named := n.NamedChildren()
-	allLiteral := true
-	for _, child := range named {
-		if !isJSLiteral(child) {
-			allLiteral = false
-			break
+	operands := flattenJSConcat(n)
+	var litParts []string
+	hasDynamic := false
+	for _, op := range operands {
+		switch op.Type() {
+		case "string":
+			litParts = append(litParts, jsStringValue(op))
+		case "number", "true", "false", "null", "undefined":
+			// static, non-string operand — contributes nothing
+		default:
+			// identifier, member_expression, call_expression, etc.
+			hasDynamic = true
 		}
 	}
-	if allLiteral {
+	if !hasDynamic {
+		return
+	}
+	if !looksLikeSQLFragment(strings.Join(litParts, " ")) {
 		return
 	}
 	line := int(n.StartRow()) + 1
@@ -337,6 +368,70 @@ func (c *jsChecker) checkSQLBinaryExpression(n *ast.Node) {
 		Confidence:    "high",
 		Tags:          []string{"sql-injection", "injection", "ast"},
 	})
+}
+
+// flattenJSConcat returns the leaf operands of a `+`-chain. A chain like
+// `"a" + b + "c"` parses as `(("a" + b) + "c")` — a nested binary_expression
+// whose left is itself a `+` binary_expression — so we recurse only through
+// `+`-operator binary_expressions and treat everything else as a leaf.
+func flattenJSConcat(n *ast.Node) []*ast.Node {
+	if n == nil {
+		return nil
+	}
+	if n.Type() == "binary_expression" && jsBinaryOperator(n) == "+" {
+		var out []*ast.Node
+		for _, side := range []*ast.Node{n.ChildByFieldName("left"), n.ChildByFieldName("right")} {
+			out = append(out, flattenJSConcat(side)...)
+		}
+		return out
+	}
+	if n.Type() == "parenthesized_expression" {
+		if inner := firstNamedChild(n); inner != nil {
+			return flattenJSConcat(inner)
+		}
+	}
+	return []*ast.Node{n}
+}
+
+// jsBinaryOperator returns the operator token of a binary_expression
+// (e.g. "+", "-", "*", "&&"), or "" if it can't be determined.
+func jsBinaryOperator(n *ast.Node) string {
+	if n == nil || n.Type() != "binary_expression" {
+		return ""
+	}
+	if op := n.ChildByFieldName("operator"); op != nil {
+		return op.Text()
+	}
+	return ""
+}
+
+// jsStringValue returns the textual value of a `string` literal node,
+// concatenating its `string_fragment` children (so escape sequences and the
+// surrounding quote characters are excluded). An empty string is returned for
+// quote-only literals like `”`.
+func jsStringValue(n *ast.Node) string {
+	if n == nil {
+		return ""
+	}
+	var parts []string
+	for _, ch := range n.NamedChildren() {
+		if ch.Type() == "string_fragment" {
+			parts = append(parts, ch.Text())
+		}
+	}
+	if len(parts) > 0 {
+		return strings.Join(parts, "")
+	}
+	// No string_fragment child (empty literal, or a parser that doesn't emit
+	// fragments) — fall back to trimming the surrounding quotes.
+	t := n.Text()
+	if len(t) >= 2 {
+		q := t[0]
+		if (q == '\'' || q == '"' || q == '`') && t[len(t)-1] == q {
+			return t[1 : len(t)-1]
+		}
+	}
+	return t
 }
 
 // --- helpers ---
@@ -420,11 +515,185 @@ func isJSLiteral(n *ast.Node) bool {
 	return false
 }
 
-func containsSQLKeyword(s string) bool {
-	upper := strings.ToUpper(s)
-	return strings.Contains(upper, "SELECT") || strings.Contains(upper, "INSERT") ||
-		strings.Contains(upper, "UPDATE") || strings.Contains(upper, "DELETE") ||
-		strings.Contains(upper, "DROP") || strings.Contains(upper, "ALTER")
+// jsSafeHTMLHelpers lists callable names that, when they appear as the
+// right-hand side of an innerHTML/outerHTML assignment, mean the value is
+// not attacker-derived raw HTML. svg() is the standard typed-icon helper;
+// the others are common app-level wrappers around DOMPurify / static
+// templates, localization helpers (which return developer-authored strings
+// keyed by a constant message id), typed-icon builders (a fixed snippet keyed
+// by a constant icon name), and numeric-coercion functions (whose result is a
+// Number, never raw HTML).
+var jsSafeHTMLHelpers = map[string]bool{
+	"svg":           true, // typed SVG-icon constructor (Gitea, Octicon-style)
+	"html":          true, // htm-style tagged template helper (returns vnode/string)
+	"htmlsafe":      true, // hand-written sanitizer
+	"sanitize":      true,
+	"sanitizehtml":  true,
+	"sanitize_html": true,
+	"dompurify":     true, // DOMPurify(input) one-liner alias
+	"trustedhtml":   true, // Trusted Types policy wrapper
+	"sanitizedhtml": true,
+	// Localization helpers: the visible text is a developer-authored template
+	// selected by a constant message id, not attacker-controlled HTML.
+	"i18n":      true, // Ember/Discourse I18n.t alias
+	"t":         true, // Nextcloud / i18next translate
+	"translate": true,
+	"gettext":   true,
+	// Typed-icon / static-fragment builders: a fixed SVG/HTML snippet keyed by
+	// a constant icon name.
+	"iconhtml":         true, // Discourse iconHTML("name")
+	"rendericon":       true,
+	"escapeexpression": true, // Handlebars / Ember escapeExpression
+	// Numeric-coercion functions: the result is a Number, never HTML.
+	"parseint":   true,
+	"parsefloat": true,
+	"number":     true,
+}
+
+// isJSSafeHTMLExpression returns true when the right-hand side of an
+// `el.innerHTML = X` assignment is one of:
+//
+//   - a plain literal (string/number/etc.)
+//   - a parenthesized safe expression
+//   - a template literal with no ${} substitutions, or whose every
+//     substitution is itself a safe expression
+//   - a tagged template literal with a safe tag (html`...`, svg`...`)
+//   - a binary expression whose every operand is itself safe (covers
+//     `iconHTML("x") + " " + i18n("y")` and numeric `parseInt(s) + 1`)
+//   - a call to a known safe-HTML helper (svg(...), sanitize(...), i18n(...),
+//     iconHTML(...), parseInt(...), ...)
+//   - a call to <something>.sanitize(...) or <something>.escape(...)
+//
+// This is NOT a taint analysis — the analyzer has no taint engine. It only
+// recognises RHS shapes that are *constant or developer-authored by
+// construction* and so cannot carry attacker HTML, eliminating the dominant
+// false-positive classes (numeric results, i18n/icon builders, literals)
+// while still firing on bare variables, member accesses, and templates that
+// interpolate a variable.
+//
+// Conservative: returns false for anything it doesn't recognise.
+func isJSSafeHTMLExpression(n *ast.Node) bool {
+	if n == nil {
+		return false
+	}
+	if isJSLiteral(n) {
+		return true
+	}
+	switch n.Type() {
+	case "parenthesized_expression":
+		// `(expr)` — unwrap and judge the inner expression.
+		if inner := firstNamedChild(n); inner != nil {
+			return isJSSafeHTMLExpression(inner)
+		}
+		return false
+	case "template_string", "template_literal":
+		// Tree-sitter exposes ${...} as a `template_substitution` named child.
+		// A template_string with NO substitutions is a constant; one WITH
+		// substitutions is safe only when every interpolated expression is
+		// itself safe (e.g. `${iconHTML("pause")}${iconHTML("play")}`). A bare
+		// `${tagText}` or `${emojiUnescape(data.text)}` is unsafe and fires.
+		for _, child := range n.NamedChildren() {
+			if child.Type() == "template_substitution" {
+				expr := firstNamedChild(child)
+				if !isJSSafeHTMLExpression(expr) {
+					return false
+				}
+			}
+		}
+		return true
+	case "binary_expression":
+		// Concatenation / arithmetic. Safe only when both operands are safe.
+		// Covers `iconHTML("x") + " " + i18n("y")` (nested binary, all safe
+		// builders/literals) and numeric `parseInt(html, 10) + 1`. A `"<p>" +
+		// userVar` still fires because the variable operand is not safe.
+		named := n.NamedChildren()
+		if len(named) < 2 {
+			return false
+		}
+		return isJSSafeHTMLExpression(named[0]) && isJSSafeHTMLExpression(named[1])
+	case "tagged_template_expression", "tagged_template_literal":
+		// tag is the first named child, template is the second.
+		named := n.NamedChildren()
+		if len(named) == 0 {
+			return false
+		}
+		tagName := strings.ToLower(strings.TrimSpace(named[0].Text()))
+		// Accept html`...` and svg`...` regardless of substitutions — these
+		// htm/lit-html style tags handle their own escaping. Demote
+		// confidence elsewhere if the project disagrees.
+		return tagName == "html" || tagName == "svg"
+	case "call_expression":
+		// Recognise svg('octicon-...'), htmlSafe(x), sanitize(x), iconHTML(x),
+		// i18n(x), parseInt(x), etc.
+		named := n.NamedChildren()
+		if len(named) == 0 {
+			return false
+		}
+		callee := named[0]
+		var name string
+		switch callee.Type() {
+		case "identifier":
+			name = strings.ToLower(strings.TrimSpace(callee.Text()))
+		case "member_expression":
+			// foo.sanitize(x) / DOMPurify.sanitize(x) — match on the method.
+			name = strings.ToLower(strings.TrimSpace(memberProperty(callee)))
+		}
+		if jsSafeHTMLHelpers[name] {
+			return true
+		}
+		// Method-name-suffix heuristic: anything ending in "sanitize",
+		// "purify", or "escape" is, by convention, a sanitizer.
+		if strings.HasSuffix(name, "sanitize") || strings.HasSuffix(name, "purify") || strings.HasSuffix(name, "escape") {
+			return true
+		}
+	}
+	return false
+}
+
+// sqlFragmentShape recognises text that has the *shape* of a SQL statement
+// or clause, not merely an English word that happens to also be a SQL verb.
+//
+// SQL keywords are whitespace-or-quote delimited (`SELECT *`, `* FROM x`,
+// `WHERE id`), never adjacent to `.`, `-`, `/`, or other identifier/path
+// characters. RE2 has no lookbehind, so the leading delimiter is the
+// alternation `(^|[\s'"`+])` (string start, whitespace, quote, or `+` from
+// concat); the trailing delimiter is a char class. These delimiters keep
+// `Selected`/`selectedIndex` from matching `SELECT`, `inserted` from
+// matching `INSERT`, and path/CSS fragments like `/select-all/` or
+// `select-from-here` from matching `SELECT ... FROM`.
+//
+// On top of the boundaries, a bare DML verb is not enough: it must be paired
+// with a structural keyword (FROM/INTO/SET/WHERE/VALUES), or be a structural
+// keyword that is itself rare in prose (a JOIN variant, UNION SELECT,
+// GROUP/ORDER BY), or a WHERE-comparison, or a DDL statement. Bounded
+// repetition (`{0,N}?`) is supported by RE2, so the "verb ... keyword"
+// shapes are expressed directly.
+const (
+	// sqlKwL is the leading delimiter for a SQL keyword.
+	sqlKwL = "(^|[\\s'\"`+])"
+	// sqlKwR is the trailing delimiter for a SQL keyword.
+	sqlKwR = "([\\s,;)('\"`+*=<>]|$)"
+)
+
+var sqlFragmentShape = regexp.MustCompile(`(?i)(` +
+	sqlKwL + `(SELECT|DELETE)` + sqlKwR + `[\s\S]{0,200}?` + sqlKwL + `FROM` + sqlKwR +
+	`|` + sqlKwL + `INSERT` + sqlKwR + `[\s\S]{0,40}?` + sqlKwL + `INTO` + sqlKwR +
+	`|` + sqlKwL + `UPDATE` + sqlKwR + `[\s\S]{0,80}?` + sqlKwL + `SET` + sqlKwR +
+	`|` + sqlKwL + `WHERE` + sqlKwR + `[\s\S]{0,200}?(=|<|>|!=|` + sqlKwL + `LIKE\s|` + sqlKwL + `IN\s*\(|` + sqlKwL + `IS\s+(NOT\s+)?NULL)` +
+	`|` + sqlKwL + `(LEFT|RIGHT|INNER|OUTER|CROSS|FULL)\s+(OUTER\s+)?JOIN` + sqlKwR +
+	`|` + sqlKwL + `UNION\s+(ALL\s+)?SELECT` + sqlKwR +
+	`|` + sqlKwL + `GROUP\s+BY` + sqlKwR + `|` + sqlKwL + `ORDER\s+BY` + sqlKwR +
+	`|` + sqlKwL + `INTO` + sqlKwR + `[\s\S]{0,80}?` + sqlKwL + `VALUES` + sqlKwR +
+	`|` + sqlKwL + `TRUNCATE\s+TABLE` + sqlKwR +
+	`|` + sqlKwL + `DROP\s+(TABLE|INDEX|DATABASE|VIEW|SCHEMA)` + sqlKwR +
+	`|` + sqlKwL + `ALTER\s+TABLE` + sqlKwR +
+	`|` + sqlKwL + `CREATE\s+(TABLE|INDEX|VIEW|DATABASE|SCHEMA)` + sqlKwR +
+	`)`)
+
+// looksLikeSQLFragment reports whether s (the concatenated *literal* parts of
+// a template literal or string concat) has the shape of a SQL fragment.
+func looksLikeSQLFragment(s string) bool {
+	return sqlFragmentShape.MatchString(s)
 }
 
 func truncate(s string, maxLen int) string {

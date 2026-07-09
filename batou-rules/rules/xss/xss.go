@@ -23,18 +23,18 @@ var (
 	reDangerouslySet = regexp.MustCompile(`dangerouslySetInnerHTML\s*=\s*\{\s*\{`)
 
 	// BATOU-XSS-003: document.write / document.writeln
-	reDocWrite      = regexp.MustCompile(`document\s*\.\s*(write|writeln)\s*\((.+)\)`)
+	reDocWrite       = regexp.MustCompile(`document\s*\.\s*(write|writeln)\s*\((.+)\)`)
 	reDocWriteStatic = regexp.MustCompile(`document\s*\.\s*(write|writeln)\s*\(\s*["'` + "`" + `]`)
 
 	// BATOU-XSS-004: Unescaped template output
-	reGoTemplateHTML   = regexp.MustCompile(`template\.HTML\s*\(`)
-	reJinjaSafe        = regexp.MustCompile(`\|\s*safe\b`)
-	reJinjaAutoescOff  = regexp.MustCompile(`\{%[-\s]*autoescape\s+(false|off)\s*[-\s]*%\}`)
-	reERBUnescaped     = regexp.MustCompile(`<%==?\s+`)
-	reERBRaw           = regexp.MustCompile(`\braw\s*\(`)
-	reHandlebarTriple  = regexp.MustCompile(`\{\{\{.+?\}\}\}`)
-	rePHPEcho          = regexp.MustCompile(`<\?(?:php)?\s+echo\s+\$`)
-	rePHPEchoSafe      = regexp.MustCompile(`htmlspecialchars\s*\(|htmlentities\s*\(|strip_tags\s*\(`)
+	reGoTemplateHTML  = regexp.MustCompile(`template\.HTML\s*\(`)
+	reJinjaSafe       = regexp.MustCompile(`\|\s*safe\b`)
+	reJinjaAutoescOff = regexp.MustCompile(`\{%[-\s]*autoescape\s+(false|off)\s*[-\s]*%\}`)
+	reERBUnescaped    = regexp.MustCompile(`<%==?\s+`)
+	reERBRaw          = regexp.MustCompile(`\braw\s*\(`)
+	reHandlebarTriple = regexp.MustCompile(`\{\{\{.+?\}\}\}`)
+	rePHPEcho         = regexp.MustCompile(`<\?(?:php)?\s+echo\s+\$`)
+	rePHPEchoSafe     = regexp.MustCompile(`htmlspecialchars\s*\(|htmlentities\s*\(|strip_tags\s*\(`)
 
 	// BATOU-XSS-005: Risky DOM manipulation
 	reEvalCall         = regexp.MustCompile(`\beval\s*\(`)
@@ -42,11 +42,13 @@ var (
 	reWindowOpen       = regexp.MustCompile(`window\.open\s*\(`)
 	reSetAttrDangerous = regexp.MustCompile(`setAttribute\s*\(\s*["'](href|src|action|on\w+)["']\s*,`)
 
-	// BATOU-XSS-006: Response header injection
-	reNodeSetHeader  = regexp.MustCompile(`(?:res|response)\.setHeader\s*\(\s*["'][\w-]+["']\s*,\s*(.+)\)`)
-	reGoHeaderSet    = regexp.MustCompile(`\.Header\(\)\s*\.Set\s*\(\s*["'][\w-]+["']\s*,\s*(.+)\)`)
-	reHeaderFromReq  = regexp.MustCompile(`\.Header\(\)\s*\.Set\s*\(.+(?:req\.|request\.|r\.|params|query|body)`)
-	reNodeHeaderReq  = regexp.MustCompile(`\.setHeader\s*\(.+(?:req\.|request\.|params|query|body)`)
+	// BATOU-XSS-006: Response header injection.
+	// Only fire when the value being written to the header is request-derived
+	// (req.*/request.*/params/query/body) — bare setHeader/Header().Set with a
+	// non-literal value is too noisy. Original loose patterns
+	// (reNodeSetHeader, reGoHeaderSet) were removed in PR #605.
+	reHeaderFromReq = regexp.MustCompile(`\.Header\(\)\s*\.Set\s*\(.+(?:req\.|request\.|r\.|params|query|body)`)
+	reNodeHeaderReq = regexp.MustCompile(`\.setHeader\s*\(.+(?:req\.|request\.|params|query|body)`)
 
 	// BATOU-XSS-007: URL scheme injection (javascript: protocol)
 	reJSProtocolHref = regexp.MustCompile(`(?:href|src|action)\s*=\s*["']javascript:`)
@@ -81,7 +83,7 @@ var (
 	rePyEscape      = regexp.MustCompile(`(?:escape_for_html|escape|html\.escape|markupsafe\.escape|cgi\.escape|bleach\.clean)\s*\(`)
 
 	// Multi-line f-string continuation: standalone f-string with interpolation
-	rePyFStringInterp  = regexp.MustCompile(`^f["'].*\{[a-zA-Z_]`)
+	rePyFStringInterp = regexp.MustCompile(`^f["'].*\{[a-zA-Z_]`)
 	// Response-like variable with += (for multi-line detection)
 	rePyResponseAppend = regexp.MustCompile(`(?i:html|response|output|body|page|content|markup|template_str)\s*\+=`)
 
@@ -94,19 +96,18 @@ var (
 	reJavaReflected    = regexp.MustCompile(`(?:out\.print(?:ln)?|writer\.(?:write|println))\s*\(.*request\.getParameter\s*\(`)
 	reRubyReflected    = regexp.MustCompile(`render\s+(?:html|inline|text)\s*:.*params\s*\[`)
 	// JS/TS: res.send with template literal containing user input (reflected XSS)
-	reJSResSendHTML    = regexp.MustCompile(`res\.send\s*\(`)
+	reJSResSendHTML = regexp.MustCompile(`res\.send\s*\(`)
 	// Indicators of user input in nearby lines for JS/TS
-	reJSReqInput       = regexp.MustCompile(`req\.(?:query|params|body)\b`)
+	reJSReqInput = regexp.MustCompile(`req\.(?:query|params|body)\b`)
 
 	// PHP: echo with variable concatenation (. $var) or interpolation ("...$var...")
 	rePHPEchoVarConcat = regexp.MustCompile(`(?i)\becho\s+["'].*\.\s*\$\w+`)
 	rePHPEchoVarInterp = regexp.MustCompile(`(?i)\becho\s+"[^"]*\$\w+`)
 	// PHP superglobal usage nearby (indicates user input)
-	rePHPSuperglobal   = regexp.MustCompile(`\$_(?:GET|POST|REQUEST|COOKIE)\s*\[`)
+	rePHPSuperglobal = regexp.MustCompile(`\$_(?:GET|POST|REQUEST|COOKIE)\s*\[`)
 
 	// BATOU-XSS-014: Java HTML string concatenation with user input
 	// StringBuilder/StringBuffer.append with HTML tags and variables
-	reJavaStringBuilderHTML = regexp.MustCompile(`(?:StringBuilder|StringBuffer)\s*(?:\(\s*\))?[^;]*\.append\s*\(\s*["']<[^"']*["']\s*\+`)
 	reJavaStringBuilderAppendConcat = regexp.MustCompile(`\.append\s*\(\s*["']<[^"']*["']\s*\+`)
 	// String concatenation with HTML tags: "<tag>" + variable
 	reJavaHTMLStringConcat = regexp.MustCompile(`["']<\s*(?:div|span|p|h[1-6]|br|td|tr|table|li|ul|ol|a|form|input|img|script|body|html|head|title|meta|link|b|i|u|strong|em|label|button|select|option|textarea|section|article|header|footer|nav|main)[^"']*>?\s*["']\s*\+`)
@@ -131,7 +132,7 @@ var (
 	// @RestController annotation indicator
 	reJavaRestController = regexp.MustCompile(`@RestController`)
 
-	// BATOU-XSS-016: Java servlet reflected XSS (response.getWriter() writing variable data)
+	// BATOU-XSS-029: Java servlet reflected XSS (response.getWriter() writing variable data)
 	// Matches response.getWriter().print/println/write/format/printf with a variable (non-literal) first arg
 	reJavaServletWriterVar = regexp.MustCompile(`(?:response\.getWriter\s*\(\s*\))\s*\.\s*(?:print(?:ln|f)?|write|format)\s*\(\s*(?:java\.util\.Locale\.\w+\s*,\s*)?[a-zA-Z_]\w*`)
 	// Matches response.getWriter().print/println/write with string concat including a variable: "..." + var
@@ -187,9 +188,11 @@ func isJSOrTS(lang rules.Language) bool {
 
 type InnerHTMLUsage struct{}
 
-func (r *InnerHTMLUsage) ID() string                   { return "BATOU-XSS-001" }
-func (r *InnerHTMLUsage) Name() string                 { return "InnerHTMLUsage" }
-func (r *InnerHTMLUsage) Description() string          { return "Detects innerHTML/outerHTML assignments with dynamic content that may lead to XSS" }
+func (r *InnerHTMLUsage) ID() string   { return "BATOU-XSS-001" }
+func (r *InnerHTMLUsage) Name() string { return "InnerHTMLUsage" }
+func (r *InnerHTMLUsage) Description() string {
+	return "Detects innerHTML/outerHTML assignments with dynamic content that may lead to XSS"
+}
 func (r *InnerHTMLUsage) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InnerHTMLUsage) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -205,10 +208,11 @@ func (r *InnerHTMLUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 	fileSanitized := rules.HasHTMLSanitizer(ctx.Content)
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		// Original innerHTML/outerHTML assignment check
-		m := reInnerHTMLAssign.FindStringSubmatch(line)
+		m := rules.GFindSubmatchLower(reInnerHTMLAssign, line, lowered[i])
 		if m != nil {
 			rhs := m[2]
 			// Skip static string assignments like .innerHTML = "" or .innerHTML = "<br>"
@@ -236,7 +240,7 @@ func (r *InnerHTMLUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		// insertAdjacentHTML — functionally identical to innerHTML
-		if reInsertAdjacentHTML.MatchString(line) {
+		if rules.GMatchLower(reInsertAdjacentHTML, line, lowered[i]) {
 			findings = append(findings, makeFinding(
 				r.ID(), "insertAdjacentHTML with dynamic content",
 				"insertAdjacentHTML() inserts raw HTML into the DOM, equivalent to innerHTML. If the content includes unsanitized user input, it creates an XSS vulnerability.",
@@ -247,7 +251,7 @@ func (r *InnerHTMLUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		// jQuery .html() with argument
-		if reJQueryHTML.MatchString(line) {
+		if rules.GMatchLower(reJQueryHTML, line, lowered[i]) {
 			findings = append(findings, makeFinding(
 				r.ID(), "jQuery .html() with dynamic content",
 				"jQuery's .html() method sets innerHTML on the matched elements. If the argument includes unsanitized user input, it creates an XSS vulnerability.",
@@ -258,7 +262,7 @@ func (r *InnerHTMLUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		// createContextualFragment
-		if reContextualFragment.MatchString(line) {
+		if rules.GMatchLower(reContextualFragment, line, lowered[i]) {
 			findings = append(findings, makeFinding(
 				r.ID(), "createContextualFragment with dynamic content",
 				"createContextualFragment() parses a string as HTML. If the string includes unsanitized user input, it creates an XSS vulnerability.",
@@ -275,9 +279,11 @@ func (r *InnerHTMLUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DangerouslySetInnerHTML struct{}
 
-func (r *DangerouslySetInnerHTML) ID() string                   { return "BATOU-XSS-002" }
-func (r *DangerouslySetInnerHTML) Name() string                 { return "DangerouslySetInnerHTML" }
-func (r *DangerouslySetInnerHTML) Description() string          { return "Detects React dangerouslySetInnerHTML usage that may lead to XSS" }
+func (r *DangerouslySetInnerHTML) ID() string   { return "BATOU-XSS-002" }
+func (r *DangerouslySetInnerHTML) Name() string { return "DangerouslySetInnerHTML" }
+func (r *DangerouslySetInnerHTML) Description() string {
+	return "Detects React dangerouslySetInnerHTML usage that may lead to XSS"
+}
 func (r *DangerouslySetInnerHTML) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DangerouslySetInnerHTML) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -288,9 +294,10 @@ func (r *DangerouslySetInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if !reDangerouslySet.MatchString(line) {
+		if !rules.GMatchLower(reDangerouslySet, line, lowered[i]) {
 			continue
 		}
 		findings = append(findings, makeFinding(
@@ -308,9 +315,11 @@ func (r *DangerouslySetInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DocumentWrite struct{}
 
-func (r *DocumentWrite) ID() string                   { return "BATOU-XSS-003" }
-func (r *DocumentWrite) Name() string                 { return "DocumentWrite" }
-func (r *DocumentWrite) Description() string          { return "Detects document.write/writeln calls with dynamic content" }
+func (r *DocumentWrite) ID() string   { return "BATOU-XSS-003" }
+func (r *DocumentWrite) Name() string { return "DocumentWrite" }
+func (r *DocumentWrite) Description() string {
+	return "Detects document.write/writeln calls with dynamic content"
+}
 func (r *DocumentWrite) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DocumentWrite) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -321,13 +330,14 @@ func (r *DocumentWrite) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if !reDocWrite.MatchString(line) {
+		if !rules.GMatchLower(reDocWrite, line, lowered[i]) {
 			continue
 		}
 		// Skip purely static string arguments
-		if reDocWriteStatic.MatchString(line) && !strings.Contains(line, "+") && !strings.Contains(line, "${") {
+		if rules.GMatchLower(reDocWriteStatic, line, lowered[i]) && !strings.Contains(line, "+") && !strings.Contains(line, "${") {
 			continue
 		}
 		findings = append(findings, makeFinding(
@@ -345,9 +355,11 @@ func (r *DocumentWrite) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnescapedTemplateOutput struct{}
 
-func (r *UnescapedTemplateOutput) ID() string                   { return "BATOU-XSS-004" }
-func (r *UnescapedTemplateOutput) Name() string                 { return "UnescapedTemplateOutput" }
-func (r *UnescapedTemplateOutput) Description() string          { return "Detects template engines outputting unescaped content" }
+func (r *UnescapedTemplateOutput) ID() string   { return "BATOU-XSS-004" }
+func (r *UnescapedTemplateOutput) Name() string { return "UnescapedTemplateOutput" }
+func (r *UnescapedTemplateOutput) Description() string {
+	return "Detects template engines outputting unescaped content"
+}
 func (r *UnescapedTemplateOutput) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnescapedTemplateOutput) Languages() []rules.Language {
 	return []rules.Language{
@@ -358,7 +370,8 @@ func (r *UnescapedTemplateOutput) Languages() []rules.Language {
 
 func (r *UnescapedTemplateOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		var matched bool
@@ -366,43 +379,43 @@ func (r *UnescapedTemplateOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if reGoTemplateHTML.MatchString(line) {
+			if rules.GMatchLower(reGoTemplateHTML, line, lowered[i]) {
 				matched = true
 				desc = "template.HTML() casts a string to unescaped HTML, bypassing Go's html/template auto-escaping."
 				suggestion = "Avoid template.HTML() with user input. Sanitize the content first or use auto-escaping."
 			}
 
 		case rules.LangPython:
-			if reJinjaSafe.MatchString(line) {
+			if rules.GMatchLower(reJinjaSafe, line, lowered[i]) {
 				matched = true
 				desc = "The |safe filter in Jinja2 marks content as safe HTML, bypassing auto-escaping."
 				suggestion = "Remove |safe and let Jinja2 auto-escape the content, or sanitize with bleach before marking safe."
-			} else if reJinjaAutoescOff.MatchString(line) {
+			} else if rules.GMatchLower(reJinjaAutoescOff, line, lowered[i]) {
 				matched = true
 				desc = "Disabling autoescape in Jinja2 outputs raw HTML for all variables in the block."
 				suggestion = "Keep autoescape enabled. If specific values must be raw, sanitize them individually."
 			}
 
 		case rules.LangRuby:
-			if reERBUnescaped.MatchString(line) {
+			if rules.GMatchLower(reERBUnescaped, line, lowered[i]) {
 				matched = true
 				desc = "ERB <%== %> outputs unescaped HTML content."
 				suggestion = "Use <%= %> for auto-escaped output, or sanitize with sanitize() helper before outputting."
-			} else if reERBRaw.MatchString(line) {
+			} else if rules.GMatchLower(reERBRaw, line, lowered[i]) {
 				matched = true
 				desc = "raw() outputs unescaped HTML in Rails templates."
 				suggestion = "Remove raw() and let Rails auto-escape, or sanitize with sanitize() helper."
 			}
 
 		case rules.LangPHP:
-			if rePHPEcho.MatchString(line) && !rePHPEchoSafe.MatchString(line) {
+			if rules.GMatchLower(rePHPEcho, line, lowered[i]) && !rules.GMatchLower(rePHPEchoSafe, line, lowered[i]) {
 				matched = true
 				desc = "echo with a variable and no htmlspecialchars() can output unescaped user input."
 				suggestion = "Wrap the variable with htmlspecialchars($var, ENT_QUOTES, 'UTF-8') before echoing."
 			}
 
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if reHandlebarTriple.MatchString(line) {
+			if rules.GMatchLower(reHandlebarTriple, line, lowered[i]) {
 				matched = true
 				desc = "Handlebars triple-brace {{{ }}} outputs unescaped HTML."
 				suggestion = "Use double-brace {{ }} for auto-escaped output, or sanitize the content before rendering."
@@ -424,9 +437,11 @@ func (r *UnescapedTemplateOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DOMManipulation struct{}
 
-func (r *DOMManipulation) ID() string                   { return "BATOU-XSS-005" }
-func (r *DOMManipulation) Name() string                 { return "DOMManipulation" }
-func (r *DOMManipulation) Description() string          { return "Detects risky DOM APIs that can lead to XSS when used with user-controlled data" }
+func (r *DOMManipulation) ID() string   { return "BATOU-XSS-005" }
+func (r *DOMManipulation) Name() string { return "DOMManipulation" }
+func (r *DOMManipulation) Description() string {
+	return "Detects risky DOM APIs that can lead to XSS when used with user-controlled data"
+}
 func (r *DOMManipulation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DOMManipulation) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -437,13 +452,14 @@ func (r *DOMManipulation) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
 		// eval() - especially dangerous with URL/query params
-		if reEvalCall.MatchString(line) {
+		if rules.GMatchLower(reEvalCall, line, lowered[i]) {
 			confidence := "medium"
 			if strings.Contains(line, "location") || strings.Contains(line, "search") ||
 				strings.Contains(line, "param") || strings.Contains(line, "query") ||
@@ -461,42 +477,51 @@ func (r *DOMManipulation) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// location.href / location.assign / location.replace assignment
-		if reLocationAssign.MatchString(line) {
-			m := reLocationAssign.FindStringSubmatch(line)
+		if rules.GMatchLower(reLocationAssign, line, lowered[i]) {
+			m := rules.GFindSubmatchLower(reLocationAssign, line, lowered[i])
 			rhs := m[1]
 			if strings.Contains(rhs, "location") || strings.Contains(rhs, "param") ||
 				strings.Contains(rhs, "query") || strings.Contains(rhs, "input") ||
 				strings.Contains(rhs, "user") || strings.Contains(rhs, "search") ||
 				strings.Contains(rhs, "hash") || strings.Contains(rhs, "url") {
-				findings = append(findings, makeFinding(
+				// CWE-601 (open redirect), not CWE-79: the sink is a
+				// navigation target, not HTML output. Matches the redirect
+				// category's classification for unvalidated redirects.
+				f := makeFinding(
 					r.ID(), "location assignment from potential user input",
 					"Assigning user-controlled values to location.href can enable open redirects or javascript: URL XSS.",
 					ctx.FilePath, i+1, trimmed,
 					"Validate the URL scheme (allow only http/https) and use a URL allowlist when redirecting based on user input.",
-					"CWE-79", string(ctx.Language), rules.Medium, "medium",
-				))
+					"CWE-601", string(ctx.Language), rules.Medium, "medium",
+				)
+				f.OWASPCategory = "A01:2021-Broken Access Control"
+				findings = append(findings, f)
 				continue
 			}
 		}
 
 		// window.open()
-		if reWindowOpen.MatchString(line) {
+		if rules.GMatchLower(reWindowOpen, line, lowered[i]) {
 			if strings.Contains(line, "location") || strings.Contains(line, "param") ||
 				strings.Contains(line, "query") || strings.Contains(line, "input") ||
 				strings.Contains(line, "user") || strings.Contains(line, "url") {
-				findings = append(findings, makeFinding(
+				// CWE-601: same navigation-target class as the location
+				// assignment above — not an HTML-output sink.
+				f := makeFinding(
 					r.ID(), "window.open() with potential user-controlled URL",
 					"window.open() with a user-controlled URL can be used for phishing or javascript: protocol XSS.",
 					ctx.FilePath, i+1, trimmed,
 					"Validate the URL scheme (allow only http/https) before passing to window.open().",
-					"CWE-79", string(ctx.Language), rules.Medium, "medium",
-				))
+					"CWE-601", string(ctx.Language), rules.Medium, "medium",
+				)
+				f.OWASPCategory = "A01:2021-Broken Access Control"
+				findings = append(findings, f)
 				continue
 			}
 		}
 
 		// setAttribute with dangerous attributes
-		if reSetAttrDangerous.MatchString(line) {
+		if rules.GMatchLower(reSetAttrDangerous, line, lowered[i]) {
 			findings = append(findings, makeFinding(
 				r.ID(), "setAttribute with dangerous attribute",
 				"Setting href, src, action, or event handler attributes via setAttribute can introduce XSS if the value is user-controlled.",
@@ -513,9 +538,11 @@ func (r *DOMManipulation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ResponseHeaderInjection struct{}
 
-func (r *ResponseHeaderInjection) ID() string                   { return "BATOU-XSS-006" }
-func (r *ResponseHeaderInjection) Name() string                 { return "ResponseHeaderInjection" }
-func (r *ResponseHeaderInjection) Description() string          { return "Detects HTTP response headers set with unsanitized input" }
+func (r *ResponseHeaderInjection) ID() string   { return "BATOU-XSS-006" }
+func (r *ResponseHeaderInjection) Name() string { return "ResponseHeaderInjection" }
+func (r *ResponseHeaderInjection) Description() string {
+	return "Detects HTTP response headers set with unsanitized input"
+}
 func (r *ResponseHeaderInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ResponseHeaderInjection) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript, rules.LangGo}
@@ -523,7 +550,8 @@ func (r *ResponseHeaderInjection) Languages() []rules.Language {
 
 func (r *ResponseHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -531,40 +559,33 @@ func (r *ResponseHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangJavaScript, rules.LangTypeScript:
-			// res.setHeader('Content-Type', userInput)
-			if reNodeSetHeader.MatchString(line) || reNodeHeaderReq.MatchString(line) {
-				m := reNodeSetHeader.FindStringSubmatch(line)
-				if m != nil {
-					val := m[1]
-					// Skip static string values
-					if reStaticString.MatchString(val) {
-						continue
-					}
-				}
+			// res.setHeader('Content-Type', userInput) — require the value
+			// to be request-derived. Tightened 2026-05-05: bare
+			// .setHeader(...) was firing on every standard cache/content
+			// header (Etag, Last-Modified, Content-Length, Content-Type
+			// from a constant) regardless of value provenance.
+			if rules.GMatchLower(reNodeHeaderReq, line, lowered[i]) {
 				matched = true
 			}
 
 		case rules.LangGo:
-			// w.Header().Set(key, userInput)
-			if reGoHeaderSet.MatchString(line) || reHeaderFromReq.MatchString(line) {
-				m := reGoHeaderSet.FindStringSubmatch(line)
-				if m != nil {
-					val := m[1]
-					if reStaticString.MatchString(val) {
-						continue
-					}
-				}
+			// w.Header().Set(key, userInput) — require the value to be
+			// request-derived. See note above.
+			if rules.GMatchLower(reHeaderFromReq, line, lowered[i]) {
 				matched = true
 			}
 		}
 
 		if matched {
+			// CWE-113 (HTTP response splitting / header injection), not
+			// CWE-79: the sink is a response header, not HTML output.
+			// Matches the taint catalog's header-injection sinks.
 			findings = append(findings, makeFinding(
 				r.ID(), "HTTP response header set with unsanitized value",
 				"Setting HTTP response headers with user-controlled values can lead to header injection, enabling XSS via Content-Type manipulation or response splitting.",
 				ctx.FilePath, i+1, trimmed,
 				"Validate and sanitize header values. Use allowlists for Content-Type. Strip newline characters (\\r\\n) from header values.",
-				"CWE-79", string(ctx.Language), rules.High, "medium",
+				"CWE-113", string(ctx.Language), rules.High, "medium",
 			))
 		}
 	}
@@ -575,9 +596,11 @@ func (r *ResponseHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type URLSchemeInjection struct{}
 
-func (r *URLSchemeInjection) ID() string                   { return "BATOU-XSS-007" }
-func (r *URLSchemeInjection) Name() string                 { return "URLSchemeInjection" }
-func (r *URLSchemeInjection) Description() string          { return "Detects javascript: protocol in URLs and dynamic href/src without protocol validation" }
+func (r *URLSchemeInjection) ID() string   { return "BATOU-XSS-007" }
+func (r *URLSchemeInjection) Name() string { return "URLSchemeInjection" }
+func (r *URLSchemeInjection) Description() string {
+	return "Detects javascript: protocol in URLs and dynamic href/src without protocol validation"
+}
 func (r *URLSchemeInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *URLSchemeInjection) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -588,13 +611,14 @@ func (r *URLSchemeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
 		// Explicit javascript: in href/src/action attributes
-		if reJSProtocolHref.MatchString(line) {
+		if rules.GMatchLower(reJSProtocolHref, line, lowered[i]) {
 			findings = append(findings, makeFinding(
 				r.ID(), "javascript: protocol in URL attribute",
 				"Using javascript: protocol in href, src, or action attributes executes JavaScript when the link is clicked or resource loaded.",
@@ -606,7 +630,7 @@ func (r *URLSchemeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// javascript: protocol concatenation
-		if reJSProtocolVar.MatchString(line) {
+		if rules.GMatchLower(reJSProtocolVar, line, lowered[i]) {
 			findings = append(findings, makeFinding(
 				r.ID(), "javascript: protocol string concatenation",
 				"Concatenating 'javascript:' with dynamic content constructs an XSS payload.",
@@ -618,7 +642,7 @@ func (r *URLSchemeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Dynamic href/src in JSX: href={userInput} without validation
-		if reHrefDynamic.MatchString(line) {
+		if rules.GMatchLower(reHrefDynamic, line, lowered[i]) {
 			// Check that it's not using a safe pattern like href={`/path`} or href={"static"}
 			// Only flag when the value references a variable that could be user-controlled
 			if strings.Contains(line, "url") || strings.Contains(line, "href") ||
@@ -642,9 +666,11 @@ func (r *URLSchemeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ServerSideRenderingXSS struct{}
 
-func (r *ServerSideRenderingXSS) ID() string                   { return "BATOU-XSS-008" }
-func (r *ServerSideRenderingXSS) Name() string                 { return "ServerSideRenderingXSS" }
-func (r *ServerSideRenderingXSS) Description() string          { return "Detects server-side rendering without escaping across Python, Java, Go, Ruby, and C#" }
+func (r *ServerSideRenderingXSS) ID() string   { return "BATOU-XSS-008" }
+func (r *ServerSideRenderingXSS) Name() string { return "ServerSideRenderingXSS" }
+func (r *ServerSideRenderingXSS) Description() string {
+	return "Detects server-side rendering without escaping across Python, Java, Go, Ruby, and C#"
+}
 func (r *ServerSideRenderingXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ServerSideRenderingXSS) Languages() []rules.Language {
 	return []rules.Language{
@@ -654,7 +680,8 @@ func (r *ServerSideRenderingXSS) Languages() []rules.Language {
 
 func (r *ServerSideRenderingXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -663,26 +690,32 @@ func (r *ServerSideRenderingXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangPython:
-			if rePyMarkup.MatchString(line) || rePyMarkupFmt.MatchString(line) {
+			if rules.GMatchLower(rePyMarkup, line, lowered[i]) || rules.GMatchLower(rePyMarkupFmt, line, lowered[i]) {
 				matched = true
 				desc = "Markup() marks a string as safe HTML, bypassing Jinja2/Flask auto-escaping. If user input is passed in, it creates an XSS vulnerability."
 				suggestion = "Do not pass user input to Markup(). Use auto-escaping or sanitize with bleach before wrapping in Markup()."
-			} else if rePyMarkSafe.MatchString(line) {
+			} else if rules.GMatchLower(rePyMarkSafe, line, lowered[i]) {
 				matched = true
 				desc = "Django's mark_safe() marks a string as safe HTML, bypassing auto-escaping. If user input is included, it creates an XSS vulnerability."
 				suggestion = "Do not pass user input to mark_safe(). Use the |escape filter or django.utils.html.escape() on user data before marking safe."
 			}
 
 		case rules.LangJava:
-			if reJSPUnescaped.MatchString(line) {
+			if rules.GMatchLower(reJSPUnescaped, line, lowered[i]) {
 				matched = true
 				desc = "JSP expression tag (<%= %>) outputs request.getParameter() without escaping, creating a reflected XSS vulnerability."
 				suggestion = "Use <c:out value=\"${param.name}\"/> or fn:escapeXml() instead of direct expression output."
-			} else if reJavaHTMLConcat.MatchString(line) {
-				// Skip if the line uses a known encoder
+			} else if rules.GMatchLower(reJavaHTMLConcat, line, lowered[i]) {
+				// Skip if the line uses a known encoder, OR a nearby line
+				// declares a variable assigned from a known encoder
+				// (e.g. `String safe = Encode.forHtml(who);` two lines above).
+				// The body-scope check via hasNearbyJavaEncoder is the
+				// canonical OWASP BenchmarkJava / classic-spring-xss safe
+				// shape and was previously only handled at same-line scope.
 				if !strings.Contains(line, "Encode.forHtml") && !strings.Contains(line, "escapeHtml") &&
 					!strings.Contains(line, "escapeXml") && !strings.Contains(line, "StringEscapeUtils") &&
-					!strings.Contains(line, "HtmlUtils.htmlEscape") {
+					!strings.Contains(line, "HtmlUtils.htmlEscape") &&
+					!hasNearbyJavaEncoder(lines, i) {
 					matched = true
 					desc = "Constructing HTML by concatenating strings with user input in a PrintWriter/response writer creates an XSS vulnerability."
 					suggestion = "Use a template engine with auto-escaping, or apply OWASP Java Encoder (Encode.forHtml()) before outputting."
@@ -690,14 +723,14 @@ func (r *ServerSideRenderingXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 
 		case rules.LangGo:
-			if reGoFprintfHTML.MatchString(line) {
+			if rules.GMatchLower(reGoFprintfHTML, line, lowered[i]) {
 				matched = true
 				desc = "Writing HTML content with fmt.Fprintf to an http.ResponseWriter using %s or %v format verbs can inject unsanitized user data into the response."
 				suggestion = "Use html/template for HTML rendering. If fmt.Fprintf is necessary, escape user data with html.EscapeString() first."
 			}
 
 		case rules.LangRuby:
-			if reRubyHTMLSafe.MatchString(line) {
+			if rules.GMatchLower(reRubyHTMLSafe, line, lowered[i]) {
 				// Check for user-input indicators near html_safe
 				if strings.Contains(line, "param") || strings.Contains(line, "input") ||
 					strings.Contains(line, "user") || strings.Contains(line, "request") ||
@@ -709,7 +742,7 @@ func (r *ServerSideRenderingXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 
 		case rules.LangCSharp:
-			if reCSharpHtmlRaw.MatchString(line) {
+			if rules.GMatchLower(reCSharpHtmlRaw, line, lowered[i]) {
 				matched = true
 				desc = "Html.Raw() bypasses Razor auto-escaping. If user input is included, it creates an XSS vulnerability."
 				suggestion = "Remove Html.Raw() and let Razor auto-escape, or sanitize input with an HTML sanitizer before using Html.Raw()."
@@ -731,9 +764,11 @@ func (r *ServerSideRenderingXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingContentType struct{}
 
-func (r *MissingContentType) ID() string                   { return "BATOU-XSS-009" }
-func (r *MissingContentType) Name() string                 { return "MissingContentType" }
-func (r *MissingContentType) Description() string          { return "Detects HTML-like content written to HTTP responses without Content-Type header" }
+func (r *MissingContentType) ID() string   { return "BATOU-XSS-009" }
+func (r *MissingContentType) Name() string { return "MissingContentType" }
+func (r *MissingContentType) Description() string {
+	return "Detects HTML-like content written to HTTP responses without Content-Type header"
+}
 func (r *MissingContentType) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingContentType) Languages() []rules.Language {
 	return []rules.Language{rules.LangGo}
@@ -745,7 +780,7 @@ func (r *MissingContentType) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Check if content contains HTML writes but no Content-Type header set
-	hasHTMLWrite := reGoWriteHTML.MatchString(ctx.Content) || reGoFprintfHTMLTag.MatchString(ctx.Content)
+	hasHTMLWrite := rules.GMatchFile(reGoWriteHTML, ctx) || rules.GMatchFile(reGoFprintfHTMLTag, ctx)
 	if !hasHTMLWrite {
 		return nil
 	}
@@ -759,9 +794,10 @@ func (r *MissingContentType) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if reGoWriteHTML.MatchString(line) || reGoFprintfHTMLTag.MatchString(line) {
+		if rules.GMatchLower(reGoWriteHTML, line, lowered[i]) || rules.GMatchLower(reGoFprintfHTMLTag, line, lowered[i]) {
 			findings = append(findings, makeFinding(
 				r.ID(), "HTML response without Content-Type header",
 				"Writing HTML content to an HTTP response without explicitly setting Content-Type allows browsers to sniff the content type, potentially executing scripts in contexts where they shouldn't.",
@@ -778,9 +814,11 @@ func (r *MissingContentType) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JSONContentTypeXSS struct{}
 
-func (r *JSONContentTypeXSS) ID() string                   { return "BATOU-XSS-010" }
-func (r *JSONContentTypeXSS) Name() string                 { return "JSONContentTypeXSS" }
-func (r *JSONContentTypeXSS) Description() string          { return "Detects JSON responses with user data sent without proper application/json Content-Type" }
+func (r *JSONContentTypeXSS) ID() string   { return "BATOU-XSS-010" }
+func (r *JSONContentTypeXSS) Name() string { return "JSONContentTypeXSS" }
+func (r *JSONContentTypeXSS) Description() string {
+	return "Detects JSON responses with user data sent without proper application/json Content-Type"
+}
 func (r *JSONContentTypeXSS) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *JSONContentTypeXSS) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -792,18 +830,19 @@ func (r *JSONContentTypeXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Only flag if there are res.send/end/write calls but no res.json and no application/json Content-Type
-	if !reNodeResSend.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNodeResSend, ctx) {
 		return nil
 	}
 	// If res.json is used or application/json is set, skip
-	if reNodeResJSON.MatchString(ctx.Content) || reNodeContentJSON.MatchString(ctx.Content) {
+	if rules.GMatchFile(reNodeResJSON, ctx) || rules.GMatchFile(reNodeContentJSON, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if !reNodeResSend.MatchString(line) {
+		if !rules.GMatchLower(reNodeResSend, line, lowered[i]) {
 			continue
 		}
 		// Flag lines that look like they're sending JSON-like content via res.send/end
@@ -825,9 +864,11 @@ func (r *JSONContentTypeXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ReflectedXSS struct{}
 
-func (r *ReflectedXSS) ID() string                   { return "BATOU-XSS-011" }
-func (r *ReflectedXSS) Name() string                 { return "ReflectedXSS" }
-func (r *ReflectedXSS) Description() string          { return "Detects direct reflection of request parameters in HTTP response body" }
+func (r *ReflectedXSS) ID() string   { return "BATOU-XSS-011" }
+func (r *ReflectedXSS) Name() string { return "ReflectedXSS" }
+func (r *ReflectedXSS) Description() string {
+	return "Detects direct reflection of request parameters in HTTP response body"
+}
 func (r *ReflectedXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ReflectedXSS) Languages() []rules.Language {
 	return []rules.Language{
@@ -838,7 +879,8 @@ func (r *ReflectedXSS) Languages() []rules.Language {
 
 func (r *ReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -847,7 +889,7 @@ func (r *ReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangPython:
-			if rePyReflected.MatchString(line) || rePyFStringReq.MatchString(line) {
+			if rules.GMatchLower(rePyReflected, line, lowered[i]) || rules.GMatchLower(rePyFStringReq, line, lowered[i]) {
 				// Check if the sink variable was last assigned a safe value,
 				// or if there is an input validation guard nearby.
 				if rules.PySinkVarIsSafe(lines, i) {
@@ -859,33 +901,33 @@ func (r *ReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 
 		case rules.LangPHP:
-			if rePHPEchoGet.MatchString(line) {
+			if rules.GMatchLower(rePHPEchoGet, line, lowered[i]) {
 				matched = true
 				desc = "PHP echo outputs superglobal parameters directly in the response without escaping, creating a reflected XSS vulnerability."
 				suggestion = "Wrap with htmlspecialchars($value, ENT_QUOTES, 'UTF-8') before echoing, or use a template engine with auto-escaping."
-			} else if (rePHPEchoVarConcat.MatchString(line) || rePHPEchoVarInterp.MatchString(line)) &&
-				!rePHPEchoSafe.MatchString(line) && hasNearbyPHPSuperglobal(lines, i) {
+			} else if (rules.GMatchLower(rePHPEchoVarConcat, line, lowered[i]) || rules.GMatchLower(rePHPEchoVarInterp, line, lowered[i])) &&
+				!rules.GMatchLower(rePHPEchoSafe, line, lowered[i]) && hasNearbyPHPSuperglobal(lines, i) {
 				matched = true
 				desc = "PHP echo outputs a variable derived from user input (superglobals) without escaping, creating a reflected XSS vulnerability."
 				suggestion = "Wrap with htmlspecialchars($value, ENT_QUOTES, 'UTF-8') before echoing, or use a template engine with auto-escaping."
 			}
 
 		case rules.LangGo:
-			if reGoReflected.MatchString(line) || reGoFprintfReqBody.MatchString(line) {
+			if rules.GMatchLower(reGoReflected, line, lowered[i]) || rules.GMatchLower(reGoFprintfReqBody, line, lowered[i]) {
 				matched = true
 				desc = "Request parameters from URL query or form data are written directly to the HTTP response via fmt.Fprintf, creating a reflected XSS vulnerability."
 				suggestion = "Escape user input with html.EscapeString() before writing to the response, or use html/template for rendering HTML."
 			}
 
 		case rules.LangJava:
-			if reJavaReflected.MatchString(line) {
+			if rules.GMatchLower(reJavaReflected, line, lowered[i]) {
 				matched = true
 				desc = "request.getParameter() is written directly to the response via PrintWriter, creating a reflected XSS vulnerability."
 				suggestion = "Use OWASP Java Encoder (Encode.forHtml()) to escape user input, or use a template engine with auto-escaping like Thymeleaf."
 			}
 
 		case rules.LangRuby:
-			if reRubyReflected.MatchString(line) {
+			if rules.GMatchLower(reRubyReflected, line, lowered[i]) {
 				matched = true
 				desc = "Request params are rendered directly in the response without escaping, creating a reflected XSS vulnerability."
 				suggestion = "Use ERB auto-escaping (<%= %>) or call ERB::Util.html_escape() / h() on params before rendering."
@@ -893,7 +935,7 @@ func (r *ReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		case rules.LangJavaScript, rules.LangTypeScript:
 			// res.send() with HTML content and user input nearby
-			if reJSResSendHTML.MatchString(line) {
+			if rules.GMatchLower(reJSResSendHTML, line, lowered[i]) {
 				// Check if the line or nearby context contains HTML tags and user input
 				hasHTML := strings.Contains(line, "<") || strings.Contains(line, "html") || strings.Contains(line, "${")
 				if hasHTML && hasNearbyJSInput(lines, i) {
@@ -921,8 +963,8 @@ func (r *ReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PythonFStringHTML struct{}
 
-func (r *PythonFStringHTML) ID() string                     { return "BATOU-XSS-013" }
-func (r *PythonFStringHTML) Name() string                   { return "PythonFStringHTML" }
+func (r *PythonFStringHTML) ID() string                      { return "BATOU-XSS-013" }
+func (r *PythonFStringHTML) Name() string                    { return "PythonFStringHTML" }
 func (r *PythonFStringHTML) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PythonFStringHTML) Description() string {
 	return "Detects Python code that builds HTML strings using f-strings, .format(), or % formatting with unescaped variables, leading to stored/reflected XSS."
@@ -937,10 +979,11 @@ func (r *PythonFStringHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if file uses escape functions anywhere
-	hasEscapeImport := rePyEscape.MatchString(ctx.Content)
+	hasEscapeImport := rules.GMatchFile(rePyEscape, ctx)
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -949,17 +992,17 @@ func (r *PythonFStringHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := rePyFStringHTML.FindString(line); m != "" {
+		if m := rules.GFindLower(rePyFStringHTML, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := rePyFormatHTML.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePyFormatHTML, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := rePyPctHTML.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePyPctHTML, line, lowered[i]); m != "" {
 			matched = m
-		} else if rePyFStringInterp.MatchString(trimmed) {
+		} else if rules.GMatch(rePyFStringInterp, trimmed) {
 			// Standalone f-string with interpolation on a continuation line —
 			// check if a response-like variable += is within 3 lines above.
 			for back := 1; back <= 3 && i-back >= 0; back++ {
-				if rePyResponseAppend.MatchString(lines[i-back]) {
+				if rules.GMatch(rePyResponseAppend, lines[i-back]) {
 					matched = trimmed
 					break
 				}
@@ -976,11 +1019,12 @@ func (r *PythonFStringHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		// Check if the interpolated variable on this line was escaped
-		// Look back a few lines for escape() calls on the variables used
+		// Check if the interpolated variable on this line was escaped.
+		// Look back ~12 lines for escape() calls on the variables used
+		// (OWASP Benchmark interleaves escape with helper-class wiring).
 		lineEscaped := false
 		if hasEscapeImport {
-			start := i - 5
+			start := i - 12
 			if start < 0 {
 				start = 0
 			}
@@ -1029,10 +1073,11 @@ func (r *JavaHTMLStringConcat) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if file has encoder imports (reduces false positives)
-	fileHasEncoder := reJavaEncoder.MatchString(ctx.Content)
+	fileHasEncoder := rules.GMatchFile(reJavaEncoder, ctx)
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -1041,7 +1086,7 @@ func (r *JavaHTMLStringConcat) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Skip lines that use an encoder
-		if reJavaEncoder.MatchString(line) {
+		if rules.GMatchLower(reJavaEncoder, line, lowered[i]) {
 			continue
 		}
 
@@ -1049,7 +1094,7 @@ func (r *JavaHTMLStringConcat) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 
 		// StringBuilder/StringBuffer.append with HTML + concatenation
-		if reJavaStringBuilderAppendConcat.MatchString(line) {
+		if rules.GMatchLower(reJavaStringBuilderAppendConcat, line, lowered[i]) {
 			// Only flag if the concat part looks like a variable (not another string literal)
 			// Skip lines where all + operands are string literals: "..." + "..."
 			if !isJavaAllStringLiteralConcat(line) {
@@ -1062,7 +1107,7 @@ func (r *JavaHTMLStringConcat) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// String concat: "<tag>" + variable  or  variable + "</tag>"
 		if !matched && !isJavaAllStringLiteralConcatLine(line) &&
-			(reJavaHTMLStringConcat.MatchString(line) || reJavaHTMLCloseConcat.MatchString(line) || reJavaHTMLConcatGeneral.MatchString(line)) {
+			(rules.GMatchLower(reJavaHTMLStringConcat, line, lowered[i]) || rules.GMatchLower(reJavaHTMLCloseConcat, line, lowered[i]) || rules.GMatchLower(reJavaHTMLConcatGeneral, line, lowered[i])) {
 			// Only flag if not inside a test and not using an encoder
 			if !fileHasEncoder || !hasNearbyJavaEncoder(lines, i) {
 				// Check for user input indicators nearby (request params, annotations)
@@ -1109,11 +1154,12 @@ func (r *JavaResponseWriterXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Detect file-level annotations for Spring controllers
-	isResponseBody := reJavaResponseBodyAnnotation.MatchString(ctx.Content)
-	isRestController := reJavaRestController.MatchString(ctx.Content)
+	isResponseBody := rules.GMatchFile(reJavaResponseBodyAnnotation, ctx)
+	isRestController := rules.GMatchFile(reJavaRestController, ctx)
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -1122,7 +1168,7 @@ func (r *JavaResponseWriterXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Skip lines using encoders
-		if reJavaEncoder.MatchString(line) {
+		if rules.GMatchLower(reJavaEncoder, line, lowered[i]) {
 			continue
 		}
 
@@ -1130,7 +1176,7 @@ func (r *JavaResponseWriterXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 
 		// response.getWriter().print/write("<html>" + var)
-		if reJavaResponseWriterHTML.MatchString(line) {
+		if rules.GMatchLower(reJavaResponseWriterHTML, line, lowered[i]) {
 			if !hasNearbyJavaEncoder(lines, i) {
 				matched = true
 				desc = "HttpServletResponse writer outputs HTML concatenated with variables. If any variable contains user input, this creates an XSS vulnerability."
@@ -1138,7 +1184,7 @@ func (r *JavaResponseWriterXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// String.format("<html>%s</html>", userInput)
-		if !matched && reJavaStringFormatHTML.MatchString(line) {
+		if !matched && rules.GMatchLower(reJavaStringFormatHTML, line, lowered[i]) {
 			if !hasNearbyJavaEncoder(lines, i) {
 				matched = true
 				desc = "String.format() builds HTML with %s placeholders. User input inserted via format parameters creates an XSS vulnerability."
@@ -1146,7 +1192,7 @@ func (r *JavaResponseWriterXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// return "<tag>" + var in @ResponseBody or @RestController
-		if !matched && reJavaResponseBodyReturn.MatchString(line) {
+		if !matched && rules.GMatchLower(reJavaResponseBodyReturn, line, lowered[i]) {
 			if isResponseBody || isRestController {
 				if !hasNearbyJavaEncoder(lines, i) {
 					matched = true
@@ -1171,11 +1217,14 @@ func (r *JavaResponseWriterXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
-// ---------- BATOU-XSS-016: JavaServletReflectedXSS ----------
+// ---------- BATOU-XSS-029: JavaServletReflectedXSS ----------
 
 type JavaServletReflectedXSS struct{}
 
-func (r *JavaServletReflectedXSS) ID() string                      { return "BATOU-XSS-016" }
+// ID returns BATOU-XSS-029. This rule originally shipped as BATOU-XSS-016,
+// which collided with DOMXSSDocWrite (xss_ext.go) — the older holder of 016
+// since the initial commit. Renumbered 2026-06-09.
+func (r *JavaServletReflectedXSS) ID() string                      { return "BATOU-XSS-029" }
 func (r *JavaServletReflectedXSS) Name() string                    { return "JavaServletReflectedXSS" }
 func (r *JavaServletReflectedXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JavaServletReflectedXSS) Description() string {
@@ -1191,12 +1240,13 @@ func (r *JavaServletReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Only apply in servlet context (file must reference HttpServletRequest)
-	if !reJavaServletRequest.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reJavaServletRequest, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -1205,19 +1255,19 @@ func (r *JavaServletReflectedXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Skip lines using encoders/escapers
-		if reJavaEncoder.MatchString(line) {
+		if rules.GMatchLower(reJavaEncoder, line, lowered[i]) {
 			continue
 		}
 
 		var matched bool
 
 		// response.getWriter().print/println/write/format/printf(variable, ...)
-		if reJavaServletWriterVar.MatchString(line) {
+		if rules.GMatchLower(reJavaServletWriterVar, line, lowered[i]) {
 			matched = true
 		}
 
 		// response.getWriter().print/write("..." + variable)
-		if !matched && reJavaServletWriterConcat.MatchString(line) {
+		if !matched && rules.GMatchLower(reJavaServletWriterConcat, line, lowered[i]) {
 			matched = true
 		}
 
@@ -1334,7 +1384,7 @@ func hasNearbyJavaEncoder(lines []string, idx int) bool {
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if reJavaEncoder.MatchString(l) {
+		if rules.GMatch(reJavaEncoder, l) {
 			return true
 		}
 	}
@@ -1356,7 +1406,7 @@ func hasNearbyJavaUserInput(lines []string, idx int) bool {
 		if strings.Contains(l, "request.getParameter") ||
 			strings.Contains(l, "request.getHeader") ||
 			strings.Contains(l, "request.getCookies") ||
-			reJavaRequestParam.MatchString(l) {
+			rules.GMatch(reJavaRequestParam, l) {
 			return true
 		}
 	}
@@ -1371,7 +1421,7 @@ func hasNearbyPHPSuperglobal(lines []string, idx int) bool {
 		start = 0
 	}
 	for _, l := range lines[start : idx+1] {
-		if rePHPSuperglobal.MatchString(l) {
+		if rules.GMatch(rePHPSuperglobal, l) {
 			return true
 		}
 	}
@@ -1389,7 +1439,7 @@ func hasNearbyJSInput(lines []string, idx int) bool {
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if reJSReqInput.MatchString(l) {
+		if rules.GMatch(reJSReqInput, l) {
 			return true
 		}
 	}

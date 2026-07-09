@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-core/hook"
 )
 
@@ -96,6 +95,34 @@ func TestIsSuppressOnlyEdit(t *testing.T) {
 			tool:     "Edit",
 			old:      "x := safe()",
 			new:      "batouIgnore := true\nx := safe()",
+			expected: false,
+		},
+		{
+			// Regression: session 265a06be attempt 2 converted the pure-comment
+			// directive to a trailing form. isSuppressOnlyEdit used to reject
+			// this, so the escape hatch didn't kick in and the write was blocked.
+			// The fix: accept a new line if stripping the trailing batou:ignore
+			// portion yields a residue that existed in oldSet.
+			name:     "trailing inline directive on existing code line",
+			tool:     "Edit",
+			old:      "    lines = args.input.read_text()",
+			new:      "    lines = args.input.read_text()  # batou:ignore file_read -- local CLI",
+			expected: true,
+		},
+		{
+			name:     "trailing inline directive with // comment prefix",
+			tool:     "Edit",
+			old:      "    db.Query(sql)",
+			new:      "    db.Query(sql) // batou:ignore injection -- parameterized upstream",
+			expected: true,
+		},
+		{
+			// The trailing-comment escape must not accept lines where the
+			// code itself changed beyond adding a trailing comment.
+			name:     "code modified AND trailing suppress — not suppress-only",
+			tool:     "Edit",
+			old:      "    db.Query(sql)",
+			new:      "    db.Query(safe(sql)) // batou:ignore injection",
 			expected: false,
 		},
 	}

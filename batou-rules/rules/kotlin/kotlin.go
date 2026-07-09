@@ -20,16 +20,14 @@ var (
 
 // KT-002: Android Intent Injection
 var (
-	implicitIntent     = regexp.MustCompile(`Intent\s*\(\s*(?:"[^"]*"|[A-Z_]+)\s*\)`)
-	intentPutExtra     = regexp.MustCompile(`\.putExtra\s*\(`)
-	intentSetData      = regexp.MustCompile(`\.(?:setData|data)\s*=`)
-	sendBroadcast      = regexp.MustCompile(`sendBroadcast\s*\(`)
-	startActivityNoVal = regexp.MustCompile(`startActivity\s*\(`)
+	implicitIntent = regexp.MustCompile(`Intent\s*\(\s*(?:"[^"]*"|[A-Z_]+)\s*\)`)
+	intentPutExtra = regexp.MustCompile(`\.putExtra\s*\(`)
+	intentSetData  = regexp.MustCompile(`\.(?:setData|data)\s*=`)
+	sendBroadcast  = regexp.MustCompile(`sendBroadcast\s*\(`)
 )
 
 // KT-003: WebView JavaScript Injection
 var (
-	loadUrlJavascript       = regexp.MustCompile(`\.loadUrl\s*\(\s*"javascript:`)
 	loadUrlTemplate         = regexp.MustCompile(`\.loadUrl\s*\(\s*"javascript:[^"]*\$\{`)
 	loadUrlConcat           = regexp.MustCompile(`\.loadUrl\s*\(\s*"javascript:[^"]*"\s*\+`)
 	addJavascriptInterface  = regexp.MustCompile(`\.addJavascriptInterface\s*\(`)
@@ -45,28 +43,27 @@ var (
 
 // KT-005: Android Exported Components
 var (
-	exportedTrue       = regexp.MustCompile(`android:exported\s*=\s*"true"`)
-	permissionAttr     = regexp.MustCompile(`android:permission\s*=`)
-	intentFilterTag    = regexp.MustCompile(`<intent-filter`)
-	activityTag        = regexp.MustCompile(`<activity\b`)
-	serviceTag         = regexp.MustCompile(`<service\b`)
-	receiverTag        = regexp.MustCompile(`<receiver\b`)
-	providerTag        = regexp.MustCompile(`<provider\b`)
+	exportedTrue   = regexp.MustCompile(`android:exported\s*=\s*"true"`)
+	permissionAttr = regexp.MustCompile(`android:permission\s*=`)
+	activityTag    = regexp.MustCompile(`<activity\b`)
+	serviceTag     = regexp.MustCompile(`<service\b`)
+	receiverTag    = regexp.MustCompile(`<receiver\b`)
+	providerTag    = regexp.MustCompile(`<provider\b`)
 )
 
 // KT-006: Ktor CORS Misconfiguration
 var (
-	ktorCORSAnyHost         = regexp.MustCompile(`anyHost\s*\(`)
+	ktorCORSAnyHost          = regexp.MustCompile(`anyHost\s*\(`)
 	ktorCORSAllowCredentials = regexp.MustCompile(`allowCredentials\s*=\s*true`)
-	ktorCORSBlock           = regexp.MustCompile(`install\s*\(\s*CORS\s*\)|cors\s*\{`)
+	ktorCORSBlock            = regexp.MustCompile(`install\s*\(\s*CORS\s*\)|cors\s*\{`)
 )
 
 // KT-007: Unsafe Coroutine Exception Handling
 var (
-	globalScopeLaunch     = regexp.MustCompile(`GlobalScope\s*\.\s*launch\s*\{`)
-	globalScopeAsync      = regexp.MustCompile(`GlobalScope\s*\.\s*async\s*\{`)
+	globalScopeLaunch         = regexp.MustCompile(`GlobalScope\s*\.\s*launch\s*\{`)
+	globalScopeAsync          = regexp.MustCompile(`GlobalScope\s*\.\s*async\s*\{`)
 	coroutineExceptionHandler = regexp.MustCompile(`CoroutineExceptionHandler`)
-	supervisorJob         = regexp.MustCompile(`SupervisorJob\s*\(`)
+	supervisorJob             = regexp.MustCompile(`SupervisorJob\s*\(`)
 )
 
 // KT-008: Kotlin Serialization with Untrusted Input
@@ -78,7 +75,6 @@ var (
 // KT-009: Kotlin reflection with user input
 var (
 	reClassForName     = regexp.MustCompile(`Class\.forName\s*\(\s*[a-zA-Z_]\w*`)
-	reKotlinReflection = regexp.MustCompile(`(?:::class|\.java\.newInstance|\.createInstance)\s*`)
 	reClassForNameSafe = regexp.MustCompile(`(?i)(?:allowedClasses|classWhitelist|validClasses|classList)`)
 )
 
@@ -91,15 +87,13 @@ var (
 
 // KT-011: Android deep link injection
 var (
-	reIntentGetData     = regexp.MustCompile(`intent\s*\.?\s*(?:data|getData\s*\(\s*\))`)
-	reDeepLinkAction    = regexp.MustCompile(`intent\s*\.\s*(?:action|getAction\s*\(\s*\))`)
-	reDeepLinkValidate  = regexp.MustCompile(`(?i)(?:isValidUrl|validateDeepLink|isAllowed|scheme\s*==\s*"https")`)
+	reIntentGetData    = regexp.MustCompile(`intent\s*\.?\s*(?:data|getData\s*\(\s*\))`)
+	reDeepLinkValidate = regexp.MustCompile(`(?i)(?:isValidUrl|validateDeepLink|isAllowed|scheme\s*==\s*"https")`)
 )
 
 // KT-012: Insecure network config (cleartext traffic)
 var (
 	reCleartextTraffic = regexp.MustCompile(`android:usesCleartextTraffic\s*=\s*"true"`)
-	reNetworkSecurityConfig = regexp.MustCompile(`android:networkSecurityConfig`)
 )
 
 // KT-013: Android logging sensitive data
@@ -110,8 +104,8 @@ var (
 
 // KT-014: Room database raw query
 var (
-	reRoomRawQuery     = regexp.MustCompile(`(?:RoomDatabase|\.openHelper|database)\s*\.\s*query\s*\(\s*(?:"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+|"[^"]*\$\{)`)
-	reSupportSQLQuery  = regexp.MustCompile(`SimpleSQLiteQuery\s*\(\s*(?:"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+|"[^"]*\$\{)`)
+	reRoomRawQuery    = regexp.MustCompile(`(?:RoomDatabase|\.openHelper|database)\s*\.\s*query\s*\(\s*(?:"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+|"[^"]*\$\{)`)
+	reSupportSQLQuery = regexp.MustCompile(`SimpleSQLiteQuery\s*\(\s*(?:"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+|"[^"]*\$\{)`)
 )
 
 // KT-015: Ktor route parameter injection
@@ -124,9 +118,9 @@ var (
 
 // KT-016: Android broadcast receiver without permission
 var (
-	reRegisterReceiver     = regexp.MustCompile(`registerReceiver\s*\(`)
-	reReceiverPermission   = regexp.MustCompile(`registerReceiver\s*\([^,]+,\s*[^,]+,\s*["'][^"']+["']`)
-	reLocalBroadcast       = regexp.MustCompile(`LocalBroadcastManager`)
+	reRegisterReceiver   = regexp.MustCompile(`registerReceiver\s*\(`)
+	reReceiverPermission = regexp.MustCompile(`registerReceiver\s*\([^,]+,\s*[^,]+,\s*["'][^"']+["']`)
+	reLocalBroadcast     = regexp.MustCompile(`LocalBroadcastManager`)
 )
 
 func init() {
@@ -152,15 +146,18 @@ func init() {
 
 type AndroidSQLInjection struct{}
 
-func (r *AndroidSQLInjection) ID() string                      { return "BATOU-KT-001" }
-func (r *AndroidSQLInjection) Name() string                    { return "AndroidSQLInjection" }
-func (r *AndroidSQLInjection) Description() string             { return "Detects Android SQLite rawQuery/execSQL with string concatenation or template interpolation." }
+func (r *AndroidSQLInjection) ID() string   { return "BATOU-KT-001" }
+func (r *AndroidSQLInjection) Name() string { return "AndroidSQLInjection" }
+func (r *AndroidSQLInjection) Description() string {
+	return "Detects Android SQLite rawQuery/execSQL with string concatenation or template interpolation."
+}
 func (r *AndroidSQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *AndroidSQLInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
 
 func (r *AndroidSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -171,16 +168,16 @@ func (r *AndroidSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := rawQueryConcat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(rawQueryConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "rawQuery with string concatenation"
-		} else if loc := rawQueryTemplate.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(rawQueryTemplate, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "rawQuery with string template interpolation"
-		} else if loc := execSQLConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(execSQLConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "execSQL with string concatenation"
-		} else if loc := execSQLTemplate.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(execSQLTemplate, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "execSQL with string template interpolation"
 		}
@@ -212,15 +209,20 @@ func (r *AndroidSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AndroidIntentInjection struct{}
 
-func (r *AndroidIntentInjection) ID() string                      { return "BATOU-KT-002" }
-func (r *AndroidIntentInjection) Name() string                    { return "AndroidIntentInjection" }
-func (r *AndroidIntentInjection) Description() string             { return "Detects implicit intents with user-controlled data that could be intercepted by malicious apps." }
+func (r *AndroidIntentInjection) ID() string   { return "BATOU-KT-002" }
+func (r *AndroidIntentInjection) Name() string { return "AndroidIntentInjection" }
+func (r *AndroidIntentInjection) Description() string {
+	return "Detects implicit intents with user-controlled data that could be intercepted by malicious apps."
+}
 func (r *AndroidIntentInjection) DefaultSeverity() rules.Severity { return rules.High }
-func (r *AndroidIntentInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *AndroidIntentInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *AndroidIntentInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if file uses user input sources
 	hasUserInput := strings.Contains(ctx.Content, "getStringExtra") ||
@@ -236,7 +238,7 @@ func (r *AndroidIntentInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Detect sendBroadcast with implicit intent
-		if sendBroadcast.MatchString(line) && hasUserInput {
+		if rules.GMatchLower(sendBroadcast, line, lowered[i]) && hasUserInput {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -256,7 +258,7 @@ func (r *AndroidIntentInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Detect implicit intent with user data sent via startActivity
-		if implicitIntent.MatchString(line) && hasUserInput {
+		if rules.GMatchLower(implicitIntent, line, lowered[i]) && hasUserInput {
 			context := surroundingContext(lines, i, 5)
 			if intentPutExtra.MatchString(context) || intentSetData.MatchString(context) {
 				confidence := "medium"
@@ -291,15 +293,18 @@ func (r *AndroidIntentInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WebViewJSInjection struct{}
 
-func (r *WebViewJSInjection) ID() string                      { return "BATOU-KT-003" }
-func (r *WebViewJSInjection) Name() string                    { return "WebViewJSInjection" }
-func (r *WebViewJSInjection) Description() string             { return "Detects Android WebView JavaScript injection via loadUrl(\"javascript:\") and addJavascriptInterface." }
+func (r *WebViewJSInjection) ID() string   { return "BATOU-KT-003" }
+func (r *WebViewJSInjection) Name() string { return "WebViewJSInjection" }
+func (r *WebViewJSInjection) Description() string {
+	return "Detects Android WebView JavaScript injection via loadUrl(\"javascript:\") and addJavascriptInterface."
+}
 func (r *WebViewJSInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *WebViewJSInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
 
 func (r *WebViewJSInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -308,7 +313,7 @@ func (r *WebViewJSInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// loadUrl("javascript:..." + userInput) or loadUrl("javascript:...${}...")
-		if loc := loadUrlConcat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(loadUrlConcat, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -325,7 +330,7 @@ func (r *WebViewJSInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 				Confidence:    "high",
 				Tags:          []string{"android", "webview", "xss", "javascript-injection"},
 			})
-		} else if loc := loadUrlTemplate.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(loadUrlTemplate, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -345,7 +350,7 @@ func (r *WebViewJSInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// evaluateJavascript with tainted input
-		if loc := evaluateJavascriptTaint.FindString(line); loc != "" {
+		if loc := rules.GFindLower(evaluateJavascriptTaint, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -365,7 +370,7 @@ func (r *WebViewJSInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// addJavascriptInterface
-		if addJavascriptInterface.MatchString(line) {
+		if rules.GMatchLower(addJavascriptInterface, line, lowered[i]) {
 			severity := rules.High
 			confidence := "medium"
 			context := surroundingContext(lines, i, 10)
@@ -401,11 +406,15 @@ func (r *WebViewJSInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureSharedPreferences struct{}
 
-func (r *InsecureSharedPreferences) ID() string                      { return "BATOU-KT-004" }
-func (r *InsecureSharedPreferences) Name() string                    { return "InsecureSharedPreferences" }
-func (r *InsecureSharedPreferences) Description() string             { return "Detects storage of secrets in SharedPreferences without encryption." }
+func (r *InsecureSharedPreferences) ID() string   { return "BATOU-KT-004" }
+func (r *InsecureSharedPreferences) Name() string { return "InsecureSharedPreferences" }
+func (r *InsecureSharedPreferences) Description() string {
+	return "Detects storage of secrets in SharedPreferences without encryption."
+}
 func (r *InsecureSharedPreferences) DefaultSeverity() rules.Severity { return rules.High }
-func (r *InsecureSharedPreferences) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *InsecureSharedPreferences) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *InsecureSharedPreferences) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
@@ -416,11 +425,12 @@ func (r *InsecureSharedPreferences) Scan(ctx *rules.ScanContext) []rules.Finding
 	}
 
 	// Only trigger if file uses SharedPreferences
-	if !sharedPrefsEdit.MatchString(ctx.Content) {
+	if !rules.GMatchFile(sharedPrefsEdit, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -428,7 +438,7 @@ func (r *InsecureSharedPreferences) Scan(ctx *rules.ScanContext) []rules.Finding
 			continue
 		}
 
-		if sharedPrefsPutData.MatchString(line) && sensitiveKeyNames.MatchString(line) {
+		if rules.GMatchLower(sharedPrefsPutData, line, lowered[i]) && rules.GMatchLower(sensitiveKeyNames, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -455,11 +465,15 @@ func (r *InsecureSharedPreferences) Scan(ctx *rules.ScanContext) []rules.Finding
 
 type ExportedComponents struct{}
 
-func (r *ExportedComponents) ID() string                      { return "BATOU-KT-005" }
-func (r *ExportedComponents) Name() string                    { return "ExportedComponents" }
-func (r *ExportedComponents) Description() string             { return "Detects Android components exported without permission protection in AndroidManifest.xml." }
+func (r *ExportedComponents) ID() string   { return "BATOU-KT-005" }
+func (r *ExportedComponents) Name() string { return "ExportedComponents" }
+func (r *ExportedComponents) Description() string {
+	return "Detects Android components exported without permission protection in AndroidManifest.xml."
+}
 func (r *ExportedComponents) DefaultSeverity() rules.Severity { return rules.Medium }
-func (r *ExportedComponents) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin, rules.LangJava, rules.LangAny} }
+func (r *ExportedComponents) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin, rules.LangJava, rules.LangAny}
+}
 
 func (r *ExportedComponents) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
@@ -469,10 +483,11 @@ func (r *ExportedComponents) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
-		if !exportedTrue.MatchString(line) {
+		if !rules.GMatchLower(exportedTrue, line, lowered[i]) {
 			continue
 		}
 
@@ -524,23 +539,26 @@ func (r *ExportedComponents) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KtorCORSMisconfig struct{}
 
-func (r *KtorCORSMisconfig) ID() string                      { return "BATOU-KT-006" }
-func (r *KtorCORSMisconfig) Name() string                    { return "KtorCORSMisconfig" }
-func (r *KtorCORSMisconfig) Description() string             { return "Detects Ktor CORS plugin misconfiguration with anyHost() and allowCredentials." }
+func (r *KtorCORSMisconfig) ID() string   { return "BATOU-KT-006" }
+func (r *KtorCORSMisconfig) Name() string { return "KtorCORSMisconfig" }
+func (r *KtorCORSMisconfig) Description() string {
+	return "Detects Ktor CORS plugin misconfiguration with anyHost() and allowCredentials."
+}
 func (r *KtorCORSMisconfig) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *KtorCORSMisconfig) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
 
 func (r *KtorCORSMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
-	if !ktorCORSBlock.MatchString(ctx.Content) {
+	if !rules.GMatchFile(ktorCORSBlock, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
-	hasAnyHost := ktorCORSAnyHost.MatchString(ctx.Content)
-	hasAllowCredentials := ktorCORSAllowCredentials.MatchString(ctx.Content)
+	hasAnyHost := rules.GMatchFile(ktorCORSAnyHost, ctx)
+	hasAllowCredentials := rules.GMatchFile(ktorCORSAllowCredentials, ctx)
 
 	if hasAnyHost && hasAllowCredentials {
 		// Find the anyHost() line
@@ -549,7 +567,7 @@ func (r *KtorCORSMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if isComment(trimmed) {
 				continue
 			}
-			if ktorCORSAnyHost.MatchString(line) {
+			if rules.GMatchLower(ktorCORSAnyHost, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      rules.High,
@@ -575,7 +593,7 @@ func (r *KtorCORSMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if isComment(trimmed) {
 				continue
 			}
-			if ktorCORSAnyHost.MatchString(line) {
+			if rules.GMatchLower(ktorCORSAnyHost, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -604,19 +622,24 @@ func (r *KtorCORSMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeCoroutineException struct{}
 
-func (r *UnsafeCoroutineException) ID() string                      { return "BATOU-KT-007" }
-func (r *UnsafeCoroutineException) Name() string                    { return "UnsafeCoroutineException" }
-func (r *UnsafeCoroutineException) Description() string             { return "Detects GlobalScope.launch/async without CoroutineExceptionHandler." }
+func (r *UnsafeCoroutineException) ID() string   { return "BATOU-KT-007" }
+func (r *UnsafeCoroutineException) Name() string { return "UnsafeCoroutineException" }
+func (r *UnsafeCoroutineException) Description() string {
+	return "Detects GlobalScope.launch/async without CoroutineExceptionHandler."
+}
 func (r *UnsafeCoroutineException) DefaultSeverity() rules.Severity { return rules.Medium }
-func (r *UnsafeCoroutineException) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *UnsafeCoroutineException) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *UnsafeCoroutineException) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
-	hasExceptionHandler := coroutineExceptionHandler.MatchString(ctx.Content)
-	hasSupervisorJob := supervisorJob.MatchString(ctx.Content)
+	hasExceptionHandler := rules.GMatchFile(coroutineExceptionHandler, ctx)
+	hasSupervisorJob := rules.GMatchFile(supervisorJob, ctx)
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -625,9 +648,9 @@ func (r *UnsafeCoroutineException) Scan(ctx *rules.ScanContext) []rules.Finding 
 		}
 
 		var matched string
-		if loc := globalScopeLaunch.FindString(line); loc != "" {
+		if loc := rules.GFindLower(globalScopeLaunch, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := globalScopeAsync.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(globalScopeAsync, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 
@@ -663,11 +686,15 @@ func (r *UnsafeCoroutineException) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type KotlinSerializationUntrusted struct{}
 
-func (r *KotlinSerializationUntrusted) ID() string                      { return "BATOU-KT-008" }
-func (r *KotlinSerializationUntrusted) Name() string                    { return "KotlinSerializationUntrusted" }
-func (r *KotlinSerializationUntrusted) Description() string             { return "Detects kotlinx.serialization Json.decodeFromString with potentially untrusted input." }
+func (r *KotlinSerializationUntrusted) ID() string   { return "BATOU-KT-008" }
+func (r *KotlinSerializationUntrusted) Name() string { return "KotlinSerializationUntrusted" }
+func (r *KotlinSerializationUntrusted) Description() string {
+	return "Detects kotlinx.serialization Json.decodeFromString with potentially untrusted input."
+}
 func (r *KotlinSerializationUntrusted) DefaultSeverity() rules.Severity { return rules.High }
-func (r *KotlinSerializationUntrusted) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *KotlinSerializationUntrusted) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *KotlinSerializationUntrusted) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
@@ -686,7 +713,8 @@ func (r *KotlinSerializationUntrusted) Scan(ctx *rules.ScanContext) []rules.Find
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -695,9 +723,9 @@ func (r *KotlinSerializationUntrusted) Scan(ctx *rules.ScanContext) []rules.Find
 		}
 
 		var matched string
-		if loc := jsonDecodeFromString.FindString(line); loc != "" {
+		if loc := rules.GFindLower(jsonDecodeFromString, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := jsonDecodeCustom.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(jsonDecodeCustom, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 
@@ -741,15 +769,20 @@ func (r *KotlinSerializationUntrusted) Scan(ctx *rules.ScanContext) []rules.Find
 
 type KotlinReflectionInjection struct{}
 
-func (r *KotlinReflectionInjection) ID() string                      { return "BATOU-KT-009" }
-func (r *KotlinReflectionInjection) Name() string                    { return "KotlinReflectionInjection" }
-func (r *KotlinReflectionInjection) Description() string             { return "Detects Class.forName() with user-controlled input enabling arbitrary class instantiation." }
+func (r *KotlinReflectionInjection) ID() string   { return "BATOU-KT-009" }
+func (r *KotlinReflectionInjection) Name() string { return "KotlinReflectionInjection" }
+func (r *KotlinReflectionInjection) Description() string {
+	return "Detects Class.forName() with user-controlled input enabling arbitrary class instantiation."
+}
 func (r *KotlinReflectionInjection) DefaultSeverity() rules.Severity { return rules.High }
-func (r *KotlinReflectionInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *KotlinReflectionInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *KotlinReflectionInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -757,7 +790,7 @@ func (r *KotlinReflectionInjection) Scan(ctx *rules.ScanContext) []rules.Finding
 			continue
 		}
 
-		if m := reClassForName.FindString(line); m != "" {
+		if m := rules.GFindLower(reClassForName, line, lowered[i]); m != "" {
 			// Check if there's allowlist validation nearby
 			context := surroundingContext(lines, i, 5)
 			if reClassForNameSafe.MatchString(context) {
@@ -788,21 +821,26 @@ func (r *KotlinReflectionInjection) Scan(ctx *rules.ScanContext) []rules.Finding
 
 type ContentProviderInjection struct{}
 
-func (r *ContentProviderInjection) ID() string                      { return "BATOU-KT-010" }
-func (r *ContentProviderInjection) Name() string                    { return "ContentProviderInjection" }
-func (r *ContentProviderInjection) Description() string             { return "Detects ContentResolver.query/insert/update/delete with user-controlled URIs enabling content provider injection." }
+func (r *ContentProviderInjection) ID() string   { return "BATOU-KT-010" }
+func (r *ContentProviderInjection) Name() string { return "ContentProviderInjection" }
+func (r *ContentProviderInjection) Description() string {
+	return "Detects ContentResolver.query/insert/update/delete with user-controlled URIs enabling content provider injection."
+}
 func (r *ContentProviderInjection) DefaultSeverity() rules.Severity { return rules.High }
-func (r *ContentProviderInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *ContentProviderInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *ContentProviderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Check if file uses Uri.parse with a variable (user-controlled URI)
-	if !reUriParse.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reUriParse, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -811,9 +849,9 @@ func (r *ContentProviderInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 		}
 
 		var matched string
-		if m := reContentResolverQuery.FindString(line); m != "" {
+		if m := rules.GFindLower(reContentResolverQuery, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reContentProviderInsert.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reContentProviderInsert, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -846,15 +884,18 @@ func (r *ContentProviderInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type DeepLinkInjection struct{}
 
-func (r *DeepLinkInjection) ID() string                      { return "BATOU-KT-011" }
-func (r *DeepLinkInjection) Name() string                    { return "DeepLinkInjection" }
-func (r *DeepLinkInjection) Description() string             { return "Detects intent.getData() usage without validation, enabling deep link injection attacks." }
+func (r *DeepLinkInjection) ID() string   { return "BATOU-KT-011" }
+func (r *DeepLinkInjection) Name() string { return "DeepLinkInjection" }
+func (r *DeepLinkInjection) Description() string {
+	return "Detects intent.getData() usage without validation, enabling deep link injection attacks."
+}
 func (r *DeepLinkInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DeepLinkInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
 
 func (r *DeepLinkInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -862,7 +903,7 @@ func (r *DeepLinkInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reIntentGetData.MatchString(line) {
+		if rules.GMatchLower(reIntentGetData, line, lowered[i]) {
 			// Check if there's validation nearby
 			context := surroundingContext(lines, i, 8)
 			if reDeepLinkValidate.MatchString(context) {
@@ -901,11 +942,15 @@ func (r *DeepLinkInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureNetworkConfig struct{}
 
-func (r *InsecureNetworkConfig) ID() string                      { return "BATOU-KT-012" }
-func (r *InsecureNetworkConfig) Name() string                    { return "InsecureNetworkConfig" }
-func (r *InsecureNetworkConfig) Description() string             { return "Detects android:usesCleartextTraffic=\"true\" allowing unencrypted HTTP connections." }
+func (r *InsecureNetworkConfig) ID() string   { return "BATOU-KT-012" }
+func (r *InsecureNetworkConfig) Name() string { return "InsecureNetworkConfig" }
+func (r *InsecureNetworkConfig) Description() string {
+	return "Detects android:usesCleartextTraffic=\"true\" allowing unencrypted HTTP connections."
+}
 func (r *InsecureNetworkConfig) DefaultSeverity() rules.Severity { return rules.High }
-func (r *InsecureNetworkConfig) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin, rules.LangJava, rules.LangAny} }
+func (r *InsecureNetworkConfig) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin, rules.LangJava, rules.LangAny}
+}
 
 func (r *InsecureNetworkConfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
@@ -915,10 +960,11 @@ func (r *InsecureNetworkConfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
-		if reCleartextTraffic.MatchString(line) {
+		if rules.GMatchLower(reCleartextTraffic, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -944,15 +990,20 @@ func (r *InsecureNetworkConfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AndroidLoggingSensitive struct{}
 
-func (r *AndroidLoggingSensitive) ID() string                      { return "BATOU-KT-013" }
-func (r *AndroidLoggingSensitive) Name() string                    { return "AndroidLoggingSensitive" }
-func (r *AndroidLoggingSensitive) Description() string             { return "Detects Android Log.d/Log.v/etc. calls that may log sensitive data like passwords and tokens." }
+func (r *AndroidLoggingSensitive) ID() string   { return "BATOU-KT-013" }
+func (r *AndroidLoggingSensitive) Name() string { return "AndroidLoggingSensitive" }
+func (r *AndroidLoggingSensitive) Description() string {
+	return "Detects Android Log.d/Log.v/etc. calls that may log sensitive data like passwords and tokens."
+}
 func (r *AndroidLoggingSensitive) DefaultSeverity() rules.Severity { return rules.Medium }
-func (r *AndroidLoggingSensitive) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *AndroidLoggingSensitive) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *AndroidLoggingSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -960,7 +1011,7 @@ func (r *AndroidLoggingSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reAndroidLog.MatchString(line) && reSensitiveLogData.MatchString(line) {
+		if rules.GMatchLower(reAndroidLog, line, lowered[i]) && rules.GMatchLower(reSensitiveLogData, line, lowered[i]) {
 			severity := r.DefaultSeverity()
 			confidence := "medium"
 			// Higher severity for debug/verbose logs (more likely left in production)
@@ -994,15 +1045,20 @@ func (r *AndroidLoggingSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RoomRawQueryInjection struct{}
 
-func (r *RoomRawQueryInjection) ID() string                      { return "BATOU-KT-014" }
-func (r *RoomRawQueryInjection) Name() string                    { return "RoomRawQueryInjection" }
-func (r *RoomRawQueryInjection) Description() string             { return "Detects Room/SQLite raw queries with string concatenation or template interpolation." }
+func (r *RoomRawQueryInjection) ID() string   { return "BATOU-KT-014" }
+func (r *RoomRawQueryInjection) Name() string { return "RoomRawQueryInjection" }
+func (r *RoomRawQueryInjection) Description() string {
+	return "Detects Room/SQLite raw queries with string concatenation or template interpolation."
+}
 func (r *RoomRawQueryInjection) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *RoomRawQueryInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *RoomRawQueryInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *RoomRawQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -1013,10 +1069,10 @@ func (r *RoomRawQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if m := reRoomRawQuery.FindString(line); m != "" {
+		if m := rules.GFindLower(reRoomRawQuery, line, lowered[i]); m != "" {
 			matched = m
 			detail = "RoomDatabase.query() with string concatenation or template interpolation"
-		} else if m := reSupportSQLQuery.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSupportSQLQuery, line, lowered[i]); m != "" {
 			matched = m
 			detail = "SimpleSQLiteQuery with string concatenation or template interpolation"
 		}
@@ -1047,24 +1103,29 @@ func (r *RoomRawQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KtorParameterInjection struct{}
 
-func (r *KtorParameterInjection) ID() string                      { return "BATOU-KT-015" }
-func (r *KtorParameterInjection) Name() string                    { return "KtorParameterInjection" }
-func (r *KtorParameterInjection) Description() string             { return "Detects Ktor call.parameters used in SQL queries without parameterized queries." }
+func (r *KtorParameterInjection) ID() string   { return "BATOU-KT-015" }
+func (r *KtorParameterInjection) Name() string { return "KtorParameterInjection" }
+func (r *KtorParameterInjection) Description() string {
+	return "Detects Ktor call.parameters used in SQL queries without parameterized queries."
+}
 func (r *KtorParameterInjection) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *KtorParameterInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *KtorParameterInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *KtorParameterInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only flag if file uses both Ktor parameters and SQL
-	if !reKtorCallParams.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reKtorCallParams, ctx) {
 		return nil
 	}
-	if !reKtorParamInSQL.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reKtorParamInSQL, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -1072,7 +1133,7 @@ func (r *KtorParameterInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reKtorCallParams.MatchString(line) {
+		if rules.GMatchLower(reKtorCallParams, line, lowered[i]) {
 			// Check if this parameter value flows into SQL nearby
 			context := surroundingContext(lines, i, 10)
 			if !reKtorParamInSQL.MatchString(context) {
@@ -1112,21 +1173,26 @@ func (r *KtorParameterInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type BroadcastReceiverNoPermission struct{}
 
-func (r *BroadcastReceiverNoPermission) ID() string                      { return "BATOU-KT-016" }
-func (r *BroadcastReceiverNoPermission) Name() string                    { return "BroadcastReceiverNoPermission" }
-func (r *BroadcastReceiverNoPermission) Description() string             { return "Detects registerReceiver() without a broadcast permission, allowing any app to send broadcasts to the receiver." }
+func (r *BroadcastReceiverNoPermission) ID() string   { return "BATOU-KT-016" }
+func (r *BroadcastReceiverNoPermission) Name() string { return "BroadcastReceiverNoPermission" }
+func (r *BroadcastReceiverNoPermission) Description() string {
+	return "Detects registerReceiver() without a broadcast permission, allowing any app to send broadcasts to the receiver."
+}
 func (r *BroadcastReceiverNoPermission) DefaultSeverity() rules.Severity { return rules.Medium }
-func (r *BroadcastReceiverNoPermission) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *BroadcastReceiverNoPermission) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *BroadcastReceiverNoPermission) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if using LocalBroadcastManager (safe pattern)
-	if reLocalBroadcast.MatchString(ctx.Content) {
+	if rules.GMatchFile(reLocalBroadcast, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -1134,7 +1200,7 @@ func (r *BroadcastReceiverNoPermission) Scan(ctx *rules.ScanContext) []rules.Fin
 			continue
 		}
 
-		if reRegisterReceiver.MatchString(line) {
+		if rules.GMatchLower(reRegisterReceiver, line, lowered[i]) {
 			// Check if permission is specified (3-argument form)
 			context := surroundingContext(lines, i, 3)
 			if reReceiverPermission.MatchString(context) {

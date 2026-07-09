@@ -18,10 +18,10 @@ var (
 	reAspnetSensitiveEndpoint = regexp.MustCompile(`(?i)(?:admin|account|user|payment|billing|password|credential|secret|token|auth|profile|settings|manage)`)
 
 	// BATOU-FW-ASPNET-002: Missing ValidateAntiForgeryToken on POST
-	reAspnetHttpPost           = regexp.MustCompile(`\[Http(?:Post|Put|Delete|Patch)\]`)
-	reAspnetAntiForgery        = regexp.MustCompile(`\[ValidateAntiForgeryToken\]`)
-	reAspnetAutoAntiForgery    = regexp.MustCompile(`\[AutoValidateAntiforgeryToken\]`)
-	reAspnetIgnoreAntiForgery  = regexp.MustCompile(`\[IgnoreAntiforgeryToken\]`)
+	reAspnetHttpPost          = regexp.MustCompile(`\[Http(?:Post|Put|Delete|Patch)\]`)
+	reAspnetAntiForgery       = regexp.MustCompile(`\[ValidateAntiForgeryToken\]`)
+	reAspnetAutoAntiForgery   = regexp.MustCompile(`\[AutoValidateAntiforgeryToken\]`)
+	reAspnetIgnoreAntiForgery = regexp.MustCompile(`\[IgnoreAntiforgeryToken\]`)
 
 	// BATOU-FW-ASPNET-003: Html.Raw with user input
 	reAspnetHtmlRaw = regexp.MustCompile(`Html\.Raw\s*\(\s*(?:Model\.|ViewBag\.|ViewData\[|TempData\[|Request\.|[a-zA-Z_]\w*\s*[,)])`)
@@ -30,7 +30,7 @@ var (
 	reAspnetConnStrPassword = regexp.MustCompile(`(?i)(?:connectionString|connection\s*string)\s*[=:]\s*["'][^"']*(?:Password|Pwd)\s*=\s*[^;'"]+`)
 
 	// BATOU-FW-ASPNET-005: Custom errors disabled
-	reAspnetCustomErrorsOff = regexp.MustCompile(`(?i)<customErrors\s+mode\s*=\s*["']Off["']`)
+	reAspnetCustomErrorsOff  = regexp.MustCompile(`(?i)<customErrors\s+mode\s*=\s*["']Off["']`)
 	reAspnetDevExceptionPage = regexp.MustCompile(`\.UseDeveloperExceptionPage\s*\(`)
 
 	// BATOU-FW-ASPNET-006: ViewState MAC disabled
@@ -41,7 +41,7 @@ var (
 	reAspnetReqFilterOff     = regexp.MustCompile(`(?i)requestValidationMode\s*=\s*["']2\.0["']`)
 
 	// BATOU-FW-ASPNET-008: CORS allowing all origins
-	reAspnetCorsAllowAny = regexp.MustCompile(`\.AllowAnyOrigin\s*\(`)
+	reAspnetCorsAllowAny  = regexp.MustCompile(`\.AllowAnyOrigin\s*\(`)
 	reAspnetCorsPolicyAll = regexp.MustCompile(`(?i)WithOrigins\s*\(\s*["']\*["']\s*\)`)
 	reAspnetCorsEnableAll = regexp.MustCompile(`EnableCors\s*\(\s*["']\*["']\s*\)`)
 
@@ -53,7 +53,6 @@ var (
 
 	// BATOU-FW-ASPNET-010: Session cookie without SameSite
 	reAspnetCookieSameSiteNone = regexp.MustCompile(`(?i)SameSite\s*=\s*(?:SameSiteMode\s*\.\s*)?None`)
-	reAspnetCookieOptions      = regexp.MustCompile(`(?i)CookieOptions|CookieBuilder|CookiePolicyOptions`)
 )
 
 func init() {
@@ -87,14 +86,15 @@ func (r *AspnetAllowAnonymous) Languages() []rules.Language {
 
 func (r *AspnetAllowAnonymous) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if !reAspnetAllowAnonymous.MatchString(line) {
+		if !rules.GMatchLower(reAspnetAllowAnonymous, line, lowered[i]) {
 			continue
 		}
 		// Look at surrounding lines for sensitive endpoint indicators
@@ -151,19 +151,20 @@ func (r *AspnetMissingAntiForgery) Languages() []rules.Language {
 
 func (r *AspnetMissingAntiForgery) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Skip if file has [AutoValidateAntiforgeryToken] (class-level protection)
-	if reAspnetAutoAntiForgery.MatchString(ctx.Content) {
+	if rules.GMatchFile(reAspnetAutoAntiForgery, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if !reAspnetHttpPost.MatchString(line) {
+		if !rules.GMatchLower(reAspnetHttpPost, line, lowered[i]) {
 			continue
 		}
 		// Check surrounding lines (above) for [ValidateAntiForgeryToken]
@@ -222,14 +223,15 @@ func (r *AspnetHtmlRaw) Languages() []rules.Language {
 
 func (r *AspnetHtmlRaw) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reAspnetHtmlRaw.FindString(line); m != "" {
+		if m := rules.GFindLower(reAspnetHtmlRaw, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -273,14 +275,15 @@ func (r *AspnetConnStringPassword) Languages() []rules.Language {
 
 func (r *AspnetConnStringPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") || strings.HasPrefix(t, "<!--") {
 			continue
 		}
-		if m := reAspnetConnStrPassword.FindString(line); m != "" {
+		if m := rules.GFindLower(reAspnetConnStrPassword, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -324,7 +327,8 @@ func (r *AspnetCustomErrorsOff) Languages() []rules.Language {
 
 func (r *AspnetCustomErrorsOff) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -332,7 +336,7 @@ func (r *AspnetCustomErrorsOff) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if m := reAspnetCustomErrorsOff.FindString(line); m != "" {
+		if m := rules.GFindLower(reAspnetCustomErrorsOff, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -355,7 +359,7 @@ func (r *AspnetCustomErrorsOff) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if m := reAspnetDevExceptionPage.FindString(line); m != "" {
+		if m := rules.GFindLower(reAspnetDevExceptionPage, line, lowered[i]); m != "" {
 			// Check if guarded by IsDevelopment()
 			start := i - 5
 			if start < 0 {
@@ -408,14 +412,15 @@ func (r *AspnetViewStateMacOff) Languages() []rules.Language {
 
 func (r *AspnetViewStateMacOff) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") || strings.HasPrefix(t, "<!--") {
 			continue
 		}
-		if m := reAspnetViewStateMacOff.FindString(line); m != "" {
+		if m := rules.GFindLower(reAspnetViewStateMacOff, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -459,7 +464,8 @@ func (r *AspnetReqValidationOff) Languages() []rules.Language {
 
 func (r *AspnetReqValidationOff) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -468,9 +474,9 @@ func (r *AspnetReqValidationOff) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reAspnetReqValidationOff.FindString(line); m != "" {
+		if m := rules.GFindLower(reAspnetReqValidationOff, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reAspnetReqFilterOff.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reAspnetReqFilterOff, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -517,7 +523,8 @@ func (r *AspnetCorsAllowAll) Languages() []rules.Language {
 
 func (r *AspnetCorsAllowAll) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -526,11 +533,11 @@ func (r *AspnetCorsAllowAll) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reAspnetCorsAllowAny.FindString(line); m != "" {
+		if m := rules.GFindLower(reAspnetCorsAllowAny, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reAspnetCorsPolicyAll.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reAspnetCorsPolicyAll, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reAspnetCorsEnableAll.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reAspnetCorsEnableAll, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -577,7 +584,8 @@ func (r *AspnetWeakPassword) Languages() []rules.Language {
 
 func (r *AspnetWeakPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -585,7 +593,7 @@ func (r *AspnetWeakPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if m := reAspnetWeakPwdLength.FindString(line); m != "" {
+		if m := rules.GFindLower(reAspnetWeakPwdLength, line, lowered[i]); m != "" {
 			if len(m) > 120 {
 				m = m[:120] + "..."
 			}
@@ -608,7 +616,7 @@ func (r *AspnetWeakPassword) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Check for multiple complexity requirements disabled together
-		if reAspnetPwdDigitFalse.MatchString(line) || reAspnetPwdUpperFalse.MatchString(line) || reAspnetPwdNonAlphaFalse.MatchString(line) {
+		if rules.GMatchLower(reAspnetPwdDigitFalse, line, lowered[i]) || rules.GMatchLower(reAspnetPwdUpperFalse, line, lowered[i]) || rules.GMatchLower(reAspnetPwdNonAlphaFalse, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -652,14 +660,15 @@ func (r *AspnetCookieSameSite) Languages() []rules.Language {
 
 func (r *AspnetCookieSameSite) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reAspnetCookieSameSiteNone.MatchString(line) {
+		if rules.GMatchLower(reAspnetCookieSameSiteNone, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

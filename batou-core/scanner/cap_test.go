@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 )
 

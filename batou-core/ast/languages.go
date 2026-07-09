@@ -18,6 +18,7 @@ import (
 	"github.com/smacker/go-tree-sitter/rust"
 	"github.com/smacker/go-tree-sitter/sql"
 	"github.com/smacker/go-tree-sitter/swift"
+	ts_tsx "github.com/smacker/go-tree-sitter/typescript/tsx"
 	ts_typescript "github.com/smacker/go-tree-sitter/typescript/typescript"
 	"github.com/smacker/go-tree-sitter/yaml"
 
@@ -55,6 +56,17 @@ var langRegistry = map[rules.Language]*sitter.Language{
 // or nil if no grammar is registered.
 func lookupLanguage(lang rules.Language) *sitter.Language {
 	return langRegistry[lang]
+}
+
+// tsxLanguage is the vendored typescript/tsx grammar. It parses TypeScript
+// + JSX (.tsx files), which the plain typescript/typescript grammar
+// mangles into ERROR nodes. It is NOT in langRegistry because .tsx files
+// keep rules.LangTypeScript everywhere downstream (rules / taint / resolver
+// treat .ts and .tsx identically) — only the grammar selection differs,
+// and that selection is keyed on the file path, not the language constant.
+// See ParseFile.
+func tsxLanguage() *sitter.Language {
+	return ts_tsx.GetLanguage()
 }
 
 // SupportsLanguage returns true if tree-sitter parsing is available for lang.

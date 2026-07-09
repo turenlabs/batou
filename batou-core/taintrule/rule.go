@@ -1,6 +1,7 @@
 package taintrule
 
 import (
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -9,8 +10,33 @@ import (
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
 	"github.com/turenlabs/batou-core/taint/astflow"
+	"github.com/turenlabs/batou-core/taint/ssaflow"
 	"github.com/turenlabs/batou-core/taint/tsflow"
 )
+
+// ssaflowEnabled returns true when the SSA-based Go taint engine should
+// run alongside astflow. The engine is **ON by default** since PR-KK —
+// PR-MM brought scan time to within 7% of env-OFF on real codebases
+// (coder 94s vs 88s), PR-OO restored recall, and PR-PP added a
+// per-leaf-sink rollup tag to keep middleware-chain noise visible-but-
+// hidable. Users who want the old behaviour can opt out with
+// BATOU_SSAFLOW=0 (or "off" / "false"). The opt-in spellings still
+// work as no-ops for back-compat scripts.
+//
+// ssaflow never replaces astflow; it only adds intra-procedural flows
+// astflow may have missed (or, more often, confirms ones astflow
+// already found).
+func ssaflowEnabled() bool {
+	v := os.Getenv("BATOU_SSAFLOW")
+	if v == "" {
+		return true // default ON
+	}
+	// Explicit opt-out wins over default-on.
+	if v == "0" || strings.EqualFold(v, "false") || strings.EqualFold(v, "off") || strings.EqualFold(v, "no") {
+		return false
+	}
+	return true
+}
 
 // TaintRule implements rules.Rule using the taint analysis engine.
 // It runs source-to-sink dataflow analysis on the scanned code.
@@ -31,7 +57,8 @@ func (t *TaintRule) Languages() []rules.Language {
 		rules.LangJava, rules.LangPHP, rules.LangRuby,
 		rules.LangC, rules.LangCPP,
 		rules.LangKotlin, rules.LangSwift, rules.LangRust, rules.LangCSharp,
-		rules.LangPerl, rules.LangLua, rules.LangGroovy,
+		rules.LangPerl, rules.LangLua, rules.LangGroovy, rules.LangShell,
+		rules.LangZig,
 	}
 }
 
@@ -55,11 +82,25 @@ func (t *TaintRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 		}
 		flows = astflow.AnalyzeGoWithAST(ctx.Content, ctx.FilePath, goParsed)
-	} else if tsflow.Supports(ctx.Language) {
+		// PR-V: experimental SSA-based intra-procedural engine. Runs ONLY
+		// when BATOU_SSAFLOW=1 (off by default). Flows are appended to the
+		// astflow result; downstream dedup (scanner/dedup.go) groups by
+		// (line, CWE) so a flow detected by both engines collapses into a
+		// single boosted finding rather than emitting a duplicate.
+		if ssaflowEnabled() {
+			if ssaFlows := ssaflow.AnalyzeGo(ctx.Content, ctx.FilePath); len(ssaFlows) > 0 {
+				flows = append(flows, ssaFlows...)
+			}
+		}
+	} else if tsflow.Supports(ctx.Language) && batouast.SupportsLanguage(ctx.Language) {
 		// Reuse tree-sitter tree from Layer 2 (stored in ctx.Tree).
 		tree := batouast.TreeFromContext(ctx)
 		flows = tsflow.AnalyzeWithTree(ctx.Content, ctx.FilePath, ctx.Language, tree)
 	} else {
+		// tsflow may carry a langConfig without a registered tree-sitter
+		// grammar (e.g. Zig: zigConfig() exists but smacker/go-tree-sitter
+		// ships no Zig grammar, so tsflow yields nothing). Fall back to the
+		// regex taint engine, which consumes the same catalog Patterns.
 		flows = taint.Analyze(ctx.Content, ctx.FilePath, ctx.Language)
 	}
 
@@ -347,10 +388,6 @@ var javaLiteralAssign = regexp.MustCompile(`\b\w+\s*=\s*"[^"]*"\s*;`)
 func javaFilterTaintFindings(content string, findings []rules.Finding) []rules.Finding {
 	lines := strings.Split(content, "\n")
 
-	// File-level check: suppress taint findings when param originates
-	// from getTheValue() which always returns a hardcoded string.
-	fileParamSafe := rules.JavaParamSourceIsSafe(lines)
-
 	kept := make([]rules.Finding, 0, len(findings))
 	for _, f := range findings {
 		lineIdx := f.LineNumber - 1
@@ -361,11 +398,6 @@ func javaFilterTaintFindings(content string, findings []rules.Finding) []rules.F
 
 		// Deterministic conditional check — applies to ALL findings.
 		if javaHasDeterministicConditional(lines, lineIdx) {
-			continue
-		}
-
-		// For taint findings: file-level safe-source check.
-		if strings.HasPrefix(f.RuleID, "BATOU-TAINT") && fileParamSafe {
 			continue
 		}
 

@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-core/graph"
 	"github.com/turenlabs/batou-rules/rules"
 )
@@ -26,7 +25,7 @@ func TestSuppressRegexWhenTaintClean_ActiveTaint(t *testing.T) {
 		rxf("327"), // Crypto — not taint-coverable
 	}
 
-	result := SuppressRegexWhenTaintClean(findings, nil, "/app/f.go", 0)
+	result := SuppressRegexWhenTaintClean(findings, nil, "/app/f.go", 0, false)
 
 	// Should keep the taint finding and the crypto regex, drop the SQL regex.
 	if len(result) != 2 {
@@ -48,9 +47,68 @@ func TestSuppressRegexWhenTaintClean_NoTaintNoCache(t *testing.T) {
 		rxf("79"),
 	}
 
-	result := SuppressRegexWhenTaintClean(findings, nil, "/app/f.go", 0)
+	result := SuppressRegexWhenTaintClean(findings, nil, "/app/f.go", 0, false)
 	if len(result) != 2 {
 		t.Fatalf("expected 2 findings (no suppression), got %d", len(result))
+	}
+}
+
+// TestSuppressRegexWhenTaintClean_UnconfirmableRuleExempt pins the fix for the
+// flaky hook-mode suppression: BATOU-NOSQL-001 ($where) detects a shape the
+// taint engine structurally cannot model, so a taint-clean negative
+// confirmation must NOT suppress it (the regex is the only detection path).
+// A different CWE-943 regex rule, which is NOT exempt, is still suppressed.
+func TestSuppressRegexWhenTaintClean_UnconfirmableRuleExempt(t *testing.T) {
+	nosql001 := regexFinding(1, "CWE-943", rules.High, "medium")
+	nosql001.RuleID = "BATOU-NOSQL-001" // exempt — taint can't model object-literal $where
+	otherNoSQL := regexFinding(1, "CWE-943", rules.High, "medium")
+	otherNoSQL.RuleID = "BATOU-NOSQL-099" // not exempt
+	findings := []rules.Finding{nosql001, otherNoSQL}
+
+	// taintRan=true, no taint findings → negativeTaintClean → suppress coverable CWEs.
+	result := SuppressRegexWhenTaintClean(findings, nil, "/app/dao.js", 0, true)
+
+	got := map[string]bool{}
+	for _, f := range result {
+		got[f.RuleID] = true
+	}
+	if !got["BATOU-NOSQL-001"] {
+		t.Error("BATOU-NOSQL-001 must be EXEMPT from taint-clean suppression (taint can't confirm object-literal $where)")
+	}
+	if got["BATOU-NOSQL-099"] {
+		t.Error("a non-exempt CWE-943 regex rule should still be suppressed under negative taint confirmation")
+	}
+}
+
+func TestSuppressRegexWhenTaintClean_WithinScanTaintRan(t *testing.T) {
+	// taintRan=true: the taint engine executed this scan and produced no
+	// coverable-CWE finding. Regex-only findings for taint-coverable CWEs
+	// are unconfirmed and suppressed WITHOUT a cache entry (the one-shot
+	// scan case). Non-coverable CWEs (crypto) are kept.
+	findings := []rules.Finding{
+		rxf("89"),  // SQLi regex — coverable, taint clean → suppress
+		rxf("79"),  // XSS regex  — coverable, taint clean → suppress
+		rxf("327"), // Crypto regex — NOT taint-coverable → keep
+	}
+	result := SuppressRegexWhenTaintClean(findings, nil, "/app/f.go", 0, true)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 finding (only the non-coverable crypto regex), got %d", len(result))
+	}
+	if result[0].CWEID != "CWE-327" {
+		t.Errorf("expected the crypto regex to survive, got %s", result[0].CWEID)
+	}
+}
+
+func TestSuppressRegexWhenTaintClean_TaintRanKeepsTaintFinding(t *testing.T) {
+	// taintRan=true with an active taint finding: the taint TP is kept, the
+	// redundant regex twin is suppressed (vuln cases stay detected).
+	findings := []rules.Finding{
+		rxf("89"), // regex twin
+		tf("89"),  // taint TP — must survive
+	}
+	result := SuppressRegexWhenTaintClean(findings, nil, "/app/f.go", 0, true)
+	if len(result) != 1 || findingTier(&result[0]) == tierRegex {
+		t.Fatalf("expected only the taint finding to survive, got %d findings", len(result))
 	}
 }
 
@@ -69,7 +127,7 @@ func TestSuppressRegexWhenTaintClean_NegativeConfirmation(t *testing.T) {
 		rxf("327"), // Crypto — NOT taint-coverable
 	}
 
-	result := SuppressRegexWhenTaintClean(findings, cg, "/app/handler.go", hash)
+	result := SuppressRegexWhenTaintClean(findings, cg, "/app/handler.go", hash, false)
 
 	// Should suppress 89 and 79, keep 327.
 	if len(result) != 1 {
@@ -93,7 +151,7 @@ func TestSuppressRegexWhenTaintClean_StaleCache(t *testing.T) {
 		rxf("89"),
 	}
 
-	result := SuppressRegexWhenTaintClean(findings, cg, "/app/f.go", newHash)
+	result := SuppressRegexWhenTaintClean(findings, cg, "/app/f.go", newHash, false)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 finding (stale cache, no suppression), got %d", len(result))
 	}
@@ -112,7 +170,7 @@ func TestSuppressRegexWhenTaintClean_CacheWithFlows(t *testing.T) {
 		rxf("89"),
 	}
 
-	result := SuppressRegexWhenTaintClean(findings, cg, "/app/f.go", hash)
+	result := SuppressRegexWhenTaintClean(findings, cg, "/app/f.go", hash, false)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 finding (cache has flows, no suppression), got %d", len(result))
 	}
@@ -133,7 +191,7 @@ func TestSuppressRegexWhenTaintClean_ActiveTaintOverridesCache(t *testing.T) {
 		rxf("79"), // XSS regex — taint didn't find XSS
 	}
 
-	result := SuppressRegexWhenTaintClean(findings, cg, "/app/f.go", hash)
+	result := SuppressRegexWhenTaintClean(findings, cg, "/app/f.go", hash, false)
 
 	// Active taint for CWE-89 suppresses regex-89.
 	// CWE-79 is NOT suppressed by active taint (no taint finding for 79).
@@ -149,7 +207,7 @@ func TestSuppressRegexWhenTaintClean_NilCallGraph(t *testing.T) {
 		rxf("89"),
 	}
 
-	result := SuppressRegexWhenTaintClean(findings, nil, "/app/f.go", 12345)
+	result := SuppressRegexWhenTaintClean(findings, nil, "/app/f.go", 12345, false)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 finding with nil call graph, got %d", len(result))
 	}

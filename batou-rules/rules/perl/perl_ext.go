@@ -13,16 +13,16 @@ import (
 
 // PL-011: Two-argument open (command injection)
 var (
-	reTwoArgOpen      = regexp.MustCompile(`\bopen\s*\(\s*\$?\w+\s*,\s*\$`)
-	reTwoArgOpenPipe  = regexp.MustCompile(`\bopen\s*\(\s*\$?\w+\s*,\s*["'][|>]`)
-	reTwoArgOpenVar   = regexp.MustCompile(`\bopen\s*\(\s*\w+\s*,\s*"[^"]*\$[a-zA-Z_{]`)
+	reTwoArgOpen     = regexp.MustCompile(`\bopen\s*\(\s*\$?\w+\s*,\s*\$`)
+	reTwoArgOpenPipe = regexp.MustCompile(`\bopen\s*\(\s*\$?\w+\s*,\s*["'][|>]`)
+	reTwoArgOpenVar  = regexp.MustCompile(`\bopen\s*\(\s*\w+\s*,\s*"[^"]*\$[a-zA-Z_{]`)
 )
 
 // PL-012: Backtick/qx with variable interpolation
 var (
-	reBacktickVar     = regexp.MustCompile("`[^`]*\\$[a-zA-Z_{]")
-	reQxVar           = regexp.MustCompile(`\bqx\s*[({/|][^)}\\/|]*\$[a-zA-Z_{]`)
-	reQxBracket       = regexp.MustCompile(`\bqx\s*\[[^\]]*\$[a-zA-Z_{]`)
+	reBacktickVar = regexp.MustCompile("`[^`]*\\$[a-zA-Z_{]")
+	reQxVar       = regexp.MustCompile(`\bqx\s*[({/|][^)}\\/|]*\$[a-zA-Z_{]`)
+	reQxBracket   = regexp.MustCompile(`\bqx\s*\[[^\]]*\$[a-zA-Z_{]`)
 )
 
 // PL-013: DBI query without placeholders
@@ -42,22 +42,21 @@ var (
 
 // PL-015: eval with user input
 var (
-	reEvalVar         = regexp.MustCompile(`\beval\s*\(\s*\$`)
-	reEvalInterp      = regexp.MustCompile(`\beval\s*\(\s*"[^"]*\$[a-zA-Z_{]`)
-	reEvalCGI         = regexp.MustCompile(`\beval\s*\(\s*\$(?:cgi|query|param|input|data|body)`)
-	reStringEval      = regexp.MustCompile(`\beval\s+"[^"]*\$`)
+	reEvalVar    = regexp.MustCompile(`\beval\s*\(\s*\$`)
+	reEvalInterp = regexp.MustCompile(`\beval\s*\(\s*"[^"]*\$[a-zA-Z_{]`)
+	reEvalCGI    = regexp.MustCompile(`\beval\s*\(\s*\$(?:cgi|query|param|input|data|body)`)
+	reStringEval = regexp.MustCompile(`\beval\s+"[^"]*\$`)
 )
 
 // PL-016: Regex with user input
 var (
-	reRegexUserInput  = regexp.MustCompile(`=~\s*(?:m|s)?\s*/[^/]*\$[a-zA-Z_{]`)
-	reRegexQR         = regexp.MustCompile(`\bqr\s*/[^/]*\$[a-zA-Z_{]`)
+	reRegexUserInput = regexp.MustCompile(`=~\s*(?:m|s)?\s*/[^/]*\$[a-zA-Z_{]`)
+	reRegexQR        = regexp.MustCompile(`\bqr\s*/[^/]*\$[a-zA-Z_{]`)
 )
 
 // PL-017: Insecure temporary file
 var (
 	reTmpnam       = regexp.MustCompile(`\btmpnam\s*\(`)
-	reTempfile     = regexp.MustCompile(`\btempnam\s*\(`)
 	rePredictTmp   = regexp.MustCompile(`(?:"/tmp/|'/tmp/)[^"']*\$`)
 	reMktemp       = regexp.MustCompile(`\bmktemp\s*\(`)
 	reFileTempSafe = regexp.MustCompile(`File::Temp|tempfile\s*\(|tmpfile\s*\(`)
@@ -65,7 +64,6 @@ var (
 
 // PL-018: Symlink attack via predictable filename
 var (
-	reSymlinkCreate   = regexp.MustCompile(`\bsymlink\s*\(`)
 	rePredictFilename = regexp.MustCompile(`open\s*\(\s*\$?\w+\s*,\s*["']>\s*/tmp/[a-zA-Z_]`)
 	reTmpConcat       = regexp.MustCompile(`"/tmp/"\s*\.\s*\$|'/tmp/'\s*\.\s*\$`)
 )
@@ -87,15 +85,18 @@ func init() {
 
 type PerlTwoArgOpen struct{}
 
-func (r *PerlTwoArgOpen) ID() string                      { return "BATOU-PL-011" }
-func (r *PerlTwoArgOpen) Name() string                    { return "PerlTwoArgOpen" }
-func (r *PerlTwoArgOpen) Description() string             { return "Detects Perl two-argument open() which interprets special characters (|, >, <) in the filename, enabling command injection." }
+func (r *PerlTwoArgOpen) ID() string   { return "BATOU-PL-011" }
+func (r *PerlTwoArgOpen) Name() string { return "PerlTwoArgOpen" }
+func (r *PerlTwoArgOpen) Description() string {
+	return "Detects Perl two-argument open() which interprets special characters (|, >, <) in the filename, enabling command injection."
+}
 func (r *PerlTwoArgOpen) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PerlTwoArgOpen) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *PerlTwoArgOpen) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isPerlComment(trimmed) {
@@ -105,13 +106,13 @@ func (r *PerlTwoArgOpen) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reTwoArgOpenPipe.FindString(line); m != "" {
+		if m := rules.GFindLower(reTwoArgOpenPipe, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Two-argument open() with explicit pipe or redirection character. This directly executes a shell command or opens a file in an unsafe mode."
-		} else if m := reTwoArgOpenVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reTwoArgOpenVar, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Two-argument open() with variable interpolation in the filename. If the variable starts with | it executes a command, with > it truncates the file."
-		} else if m := reTwoArgOpen.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reTwoArgOpen, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Two-argument open() with a variable as the second argument. Perl interprets special characters in the filename: leading | executes as a command, > opens for writing."
 		}
@@ -147,15 +148,18 @@ func (r *PerlTwoArgOpen) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PerlBacktickVar struct{}
 
-func (r *PerlBacktickVar) ID() string                      { return "BATOU-PL-012" }
-func (r *PerlBacktickVar) Name() string                    { return "PerlBacktickVar" }
-func (r *PerlBacktickVar) Description() string             { return "Detects Perl backtick or qx// with variable interpolation, enabling command injection." }
+func (r *PerlBacktickVar) ID() string   { return "BATOU-PL-012" }
+func (r *PerlBacktickVar) Name() string { return "PerlBacktickVar" }
+func (r *PerlBacktickVar) Description() string {
+	return "Detects Perl backtick or qx// with variable interpolation, enabling command injection."
+}
 func (r *PerlBacktickVar) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PerlBacktickVar) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *PerlBacktickVar) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isPerlComment(trimmed) {
@@ -165,13 +169,13 @@ func (r *PerlBacktickVar) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reBacktickVar.FindString(line); m != "" {
+		if m := rules.GFindLower(reBacktickVar, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Backtick operator with variable interpolation. Shell metacharacters in the variable enable arbitrary command injection."
-		} else if m := reQxVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reQxVar, line, lowered[i]); m != "" {
 			matched = m
 			desc = "qx// with variable interpolation. The variable is interpolated into a shell command, enabling command injection."
-		} else if m := reQxBracket.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reQxBracket, line, lowered[i]); m != "" {
 			matched = m
 			desc = "qx[] with variable interpolation. The variable is interpolated into a shell command."
 		}
@@ -207,15 +211,18 @@ func (r *PerlBacktickVar) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PerlDBINoPlaceholder struct{}
 
-func (r *PerlDBINoPlaceholder) ID() string                      { return "BATOU-PL-013" }
-func (r *PerlDBINoPlaceholder) Name() string                    { return "PerlDBINoPlaceholder" }
-func (r *PerlDBINoPlaceholder) Description() string             { return "Detects Perl DBI queries with variable interpolation instead of placeholders, enabling SQL injection." }
+func (r *PerlDBINoPlaceholder) ID() string   { return "BATOU-PL-013" }
+func (r *PerlDBINoPlaceholder) Name() string { return "PerlDBINoPlaceholder" }
+func (r *PerlDBINoPlaceholder) Description() string {
+	return "Detects Perl DBI queries with variable interpolation instead of placeholders, enabling SQL injection."
+}
 func (r *PerlDBINoPlaceholder) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PerlDBINoPlaceholder) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *PerlDBINoPlaceholder) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isPerlComment(trimmed) {
@@ -223,20 +230,20 @@ func (r *PerlDBINoPlaceholder) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Skip if the line uses quote()
-		if reDBIQuote.MatchString(line) {
+		if rules.GMatchLower(reDBIQuote, line, lowered[i]) {
 			continue
 		}
 
 		var matched string
 		var desc string
 
-		if m := reDBIDoConcat.FindString(line); m != "" {
+		if m := rules.GFindLower(reDBIDoConcat, line, lowered[i]); m != "" {
 			matched = m
 			desc = "DBI->do() with variable interpolation. User input embedded in the SQL string enables SQL injection."
-		} else if m := reDBIPrepareConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reDBIPrepareConcat, line, lowered[i]); m != "" {
 			matched = m
 			desc = "DBI->prepare() with variable interpolation. The SQL is pre-interpolated before prepare(), bypassing parameterization."
-		} else if m := reDBISelectConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reDBISelectConcat, line, lowered[i]); m != "" {
 			matched = m
 			desc = "DBI->selectrow with variable interpolation. User input is embedded directly in the SQL query."
 		}
@@ -272,27 +279,30 @@ func (r *PerlDBINoPlaceholder) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PerlTaintMode struct{}
 
-func (r *PerlTaintMode) ID() string                      { return "BATOU-PL-014" }
-func (r *PerlTaintMode) Name() string                    { return "PerlTaintMode" }
-func (r *PerlTaintMode) Description() string             { return "Detects Perl CGI scripts without taint mode (-T), which leaves user input validation unchecked." }
+func (r *PerlTaintMode) ID() string   { return "BATOU-PL-014" }
+func (r *PerlTaintMode) Name() string { return "PerlTaintMode" }
+func (r *PerlTaintMode) Description() string {
+	return "Detects Perl CGI scripts without taint mode (-T), which leaves user input validation unchecked."
+}
 func (r *PerlTaintMode) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *PerlTaintMode) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *PerlTaintMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Only check files that use CGI
-	if !reCGIUse.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reCGIUse, ctx) {
 		return nil
 	}
 
 	// Check if taint mode is enabled
-	if reTaintMode.MatchString(ctx.Content) || rePerlTaintCheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reTaintMode, ctx) || rules.GMatchFile(rePerlTaintCheck, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if reCGIUse.MatchString(line) {
+		if rules.GMatchLower(reCGIUse, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -325,15 +335,18 @@ func (r *PerlTaintMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PerlEvalUser struct{}
 
-func (r *PerlEvalUser) ID() string                      { return "BATOU-PL-015" }
-func (r *PerlEvalUser) Name() string                    { return "PerlEvalUser" }
-func (r *PerlEvalUser) Description() string             { return "Detects Perl string eval with variable interpolation or user input, enabling arbitrary code execution." }
+func (r *PerlEvalUser) ID() string   { return "BATOU-PL-015" }
+func (r *PerlEvalUser) Name() string { return "PerlEvalUser" }
+func (r *PerlEvalUser) Description() string {
+	return "Detects Perl string eval with variable interpolation or user input, enabling arbitrary code execution."
+}
 func (r *PerlEvalUser) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PerlEvalUser) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *PerlEvalUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isPerlComment(trimmed) {
@@ -342,13 +355,13 @@ func (r *PerlEvalUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reEvalCGI.FindString(line); m != "" {
+		if m := rules.GFindLower(reEvalCGI, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reEvalInterp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reEvalInterp, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reEvalVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reEvalVar, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reStringEval.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reStringEval, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -383,15 +396,18 @@ func (r *PerlEvalUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PerlRegexUser struct{}
 
-func (r *PerlRegexUser) ID() string                      { return "BATOU-PL-016" }
-func (r *PerlRegexUser) Name() string                    { return "PerlRegexUser" }
-func (r *PerlRegexUser) Description() string             { return "Detects Perl regex with user-controlled variable interpolation, enabling ReDoS or regex injection." }
+func (r *PerlRegexUser) ID() string   { return "BATOU-PL-016" }
+func (r *PerlRegexUser) Name() string { return "PerlRegexUser" }
+func (r *PerlRegexUser) Description() string {
+	return "Detects Perl regex with user-controlled variable interpolation, enabling ReDoS or regex injection."
+}
 func (r *PerlRegexUser) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *PerlRegexUser) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *PerlRegexUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isPerlComment(trimmed) {
@@ -400,9 +416,9 @@ func (r *PerlRegexUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reRegexUserInput.FindString(line); m != "" {
+		if m := rules.GFindLower(reRegexUserInput, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reRegexQR.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRegexQR, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -437,20 +453,23 @@ func (r *PerlRegexUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PerlInsecureTmp struct{}
 
-func (r *PerlInsecureTmp) ID() string                      { return "BATOU-PL-017" }
-func (r *PerlInsecureTmp) Name() string                    { return "PerlInsecureTmp" }
-func (r *PerlInsecureTmp) Description() string             { return "Detects Perl insecure temporary file creation via tmpnam(), mktemp(), or predictable /tmp filenames." }
+func (r *PerlInsecureTmp) ID() string   { return "BATOU-PL-017" }
+func (r *PerlInsecureTmp) Name() string { return "PerlInsecureTmp" }
+func (r *PerlInsecureTmp) Description() string {
+	return "Detects Perl insecure temporary file creation via tmpnam(), mktemp(), or predictable /tmp filenames."
+}
 func (r *PerlInsecureTmp) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *PerlInsecureTmp) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *PerlInsecureTmp) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Skip if using File::Temp (secure alternative)
-	if reFileTempSafe.MatchString(ctx.Content) {
+	if rules.GMatchFile(reFileTempSafe, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isPerlComment(trimmed) {
@@ -460,13 +479,13 @@ func (r *PerlInsecureTmp) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reTmpnam.FindString(line); m != "" {
+		if m := rules.GFindLower(reTmpnam, line, lowered[i]); m != "" {
 			matched = m
 			desc = "tmpnam() generates a predictable temporary filename. An attacker can create a symlink at the predicted path before the file is created, leading to symlink attacks (writing to arbitrary files)."
-		} else if m := reMktemp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reMktemp, line, lowered[i]); m != "" {
 			matched = m
 			desc = "mktemp() creates a predictable temporary filename without atomically opening it. A TOCTOU race condition allows symlink attacks between name generation and file creation."
-		} else if m := rePredictTmp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePredictTmp, line, lowered[i]); m != "" {
 			matched = m
 			desc = "A file is opened in /tmp with a path that includes variable interpolation but may be predictable. Predictable temp filenames enable symlink attacks."
 		}
@@ -502,15 +521,18 @@ func (r *PerlInsecureTmp) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PerlSymlinkAttack struct{}
 
-func (r *PerlSymlinkAttack) ID() string                      { return "BATOU-PL-018" }
-func (r *PerlSymlinkAttack) Name() string                    { return "PerlSymlinkAttack" }
-func (r *PerlSymlinkAttack) Description() string             { return "Detects Perl file operations writing to predictable /tmp paths, enabling symlink race condition attacks." }
+func (r *PerlSymlinkAttack) ID() string   { return "BATOU-PL-018" }
+func (r *PerlSymlinkAttack) Name() string { return "PerlSymlinkAttack" }
+func (r *PerlSymlinkAttack) Description() string {
+	return "Detects Perl file operations writing to predictable /tmp paths, enabling symlink race condition attacks."
+}
 func (r *PerlSymlinkAttack) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *PerlSymlinkAttack) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *PerlSymlinkAttack) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isPerlComment(trimmed) {
@@ -520,10 +542,10 @@ func (r *PerlSymlinkAttack) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := rePredictFilename.FindString(line); m != "" {
+		if m := rules.GFindLower(rePredictFilename, line, lowered[i]); m != "" {
 			matched = m
 			desc = "A file is opened for writing (>) in /tmp with a predictable filename. An attacker can pre-create a symlink at this path to redirect writes to arbitrary files (e.g., /etc/crontab, ~/.ssh/authorized_keys)."
-		} else if m := reTmpConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reTmpConcat, line, lowered[i]); m != "" {
 			matched = m
 			desc = "A /tmp path is built via string concatenation with a variable. If the resulting path is predictable, an attacker can exploit a TOCTOU race to create a symlink and redirect file operations."
 		}

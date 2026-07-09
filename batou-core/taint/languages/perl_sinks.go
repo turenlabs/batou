@@ -1,8 +1,8 @@
 package languages
 
 import (
-	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
+	"github.com/turenlabs/batou-rules/rules"
 )
 
 func (perlCatalog) Sinks() []taint.SinkDef {
@@ -18,15 +18,30 @@ func (perlCatalog) Sinks() []taint.SinkDef {
 		// SQL injection (CWE-89)
 		{ID: "perl.dbi.do", Category: taint.SnkSQLQuery, Language: rules.LangPerl, Pattern: `\$dbh->do\s*\(`, ObjectType: "DBI", MethodName: "do", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "SQL execution via DBI do()", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
 		{ID: "perl.dbi.prepare", Category: taint.SnkSQLQuery, Language: rules.LangPerl, Pattern: `\$dbh->prepare\s*\(`, ObjectType: "DBI", MethodName: "prepare", DangerousArgs: []int{0}, Severity: rules.High, Description: "SQL preparation via DBI prepare()", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.dbi.prepare_cached", Category: taint.SnkSQLQuery, Language: rules.LangPerl, Pattern: `->prepare_cached\s*\(`, ObjectType: "DBI", MethodName: "prepare_cached", DangerousArgs: []int{0}, Severity: rules.High, Description: "SQL preparation via DBI prepare_cached() — caches the statement handle but interpolated SQL is just as injectable as prepare()", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
 		{ID: "perl.dbi.selectrow", Category: taint.SnkSQLQuery, Language: rules.LangPerl, Pattern: `\$dbh->selectrow_\w+\s*\(`, ObjectType: "DBI", MethodName: "selectrow_*", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "SQL query via DBI selectrow", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
 		{ID: "perl.dbi.selectall", Category: taint.SnkSQLQuery, Language: rules.LangPerl, Pattern: `\$dbh->selectall_\w+\s*\(`, ObjectType: "DBI", MethodName: "selectall_*", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "SQL query via DBI selectall", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
 
 		// Code injection (CWE-94)
 		{ID: "perl.eval", Category: taint.SnkEval, Language: rules.LangPerl, Pattern: `\beval\s*\(|\beval\s+"|\beval\s+'|\beval\s+\$`, ObjectType: "", MethodName: "eval", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "Dynamic code evaluation via eval()", CWEID: "CWE-94", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.eval.heredoc", Category: taint.SnkEval, Language: rules.LangPerl, Pattern: `\beval\s+<<`, ObjectType: "", MethodName: "eval", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "Dynamic code evaluation via eval with heredoc string (eval <<END)", CWEID: "CWE-94", OWASPCategory: "A03:2021-Injection"},
+
+		// Regex substitution code execution (CWE-94/CWE-95)
+		{ID: "perl.eval.subst.e", Category: taint.SnkEval, Language: rules.LangPerl, Pattern: `\bs/[^/]+/[^/]*/[gimsxcadlpur]*e`, ObjectType: "", MethodName: "subst_eval", DangerousArgs: []int{-1}, Severity: rules.Critical, Description: "Regex substitution with /e modifier executes replacement as Perl code (s///e)", CWEID: "CWE-95", OWASPCategory: "A03:2021-Injection"},
+
+		// Format string injection (CWE-134) — a tainted FORMAT argument (arg 0) lets an attacker
+		// inject conversion specifiers; DangerousArgs[0] ensures literal formats (sprintf("%d", $x)) stay clean.
+		{ID: "perl.sprintf.format", Category: taint.SnkCommand, Language: rules.LangPerl, Pattern: `\bsprintf\s*\(`, ObjectType: "", MethodName: "sprintf", DangerousArgs: []int{0}, Severity: rules.High, Description: "sprintf with potentially tainted format string — format string injection (CWE-134)", CWEID: "CWE-134", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.printf.format", Category: taint.SnkCommand, Language: rules.LangPerl, Pattern: `\bprintf\s*\(`, ObjectType: "", MethodName: "printf", DangerousArgs: []int{0}, Severity: rules.High, Description: "printf with potentially tainted format string — format string injection (CWE-134)", CWEID: "CWE-134", OWASPCategory: "A03:2021-Injection"},
 
 		// File operations / Path traversal (CWE-22)
-		{ID: "perl.open", Category: taint.SnkFileWrite, Language: rules.LangPerl, Pattern: `\bopen\s*\(`, ObjectType: "", MethodName: "open", DangerousArgs: []int{0}, Severity: rules.High, Description: "File open with potential path traversal", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
-		{ID: "perl.file.slurp.write", Category: taint.SnkFileWrite, Language: rules.LangPerl, Pattern: `write_file\s*\(`, ObjectType: "File::Slurp", MethodName: "write_file", DangerousArgs: []int{0}, Severity: rules.High, Description: "File write via File::Slurp", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+		// DangerousArgs is -1 (all args): in Perl's open(FH, MODE, PATH) /
+		// open(FH, ">PATH") the tainted path is never arg 0 (that's the file
+		// handle), so the path lives at arg 1 (2-arg) or arg 2 (3-arg). The
+		// file-handle arg is a bareword/lexical and is never user input, so
+		// scanning every argument cannot introduce a false positive here.
+		{ID: "perl.open", Category: taint.SnkFileWrite, Language: rules.LangPerl, Pattern: `\bopen\s*\(`, ObjectType: "", MethodName: "open", DangerousArgs: []int{-1}, Severity: rules.High, Description: "File open with potential path traversal", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
+		{ID: "perl.file.slurp.write", Category: taint.SnkFileWrite, Language: rules.LangPerl, Pattern: `\bwrite_file\s*\(`, ObjectType: "File::Slurp", MethodName: "write_file", DangerousArgs: []int{0}, Severity: rules.High, Description: "File write via File::Slurp", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
 		{ID: "perl.unlink", Category: taint.SnkFileWrite, Language: rules.LangPerl, Pattern: `\bunlink\s*\(`, ObjectType: "", MethodName: "unlink", DangerousArgs: []int{0}, Severity: rules.High, Description: "File deletion with potentially tainted path", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
 		{ID: "perl.rename", Category: taint.SnkFileWrite, Language: rules.LangPerl, Pattern: `\brename\s*\(`, ObjectType: "", MethodName: "rename", DangerousArgs: []int{0}, Severity: rules.High, Description: "File rename with potentially tainted path", CWEID: "CWE-22", OWASPCategory: "A01:2021-Broken Access Control"},
 
@@ -36,17 +51,23 @@ func (perlCatalog) Sinks() []taint.SinkDef {
 		// Deserialization (CWE-502)
 		{ID: "perl.storable.thaw", Category: taint.SnkDeserialize, Language: rules.LangPerl, Pattern: `Storable::thaw\s*\(|\bthaw\s*\(`, ObjectType: "Storable", MethodName: "thaw", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "Unsafe deserialization via Storable::thaw", CWEID: "CWE-502", OWASPCategory: "A08:2021-Software and Data Integrity Failures"},
 		{ID: "perl.storable.retrieve", Category: taint.SnkDeserialize, Language: rules.LangPerl, Pattern: `Storable::retrieve\s*\(|\bretrieve\s*\(`, ObjectType: "Storable", MethodName: "retrieve", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "Unsafe deserialization via Storable::retrieve", CWEID: "CWE-502", OWASPCategory: "A08:2021-Software and Data Integrity Failures"},
-		{ID: "perl.yaml.load", Category: taint.SnkDeserialize, Language: rules.LangPerl, Pattern: `YAML::Load\s*\(|YAML::Syck::Load\s*\(|Load\s*\(\s*\$`, ObjectType: "YAML", MethodName: "Load", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "Unsafe YAML deserialization", CWEID: "CWE-502", OWASPCategory: "A08:2021-Software and Data Integrity Failures"},
+		{ID: "perl.yaml.load", Category: taint.SnkDeserialize, Language: rules.LangPerl, Pattern: `YAML::Load\s*\(|YAML::Syck::Load\s*\(|\bLoad\s*\(\s*\$`, ObjectType: "YAML", MethodName: "Load", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "Unsafe YAML deserialization", CWEID: "CWE-502", OWASPCategory: "A08:2021-Software and Data Integrity Failures"},
 
 		// SSRF / URL fetch (CWE-918)
 		{ID: "perl.lwp.get", Category: taint.SnkURLFetch, Language: rules.LangPerl, Pattern: `\$ua->get\s*\(|LWP::UserAgent.*->get\s*\(|LWP::Simple::get\s*\(`, ObjectType: "LWP::UserAgent", MethodName: "get", DangerousArgs: []int{0}, Severity: rules.High, Description: "SSRF via LWP::UserAgent get()", CWEID: "CWE-918", OWASPCategory: "A10:2021-Server-Side Request Forgery"},
 		{ID: "perl.http.tiny.get", Category: taint.SnkURLFetch, Language: rules.LangPerl, Pattern: `HTTP::Tiny.*->get\s*\(`, ObjectType: "HTTP::Tiny", MethodName: "get", DangerousArgs: []int{0}, Severity: rules.High, Description: "SSRF via HTTP::Tiny get()", CWEID: "CWE-918", OWASPCategory: "A10:2021-Server-Side Request Forgery"},
 
 		// Redirect (CWE-601)
-		{ID: "perl.cgi.redirect", Category: taint.SnkRedirect, Language: rules.LangPerl, Pattern: `\$cgi->redirect\s*\(|\$q->redirect\s*\(|redirect\s*\(`, ObjectType: "CGI", MethodName: "redirect", DangerousArgs: []int{0}, Severity: rules.High, Description: "HTTP redirect with potentially tainted URL", CWEID: "CWE-601", OWASPCategory: "A01:2021-Broken Access Control"},
+		{ID: "perl.cgi.redirect", Category: taint.SnkRedirect, Language: rules.LangPerl, Pattern: `\$cgi->redirect\s*\(|\$q->redirect\s*\(|\bredirect\s*\(`, ObjectType: "CGI", MethodName: "redirect", DangerousArgs: []int{0}, Severity: rules.High, Description: "HTTP redirect with potentially tainted URL", CWEID: "CWE-601", OWASPCategory: "A01:2021-Broken Access Control"},
 
 		// LDAP injection (CWE-90)
 		{ID: "perl.net.ldap.search", Category: taint.SnkLDAP, Language: rules.LangPerl, Pattern: `\$ldap->search\s*\(`, ObjectType: "Net::LDAP", MethodName: "search", DangerousArgs: []int{0}, Severity: rules.High, Description: "LDAP search with potentially tainted filter", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.net.ldap.add", Category: taint.SnkLDAP, Language: rules.LangPerl, Pattern: `\$ldap->add\s*\(`, ObjectType: "Net::LDAP", MethodName: "add", DangerousArgs: []int{0}, Severity: rules.High, Description: "LDAP entry addition with potentially tainted DN", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.net.ldap.modify", Category: taint.SnkLDAP, Language: rules.LangPerl, Pattern: `\$ldap->modify\s*\(`, ObjectType: "Net::LDAP", MethodName: "modify", DangerousArgs: []int{0}, Severity: rules.High, Description: "LDAP entry modification with potentially tainted DN", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.net.ldap.delete", Category: taint.SnkLDAP, Language: rules.LangPerl, Pattern: `\$ldap->delete\s*\(`, ObjectType: "Net::LDAP", MethodName: "delete", DangerousArgs: []int{0}, Severity: rules.High, Description: "LDAP entry deletion with potentially tainted DN", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.net.ldap.compare", Category: taint.SnkLDAP, Language: rules.LangPerl, Pattern: `\$ldap->compare\s*\(`, ObjectType: "Net::LDAP", MethodName: "compare", DangerousArgs: []int{0}, Severity: rules.High, Description: "LDAP compare with potentially tainted DN", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.net.ldap.bind", Category: taint.SnkLDAP, Language: rules.LangPerl, Pattern: `\$ldap->bind\s*\(`, ObjectType: "Net::LDAP", MethodName: "bind", DangerousArgs: []int{0}, Severity: rules.High, Description: "LDAP bind with potentially tainted DN (authentication injection)", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.net.ldap.filter", Category: taint.SnkLDAP, Language: rules.LangPerl, Pattern: `Net::LDAP::Filter->new\s*\(`, ObjectType: "Net::LDAP::Filter", MethodName: "new", DangerousArgs: []int{0}, Severity: rules.High, Description: "LDAP filter construction from potentially tainted input", CWEID: "CWE-90", OWASPCategory: "A03:2021-Injection"},
 
 		// Log injection (CWE-117)
 		{ID: "perl.log.warn", Category: taint.SnkLog, Language: rules.LangPerl, Pattern: `\$log->warn\s*\(|\$log->info\s*\(|\$log->error\s*\(|\$log->debug\s*\(`, ObjectType: "", MethodName: "warn/info/error/debug", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Logger with potentially tainted data (log injection)", CWEID: "CWE-117", OWASPCategory: "A09:2021-Security Logging and Monitoring Failures"},
@@ -58,11 +79,20 @@ func (perlCatalog) Sinks() []taint.SinkDef {
 		// Weak crypto (CWE-328)
 		{ID: "perl.digest.md5", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Digest::MD5`, ObjectType: "Digest::MD5", MethodName: "MD5", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Weak MD5 hash algorithm usage", CWEID: "CWE-328", OWASPCategory: "A02:2021-Cryptographic Failures"},
 		{ID: "perl.digest.sha1", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Digest::SHA1|Digest::SHA\b.*\bsha1\b`, ObjectType: "Digest::SHA1", MethodName: "SHA1", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "Weak SHA1 hash algorithm usage", CWEID: "CWE-328", OWASPCategory: "A02:2021-Cryptographic Failures"},
+		{ID: "perl.digest.md2.func", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `\bmd2(?:_hex|_base64)?\s*\(`, ObjectType: "", MethodName: "md2/md2_hex/md2_base64", DangerousArgs: []int{0}, Severity: rules.High, Description: "Broken MD2 hash algorithm (collision-broken, do not use)", CWEID: "CWE-328", OWASPCategory: "A02:2021-Cryptographic Failures"},
+		{ID: "perl.digest.md2.class", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Digest::MD2->new\s*\(`, ObjectType: "Digest::MD2", MethodName: "new", DangerousArgs: []int{-1}, Severity: rules.High, Description: "Broken MD2 hash algorithm via Digest::MD2 object API", CWEID: "CWE-328", OWASPCategory: "A02:2021-Cryptographic Failures"},
+		{ID: "perl.digest.md4.func", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `\bmd4(?:_hex|_base64)?\s*\(`, ObjectType: "", MethodName: "md4/md4_hex/md4_base64", DangerousArgs: []int{0}, Severity: rules.High, Description: "Broken MD4 hash algorithm (collision-broken; used by NTLM/SMB — do not use for security)", CWEID: "CWE-328", OWASPCategory: "A02:2021-Cryptographic Failures"},
+		{ID: "perl.digest.md4.class", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Digest::MD4->new\s*\(`, ObjectType: "Digest::MD4", MethodName: "new", DangerousArgs: []int{-1}, Severity: rules.High, Description: "Broken MD4 hash algorithm via Digest::MD4 object API", CWEID: "CWE-328", OWASPCategory: "A02:2021-Cryptographic Failures"},
 
 		// Weak cipher algorithms (CWE-327)
 		{ID: "perl.crypt.des", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Crypt::DES->new\s*\(|Crypt::DES_EDE3->new\s*\(`, ObjectType: "Crypt::DES", MethodName: "DES", DangerousArgs: []int{-1}, Severity: rules.Medium, Description: "Weak DES cipher (use Crypt::Cipher::AES instead)", CWEID: "CWE-327", OWASPCategory: "A02:2021-Cryptographic Failures"},
 		{ID: "perl.crypt.rc4", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Crypt::RC4->new\s*\(|Crypt::RC4\s*\(`, ObjectType: "Crypt::RC4", MethodName: "RC4", DangerousArgs: []int{-1}, Severity: rules.High, Description: "Broken RC4 cipher (cryptographically broken, do not use)", CWEID: "CWE-327", OWASPCategory: "A02:2021-Cryptographic Failures"},
 		{ID: "perl.crypt.ecb", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Crypt::ECB->new\s*\(|Crypt::Mode::ECB->new\s*\(`, ObjectType: "Crypt::ECB", MethodName: "ECB", DangerousArgs: []int{-1}, Severity: rules.Medium, Description: "ECB cipher mode (does not provide semantic security, use CBC/GCM)", CWEID: "CWE-327", OWASPCategory: "A02:2021-Cryptographic Failures"},
+		{ID: "perl.crypt.blowfish", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Crypt::Blowfish->new\s*\(`, ObjectType: "Crypt::Blowfish", MethodName: "new", DangerousArgs: []int{-1}, Severity: rules.Medium, Description: "Blowfish block cipher (64-bit block — vulnerable to SWEET32; prefer AES)", CWEID: "CWE-327", OWASPCategory: "A02:2021-Cryptographic Failures"},
+		{ID: "perl.crypt.blowfish_pp", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Crypt::Blowfish_PP->new\s*\(`, ObjectType: "Crypt::Blowfish_PP", MethodName: "new", DangerousArgs: []int{-1}, Severity: rules.Medium, Description: "Blowfish block cipher, pure-Perl variant (64-bit block — vulnerable to SWEET32; prefer AES)", CWEID: "CWE-327", OWASPCategory: "A02:2021-Cryptographic Failures"},
+		{ID: "perl.crypt.idea", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Crypt::IDEA->new\s*\(`, ObjectType: "Crypt::IDEA", MethodName: "new", DangerousArgs: []int{-1}, Severity: rules.Medium, Description: "IDEA block cipher (64-bit block, deprecated in TLS 1.3; prefer AES)", CWEID: "CWE-327", OWASPCategory: "A02:2021-Cryptographic Failures"},
+		{ID: "perl.crypt.rc2", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Crypt::RC2->new\s*\(`, ObjectType: "Crypt::RC2", MethodName: "new", DangerousArgs: []int{-1}, Severity: rules.High, Description: "RC2 block cipher (weak, obsolete per RFC 2268; prefer AES)", CWEID: "CWE-327", OWASPCategory: "A02:2021-Cryptographic Failures"},
+		{ID: "perl.crypt.cast5", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `Crypt::CAST5->new\s*\(`, ObjectType: "Crypt::CAST5", MethodName: "new", DangerousArgs: []int{-1}, Severity: rules.Medium, Description: "CAST-128/CAST5 block cipher (64-bit block, deprecated; prefer AES)", CWEID: "CWE-327", OWASPCategory: "A02:2021-Cryptographic Failures"},
 
 		// Insecure random (CWE-338)
 		{ID: "perl.rand", Category: taint.SnkCrypto, Language: rules.LangPerl, Pattern: `\brand\s*\(`, ObjectType: "", MethodName: "rand", DangerousArgs: []int{-1}, Severity: rules.Medium, Description: "Non-cryptographic random (use Crypt::URandom instead)", CWEID: "CWE-338", OWASPCategory: "A02:2021-Cryptographic Failures"},
@@ -75,6 +105,8 @@ func (perlCatalog) Sinks() []taint.SinkDef {
 		// XPath injection (CWE-643)
 		{ID: "perl.xml.xpath", Category: taint.SnkXPath, Language: rules.LangPerl, Pattern: `XML::XPath->new.*find\s*\(|->findnodes\s*\(|->find\s*\(.*\$`, ObjectType: "XML::XPath", MethodName: "find/findnodes", DangerousArgs: []int{0}, Severity: rules.High, Description: "XPath query with potentially tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
 		{ID: "perl.xml.libxml.xpath", Category: taint.SnkXPath, Language: rules.LangPerl, Pattern: `->findnodes\s*\(|->find\s*\(|XML::LibXML::XPathContext`, ObjectType: "XML::LibXML", MethodName: "findnodes", DangerousArgs: []int{0}, Severity: rules.High, Description: "XML::LibXML XPath query with potentially tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.xml.twig.xpath", Category: taint.SnkXPath, Language: rules.LangPerl, Pattern: `->get_xpath\s*\(`, ObjectType: "XML::Twig", MethodName: "get_xpath", DangerousArgs: []int{0}, Severity: rules.High, Description: "XML::Twig XPath query with potentially tainted expression", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "perl.xml.libxml.xpath.expr", Category: taint.SnkXPath, Language: rules.LangPerl, Pattern: `XML::LibXML::XPathExpression->new\s*\(`, ObjectType: "XML::LibXML::XPathExpression", MethodName: "new", DangerousArgs: []int{0}, Severity: rules.High, Description: "XPath expression compilation from potentially tainted input", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
 
 		// HTTP header injection (CWE-113)
 		{ID: "perl.cgi.header", Category: taint.SnkHeader, Language: rules.LangPerl, Pattern: `\$cgi->header\s*\(|\$q->header\s*\(|print\s+.*"HTTP/`, ObjectType: "CGI", MethodName: "header", DangerousArgs: []int{0}, Severity: rules.Medium, Description: "HTTP response header with potentially tainted value", CWEID: "CWE-113", OWASPCategory: "A03:2021-Injection"},
@@ -229,7 +261,7 @@ func (perlCatalog) Sinks() []taint.SinkDef {
 			ID:            "perl.file.slurp.read",
 			Category:      taint.SnkFileRead,
 			Language:      rules.LangPerl,
-			Pattern:       `read_file\s*\(|File::Slurp::read_file\s*\(|slurp\s*\(`,
+			Pattern:       `\bread_file\s*\(|File::Slurp::read_file\s*\(|\bslurp\s*\(`,
 			ObjectType:    "",
 			MethodName:    "read_file/slurp",
 			DangerousArgs: []int{0},
@@ -464,6 +496,49 @@ func (perlCatalog) Sinks() []taint.SinkDef {
 			DangerousArgs: []int{0},
 			Severity:      rules.High,
 			Description:   "MessagePack deserialization via functional interface",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+
+		// --- CBOR::XS deserialization (CWE-502) ---
+		{
+			ID:            "perl.cbor.decode.method",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangPerl,
+			Pattern:       `CBOR::XS.*->decode\s*\(`,
+			ObjectType:    "CBOR::XS",
+			MethodName:    "decode",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "CBOR deserialization via method call — tag-based object reconstruction from untrusted binary",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+		{
+			ID:            "perl.cbor.decode.func",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangPerl,
+			Pattern:       `decode_cbor\s*\(`,
+			ObjectType:    "@global",
+			MethodName:    "decode_cbor",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "CBOR deserialization via functional interface — tag-based object reconstruction from untrusted binary",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+
+		// --- Storable::fd_retrieve (CWE-502) ---
+		{
+			ID:            "perl.storable.fd_retrieve",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangPerl,
+			Pattern:       `Storable::fd_retrieve\s*\(|\bfd_retrieve\s*\(`,
+			ObjectType:    "",
+			MethodName:    "fd_retrieve",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Storable deserialization from file descriptor — RCE via blessed objects from untrusted pipe/socket",
 			CWEID:         "CWE-502",
 			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
 		},
@@ -742,6 +817,2041 @@ func (perlCatalog) Sinks() []taint.SinkDef {
 			Description:   "Email::Simple/MIME creation with potentially tainted headers",
 			CWEID:         "CWE-93",
 			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- IPC command injection (CWE-78) ---
+		{
+			ID:            "perl.ipc.run.run",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `IPC::Run::run\s*\(|IPC::Run->run\s*\(`,
+			ObjectType:    "",
+			MethodName:    "IPC::Run::run",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "IPC::Run::run() command execution with potentially tainted input",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.ipc.run.start",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `IPC::Run::start\s*\(|IPC::Run->start\s*\(`,
+			ObjectType:    "",
+			MethodName:    "IPC::Run::start",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "IPC::Run::start() async command execution with potentially tainted input",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.ipc.system.simple.run",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `IPC::System::Simple::run\s*\(`,
+			ObjectType:    "",
+			MethodName:    "IPC::System::Simple::run",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "IPC::System::Simple::run() command execution with potentially tainted input",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.ipc.system.simple.capture",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `IPC::System::Simple::capture\s*\(`,
+			ObjectType:    "",
+			MethodName:    "IPC::System::Simple::capture",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "IPC::System::Simple::capture() command output capture with potentially tainted input",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- File operations (CWE-22) ---
+		{
+			ID:            "perl.file.copy",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `File::Copy::copy\s*\(|\bcopy\s*\(\s*\$`,
+			ObjectType:    "",
+			MethodName:    "File::Copy::copy/copy",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "File::Copy::copy() with potentially tainted source/destination paths",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "perl.file.move",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `File::Copy::move\s*\(|\bmove\s*\(\s*\$`,
+			ObjectType:    "",
+			MethodName:    "File::Copy::move/move",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "File::Copy::move() with potentially tainted source/destination paths",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "perl.file.path.rmtree",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `File::Path::rmtree\s*\(|File::Path::remove_tree\s*\(|\brmtree\s*\(\s*\$|\bremove_tree\s*\(\s*\$`,
+			ObjectType:    "",
+			MethodName:    "File::Path::rmtree/File::Path::remove_tree/rmtree/remove_tree",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "File::Path rmtree/remove_tree with potentially tainted path (recursive deletion)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "perl.file.path.mkpath",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `File::Path::mkpath\s*\(|File::Path::make_path\s*\(|\bmkpath\s*\(\s*\$|\bmake_path\s*\(\s*\$`,
+			ObjectType:    "",
+			MethodName:    "File::Path::mkpath/File::Path::make_path/mkpath/make_path",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "File::Path mkpath/make_path with potentially tainted directory path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "perl.chmod",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\bchmod\s*\(`,
+			ObjectType:    "",
+			MethodName:    "chmod",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "chmod with potentially tainted file path (permission manipulation)",
+			CWEID:         "CWE-732",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "perl.chown",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\bchown\s*\(`,
+			ObjectType:    "",
+			MethodName:    "chown",
+			DangerousArgs: []int{2},
+			Severity:      rules.High,
+			Description:   "chown with potentially tainted file path (ownership manipulation)",
+			CWEID:         "CWE-732",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Template injection (CWE-1336) ---
+		{
+			ID:            "perl.text.template.fill_in",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPerl,
+			Pattern:       `Text::Template.*->fill_in\s*\(|\$tmpl->fill_in\s*\(`,
+			ObjectType:    "",
+			MethodName:    "fill_in",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Text::Template fill_in() evaluates Perl code in template (SSTI/RCE)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.text.template.fill_in_string",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPerl,
+			Pattern:       `\bfill_in_string\s*\(`,
+			ObjectType:    "",
+			MethodName:    "fill_in_string",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Text::Template fill_in_string() compiles and evaluates embedded Perl code from a template string; a tainted template permits SSTI/RCE",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.text.template.fill_in_file",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPerl,
+			Pattern:       `\bfill_in_file\s*\(`,
+			ObjectType:    "",
+			MethodName:    "fill_in_file",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Text::Template fill_in_file() loads and evaluates a template file at a tainted path; embedded Perl code is executed (SSTI/RCE via arbitrary template inclusion)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.xslate.render_string",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPerl,
+			Pattern:       `->render_string\s*\(`,
+			ObjectType:    "",
+			MethodName:    "render_string",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Text::Xslate render_string() compiles and renders a template from a string; a tainted template permits server-side template injection (SSTI) — Kolon/TTerse syntax can invoke arbitrary functions and object methods",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mojo.template.render_file",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPerl,
+			Pattern:       `Mojo::Template.*->render_file\s*\(|->render_file\s*\(`,
+			ObjectType:    "",
+			MethodName:    "render_file",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Mojo::Template render_file() executes template file at tainted path (SSTI/RCE via arbitrary template inclusion)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.microtemplate.render_mt",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPerl,
+			Pattern:       `\brender_mt\s*\(`,
+			ObjectType:    "",
+			MethodName:    "render_mt",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Text::MicroTemplate render_mt() compiles and renders Perl code in template source (SSTI/RCE)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.microtemplate.build_mt",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPerl,
+			Pattern:       `\bbuild_mt\s*\(`,
+			ObjectType:    "",
+			MethodName:    "build_mt",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Text::MicroTemplate build_mt() compiles Perl code from template source (SSTI/RCE)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mason.comp",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPerl,
+			Pattern:       `\$m->comp\s*\(`,
+			ObjectType:    "",
+			MethodName:    "comp",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "HTML::Mason $m->comp() invokes a component at the supplied path; tainted path permits arbitrary component execution (SSTI/RCE)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mason.scomp",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPerl,
+			Pattern:       `\$m->scomp\s*\(`,
+			ObjectType:    "",
+			MethodName:    "scomp",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "HTML::Mason $m->scomp() invokes a component at the supplied path and returns its output; tainted path permits arbitrary component execution (SSTI/RCE)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.html.template.output",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangPerl,
+			Pattern:       `HTML::Template.*->output\s*\(|\$tmpl->output\s*\(`,
+			ObjectType:    "",
+			MethodName:    "output",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "HTML::Template output with potentially tainted parameters (XSS)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- SSRF additional (CWE-918) ---
+		{
+			ID:            "perl.furl.request",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `Furl.*->(?:get|post|put|delete|head|request)\s*\(`,
+			ObjectType:    "Furl",
+			MethodName:    "get/post/put/delete/head/request",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Furl HTTP request with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.anyevent.http",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\bhttp_(?:get|post|head|request)\s*\(`,
+			ObjectType:    "",
+			MethodName:    "http_get/http_post/http_head/http_request",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "AnyEvent::HTTP request with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.net.ftp.put",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ftp->put\s*\(`,
+			ObjectType:    "Net::FTP",
+			MethodName:    "put",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Net::FTP file upload with potentially tainted local path",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- Mojolicious redirect (CWE-601) ---
+		{
+			ID:            "perl.mojo.redirect_to",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->redirect_to\s*\(|\$self->redirect_to\s*\(`,
+			ObjectType:    "Mojolicious::Controller",
+			MethodName:    "redirect_to",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Mojolicious redirect_to with potentially tainted URL (open redirect)",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Mojolicious session trust boundary (CWE-501) ---
+		{
+			ID:            "perl.mojo.session.set",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->session\s*\([^)]*=>|\$self->session\s*\([^)]*=>`,
+			ObjectType:    "Mojolicious::Controller",
+			MethodName:    "session",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Mojolicious session set with potentially tainted value (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "perl.mojo.session.hash",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->session->\{[^}]+\}\s*=|\$self->session->\{[^}]+\}\s*=`,
+			ObjectType:    "Mojolicious::Controller",
+			MethodName:    "session->{}=",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Mojolicious session hash assignment with potentially tainted value (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "perl.mojo.flash",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->flash\s*\([^)]*=>|\$self->flash\s*\([^)]*=>`,
+			ObjectType:    "Mojolicious::Controller",
+			MethodName:    "flash",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Mojolicious flash set with potentially tainted value (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+
+		// --- Catalyst session/flash trust boundary (CWE-501) ---
+		{
+			ID:            "perl.catalyst.session.set",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->session->\{[^}]+\}\s*=`,
+			ObjectType:    "Catalyst",
+			MethodName:    "session->{}=",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Catalyst session assignment with potentially tainted value (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "perl.catalyst.flash",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->flash->\{[^}]+\}\s*=`,
+			ObjectType:    "Catalyst",
+			MethodName:    "flash->{}=",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Catalyst flash assignment with potentially tainted value (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+
+		// --- Dancer2 session trust boundary (CWE-501) ---
+		{
+			ID:            "perl.dancer2.session.set",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangPerl,
+			Pattern:       `\bsession\s+['"]?\w+['"]?\s*=>`,
+			ObjectType:    "Dancer2",
+			MethodName:    "session (DSL setter)",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Dancer2 session DSL setter with potentially tainted value (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "perl.dancer2.session.write",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangPerl,
+			Pattern:       `session->write\s*\(`,
+			ObjectType:    "Dancer2",
+			MethodName:    "session->write",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Dancer2 session OO write with potentially tainted value (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+
+		// --- Dancer2 forward (CWE-601) ---
+		{
+			ID:            "perl.dancer2.forward",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangPerl,
+			Pattern:       `\bforward\s+['"/\$]`,
+			ObjectType:    "Dancer2",
+			MethodName:    "forward",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Dancer2 internal forward with potentially tainted path (open redirect/dispatch hijack)",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Dancer2 send_error (CWE-79) ---
+		{
+			ID:            "perl.dancer2.send_error",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangPerl,
+			Pattern:       `\bsend_error\s*\(\s*\$`,
+			ObjectType:    "Dancer2",
+			MethodName:    "send_error",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Dancer2 send_error with potentially tainted message (XSS in error pages)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Plack::Response redirect (CWE-601) ---
+		{
+			ID:            "perl.plack.redirect",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangPerl,
+			Pattern:       `\$res->redirect\s*\(|Plack::Response.*->redirect\s*\(`,
+			ObjectType:    "Plack::Response",
+			MethodName:    "redirect",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Plack::Response redirect with potentially tainted URL (open redirect)",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Plack::Response header injection (CWE-113) ---
+		{
+			ID:            "perl.plack.header.set",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangPerl,
+			Pattern:       `\$res->header\s*\(|Plack::Response.*->header\s*\(`,
+			ObjectType:    "Plack::Response",
+			MethodName:    "header",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.Medium,
+			Description:   "Plack::Response header with potentially tainted value (HTTP header injection)",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Plack/PSGI session trust boundary (CWE-501) ---
+		{
+			ID:            "perl.plack.session",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangPerl,
+			Pattern:       `\$env->\{'psgix\.session'\}\{[^}]+\}\s*=|\$env->\{"psgix\.session"\}\{[^}]+\}\s*=`,
+			ObjectType:    "Plack::Middleware::Session",
+			MethodName:    "psgix.session{}=",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "PSGI session hash assignment with potentially tainted value (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+
+		// --- SSH remote command execution (CWE-78) ---
+		// Per Net::OpenSSH docs: argument-quoting is "a hack" that may have bugs
+		// or corner cases with specific shells. Tainted args reaching these
+		// methods may execute arbitrary commands on the remote machine.
+		// ObjectType left empty so any Perl OO receiver (`$ssh`, `$conn`, etc.)
+		// matches — same convention as existing perl.system / perl.exec entries.
+		{
+			ID:            "perl.net.openssh.system",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ssh->system\s*\(`,
+			ObjectType:    "",
+			MethodName:    "system",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Net::OpenSSH remote command execution via $ssh->system() with potentially tainted command",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.net.openssh.capture",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ssh->capture2?\s*\(`,
+			ObjectType:    "",
+			MethodName:    "capture/capture2",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Net::OpenSSH remote command execution via $ssh->capture()/capture2() (returns command output)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.net.openssh.spawn",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ssh->spawn\s*\(`,
+			ObjectType:    "",
+			MethodName:    "spawn",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Net::OpenSSH remote process spawn via $ssh->spawn() with potentially tainted command",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.net.openssh.open",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ssh->open(?:[23]|_ex)\s*\(`,
+			ObjectType:    "",
+			MethodName:    "open2/open3/open_ex",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Net::OpenSSH bidirectional remote command execution via $ssh->open2()/open3()/open_ex()",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.net.ssh2.exec",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$(?:chan(?:nel)?|ch)->exec\s*\(`,
+			ObjectType:    "",
+			MethodName:    "exec",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Net::SSH2 channel remote command execution via $channel->exec() (libssh2 binding)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- SSH file transfer / path traversal (CWE-22) ---
+		// SCP/rsync remote paths reaching these methods can traverse the
+		// remote filesystem (e.g., "../../../etc/passwd") or write to
+		// arbitrary destinations.
+		// scp_put($local, $remote) — both args are paths; remote is the upload target,
+		// local is read from the local filesystem. Either may be tainted.
+		{
+			ID:            "perl.net.openssh.scp_put",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ssh->scp_put\s*\(`,
+			ObjectType:    "",
+			MethodName:    "scp_put",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::OpenSSH SCP upload via $ssh->scp_put() with potentially tainted local or remote path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// scp_get($remote, $local) — remote is read from the remote host, local is written.
+		{
+			ID:            "perl.net.openssh.scp_get",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ssh->scp_get\s*\(`,
+			ObjectType:    "",
+			MethodName:    "scp_get",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::OpenSSH SCP download via $ssh->scp_get() with potentially tainted remote or local path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// rsync_put($local, $remote) — same arg layout as scp_put.
+		{
+			ID:            "perl.net.openssh.rsync_put",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ssh->rsync_put\s*\(`,
+			ObjectType:    "",
+			MethodName:    "rsync_put",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::OpenSSH rsync upload via $ssh->rsync_put() with potentially tainted local or remote path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// rsync_get($remote, $local) — symmetric counterpart of rsync_put; remote
+		// is fetched from the remote host, local is written.
+		{
+			ID:            "perl.net.openssh.rsync_get",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ssh->rsync_get\s*\(`,
+			ObjectType:    "",
+			MethodName:    "rsync_get",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::OpenSSH rsync download via $ssh->rsync_get() with potentially tainted remote or local path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Net::SFTP::Foreign / Net::SFTP — SFTP file operations (CWE-22) ---
+		// Net::SFTP::Foreign is the de-facto-standard Perl SFTP client. Every
+		// method below takes a remote (and sometimes local) path as a positional
+		// argument; a tainted path can traverse the remote filesystem
+		// ("../../../etc/passwd") or write to an arbitrary destination.
+		//
+		// Scoped via ObjectType "Net::SFTP" — the tsflow matcher matches this
+		// against the last path component ("sftp"), so receivers `$sftp` / `$s`
+		// match while unrelated objects do not. (Net::SFTP::Foreign handles are
+		// canonically named `$sftp` in CPAN docs and real code, including those
+		// returned by Net::OpenSSH's `$ssh->sftp`.) The `Pattern` field is the
+		// Layer-1 regex fallback only — tsflow ignores it.
+		//
+		// `open`, `mkdir`, `rmdir`, `rename`, `symlink`, `chmod`, `chown`,
+		// `mkpath` on a `$sftp` handle are already covered by the ObjectType-""
+		// builtin filesystem sinks (perl.open, perl.mkdir, …) and are not
+		// duplicated here.
+
+		// get($remote, $local) — download: remote path is read, local path is written.
+		{
+			ID:            "perl.net.sftp.get",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->get\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "get",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign download via $sftp->get() with potentially tainted remote or local path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// put($local, $remote) — upload: local path is read, remote path is written.
+		{
+			ID:            "perl.net.sftp.put",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->put\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "put",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign upload via $sftp->put() with potentially tainted local or remote path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// get_content($remote) — read the contents of a remote file into a scalar.
+		{
+			ID:            "perl.net.sftp.get_content",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->get_content\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "get_content",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign remote file read via $sftp->get_content() with potentially tainted remote path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// put_content($content, $remote) — write a scalar to a remote file; the
+		// remote path is the second positional argument.
+		{
+			ID:            "perl.net.sftp.put_content",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->put_content\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "put_content",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign remote file write via $sftp->put_content() with potentially tainted remote path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// mget($remote_pattern, $local_dir) — fetch multiple remote files.
+		{
+			ID:            "perl.net.sftp.mget",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->mget\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "mget",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign multi-download via $sftp->mget() with potentially tainted remote pattern or local directory",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// mput($local_pattern, $remote_dir) — upload multiple local files.
+		{
+			ID:            "perl.net.sftp.mput",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->mput\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "mput",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign multi-upload via $sftp->mput() with potentially tainted local pattern or remote directory",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// rget($remote_dir, $local_dir) — recursive download of a remote tree.
+		{
+			ID:            "perl.net.sftp.rget",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->rget\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "rget",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign recursive download via $sftp->rget() with potentially tainted remote or local directory",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// rput($local_dir, $remote_dir) — recursive upload of a local tree.
+		{
+			ID:            "perl.net.sftp.rput",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->rput\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "rput",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign recursive upload via $sftp->rput() with potentially tainted local or remote directory",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// ls($remote_dir) — directory listing; the path argument is the traversal vector.
+		{
+			ID:            "perl.net.sftp.ls",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->ls\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "ls",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign remote directory listing via $sftp->ls() with potentially tainted remote path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// remove($remote) — delete a remote file.
+		{
+			ID:            "perl.net.sftp.remove",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->remove\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "remove",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign remote file deletion via $sftp->remove() with potentially tainted remote path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// rremove($remote_dirs) — recursive remote deletion.
+		{
+			ID:            "perl.net.sftp.rremove",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->rremove\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "rremove",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Net::SFTP::Foreign recursive remote deletion via $sftp->rremove() with potentially tainted remote path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// setstat($remote, %attrs) — change attributes (perm/uid/mtime) of a remote path.
+		{
+			ID:            "perl.net.sftp.setstat",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$sftp->setstat\s*\(`,
+			ObjectType:    "Net::SFTP",
+			MethodName:    "setstat",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Net::SFTP::Foreign remote attribute change via $sftp->setstat() with potentially tainted remote path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Net::SSH::Perl / Net::Telnet — remote command execution (CWE-78) ---
+		// Net::SSH::Perl (the pure-Perl SSH client) and Net::Telnet both expose
+		// a `$conn->cmd($command)` method that runs a shell command on the remote
+		// host. ObjectType is left empty (same convention as the existing
+		// perl.net.openssh.* and perl.net.ssh2.exec entries) — `->cmd(` is a
+		// remote-execution idiom in Perl, not a generic verb.
+		{
+			ID:            "perl.net.sshperl.cmd",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ssh->cmd\s*\(`,
+			ObjectType:    "",
+			MethodName:    "cmd",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Net::SSH::Perl / Net::Telnet remote command execution via $conn->cmd() with potentially tainted command",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Net::SCP — SCP file transfer (CWE-22) ---
+		// Object interface: Net::SCP->new then $scp->get($remote, $local) /
+		// $scp->put($local, $remote). Scoped via ObjectType "Net::SCP" so the
+		// tsflow matcher binds to receivers named `$scp`.
+		{
+			ID:            "perl.net.scp.get",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangPerl,
+			Pattern:       `\$scp->get\s*\(`,
+			ObjectType:    "Net::SCP",
+			MethodName:    "get",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::SCP download via $scp->get() with potentially tainted remote or local path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "perl.net.scp.put",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$scp->put\s*\(`,
+			ObjectType:    "Net::SCP",
+			MethodName:    "put",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Net::SCP upload via $scp->put() with potentially tainted local or remote path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- SSRF / URL fetch — additional HTTP client APIs (CWE-918) ---
+		// Fills out the LWP::Simple/LWP::UserAgent/Mojo::UserAgent/HTTP::Request
+		// surface. The existing entries only cover the most common verbs; the
+		// helpers and alternate verbs below are equally exploitable because the
+		// URL argument is the first positional arg to each.
+
+		// LWP::Simple helpers — bare procedural functions imported into the
+		// caller's namespace. `getstore` and `getprint` are distinctive names
+		// not reused by other CPAN modules, so matching them without an
+		// ObjectType is safe.
+		{
+			ID:            "perl.lwp.simple.getstore",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\bgetstore\s*\(|LWP::Simple::getstore\s*\(`,
+			ObjectType:    "",
+			MethodName:    "getstore",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via LWP::Simple::getstore() — fetches a user-controlled URL and writes the response to a file (also path-traversal risk on arg 1)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.lwp.simple.getprint",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\bgetprint\s*\(|LWP::Simple::getprint\s*\(`,
+			ObjectType:    "",
+			MethodName:    "getprint",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via LWP::Simple::getprint() — fetches a user-controlled URL and prints the response to STDOUT",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// LWP::UserAgent — mirror() downloads + saves; head() issues a HEAD
+		// request. Both take the URL as arg 0 and are common SSRF vectors.
+		{
+			ID:            "perl.lwp.ua.mirror",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ua->mirror\s*\(|LWP::UserAgent.*->mirror\s*\(`,
+			ObjectType:    "LWP::UserAgent",
+			MethodName:    "mirror",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via LWP::UserAgent->mirror() — fetches a user-controlled URL and saves to a file (also path-traversal on arg 1)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.lwp.ua.head",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ua->head\s*\(|LWP::UserAgent.*->head\s*\(`,
+			ObjectType:    "LWP::UserAgent",
+			MethodName:    "head",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via LWP::UserAgent->head() — HEAD request to a user-controlled URL",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// Mojo::UserAgent — the existing entries cover get/post; add the
+		// remaining HTTP verbs and the low-level build_tx() transaction
+		// constructor that every higher-level method wraps.
+		{
+			ID:            "perl.mojo.ua.head",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ua->head\s*\(|Mojo::UserAgent.*->head\s*\(`,
+			ObjectType:    "Mojo::UserAgent",
+			MethodName:    "head",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via Mojo::UserAgent->head() — HEAD request to a user-controlled URL",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.mojo.ua.put",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ua->put\s*\(|Mojo::UserAgent.*->put\s*\(`,
+			ObjectType:    "Mojo::UserAgent",
+			MethodName:    "put",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via Mojo::UserAgent->put() — PUT request to a user-controlled URL",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.mojo.ua.delete",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ua->delete\s*\(|Mojo::UserAgent.*->delete\s*\(`,
+			ObjectType:    "Mojo::UserAgent",
+			MethodName:    "delete",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via Mojo::UserAgent->delete() — DELETE request to a user-controlled URL",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.mojo.ua.patch",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ua->patch\s*\(|Mojo::UserAgent.*->patch\s*\(`,
+			ObjectType:    "Mojo::UserAgent",
+			MethodName:    "patch",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via Mojo::UserAgent->patch() — PATCH request to a user-controlled URL",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.mojo.ua.build_tx",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$ua->build_tx\s*\(|Mojo::UserAgent.*->build_tx\s*\(`,
+			ObjectType:    "Mojo::UserAgent",
+			MethodName:    "build_tx",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "SSRF via Mojo::UserAgent->build_tx() — builds a transaction whose URL (arg 1) is then sent via start/start_p",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// HTTP::Request constructor — HTTP::Request->new($method, $url) takes
+		// the URL as arg 1. The resulting request object is then dispatched
+		// via LWP::UserAgent->request(), so flagging the constructor catches
+		// SSRF even when the dispatch receiver has been renamed.
+		{
+			ID:            "perl.http.request.new",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `HTTP::Request->new\s*\(`,
+			ObjectType:    "HTTP::Request",
+			MethodName:    "new",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "SSRF via HTTP::Request->new() constructor — user-controlled URL flows into the request object (arg 1)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- SOAP::Lite — SSRF via SOAP transport configuration (CWE-918) ---
+		// proxy() and endpoint() set the actual SOAP server URL that subsequent
+		// method dispatches POST to. service() loads a remote WSDL document
+		// from a user-controlled URL (HTTP GET to attacker-controlled host).
+		// uri() is intentionally excluded — per the SOAP::Lite docs it sets
+		// the XML namespace URN (e.g. "urn:Foo"), not the request endpoint,
+		// and does not trigger an outbound HTTP request on its own.
+		//
+		// SOAP::Lite is one of the longest-lived Perl modules on CPAN and is
+		// still bundled with many enterprise Perl services that sit behind
+		// reverse proxies, where SSRF lets an attacker reach internal
+		// dependencies (cloud metadata, internal APIs).
+		//
+		// Two entries per method: the tsflow matcher's receiver heuristic
+		// matches "$soap" against ObjectType "SOAP" via direct lowercase
+		// equality, and matches "SOAP::Lite" against ObjectType "SOAP::Lite"
+		// via the same path — but neither cross-matches (the matcher does not
+		// normalize "::" inside receivers, so "$soap" cannot reach
+		// "SOAP::Lite", and "SOAP::Lite" is not a prefix of "SOAP"). Pairing
+		// the entries covers both the class-method form and the instance form
+		// without modifying the matcher.
+		{
+			ID:            "perl.soap.lite.proxy",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$soap->proxy\s*\(|SOAP::Lite.*->proxy\s*\(`,
+			ObjectType:    "SOAP::Lite",
+			MethodName:    "proxy",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via SOAP::Lite->proxy() — sets the SOAP server URL that subsequent method dispatches POST to",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.soap.proxy",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$soap->proxy\s*\(`,
+			ObjectType:    "SOAP",
+			MethodName:    "proxy",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via $soap->proxy() (SOAP::Lite instance form) — sets the SOAP server URL that subsequent method dispatches POST to",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.soap.lite.endpoint",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$soap->endpoint\s*\(|SOAP::Lite.*->endpoint\s*\(`,
+			ObjectType:    "SOAP::Lite",
+			MethodName:    "endpoint",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via SOAP::Lite->endpoint() — changes the SOAP request URL without reloading transport; user-controlled URL becomes the target of subsequent calls",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.soap.endpoint",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$soap->endpoint\s*\(`,
+			ObjectType:    "SOAP",
+			MethodName:    "endpoint",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via $soap->endpoint() (SOAP::Lite instance form) — changes the SOAP request URL; user-controlled URL becomes the target of subsequent calls",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.soap.lite.service",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$soap->service\s*\(|SOAP::Lite.*->service\s*\(`,
+			ObjectType:    "SOAP::Lite",
+			MethodName:    "service",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via SOAP::Lite->service() — fetches a WSDL document from a user-controlled URL (HTTP GET to attacker-controlled host) to auto-generate method stubs",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "perl.soap.service",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangPerl,
+			Pattern:       `\$soap->service\s*\(`,
+			ObjectType:    "SOAP",
+			MethodName:    "service",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SSRF via $soap->service() (SOAP::Lite instance form) — fetches a WSDL document from a user-controlled URL to auto-generate method stubs",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		// --- XML::LibXSLT / XML::XSLT — XSLT injection (CWE-91) ---
+		// Untrusted XSLT stylesheets enable arbitrary file read via the
+		// document() function, network access via xsl:include / xsl:import,
+		// and command execution through EXSLT extensions
+		// (str:tokenize, exsl:document) — effectively RCE. Mitigate by
+		// installing XML::LibXSLT::Security callbacks via security_callbacks().
+		// See CVE-2019-13117 and the Acunetix XSLT-injection writeup for
+		// real-world exploitation. parse_stylesheet / parse_stylesheet_file
+		// are unique to XML::LibXSLT::Stylesheet and have no naming clash
+		// with other CPAN modules.
+		// parse_stylesheet / parse_stylesheet_file are unique to
+		// XML::LibXSLT::Stylesheet — no other CPAN module exposes those
+		// exact method names — so an empty ObjectType is safe and sidesteps
+		// the matcher's "$xslt" vs "XML::LibXSLT" receiver-heuristic mismatch.
+		{
+			ID:            "perl.xml.libxslt.parse_stylesheet",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->parse_stylesheet\s*\(`,
+			ObjectType:    "",
+			MethodName:    "parse_stylesheet",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "XML::LibXSLT parses a tainted XSLT document — stylesheet body controls file/network/EXSLT command execution",
+			CWEID:         "CWE-91",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.xml.libxslt.parse_stylesheet_file",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->parse_stylesheet_file\s*\(`,
+			ObjectType:    "",
+			MethodName:    "parse_stylesheet_file",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "XML::LibXSLT loads an XSLT stylesheet from a tainted file path — attacker-controlled location can deliver a hostile stylesheet",
+			CWEID:         "CWE-91",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.xml.libxslt.transform_file",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangPerl,
+			Pattern:       `XML::LibXSLT.*->transform_file\s*\(|\$(?:stylesheet|ss|style|xslt)->transform_file\s*\(`,
+			ObjectType:    "XML::LibXSLT::Stylesheet",
+			MethodName:    "transform_file",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "XML::LibXSLT applies a stylesheet to a tainted source XML file path — enables path traversal and indirect XSLT-side data access",
+			CWEID:         "CWE-91",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.xml.xslt.new",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangPerl,
+			Pattern:       `XML::XSLT->new\s*\(`,
+			ObjectType:    "XML::XSLT",
+			MethodName:    "new",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "XML::XSLT (pure-Perl processor) constructed with a tainted stylesheet — first arg is the XSL document body",
+			CWEID:         "CWE-91",
+		},
+		// ── MongoDB NoSQL injection — MongoDB.pm driver (CWE-943) ─────
+		// Filter/update documents built from untrusted input enable NoSQL
+		// operator injection ($ne, $gt, $regex, $where) bypassing auth or
+		// exfiltrating data. https://metacpan.org/pod/MongoDB::Collection
+		{
+			ID:            "perl.mongo.collection.find",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->find\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "find",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "MongoDB::Collection find() with user-controlled filter enables NoSQL operator injection",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.find_one",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->find_one\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "find_one",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "MongoDB::Collection find_one() with user-controlled filter enables NoSQL operator injection (e.g., auth bypass via { password => { '$ne' => '' } })",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.find_one_and_update",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->find_one_and_update\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "find_one_and_update",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Collection find_one_and_update() with user-controlled filter or update document (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.find_one_and_replace",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->find_one_and_replace\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "find_one_and_replace",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Collection find_one_and_replace() with user-controlled filter or replacement document (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.find_one_and_delete",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->find_one_and_delete\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "find_one_and_delete",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Collection find_one_and_delete() with user-controlled filter (NoSQL injection can delete unintended records)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.update_one",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->update_one\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "update_one",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Collection update_one() with user-controlled filter or update document (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.update_many",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->update_many\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "update_many",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Collection update_many() with user-controlled filter or update document (NoSQL injection affects multiple records)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.replace_one",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->replace_one\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "replace_one",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Collection replace_one() with user-controlled filter or replacement document (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.delete_one",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->delete_one\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "delete_one",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Collection delete_one() with user-controlled filter (NoSQL injection can delete unintended records)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.delete_many",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->delete_many\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "delete_many",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Collection delete_many() with user-controlled filter (NoSQL injection can wipe collections via {} or $ne injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.count_documents",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->count_documents\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "count_documents",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "MongoDB::Collection count_documents() with user-controlled filter (NoSQL injection leaks record existence via $regex/$where)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.aggregate",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->aggregate\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "aggregate",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Collection aggregate() with user-controlled pipeline stages (NoSQL injection via $match/$lookup/$out stages)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.distinct",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->distinct\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "distinct",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "MongoDB::Collection distinct() with user-controlled field name or filter (NoSQL injection / field enumeration)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.collection.bulk_write",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->bulk_write\s*\(`,
+			ObjectType:    "MongoDB::Collection",
+			MethodName:    "bulk_write",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Collection bulk_write() with user-controlled operation list (NoSQL injection across multiple ops)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.mongo.database.run_command",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->run_command\s*\(`,
+			ObjectType:    "MongoDB::Database",
+			MethodName:    "run_command",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "MongoDB::Database run_command() with user-controlled command document (privileged admin operation — NoSQL injection can execute arbitrary DB commands)",
+			CWEID:         "CWE-943",
+		},
+		// Archive extraction sinks (CWE-22 Zip Slip / Tar Slip) — these methods
+		// write archive entries to disk; when the destination path is derived
+		// from an attacker-controlled entry name, traversal escapes the target.
+		// extract_file($entry, $extract_path) — second arg is destination path.
+		{
+			ID:            "perl.archive.tar.extract_file",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->extract_file\s*\(`,
+			ObjectType:    "",
+			MethodName:    "extract_file",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Archive::Tar->extract_file() writes a tar entry to a path; tainted destination enables Tar Slip directory traversal",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// extractMember($memberOrName [, $extractedName]) — second arg is destination.
+		{
+			ID:            "perl.archive.zip.extractmember",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->extractMember\s*\(`,
+			ObjectType:    "",
+			MethodName:    "extractMember",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Archive::Zip->extractMember() writes a zip entry to disk; tainted destination enables Zip Slip directory traversal",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// extractToFileNamed($fileName) — first arg is destination path.
+		{
+			ID:            "perl.archive.zip.extracttofilenamed",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->extractToFileNamed\s*\(`,
+			ObjectType:    "",
+			MethodName:    "extractToFileNamed",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Archive::Zip::Member->extractToFileNamed() writes a zip member to a caller-supplied path; tainted name enables Zip Slip directory traversal",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// --- Additional IPC / process-spawn command injection (CWE-78) ---
+		//
+		// Perl has several production-grade IPC modules beyond the ones
+		// already covered (system/exec/IPC::Run/IPC::Open2/3/IPC::System::Simple).
+		// These three are the most common remaining entry points:
+		//   * IPC::Run3::run3         — synchronous run with redirections
+		//   * AnyEvent::Util::run_cmd — async command execution via AnyEvent
+		//   * Proc::Background->new   — fire-and-forget background process
+		// Each takes a command string or array ref as its first argument, so
+		// any tainted value flowing into that slot is an OS-command-injection
+		// sink unless the invocation is in list form with a fixed binary.
+		{
+			ID:            "perl.ipc.run3.run3",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `IPC::Run3::run3\s*\(|\brun3\s*\(`,
+			ObjectType:    "",
+			MethodName:    "run3",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Critical,
+			Description:   "IPC::Run3 run3() executes an external command whose argument vector is the first parameter — a tainted command name or argument string reaches the kernel's execve",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.anyevent.util.run_cmd",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `AnyEvent::Util::run_cmd\s*\(|\brun_cmd\s*\(`,
+			ObjectType:    "",
+			MethodName:    "run_cmd",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Critical,
+			Description:   "AnyEvent::Util run_cmd() spawns an asynchronous child process; its first argument (scalar string or array ref) is shell-parsed when passed as a scalar, so tainted input leads to OS command injection",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.proc.background.new",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `Proc::Background->new\s*\(`,
+			ObjectType:    "Proc::Background",
+			MethodName:    "new",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Critical,
+			Description:   "Proc::Background->new() starts a background process whose command-line comes from the constructor arguments — a tainted scalar argument is parsed by the shell (list form with a fixed binary is the only safe shape)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// ── Redis server-side Lua code injection (CWE-94) ────────────
+		// The CPAN `Redis` and `Redis::Fast` clients expose EVAL / EVALSHA
+		// / SCRIPT LOAD which ship a Lua script to the Redis server where
+		// it runs in the sandboxed scripting engine. A tainted script body
+		// is arbitrary code execution inside Redis (and historically escapes
+		// the sandbox — see CVE-2022-0543 Debian/Ubuntu Redis Lua sandbox
+		// bypass). Mirrors ruby.redis.eval, php.redis.eval, py.redis.eval,
+		// csharp.redis.scriptevaluate etc.
+		{
+			ID:            "perl.redis.eval",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w*redis\w*->eval\s*\(`,
+			ObjectType:    "Redis",
+			MethodName:    "eval",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Redis EVAL executes a server-side Lua script; a tainted script body is code injection on the Redis server (CWE-94). Use fixed scripts with EVALSHA against a known digest.",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.redis.evalsha",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w*redis\w*->evalsha\s*\(`,
+			ObjectType:    "Redis",
+			MethodName:    "evalsha",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Redis EVALSHA runs a previously-loaded Lua script by SHA-1 digest; if the digest is attacker-controlled (or was loaded from a tainted SCRIPT LOAD), this is still code injection (CWE-94). Only pass digests of scripts you loaded yourself from literal sources.",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.redis.script_load",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w*redis\w*->script_load\s*\(`,
+			ObjectType:    "Redis",
+			MethodName:    "script_load",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Redis SCRIPT LOAD registers a Lua script for later EVALSHA execution; loading a tainted script body is code injection on the Redis server once any caller runs its SHA (CWE-94).",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Image::Magick / Graphics::Magick (PerlMagick) command injection (CWE-78) ---
+		// PerlMagick (Image::Magick on CPAN, shipped with ImageMagick) and the
+		// API-compatible Graphics::Magick wrap ImageMagick's C library. Reading
+		// an attacker-controlled image triggers the full coder/delegate chain —
+		// historically exploitable via malicious SVG / MVG / MSL / PDF / EPHEMERAL
+		// content ("ImageTragick", CVE-2016-3714 and the long tail of CVE-2017-
+		// 17939, CVE-2019-7395, CVE-2020-27829, CVE-2022-44267 in the same family).
+		// `magick =>` coder prefixes (e.g. `msl:`, `mvg:`, `ephemeral:`) and the
+		// legacy `|command` open-syntax make any tainted filename/blob reaching
+		// these methods a command-injection/RCE sink. Mirrors the Ruby
+		// MiniMagick/RMagick catalog and the C++ Magick++ ImageTragick sinks.
+		{
+			ID:            "perl.imagemagick.new",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `Image::Magick->new\s*\(`,
+			ObjectType:    "Image::Magick",
+			MethodName:    "new",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Image::Magick->new with tainted constructor attributes (e.g. magick=>, filename=>) — tainted `magick` selects the coder (msl:/mvg:/ephemeral: trigger ImageTragick RCE, CVE-2016-3714); tainted `filename` is later passed to Read during coder probing",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.graphicsmagick.new",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `Graphics::Magick->new\s*\(`,
+			ObjectType:    "Graphics::Magick",
+			MethodName:    "new",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Graphics::Magick->new with tainted constructor attributes — GraphicsMagick forks the ImageMagick codebase and inherits the same coder-prefix attack surface (ImageTragick-class, CVE-2017-11140, CVE-2017-12937)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.imagemagick.readimage",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->ReadImage\s*\(`,
+			ObjectType:    "",
+			MethodName:    "ReadImage",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Image::Magick / Graphics::Magick $image->ReadImage() with tainted path — primary ImageTragick vector: `msl:/tmp/x.msl` or `mvg:` prefixes execute arbitrary commands; legacy `|shell-cmd` syntax is still accepted (CVE-2016-3714)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.imagemagick.blobtoimage",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->BlobToImage\s*\(`,
+			ObjectType:    "",
+			MethodName:    "BlobToImage",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Image::Magick / Graphics::Magick $image->BlobToImage() with tainted bytes — magic-bytes detection routes SVG/MVG/PDF coders that execute embedded delegates (ImageTragick RCE, CVE-2016-3714)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.imagemagick.writeimage",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->WriteImage\s*\(`,
+			ObjectType:    "",
+			MethodName:    "WriteImage",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Image::Magick / Graphics::Magick $image->WriteImage() with tainted filename — coder-prefix selection (e.g. `ephemeral:/etc/passwd`, `info:|cmd`) turns a write into file overwrite or command execution via delegates",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.imagemagick.imagetoblob",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->ImageToBlob\s*\(`,
+			ObjectType:    "",
+			MethodName:    "ImageToBlob",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Image::Magick / Graphics::Magick $image->ImageToBlob() with tainted `magick=>` attribute — encoder-side coder selection still executes MVG/MSL delegates when the chosen format drives an external tool",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.imagemagick.mogrify",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->Mogrify\s*\(`,
+			ObjectType:    "",
+			MethodName:    "Mogrify",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Image::Magick / Graphics::Magick $image->Mogrify() with tainted operator arguments — `-draw`, `-format`, `-process` and `-write` options are ImageMagick command directives that can run arbitrary programs (CVE-2016-3717, CVE-2022-44268-class file disclosure)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Search::Elasticsearch / OpenSearch::Client query-DSL + Painless injection (CWE-943, CWE-94) ---
+		// Search::Elasticsearch is the official Perl client (also vendored as
+		// OpenSearch::Client for OpenSearch). Each high-level method takes a
+		// `body =>` named argument that is serialized as the JSON / NDJSON
+		// query body sent to the cluster. Tainted values inside the body
+		// permit query-structure injection (filter bypass, cross-index
+		// exfiltration) and — for endpoints accepting a `script` /
+		// `script_fields` field — Painless code execution on the cluster.
+		// Mirrors go.elasticsearch.*, js.elasticsearch.*, kotlin.elasticsearch.*,
+		// ruby.elasticsearch.* (CWE-943 + CWE-94).
+		// Refs:
+		//   https://metacpan.org/pod/Search::Elasticsearch
+		//   https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
+		//   https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-execute-api.html
+		{
+			ID:            "perl.elasticsearch.bulk",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->bulk\s*\(`,
+			ObjectType:    "",
+			MethodName:    "bulk",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Search::Elasticsearch $e->bulk() with tainted `body =>` NDJSON payload — DSL injection across mixed index/update/delete actions (CWE-943)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.elasticsearch.msearch",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->msearch\s*\(`,
+			ObjectType:    "",
+			MethodName:    "msearch",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Search::Elasticsearch $e->msearch() with tainted `body =>` NDJSON — per-shard DSL injection / cross-index data exfiltration (CWE-943)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.elasticsearch.delete_by_query",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->delete_by_query\s*\(`,
+			ObjectType:    "",
+			MethodName:    "delete_by_query",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Critical,
+			Description:   "Search::Elasticsearch $e->delete_by_query() with tainted `body =>` query — DSL injection on a destructive bulk operation (mass document deletion outside intended scope, CWE-943)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.elasticsearch.update_by_query",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->update_by_query\s*\(`,
+			ObjectType:    "",
+			MethodName:    "update_by_query",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Critical,
+			Description:   "Search::Elasticsearch $e->update_by_query() body accepts a Painless `script.source` — tainted source = arbitrary code execution on the cluster, plus DSL injection over the matching query (CWE-94)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.elasticsearch.reindex",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->reindex\s*\(`,
+			ObjectType:    "",
+			MethodName:    "reindex",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Critical,
+			Description:   "Search::Elasticsearch $e->reindex() body accepts a Painless `script.source` plus tainted source/dest selectors — Painless code execution and cross-index data movement (CWE-94)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.elasticsearch.put_script",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->put_script\s*\(`,
+			ObjectType:    "",
+			MethodName:    "put_script",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Critical,
+			Description:   "Search::Elasticsearch $e->put_script() persists a tainted Painless script under a stored ID — every later request that invokes that ID executes attacker-controlled code on the cluster (CWE-94)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.elasticsearch.scripts_painless_execute",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->scripts_painless_execute\s*\(`,
+			ObjectType:    "",
+			MethodName:    "scripts_painless_execute",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Critical,
+			Description:   "Search::Elasticsearch $e->scripts_painless_execute() runs an ad-hoc Painless script on the cluster — tainted body = remote code evaluation (CWE-94)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.elasticsearch.search_template",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangPerl,
+			Pattern:       `\$\w+->search_template\s*\(`,
+			ObjectType:    "",
+			MethodName:    "search_template",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Search::Elasticsearch $e->search_template() with tainted Mustache template source — server-side template injection that compiles into a query DSL on the cluster (CWE-943)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Catalyst framework — additional response/stash/forward sinks ---
+		// Catalyst::Response exposes the same canonical methods as HTTP::Response
+		// (location, content_type, write). $c is the conventional controller
+		// invocant; the matcher's prefix-abbreviation heuristic maps receiver
+		// "c" onto ObjectType "Catalyst" via HasPrefix("catalyst","c").
+		// (Note: $c->res->header(name, value) is intentionally not added here
+		// because perl.cgi.header registers earlier with the same indexed
+		// method name "header" and is matched first via HasPrefix("cgi","c"),
+		// so the new entry would never fire. CGI's existing DangerousArgs [0]
+		// already catches the tainted-name CRLF case.)
+		{
+			ID:            "perl.catalyst.res.location",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->res(?:ponse)?->location\s*\(`,
+			ObjectType:    "Catalyst",
+			MethodName:    "response->location",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Catalyst $c->res->location() sets the Location header — tainted URL enables open-redirect attacks",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "perl.catalyst.res.content_type",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->res(?:ponse)?->content_type\s*\(`,
+			ObjectType:    "Catalyst",
+			MethodName:    "response->content_type",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Catalyst $c->res->content_type() with tainted MIME — attacker can force content-sniffing into HTML/JS execution context",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.catalyst.res.write",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->res(?:ponse)?->write\s*\(`,
+			ObjectType:    "Catalyst",
+			MethodName:    "response->write",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Catalyst $c->res->write() streams a chunk into the response body — tainted data is reflected unescaped (XSS)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.catalyst.stash.call",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->stash\s*\(`,
+			ObjectType:    "Catalyst",
+			MethodName:    "stash",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "Catalyst $c->stash(key => value) call — tainted value crosses the trust boundary into TT/Mason templates without explicit escaping",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "perl.catalyst.forward",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->forward\s*\(`,
+			ObjectType:    "Catalyst",
+			MethodName:    "forward",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Catalyst $c->forward() dispatches to a controller action whose name is the first argument — tainted action name = arbitrary controller invocation (CWE-94)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.catalyst.detach",
+			Category:      taint.SnkEval,
+			Language:      rules.LangPerl,
+			Pattern:       `\$c->detach\s*\(`,
+			ObjectType:    "Catalyst",
+			MethodName:    "detach",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Catalyst $c->detach() like forward() but does not return — tainted action name dispatches to attacker-chosen controller (CWE-94)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- File-upload sinks (CWE-434) ---
+		{
+			ID:            "perl.cgi.upload",
+			Category:      taint.SnkUpload,
+			Language:      rules.LangPerl,
+			Pattern:       `->upload\s*\(`,
+			ObjectType:    "CGI",
+			MethodName:    "upload",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "CGI->upload($field) — returns an attacker-supplied file handle whose filename is client-controlled. Copying it into a destination path without extension/MIME validation is unrestricted file upload (CWE-434).",
+			CWEID:         "CWE-434",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "perl.plack.request.upload",
+			Category:      taint.SnkUpload,
+			Language:      rules.LangPerl,
+			Pattern:       `->uploads?\s*(?:\(|\b)`,
+			ObjectType:    "Plack::Request",
+			MethodName:    "upload/uploads",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Plack::Request->upload($name) / ->uploads — returns Plack::Request::Upload object(s) with client-supplied filename/content_type/path. Persisting to disk without an extension allowlist is unrestricted file upload (CWE-434).",
+			CWEID:         "CWE-434",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "perl.mojo.upload.move_to",
+			Category:      taint.SnkUpload,
+			Language:      rules.LangPerl,
+			Pattern:       `->move_to\s*\(`,
+			ObjectType:    "Mojo::Upload",
+			MethodName:    "move_to",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Mojolicious Mojo::Upload->move_to($path) persists an uploaded file at the given path; tainted path is unrestricted file upload + path traversal (CWE-434/CWE-22).",
+			CWEID:         "CWE-434",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+
+		// --- CSV/formula injection sinks (CWE-1236) ---
+		{
+			ID:            "perl.text_csv.print",
+			Category:      taint.SnkCSV,
+			Language:      rules.LangPerl,
+			Pattern:       `->print\s*\(`,
+			ObjectType:    "Text::CSV",
+			MethodName:    "print",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "Text::CSV->print($fh, \\@row) — string cells starting with =, +, -, @, tab, or CR become spreadsheet formulas when opened in Excel/Sheets (CSV/formula injection, CWE-1236). Sanitize at-risk cells with a leading single quote.",
+			CWEID:         "CWE-1236",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "perl.text_csv.combine",
+			Category:      taint.SnkCSV,
+			Language:      rules.LangPerl,
+			Pattern:       `->combine\s*\(`,
+			ObjectType:    "Text::CSV",
+			MethodName:    "combine",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Text::CSV->combine(@row) — joins a row into the buffer; same formula-injection risk on tainted cells (CWE-1236).",
+			CWEID:         "CWE-1236",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- JWT signature/algorithm-confusion sinks (CWE-347) ---
+		// Crypt::JWT (decode_jwt), Mojo::JWT, and JSON::WebToken are the three
+		// mainstream Perl JOSE libraries. Each lets the caller decode a
+		// client-supplied token; if the verifier is not pinned to a specific
+		// algorithm (Crypt::JWT `accepted_alg`, Mojo::JWT non-"none" algorithm,
+		// JSON::WebToken explicit alg) the token is trusted under an
+		// attacker-chosen algorithm — classic alg-confusion (RS256→HS256 key
+		// confusion) and the "alg":"none" forgery. Mirrors java.jwt.* (CWE-347),
+		// ruby.jose.jwt.* and py.jwt.decode.noverify. SnkCrypto category like the
+		// JVM JWT sinks.
+		{
+			ID:            "perl.crypt.jwt.decode_jwt",
+			Category:      taint.SnkCrypto,
+			Language:      rules.LangPerl,
+			Pattern:       `\bdecode_jwt\s*\(`,
+			ObjectType:    "Crypt::JWT",
+			MethodName:    "decode_jwt",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Crypt::JWT / JSON::WebToken decode_jwt() of a client-supplied token — without an `accepted_alg`/`accepted_enc` allowlist the signature is verified under an attacker-chosen algorithm, enabling RS256→HS256 key-confusion and alg:none forgery (CWE-347). Pin `accepted_alg => [...]`.",
+			CWEID:         "CWE-347",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+		},
+		{
+			ID:            "perl.jsonwebtoken.decode",
+			Category:      taint.SnkCrypto,
+			Language:      rules.LangPerl,
+			Pattern:       `JSON::WebToken->decode\s*\(|JSON::WebToken::decode\s*\(`,
+			ObjectType:    "JSON::WebToken",
+			MethodName:    "decode",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "JSON::WebToken decode() — accepts the token's own `alg` header (including \"none\") and an optional 3rd arg of 0 disables verification entirely; both enable token forgery / algorithm confusion (CWE-347). Pass an explicit algorithm allowlist.",
+			CWEID:         "CWE-347",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+		},
+		{
+			ID:            "perl.mojo.jwt.algorithm_none",
+			Category:      taint.SnkCrypto,
+			Language:      rules.LangPerl,
+			Pattern:       `->algorithm\s*\(\s*['"]none['"]`,
+			ObjectType:    "Mojo::JWT",
+			MethodName:    "algorithm('none')",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Critical,
+			Description:   "Mojo::JWT configured with the \"none\" algorithm — tokens are issued/accepted without any signature, so any client can forge arbitrary claims (CWE-347). Use a keyed algorithm such as HS256/RS256.",
+			CWEID:         "CWE-347",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+		},
+
+		// --- ReDoS: untrusted regex pattern compilation (CWE-1333) ---
+		// Compiling/matching against a regex whose body interpolates a tainted
+		// variable lets an attacker supply a catastrophic-backtracking pattern
+		// (e.g. (a+)+$), hanging the worker. The pattern requires a `$`/`@`
+		// sigil followed by `{` or a word char so it matches interpolation
+		// (qr/$var/, qr/${name}/, m/@list/) but NOT a literal end-of-string
+		// anchor (qr/foo$/, qr/^[a-z]+$/) which is safe. Neutralized by
+		// quotemeta()/\Q...\E (see perl.regexdos.quotemeta sanitizer).
+		{
+			ID:            "perl.regexdos.qr_interp",
+			Category:      taint.SnkRegexDoS,
+			Language:      rules.LangPerl,
+			Pattern:       `qr\s*[/{(#]\s*[^/})#]*[$@]\{?\w`,
+			ObjectType:    "",
+			MethodName:    "qr// (interpolated pattern)",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "qr// compiles a regex whose body interpolates a tainted variable — an attacker-supplied pattern can trigger catastrophic backtracking (ReDoS, CWE-1333). Escape the value with quotemeta() or \\Q...\\E, or validate it before compiling.",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+		{
+			ID:            "perl.regexdos.match_interp",
+			Category:      taint.SnkRegexDoS,
+			Language:      rules.LangPerl,
+			Pattern:       `=~\s*m?/[^/]*[$@]\{?\w`,
+			ObjectType:    "",
+			MethodName:    "=~ m// (interpolated pattern)",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "=~ m// matches against a regex whose body interpolates a tainted variable — an attacker-supplied pattern can trigger catastrophic backtracking (ReDoS, CWE-1333). Escape with quotemeta() / \\Q...\\E or validate before matching.",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+
+		// ── CGI::Application (CGI::App) sinks ─────────────────────────
+		// Framework-specific view/redirect sinks for the run-mode object
+		// ($self / $app / $webapp / $cgiapp / $c). These complement the
+		// generic system()/DBI/open() sinks (which already fire for CGI::App
+		// flows) with the framework's own output surface.
+
+		// CGI::Application::Plugin::TT — $self->tt_process($template, \%vars)
+		// renders a Template::Toolkit template. A tainted TEMPLATE NAME (arg 0)
+		// permits arbitrary template execution (SSTI); the generic TT process
+		// sink keys on $tt/$template receivers, not the CGI::App run-mode object.
+		{
+			ID:            "perl.cgiapp.tt_process",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangPerl,
+			Pattern:       `\$(?:self|app|webapp|cgiapp|c)->tt_process\s*\(`,
+			ObjectType:    "",
+			MethodName:    "tt_process",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "CGI::Application::Plugin::TT $self->tt_process() with a potentially tainted template name — server-side template injection / arbitrary template execution (CWE-1336)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// CGI::Application redirect — $self->redirect($url) (provided by
+		// CGI::Application::Plugin::Redirect) and the header-based form
+		// $self->header_add( -location => $url ) / header_props( -location => ... ).
+		// A tainted destination URL is an open redirect (CWE-601). The generic
+		// perl.cgi.redirect sink keys on $cgi/$q receivers, not the run-mode object.
+		{
+			ID:            "perl.cgiapp.redirect",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangPerl,
+			Pattern:       `\$(?:self|app|webapp|cgiapp|c)->redirect\s*\(`,
+			ObjectType:    "",
+			MethodName:    "redirect",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "CGI::Application::Plugin::Redirect $self->redirect() with a potentially tainted URL — open redirect (CWE-601)",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
 		},
 	}
 }

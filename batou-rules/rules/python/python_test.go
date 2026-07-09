@@ -101,6 +101,44 @@ env = Environment(autoescape=select_autoescape(['html', 'xml']), loader=FileSyst
 	testutil.MustNotFindRule(t, result, "BATOU-PY-003")
 }
 
+// Framework setup helper (aiohttp_jinja2.setup) with autoescape disabled —
+// no raw Environment(...) constructor. Previously missed because PY-003 was
+// anchored to `Environment(`. dvpwa's app.py is the real-world repro.
+func TestPY003_Jinja2_FrameworkSetup_AutoescapeFalse(t *testing.T) {
+	content := `from aiohttp_jinja2 import setup as setup_jinja
+from jinja2.loaders import PackageLoader
+
+def create_app(app):
+    setup_jinja(app, loader=PackageLoader('sqli', 'templates'),
+                autoescape=False)
+`
+	result := testutil.ScanContent(t, "/app/app.py", content)
+	testutil.MustFindRule(t, result, "BATOU-PY-003")
+}
+
+// A bare autoescape=False with no jinja2/templating indicator nearby must NOT
+// fire — guards the widened pattern against over-matching unrelated config.
+func TestPY003_BareAutoescapeFalse_NoJinjaContext_Safe(t *testing.T) {
+	content := `def build_config():
+    return {"debug": True, "autoescape": False, "workers": 4}
+`
+	result := testutil.ScanContent(t, "/app/config.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-PY-003")
+}
+
+// Framework setup helper that keeps autoescape enabled must NOT fire.
+func TestPY003_FrameworkSetup_AutoescapeTrue_Safe(t *testing.T) {
+	content := `from aiohttp_jinja2 import setup as setup_jinja
+from jinja2.loaders import PackageLoader
+
+def create_app(app):
+    setup_jinja(app, loader=PackageLoader('sqli', 'templates'),
+                autoescape=True)
+`
+	result := testutil.ScanContent(t, "/app/app.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-PY-003")
+}
+
 // ==========================================================================
 // BATOU-PY-004: Unsafe YAML Load
 // ==========================================================================
@@ -708,4 +746,48 @@ def search_handler():
 `
 	result := testutil.ScanContent(t, "/app/search.py", content)
 	testutil.MustFindRule(t, result, "BATOU-PY-012")
+}
+
+// ==========================================================================
+// BATOU-PY-021: Insecure XML parsing — data-sink taint discrimination
+// ==========================================================================
+
+// TestPY021_SafeConfigKey mirrors the OWASP Benchmark ConfigParser dict-shuffle
+// SAFE pattern: external entities are enabled, but the parseString document
+// argument resolves to a constant (keyA), not the request-tainted keyB. The
+// data sink must be evaluated and suppressed (no finding).
+func TestPY021_SafeConfigKey(t *testing.T) {
+	content := `import xml.dom.minidom
+import xml.sax
+import xml.sax.handler
+import configparser
+conf = configparser.ConfigParser()
+conf.add_section('s')
+conf.set('s', 'keyA', 'a-Value')
+conf.set('s', 'keyB', param)
+bar = conf.get('s', 'keyA')
+parser = xml.sax.make_parser()
+parser.setFeature(xml.sax.handler.feature_external_ges, True)
+doc = xml.dom.minidom.parseString(bar, parser)`
+	result := testutil.ScanContent(t, "/app/parser.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-PY-021")
+}
+
+// TestPY021_TaintedConfigKey is the vulnerable counterpart: the document
+// argument resolves to keyB (request-tainted param). The sink must fire.
+func TestPY021_TaintedConfigKey(t *testing.T) {
+	content := `import xml.dom.minidom
+import xml.sax
+import xml.sax.handler
+import configparser
+conf = configparser.ConfigParser()
+conf.add_section('s')
+conf.set('s', 'keyA', 'a-Value')
+conf.set('s', 'keyB', param)
+bar = conf.get('s', 'keyB')
+parser = xml.sax.make_parser()
+parser.setFeature(xml.sax.handler.feature_external_ges, True)
+doc = xml.dom.minidom.parseString(bar, parser)`
+	result := testutil.ScanContent(t, "/app/parser.py", content)
+	testutil.MustFindRule(t, result, "BATOU-PY-021")
 }

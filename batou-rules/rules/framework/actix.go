@@ -13,17 +13,16 @@ import (
 
 var (
 	// BATOU-FW-ACTIX-001: CORS permissive configuration
-	reActixCorsPermissiveOrigin  = regexp.MustCompile(`Cors::permissive\s*\(`)
-	reActixCorsAllowAnyOrigin    = regexp.MustCompile(`\.allow_any_origin\s*\(`)
-	reActixCorsAllowAnyMethod    = regexp.MustCompile(`\.allow_any_method\s*\(`)
+	reActixCorsPermissiveOrigin = regexp.MustCompile(`Cors::permissive\s*\(`)
+	reActixCorsAllowAnyOrigin   = regexp.MustCompile(`\.allow_any_origin\s*\(`)
+	reActixCorsAllowAnyMethod   = regexp.MustCompile(`\.allow_any_method\s*\(`)
 
 	// BATOU-FW-ACTIX-002: Serving static files with user-controlled path
-	reActixNamedFile     = regexp.MustCompile(`NamedFile::open\s*\(\s*(?:format!\s*\(|&format!\s*\(|path\.|req\.|info\.)`)
-	reActixFilesService  = regexp.MustCompile(`Files::new\s*\(\s*"[^"]*"\s*,\s*(?:&?\w+|format!\s*\()`)
+	reActixNamedFile = regexp.MustCompile(`NamedFile::open\s*\(\s*(?:format!\s*\(|&format!\s*\(|path\.|req\.|info\.)`)
 
 	// BATOU-FW-ACTIX-003: SQL injection via format! in query
-	reActixSQLFormat     = regexp.MustCompile(`(?:query|execute|query_as|query_scalar)\s*[!(]\s*(?:&\s*)?format!\s*\(`)
-	reActixSQLFormatStr  = regexp.MustCompile(`(?:query|execute)\s*\(\s*&format!\s*\(`)
+	reActixSQLFormat    = regexp.MustCompile(`(?:query|execute|query_as|query_scalar)\s*[!(]\s*(?:&\s*)?format!\s*\(`)
+	reActixSQLFormatStr = regexp.MustCompile(`(?:query|execute)\s*\(\s*&format!\s*\(`)
 
 	// BATOU-FW-ACTIX-004: Session without secure cookie settings
 	reActixCookieSession   = regexp.MustCompile(`CookieSession::(?:signed|private)\s*\(`)
@@ -31,12 +30,12 @@ var (
 	reActixSessionHttpOnly = regexp.MustCompile(`\.http_only\s*\(\s*true\s*\)`)
 
 	// BATOU-FW-ACTIX-005: Missing authentication extractor
-	reActixHandler        = regexp.MustCompile(`(?:\.route|\.resource|web::(?:get|post|put|delete|patch))\s*\(`)
-	reActixAuthExtractor  = regexp.MustCompile(`(?:Identity|Claims|Auth|Token|Session|User)\s*:`)
+	reActixHandler       = regexp.MustCompile(`(?:\.route|\.resource|web::(?:get|post|put|delete|patch))\s*\(`)
+	reActixAuthExtractor = regexp.MustCompile(`(?:Identity|Claims|Auth|Token|Session|User)\s*:`)
 
 	// BATOU-FW-ACTIX-006: Error response exposing internal details
-	reActixErrorDisplay   = regexp.MustCompile(`HttpResponse::(?:InternalServerError|BadRequest)\s*\(\s*\)\s*\.(?:body|json)\s*\(\s*(?:format!\s*\(|err\.|e\.|error\.)`)
-	reActixErrorDbg       = regexp.MustCompile(`HttpResponse::.*\.body\s*\(\s*format!\s*\(\s*"[^"]*\{:?\?\}`)
+	reActixErrorDisplay = regexp.MustCompile(`HttpResponse::(?:InternalServerError|BadRequest)\s*\(\s*\)\s*\.(?:body|json)\s*\(\s*(?:format!\s*\(|err\.|e\.|error\.)`)
+	reActixErrorDbg     = regexp.MustCompile(`HttpResponse::.*\.body\s*\(\s*format!\s*\(\s*"[^"]*\{:?\?\}`)
 )
 
 func init() {
@@ -66,7 +65,8 @@ func (r *ActixCorsPermissive) Languages() []rules.Language {
 
 func (r *ActixCorsPermissive) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -76,13 +76,13 @@ func (r *ActixCorsPermissive) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 		var title string
-		if m := reActixCorsPermissiveOrigin.FindString(line); m != "" {
+		if m := rules.GFindLower(reActixCorsPermissiveOrigin, line, lowered[i]); m != "" {
 			matched = m
 			title = "Actix-web Cors::permissive() allows all origins and methods"
-		} else if m := reActixCorsAllowAnyOrigin.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reActixCorsAllowAnyOrigin, line, lowered[i]); m != "" {
 			matched = m
 			title = "Actix-web CORS allows any origin"
-		} else if m := reActixCorsAllowAnyMethod.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reActixCorsAllowAnyMethod, line, lowered[i]); m != "" {
 			matched = m
 			title = "Actix-web CORS allows any HTTP method"
 		}
@@ -130,14 +130,15 @@ func (r *ActixStaticPath) Languages() []rules.Language {
 
 func (r *ActixStaticPath) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reActixNamedFile.FindString(line); m != "" {
+		if m := rules.GFindLower(reActixNamedFile, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -181,7 +182,8 @@ func (r *ActixSQLFormat) Languages() []rules.Language {
 
 func (r *ActixSQLFormat) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -190,9 +192,9 @@ func (r *ActixSQLFormat) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reActixSQLFormat.FindString(line); m != "" {
+		if m := rules.GFindLower(reActixSQLFormat, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reActixSQLFormatStr.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reActixSQLFormatStr, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -239,14 +241,15 @@ func (r *ActixInsecureSession) Languages() []rules.Language {
 
 func (r *ActixInsecureSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if !reActixCookieSession.MatchString(line) {
+		if !rules.GMatchLower(reActixCookieSession, line, lowered[i]) {
 			continue
 		}
 
@@ -312,19 +315,20 @@ func (r *ActixMissingAuth) Languages() []rules.Language {
 
 func (r *ActixMissingAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Only flag if the project uses auth extractors somewhere
-	if !reActixAuthExtractor.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reActixAuthExtractor, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if !reActixHandler.MatchString(line) {
+		if !rules.GMatchLower(reActixHandler, line, lowered[i]) {
 			continue
 		}
 		// Look at the handler function signature for auth extractors
@@ -384,7 +388,8 @@ func (r *ActixErrorExposure) Languages() []rules.Language {
 
 func (r *ActixErrorExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -393,9 +398,9 @@ func (r *ActixErrorExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reActixErrorDisplay.FindString(line); m != "" {
+		if m := rules.GFindLower(reActixErrorDisplay, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reActixErrorDbg.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reActixErrorDbg, line, lowered[i]); m != "" {
 			matched = m
 		}
 

@@ -4,21 +4,28 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/testutil"
+	"github.com/turenlabs/batou-rules/rules"
 
 	// Register all rule packages to trigger init() registrations.
-	_ "github.com/turenlabs/batou-rules/rules/injection"
-	_ "github.com/turenlabs/batou-rules/rules/secrets"
-	_ "github.com/turenlabs/batou-rules/rules/crypto"
-	_ "github.com/turenlabs/batou-rules/rules/xss"
-	_ "github.com/turenlabs/batou-rules/rules/traversal"
-	_ "github.com/turenlabs/batou-rules/rules/ssrf"
 	_ "github.com/turenlabs/batou-rules/rules/auth"
+	_ "github.com/turenlabs/batou-rules/rules/crypto"
 	_ "github.com/turenlabs/batou-rules/rules/generic"
+	_ "github.com/turenlabs/batou-rules/rules/injection"
 	_ "github.com/turenlabs/batou-rules/rules/logging"
-	_ "github.com/turenlabs/batou-rules/rules/validation"
 	_ "github.com/turenlabs/batou-rules/rules/memory"
+	_ "github.com/turenlabs/batou-rules/rules/secrets"
+	_ "github.com/turenlabs/batou-rules/rules/ssrf"
+	_ "github.com/turenlabs/batou-rules/rules/traversal"
+	_ "github.com/turenlabs/batou-rules/rules/validation"
+	_ "github.com/turenlabs/batou-rules/rules/xss"
+
+	// AST analyzers — the Group A (Layer 2) tests assert AST-tier rule IDs
+	// (e.g. BATOU-JAVAAST-001), which only register when the analyzer is
+	// linked into the test binary. jsast/goast/pyast happen to be pulled in
+	// transitively by other test files in this package; javaast is not, so it
+	// must be imported here or TestLayer2_JavaAST_SQLConcat sees no AST finding.
+	_ "github.com/turenlabs/batou-core/analyzer/javaast"
 
 	// Taint analysis engine and language catalogs.
 	_ "github.com/turenlabs/batou-core/taint"

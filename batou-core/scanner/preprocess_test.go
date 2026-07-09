@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 )
 
@@ -80,6 +79,74 @@ func TestJoinContinuationLines_PythonStringWithHash(t *testing.T) {
 	got := JoinContinuationLines(input, rules.LangPython)
 	if got != want {
 		t.Errorf("string with hash:\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
+func TestJoinContinuationLinesWithMap_PythonArgparseCollapse(t *testing.T) {
+	// Shape matching tools/carvera_vacuum.py: a multi-line ArgumentParser ctor
+	// that collapses 3 original lines into 1 preprocessed line, shifting every
+	// subsequent original line by 2.
+	input := "import argparse\n" + // orig 1 -> pre 1
+		"parser = argparse.ArgumentParser(\n" + // orig 2 \
+		"    description=\"demo\",\n" + //       orig 3  > collapses to pre 2
+		")\n" + //                                orig 4 /
+		"args = parser.parse_args()\n" // orig 5 -> pre 3
+
+	joined, preToOrig := JoinContinuationLinesWithMap(input, rules.LangPython)
+
+	wantMap := []int{1, 2, 5, 6} // pre 1..4 → orig starts 1, 2, 5, 6 (trailing "")
+	if len(preToOrig) != len(wantMap) {
+		t.Fatalf("preToOrig len = %d, want %d (joined=%q, got=%v)", len(preToOrig), len(wantMap), joined, preToOrig)
+	}
+	for i, want := range wantMap {
+		if preToOrig[i] != want {
+			t.Errorf("preToOrig[%d] = %d, want %d (full map: %v)", i, preToOrig[i], want, preToOrig)
+		}
+	}
+}
+
+func TestJoinContinuationLinesWithMap_NoCollapseIsIdentity(t *testing.T) {
+	// When no joining happens, preToOrig is 1,2,3,...
+	input := "x = 1\ny = 2\nz = 3\n"
+	_, preToOrig := JoinContinuationLinesWithMap(input, rules.LangPython)
+
+	want := []int{1, 2, 3, 4} // 4 lines after split (last is empty)
+	if len(preToOrig) != len(want) {
+		t.Fatalf("preToOrig = %v, want %v", preToOrig, want)
+	}
+	for i, w := range want {
+		if preToOrig[i] != w {
+			t.Errorf("preToOrig[%d] = %d, want %d", i, preToOrig[i], w)
+		}
+	}
+}
+
+func TestJoinContinuationLinesWithMap_UnsupportedLangReturnsNil(t *testing.T) {
+	// Languages without preprocessing return a nil map.
+	input := "const x = 1;\nconst y = 2;\n"
+	joined, preToOrig := JoinContinuationLinesWithMap(input, rules.LangJavaScript)
+	if joined != input {
+		t.Errorf("JS content should be unchanged; got %q", joined)
+	}
+	if preToOrig != nil {
+		t.Errorf("unsupported language should return nil map; got %v", preToOrig)
+	}
+}
+
+func TestJoinContinuationLinesWithMap_BackslashShell(t *testing.T) {
+	// Shell backslash continuation: orig lines 1..3 collapse into preprocessed
+	// line 1; orig line 4 -> preprocessed line 2.
+	input := "curl -X POST \\\n  -H 'Accept: */*' \\\n  http://example.com\necho done\n"
+	_, preToOrig := JoinContinuationLinesWithMap(input, rules.LangShell)
+
+	if len(preToOrig) < 2 {
+		t.Fatalf("expected at least 2 preprocessed lines, got %d (map=%v)", len(preToOrig), preToOrig)
+	}
+	if preToOrig[0] != 1 {
+		t.Errorf("preToOrig[0] = %d, want 1", preToOrig[0])
+	}
+	if preToOrig[1] != 4 {
+		t.Errorf("preToOrig[1] = %d, want 4 (echo line after 3-line backslash collapse)", preToOrig[1])
 	}
 }
 

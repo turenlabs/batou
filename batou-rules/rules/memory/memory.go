@@ -3,10 +3,24 @@ package memory
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/turenlabs/batou-rules/rules"
 )
+
+// sortedMapKeys returns the keys of m in ascending order so that iterating a
+// map (whose Go iteration order is randomized) produces deterministic results.
+// Shared by the memory rules that track freed/uninitialized variables in a map
+// and emit findings while iterating.
+func sortedMapKeys(m map[string]int) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns
@@ -59,9 +73,7 @@ var (
 	// delete / delete[]
 	reDeleteCall = regexp.MustCompile(`\bdelete\s*(?:\[\])?\s+([a-zA-Z_]\w*)`)
 	// Use of pointer after free on same pointer (simplified: free(x) then x-> or *x or x[)
-	reUseAfterFreeDeref = regexp.MustCompile(`(?:->|\*\s*[a-zA-Z_]\w*|\[\s*\d*\s*\])`)
 	// new without delete (C++ raw allocation)
-	reNewAlloc = regexp.MustCompile(`\bnew\s+[a-zA-Z_]\w*(?:\s*\[|\s*\()`)
 )
 
 // Integer overflow in allocation (BATOU-MEM-005)
@@ -89,7 +101,7 @@ var (
 var reLineComment = regexp.MustCompile(`^\s*(?://|#|/\*|\*)`)
 
 func isCommentLine(line string) bool {
-	return reLineComment.MatchString(line)
+	return rules.GMatch(reLineComment, line)
 }
 
 // truncate ensures matched text doesn't exceed maxLen characters.
@@ -107,8 +119,8 @@ func truncate(s string, maxLen int) string {
 
 type BannedFunctions struct{}
 
-func (r BannedFunctions) ID() string              { return "BATOU-MEM-001" }
-func (r BannedFunctions) Name() string            { return "Use of Banned/Dangerous Functions" }
+func (r BannedFunctions) ID() string                      { return "BATOU-MEM-001" }
+func (r BannedFunctions) Name() string                    { return "Use of Banned/Dangerous Functions" }
 func (r BannedFunctions) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r BannedFunctions) Description() string {
 	return "Detects use of C/C++ functions that are inherently unsafe and have been banned or deprecated due to buffer overflow and input validation vulnerabilities."
@@ -119,7 +131,7 @@ func (r BannedFunctions) Languages() []rules.Language {
 
 func (r BannedFunctions) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re         *regexp.Regexp
@@ -143,7 +155,7 @@ func (r BannedFunctions) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -174,8 +186,8 @@ func (r BannedFunctions) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FormatString struct{}
 
-func (r FormatString) ID() string              { return "BATOU-MEM-002" }
-func (r FormatString) Name() string            { return "Format String Vulnerability" }
+func (r FormatString) ID() string                      { return "BATOU-MEM-002" }
+func (r FormatString) Name() string                    { return "Format String Vulnerability" }
 func (r FormatString) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r FormatString) Description() string {
 	return "Detects printf-family functions called with a variable as the format string, enabling format string attacks that can read/write arbitrary memory."
@@ -186,7 +198,7 @@ func (r FormatString) Languages() []rules.Language {
 
 func (r FormatString) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -206,7 +218,7 @@ func (r FormatString) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -237,8 +249,8 @@ func (r FormatString) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type BufferOverflow struct{}
 
-func (r BufferOverflow) ID() string              { return "BATOU-MEM-003" }
-func (r BufferOverflow) Name() string            { return "Buffer Overflow" }
+func (r BufferOverflow) ID() string                      { return "BATOU-MEM-003" }
+func (r BufferOverflow) Name() string                    { return "Buffer Overflow" }
 func (r BufferOverflow) DefaultSeverity() rules.Severity { return rules.High }
 func (r BufferOverflow) Description() string {
 	return "Detects common buffer overflow patterns including unchecked memcpy with variable size, strncpy with strlen of source, and unsafe read/recv into fixed buffers."
@@ -249,7 +261,7 @@ func (r BufferOverflow) Languages() []rules.Language {
 
 func (r BufferOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re         *regexp.Regexp
@@ -275,7 +287,7 @@ func (r BufferOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -306,8 +318,8 @@ func (r BufferOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MemoryManagement struct{}
 
-func (r MemoryManagement) ID() string              { return "BATOU-MEM-004" }
-func (r MemoryManagement) Name() string            { return "Memory Management Issue" }
+func (r MemoryManagement) ID() string                      { return "BATOU-MEM-004" }
+func (r MemoryManagement) Name() string                    { return "Memory Management Issue" }
 func (r MemoryManagement) DefaultSeverity() rules.Severity { return rules.High }
 func (r MemoryManagement) Description() string {
 	return "Detects double free and use-after-free patterns where a pointer is freed and then freed again or dereferenced."
@@ -318,7 +330,7 @@ func (r MemoryManagement) Languages() []rules.Language {
 
 func (r MemoryManagement) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Track freed variables and the line where they were freed.
 	// This is a simple per-function heuristic — it resets on blank lines
@@ -339,7 +351,7 @@ func (r MemoryManagement) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Detect free(ptr) or delete ptr
-		if m := reFreeCall.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reFreeCall, line); m != nil {
 			varName := m[1]
 			if freeLine, ok := freedVars[varName]; ok {
 				// Double free detected
@@ -364,7 +376,7 @@ func (r MemoryManagement) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if m := reDeleteCall.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reDeleteCall, line); m != nil {
 			varName := m[1]
 			if _, ok := freedVars[varName]; ok {
 				findings = append(findings, rules.Finding{
@@ -388,8 +400,10 @@ func (r MemoryManagement) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		// Check for use-after-free: any freed variable used on this line
-		for varName, freeLine := range freedVars {
+		// Check for use-after-free: any freed variable used on this line.
+		// Sorted key order so the finding set is deterministic, not map order.
+		for _, varName := range sortedMapKeys(freedVars) {
+			freeLine := freedVars[varName]
 			// Check if variable is used (not in a free/delete or NULL assignment)
 			if strings.Contains(line, varName) {
 				// Exclude lines that are setting the pointer to NULL
@@ -399,7 +413,7 @@ func (r MemoryManagement) Scan(ctx *rules.ScanContext) []rules.Finding {
 					continue
 				}
 				// Exclude if this line is just another free (handled above)
-				if reFreeCall.MatchString(line) || reDeleteCall.MatchString(line) {
+				if rules.GMatch(reFreeCall, line) || rules.GMatch(reDeleteCall, line) {
 					continue
 				}
 				_ = freeLine
@@ -432,8 +446,8 @@ func (r MemoryManagement) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type IntegerOverflow struct{}
 
-func (r IntegerOverflow) ID() string              { return "BATOU-MEM-005" }
-func (r IntegerOverflow) Name() string            { return "Integer Overflow in Allocation" }
+func (r IntegerOverflow) ID() string                      { return "BATOU-MEM-005" }
+func (r IntegerOverflow) Name() string                    { return "Integer Overflow in Allocation" }
 func (r IntegerOverflow) DefaultSeverity() rules.Severity { return rules.High }
 func (r IntegerOverflow) Description() string {
 	return "Detects arithmetic in memory allocation size arguments (malloc, calloc, realloc) that may overflow, leading to undersized allocations and heap buffer overflows."
@@ -444,7 +458,7 @@ func (r IntegerOverflow) Languages() []rules.Language {
 
 func (r IntegerOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re         *regexp.Regexp
@@ -464,7 +478,7 @@ func (r IntegerOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -495,8 +509,8 @@ func (r IntegerOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NullDeref struct{}
 
-func (r NullDeref) ID() string              { return "BATOU-MEM-006" }
-func (r NullDeref) Name() string            { return "Null Pointer Dereference" }
+func (r NullDeref) ID() string                      { return "BATOU-MEM-006" }
+func (r NullDeref) Name() string                    { return "Null Pointer Dereference" }
 func (r NullDeref) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r NullDeref) Description() string {
 	return "Detects use of malloc/calloc/realloc return values without checking for NULL, which can lead to null pointer dereference and crashes."
@@ -507,7 +521,7 @@ func (r NullDeref) Languages() []rules.Language {
 
 func (r NullDeref) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -515,7 +529,7 @@ func (r NullDeref) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Find allocation assignments: ptr = (type*)malloc(...)
-		m := reAllocAssign.FindStringSubmatch(line)
+		m := rules.GFindSubmatch(reAllocAssign, line)
 		if m == nil {
 			continue
 		}
@@ -553,7 +567,7 @@ func (r NullDeref) Scan(ctx *rules.ScanContext) []rules.Finding {
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
 				SeverityLabel: r.DefaultSeverity().String(),
-				Title:         "Null Dereference: unchecked return from " + reAllocCall.FindString(line),
+				Title:         "Null Dereference: unchecked return from " + rules.GFind(reAllocCall, line),
 				Description:   "The return value of malloc/calloc/realloc is used without checking for NULL. On allocation failure, dereferencing the pointer causes undefined behavior.",
 				FilePath:      ctx.FilePath,
 				LineNumber:    i + 1,

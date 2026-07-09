@@ -183,6 +183,47 @@ parser.parse(input_file)`
 	testutil.MustFindRule(t, result, "BATOU-XXE-003")
 }
 
+// TestXXE003_SAX_SafeConfigKey mirrors the OWASP Benchmark ConfigParser
+// dict-shuffle SAFE pattern: external entities are enabled, but the document
+// argument resolves to a constant (keyA) rather than the request-tainted keyB.
+// The data sink (parseString(bar, parser)) must be evaluated and suppressed.
+func TestXXE003_SAX_SafeConfigKey(t *testing.T) {
+	content := `import xml.dom.minidom
+import xml.sax
+import xml.sax.handler
+import configparser
+conf = configparser.ConfigParser()
+conf.add_section('s')
+conf.set('s', 'keyA', 'a-Value')
+conf.set('s', 'keyB', param)
+bar = conf.get('s', 'keyA')
+parser = xml.sax.make_parser()
+parser.setFeature(xml.sax.handler.feature_external_ges, True)
+doc = xml.dom.minidom.parseString(bar, parser)`
+	result := testutil.ScanContent(t, "/app/parser.py", content)
+	testutil.MustNotFindRule(t, result, "BATOU-XXE-003")
+}
+
+// TestXXE003_SAX_TaintedConfigKey is the vulnerable counterpart: the document
+// argument resolves to keyB, which holds the request-tainted `param`. The sink
+// must fire.
+func TestXXE003_SAX_TaintedConfigKey(t *testing.T) {
+	content := `import xml.dom.minidom
+import xml.sax
+import xml.sax.handler
+import configparser
+conf = configparser.ConfigParser()
+conf.add_section('s')
+conf.set('s', 'keyA', 'a-Value')
+conf.set('s', 'keyB', param)
+bar = conf.get('s', 'keyB')
+parser = xml.sax.make_parser()
+parser.setFeature(xml.sax.handler.feature_external_ges, True)
+doc = xml.dom.minidom.parseString(bar, parser)`
+	result := testutil.ScanContent(t, "/app/parser.py", content)
+	testutil.MustFindRule(t, result, "BATOU-XXE-003")
+}
+
 func TestXXE003_Lxml(t *testing.T) {
 	content := `from lxml import etree
 doc = etree.parse(xml_file)

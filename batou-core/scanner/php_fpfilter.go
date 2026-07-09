@@ -110,7 +110,55 @@ var phpScInArrayCheck = regexp.MustCompile(`\bin_array\s*\(`)
 
 // --- Per-CWE guard checks ---
 
+// phpSinkArgVarRe extracts the first $var arg from a path-sink call so the
+// guard can check the *variable's* provenance rather than scoring any
+// basename()/realpath() that happens to appear in the file (e.g. a basename
+// call used only for the Content-Disposition header).
+var phpSinkArgVarRe = regexp.MustCompile(`\b(?:readfile|file_get_contents|fopen|file_put_contents|copy|unlink|rename|opendir|scandir|glob|include|require|include_once|require_once)\s*\(\s*\$(\w+)`)
+
 func phpScanHasPathGuard(lines []string, sinkLine int) bool {
+	// Identify the variable used as the sink path argument (if any). If we
+	// can name it, restrict basename/realpath credit to assignments that
+	// produced THAT variable — a basename() elsewhere in the file (e.g.
+	// inside a Content-Disposition header) is not a path-traversal guard.
+	var sinkVar string
+	if sinkLine >= 0 && sinkLine < len(lines) {
+		if m := phpSinkArgVarRe.FindStringSubmatch(lines[sinkLine]); m != nil {
+			sinkVar = m[1]
+		}
+	}
+
+	if sinkVar != "" {
+		// Look for `$sinkVar = ...basename(...)` / `...realpath(...)` /
+		// `...pathinfo(...)` in any line at or before the sink. If found,
+		// the sink reads a properly normalized path.
+		assignRe := regexp.MustCompile(`\$` + sinkVar + `\s*=\s*[^;]*\b(?:basename|realpath|pathinfo)\s*\(`)
+		hasRealpath := false
+		hasStrpos := false
+		for i := 0; i <= sinkLine && i < len(lines); i++ {
+			line := lines[i]
+			if assignRe.MatchString(line) {
+				return true
+			}
+			if phpScRealpath.MatchString(line) {
+				hasRealpath = true
+			}
+			if phpScStrpos.MatchString(line) {
+				hasStrpos = true
+			}
+		}
+		if hasRealpath && hasStrpos {
+			// realpath + strpos prefix-check is the canonical jail pattern;
+			// accept it even without a direct assignment match (the sink may
+			// read a transitively-cleaned var).
+			return true
+		}
+		return phpScanHasTypeCoercion(lines, sinkLine) || phpScanHasAllowlist(lines, sinkLine)
+	}
+
+	// Fallback when the finding's line doesn't have a recognizable $var
+	// sink-arg (rare — e.g. include with a constant): keep the legacy
+	// any-basename/realpath behavior so we don't regress prior FP coverage.
 	hasRealpath := false
 	hasStrpos := false
 	for i := max(0, sinkLine-15); i <= sinkLine && i < len(lines); i++ {

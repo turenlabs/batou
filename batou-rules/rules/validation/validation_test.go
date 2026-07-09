@@ -197,10 +197,17 @@ if (val > 0 && val < 100) {
 }
 
 func TestVAL008_Go_StrconvAtoi_Vulnerable(t *testing.T) {
+	// Note 2026-05-05: tightened to require an argument that's a known
+	// user-input source (r.URL.Query / req.Form / c.Param / os.Args /
+	// os.Getenv). Bare `strconv.Atoi(input)` with an opaque variable name
+	// no longer fires; the test now uses a real request source.
 	content := `package main
-import "strconv"
-func handler() {
-	val, _ := strconv.Atoi(input)
+import (
+	"net/http"
+	"strconv"
+)
+func handler(r *http.Request) {
+	val, _ := strconv.Atoi(r.URL.Query().Get("x"))
 	items[val] = true
 }`
 	result := testutil.ScanContent(t, "/app/handler.go", content)

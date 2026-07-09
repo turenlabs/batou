@@ -25,24 +25,23 @@ var (
 
 // SWIFT-020: Vapor XSS via HTML response (CWE-79)
 var (
-	reHTMLInterp    = regexp.MustCompile(`"<[a-zA-Z][^"]*\\?\([^)]*\)[^"]*>|"<[a-zA-Z][^"]*"\s*\+`)
-	reHTMLResponse  = regexp.MustCompile(`Response\s*\(\s*status\s*:.*body\s*:|text/html`)
-	reHTMLTag       = regexp.MustCompile(`<(?:html|body|div|span|p|h[1-6]|table|tr|td|a|img|script|form|input|head|title)\b`)
-	reStringInterp  = regexp.MustCompile(`\\\(`)
-	reLeafRenderer  = regexp.MustCompile(`req\.view\.render|LeafRenderer|\.leaf\s*\(`)
-	reHTMLEscape    = regexp.MustCompile(`replacingOccurrences\s*\(\s*of\s*:\s*"<"`)
-	reJSONResponse  = regexp.MustCompile(`JSONEncoder|application/json|\.encodeResponse`)
-	reStringFormat  = regexp.MustCompile(`String\s*\(\s*format\s*:`)
+	reHTMLResponse = regexp.MustCompile(`Response\s*\(\s*status\s*:.*body\s*:|text/html`)
+	reHTMLTag      = regexp.MustCompile(`<(?:html|body|div|span|p|h[1-6]|table|tr|td|a|img|script|form|input|head|title)\b`)
+	reStringInterp = regexp.MustCompile(`\\\(`)
+	reLeafRenderer = regexp.MustCompile(`req\.view\.render|LeafRenderer|\.leaf\s*\(`)
+	reHTMLEscape   = regexp.MustCompile(`replacingOccurrences\s*\(\s*of\s*:\s*"<"`)
+	reJSONResponse = regexp.MustCompile(`JSONEncoder|application/json|\.encodeResponse`)
+	reStringFormat = regexp.MustCompile(`String\s*\(\s*format\s*:`)
 )
 
 // SWIFT-021: Swift Process/command injection (CWE-78)
 var (
-	reProcessCreate    = regexp.MustCompile(`Process\s*\(\s*\)|NSTask\s*\(\s*\)`)
-	reProcessExec      = regexp.MustCompile(`\.executableURL\s*=|\.launchPath\s*=`)
-	reProcessArgs      = regexp.MustCompile(`\.arguments\s*=`)
-	reProcessRun       = regexp.MustCompile(`\.run\s*\(\s*\)|\.launch\s*\(\s*\)`)
-	reVaporSource      = regexp.MustCompile(`req\.(?:parameters|query|content|body|headers|cookies)|request\.(?:parameters|query|content|body|headers|cookies)`)
-	reAllowedCmd       = regexp.MustCompile(`allowedCommands\.contains|allowed\.contains|allowlist\.contains`)
+	reProcessCreate = regexp.MustCompile(`Process\s*\(\s*\)|NSTask\s*\(\s*\)`)
+	reProcessExec   = regexp.MustCompile(`\.executableURL\s*=|\.launchPath\s*=`)
+	reProcessArgs   = regexp.MustCompile(`\.arguments\s*=`)
+	reProcessRun    = regexp.MustCompile(`\.run\s*\(\s*\)|\.launch\s*\(\s*\)`)
+	reVaporSource   = regexp.MustCompile(`req\.(?:parameters|query|content|body|headers|cookies)|request\.(?:parameters|query|content|body|headers|cookies)`)
+	reAllowedCmd    = regexp.MustCompile(`allowedCommands\.contains|allowed\.contains|allowlist\.contains`)
 )
 
 // Shared FP suppression patterns
@@ -68,11 +67,9 @@ var (
 	reNSUnarchive     = regexp.MustCompile(`NSKeyedUnarchiver\.unarchiveObject\s*\(`)
 	reJSONSerDeser    = regexp.MustCompile(`JSONSerialization\.jsonObject\s*\(`)
 	rePListSerDeser   = regexp.MustCompile(`PropertyListSerialization\.propertyList\s*\(`)
-	rePListDecDeser   = regexp.MustCompile(`PropertyListDecoder\s*\(\s*\)\.decode\s*\(`)
 	reDecodeObjForKey = regexp.MustCompile(`\.decodeObject\s*\(\s*forKey\s*:`)
 	reNSClassFromStr  = regexp.MustCompile(`NSClassFromString\s*\(`)
 	reSecureCoding    = regexp.MustCompile(`NSSecureCoding|requiresSecureCoding\s*=\s*true|unarchivedObject\s*\(\s*ofClass`)
-	reCodableDecode   = regexp.MustCompile(`JSONDecoder\s*\(\s*\)\.decode\s*\(|\.content\.decode\s*\(|Codable|Decodable`)
 )
 
 func init() {
@@ -89,35 +86,38 @@ func init() {
 
 type SwiftVaporRedirect struct{}
 
-func (r *SwiftVaporRedirect) ID() string                      { return "BATOU-SWIFT-019" }
-func (r *SwiftVaporRedirect) Name() string                    { return "SwiftVaporRedirect" }
-func (r *SwiftVaporRedirect) Description() string             { return "Detects Vapor redirect(to:) with user-controlled URL, enabling open redirect attacks." }
+func (r *SwiftVaporRedirect) ID() string   { return "BATOU-SWIFT-019" }
+func (r *SwiftVaporRedirect) Name() string { return "SwiftVaporRedirect" }
+func (r *SwiftVaporRedirect) Description() string {
+	return "Detects Vapor redirect(to:) with user-controlled URL, enabling open redirect attacks."
+}
 func (r *SwiftVaporRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SwiftVaporRedirect) Languages() []rules.Language     { return []rules.Language{rules.LangSwift} }
 
 func (r *SwiftVaporRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reVaporRedirect.MatchString(ctx.Content) && !reLocationHeader.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reVaporRedirect, ctx) && !rules.GMatchFile(reLocationHeader, ctx) {
 		return nil
 	}
 
 	// Skip if URL validation is present
-	if reRedirectAllowCheck.MatchString(ctx.Content) || reRedirectPathCheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reRedirectAllowCheck, ctx) || rules.GMatchFile(reRedirectPathCheck, ctx) {
 		return nil
 	}
 
 	// Skip if input is restricted to enum values or integer-validated
-	if reEnumDecode.MatchString(ctx.Content) {
+	if rules.GMatchFile(reEnumDecode, ctx) {
 		return nil
 	}
-	if reIntGuard.MatchString(ctx.Content) {
+	if rules.GMatchFile(reIntGuard, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if there are Vapor request sources in the file
-	hasVaporSource := reVaporSource.MatchString(ctx.Content)
+	hasVaporSource := rules.GMatchFile(reVaporSource, ctx)
 	if !hasVaporSource {
 		return nil
 	}
@@ -130,13 +130,13 @@ func (r *SwiftVaporRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if reVaporRedirect.MatchString(line) && !reRedirectLiteral.MatchString(line) {
-			m := reVaporRedirectVar.FindStringSubmatch(line)
+		if rules.GMatchLower(reVaporRedirect, line, lowered[i]) && !rules.GMatchLower(reRedirectLiteral, line, lowered[i]) {
+			m := rules.GFindSubmatchLower(reVaporRedirectVar, line, lowered[i])
 			if len(m) > 1 {
 				matched = strings.TrimSpace(line)
 				desc = "Vapor redirect(to:) uses a variable that may contain user input. An attacker can craft a URL that redirects users to a phishing site."
 			}
-		} else if reLocationHeader.MatchString(line) {
+		} else if rules.GMatchLower(reLocationHeader, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			desc = "HTTP Location header set with potentially user-controlled value, enabling open redirect."
 		}
@@ -172,39 +172,42 @@ func (r *SwiftVaporRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SwiftVaporXSS struct{}
 
-func (r *SwiftVaporXSS) ID() string                      { return "BATOU-SWIFT-020" }
-func (r *SwiftVaporXSS) Name() string                    { return "SwiftVaporXSS" }
-func (r *SwiftVaporXSS) Description() string             { return "Detects unescaped user input embedded in HTML responses in Vapor applications." }
+func (r *SwiftVaporXSS) ID() string   { return "BATOU-SWIFT-020" }
+func (r *SwiftVaporXSS) Name() string { return "SwiftVaporXSS" }
+func (r *SwiftVaporXSS) Description() string {
+	return "Detects unescaped user input embedded in HTML responses in Vapor applications."
+}
 func (r *SwiftVaporXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SwiftVaporXSS) Languages() []rules.Language     { return []rules.Language{rules.LangSwift} }
 
 func (r *SwiftVaporXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Must have HTML tags in the file
-	if !reHTMLTag.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reHTMLTag, ctx) {
 		return nil
 	}
 
 	// Skip if using Leaf template renderer (auto-escapes) or HTML escaping
-	if reLeafRenderer.MatchString(ctx.Content) {
+	if rules.GMatchFile(reLeafRenderer, ctx) {
 		return nil
 	}
-	if reHTMLEscape.MatchString(ctx.Content) {
+	if rules.GMatchFile(reHTMLEscape, ctx) {
 		return nil
 	}
-	if rePercentEncode.MatchString(ctx.Content) {
+	if rules.GMatchFile(rePercentEncode, ctx) {
 		return nil
 	}
 	// Skip if all user input is integer-validated (output is numeric only)
-	if reIntGuard.MatchString(ctx.Content) && !strings.Contains(ctx.Content, "req.query.get") {
+	if rules.GMatchFile(reIntGuard, ctx) && !strings.Contains(ctx.Content, "req.query.get") {
 		return nil
 	}
 	// Skip if returning JSON (not HTML)
-	if reJSONResponse.MatchString(ctx.Content) && !reHTMLResponse.MatchString(ctx.Content) {
+	if rules.GMatchFile(reJSONResponse, ctx) && !rules.GMatchFile(reHTMLResponse, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -212,13 +215,13 @@ func (r *SwiftVaporXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Look for lines with HTML tags and string interpolation or concatenation
-		if !reHTMLTag.MatchString(line) {
+		if !rules.GMatchLower(reHTMLTag, line, lowered[i]) {
 			continue
 		}
 
-		hasInterp := reStringInterp.MatchString(line)
+		hasInterp := rules.GMatchLower(reStringInterp, line, lowered[i])
 		hasConcat := strings.Contains(line, "+") && strings.Contains(line, "\"")
-		hasFormat := reStringFormat.MatchString(line)
+		hasFormat := rules.GMatchLower(reStringFormat, line, lowered[i])
 
 		if hasInterp || hasConcat || hasFormat {
 			matched := strings.TrimSpace(line)
@@ -252,44 +255,49 @@ func (r *SwiftVaporXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SwiftProcessInjection struct{}
 
-func (r *SwiftProcessInjection) ID() string                      { return "BATOU-SWIFT-021" }
-func (r *SwiftProcessInjection) Name() string                    { return "SwiftProcessInjection" }
-func (r *SwiftProcessInjection) Description() string             { return "Detects Swift Process() execution with user-controlled arguments or launch path." }
+func (r *SwiftProcessInjection) ID() string   { return "BATOU-SWIFT-021" }
+func (r *SwiftProcessInjection) Name() string { return "SwiftProcessInjection" }
+func (r *SwiftProcessInjection) Description() string {
+	return "Detects Swift Process() execution with user-controlled arguments or launch path."
+}
 func (r *SwiftProcessInjection) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *SwiftProcessInjection) Languages() []rules.Language     { return []rules.Language{rules.LangSwift} }
+func (r *SwiftProcessInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangSwift}
+}
 
 func (r *SwiftProcessInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Must have Process creation and a run/launch call
-	if !reProcessCreate.MatchString(ctx.Content) && !reProcessExec.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reProcessCreate, ctx) && !rules.GMatchFile(reProcessExec, ctx) {
 		return nil
 	}
-	if !reProcessRun.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reProcessRun, ctx) {
 		return nil
 	}
 
 	// Must have user input sources
-	if !reVaporSource.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reVaporSource, ctx) {
 		return nil
 	}
 
 	// Skip if command is validated against allowlist
-	if reAllowedCmd.MatchString(ctx.Content) {
+	if rules.GMatchFile(reAllowedCmd, ctx) {
 		return nil
 	}
 
 	// Skip if input is restricted via Int guard, enum decode, or regex validation
-	if reIntGuard.MatchString(ctx.Content) {
+	if rules.GMatchFile(reIntGuard, ctx) {
 		return nil
 	}
-	if reEnumDecode.MatchString(ctx.Content) {
+	if rules.GMatchFile(reEnumDecode, ctx) {
 		return nil
 	}
-	if reRegexGuard.MatchString(ctx.Content) {
+	if rules.GMatchFile(reRegexGuard, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -299,10 +307,10 @@ func (r *SwiftProcessInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if reProcessArgs.MatchString(line) {
+		if rules.GMatchLower(reProcessArgs, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			desc = "Process arguments are set with potentially user-controlled values. An attacker could inject additional arguments or modify command behavior."
-		} else if reProcessExec.MatchString(line) && (reStringInterp.MatchString(line) || strings.Contains(line, "+")) {
+		} else if rules.GMatchLower(reProcessExec, line, lowered[i]) && (rules.GMatchLower(reStringInterp, line, lowered[i]) || strings.Contains(line, "+")) {
 			matched = strings.TrimSpace(line)
 			desc = "Process executable path contains user input via interpolation or concatenation, enabling arbitrary command execution."
 		}
@@ -338,45 +346,48 @@ func (r *SwiftProcessInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SwiftPathTraversal struct{}
 
-func (r *SwiftPathTraversal) ID() string                      { return "BATOU-SWIFT-022" }
-func (r *SwiftPathTraversal) Name() string                    { return "SwiftPathTraversal" }
-func (r *SwiftPathTraversal) Description() string             { return "Detects file operations with user-controlled paths in Swift/Vapor applications." }
+func (r *SwiftPathTraversal) ID() string   { return "BATOU-SWIFT-022" }
+func (r *SwiftPathTraversal) Name() string { return "SwiftPathTraversal" }
+func (r *SwiftPathTraversal) Description() string {
+	return "Detects file operations with user-controlled paths in Swift/Vapor applications."
+}
 func (r *SwiftPathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SwiftPathTraversal) Languages() []rules.Language     { return []rules.Language{rules.LangSwift} }
 
 func (r *SwiftPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
-	hasFileOp := reFileManagerOp.MatchString(ctx.Content) ||
-		reDataContentsOf.MatchString(ctx.Content) ||
-		reStringContents.MatchString(ctx.Content) ||
-		reDataWrite.MatchString(ctx.Content)
+	hasFileOp := rules.GMatchFile(reFileManagerOp, ctx) ||
+		rules.GMatchFile(reDataContentsOf, ctx) ||
+		rules.GMatchFile(reStringContents, ctx) ||
+		rules.GMatchFile(reDataWrite, ctx)
 
 	if !hasFileOp {
 		return nil
 	}
 
 	// Must have user input sources
-	if !reVaporSource.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reVaporSource, ctx) {
 		return nil
 	}
 
 	// Skip if path sanitization is present
-	if rePathSafe.MatchString(ctx.Content) {
+	if rules.GMatchFile(rePathSafe, ctx) {
 		return nil
 	}
 
 	// Skip if input is integer-validated, UUID-validated, or allowlisted
-	if reIntGuard.MatchString(ctx.Content) {
+	if rules.GMatchFile(reIntGuard, ctx) {
 		return nil
 	}
-	if reUUIDGuard.MatchString(ctx.Content) {
+	if rules.GMatchFile(reUUIDGuard, ctx) {
 		return nil
 	}
-	if reAllowedCmd.MatchString(ctx.Content) {
+	if rules.GMatchFile(reAllowedCmd, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -385,13 +396,13 @@ func (r *SwiftPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched bool
 
-		if reFileManagerOp.MatchString(line) {
+		if rules.GMatchLower(reFileManagerOp, line, lowered[i]) {
 			matched = true
-		} else if reDataContentsOf.MatchString(line) {
+		} else if rules.GMatchLower(reDataContentsOf, line, lowered[i]) {
 			matched = true
-		} else if reStringContents.MatchString(line) {
+		} else if rules.GMatchLower(reStringContents, line, lowered[i]) {
 			matched = true
-		} else if reDataWrite.MatchString(line) {
+		} else if rules.GMatchLower(reDataWrite, line, lowered[i]) {
 			matched = true
 		}
 
@@ -427,20 +438,23 @@ func (r *SwiftPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SwiftInsecureDeser struct{}
 
-func (r *SwiftInsecureDeser) ID() string                      { return "BATOU-SWIFT-023" }
-func (r *SwiftInsecureDeser) Name() string                    { return "SwiftInsecureDeser" }
-func (r *SwiftInsecureDeser) Description() string             { return "Detects insecure deserialization patterns in Swift (NSKeyedUnarchiver, JSONSerialization, PropertyListSerialization) without type-safe alternatives." }
+func (r *SwiftInsecureDeser) ID() string   { return "BATOU-SWIFT-023" }
+func (r *SwiftInsecureDeser) Name() string { return "SwiftInsecureDeser" }
+func (r *SwiftInsecureDeser) Description() string {
+	return "Detects insecure deserialization patterns in Swift (NSKeyedUnarchiver, JSONSerialization, PropertyListSerialization) without type-safe alternatives."
+}
 func (r *SwiftInsecureDeser) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SwiftInsecureDeser) Languages() []rules.Language     { return []rules.Language{rules.LangSwift} }
 
 func (r *SwiftInsecureDeser) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Skip if using NSSecureCoding
-	if reSecureCoding.MatchString(ctx.Content) {
+	if rules.GMatchFile(reSecureCoding, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -450,20 +464,20 @@ func (r *SwiftInsecureDeser) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if reNSUnarchive.MatchString(line) {
-			matched = reNSUnarchive.FindString(line)
+		if rules.GMatchLower(reNSUnarchive, line, lowered[i]) {
+			matched = rules.GFindLower(reNSUnarchive, line, lowered[i])
 			desc = "NSKeyedUnarchiver.unarchiveObject is deprecated and does not validate deserialized types. An attacker can craft archive data to instantiate arbitrary classes."
-		} else if reJSONSerDeser.MatchString(line) {
-			matched = reJSONSerDeser.FindString(line)
+		} else if rules.GMatchLower(reJSONSerDeser, line, lowered[i]) {
+			matched = rules.GFindLower(reJSONSerDeser, line, lowered[i])
 			desc = "JSONSerialization.jsonObject returns untyped Any objects. Combined with dynamic type casting, this enables type confusion and potential code execution via deserialized data."
-		} else if rePListSerDeser.MatchString(line) {
-			matched = rePListSerDeser.FindString(line)
+		} else if rules.GMatchLower(rePListSerDeser, line, lowered[i]) {
+			matched = rules.GFindLower(rePListSerDeser, line, lowered[i])
 			desc = "PropertyListSerialization.propertyList returns untyped Any objects from untrusted data, enabling type confusion attacks."
-		} else if reNSClassFromStr.MatchString(line) {
-			matched = reNSClassFromStr.FindString(line)
+		} else if rules.GMatchLower(reNSClassFromStr, line, lowered[i]) {
+			matched = rules.GFindLower(reNSClassFromStr, line, lowered[i])
 			desc = "NSClassFromString dynamically resolves a class name from user input, enabling arbitrary class instantiation."
-		} else if reDecodeObjForKey.MatchString(line) {
-			matched = reDecodeObjForKey.FindString(line)
+		} else if rules.GMatchLower(reDecodeObjForKey, line, lowered[i]) {
+			matched = rules.GFindLower(reDecodeObjForKey, line, lowered[i])
 			desc = "NSCoder.decodeObject(forKey:) without class restriction can deserialize arbitrary types from untrusted archives."
 		}
 

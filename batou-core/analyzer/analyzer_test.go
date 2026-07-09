@@ -2,7 +2,6 @@ package analyzer_test
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-core/analyzer"
 	"github.com/turenlabs/batou-rules/rules"
 )

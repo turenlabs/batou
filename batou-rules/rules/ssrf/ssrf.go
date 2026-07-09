@@ -12,32 +12,31 @@ import (
 // BATOU-SSRF-001: URL from User Input
 var (
 	// Go: http.Get/Post/etc with variable
-	goHTTPGetVar      = regexp.MustCompile(`\bhttp\.(?:Get|Post|Head|PostForm)\s*\(\s*[a-zA-Z_]\w*`)
-	goHTTPNewRequest  = regexp.MustCompile(`http\.NewRequest\s*\(\s*"[A-Z]+"\s*,\s*[a-zA-Z_]\w*`)
-	goHTTPClientDo    = regexp.MustCompile(`\.Do\s*\(\s*[a-zA-Z_]\w*`)
+	goHTTPGetVar     = regexp.MustCompile(`\bhttp\.(?:Get|Post|Head|PostForm)\s*\(\s*[a-zA-Z_]\w*`)
+	goHTTPNewRequest = regexp.MustCompile(`http\.NewRequest\s*\(\s*"[A-Z]+"\s*,\s*[a-zA-Z_]\w*`)
 	// Python: requests library with variable URL
-	pyRequestsCall    = regexp.MustCompile(`\brequests\.(?:get|post|put|delete|patch|head|options)\s*\(\s*[a-zA-Z_]\w*`)
-	pyUrllibOpen      = regexp.MustCompile(`\b(?:urllib\.request\.urlopen|urllib2\.urlopen|urlopen)\s*\(\s*[a-zA-Z_]\w*`)
-	pyHttpClient      = regexp.MustCompile(`\b(?:httpx|aiohttp)\.\w+\.\w+\s*\(\s*[a-zA-Z_]\w*`)
+	pyRequestsCall = regexp.MustCompile(`\brequests\.(?:get|post|put|delete|patch|head|options)\s*\(\s*[a-zA-Z_]\w*`)
+	pyUrllibOpen   = regexp.MustCompile(`\b(?:urllib\.request\.urlopen|urllib2\.urlopen|urlopen)\s*\(\s*[a-zA-Z_]\w*`)
+	pyHttpClient   = regexp.MustCompile(`\b(?:httpx|aiohttp)\.\w+\.\w+\s*\(\s*[a-zA-Z_]\w*`)
 	// JS/TS: fetch, axios, http with variable URL
-	jsFetchVar        = regexp.MustCompile(`\bfetch\s*\(\s*[a-zA-Z_]\w*`)
-	jsAxiosCall       = regexp.MustCompile(`\baxios\.(?:get|post|put|delete|patch|head|options|request)\s*\(\s*[a-zA-Z_]\w*`)
-	jsHTTPGet         = regexp.MustCompile(`\b(?:http|https)\.(?:get|request)\s*\(\s*[a-zA-Z_]\w*`)
-	jsGotCall         = regexp.MustCompile(`\bgot\s*\(\s*[a-zA-Z_]\w*`)
+	jsFetchVar  = regexp.MustCompile(`\bfetch\s*\(\s*[a-zA-Z_]\w*`)
+	jsAxiosCall = regexp.MustCompile(`\baxios\.(?:get|post|put|delete|patch|head|options|request)\s*\(\s*[a-zA-Z_]\w*`)
+	jsHTTPGet   = regexp.MustCompile(`\b(?:http|https)\.(?:get|request)\s*\(\s*[a-zA-Z_]\w*`)
+	jsGotCall   = regexp.MustCompile(`\bgot\s*\(\s*[a-zA-Z_]\w*`)
 	// JS/TS: Angular HttpClient patterns (false positive exclusion)
 	angularHTTPClient = regexp.MustCompile(`\bthis\.http\s*\.\s*(?:get|post|put|delete|patch|head|options)\s*[<(]`)
 	angularImport     = regexp.MustCompile(`@angular/common/http|HttpClient`)
 	// Java: server-side SSRF patterns
-	javaURLOpen       = regexp.MustCompile(`\bnew\s+URL\s*\(\s*[a-zA-Z_]\w*\s*\)\s*\.\s*(?:openStream|openConnection)\s*\(`)
-	javaHTTPURLConn   = regexp.MustCompile(`\(\s*HttpURLConnection\s*\)\s*[a-zA-Z_]\w*\s*\.\s*openConnection\s*\(`)
-	javaRestTemplate  = regexp.MustCompile(`\b(?:restTemplate|RestTemplate)\s*\.\s*(?:getForObject|getForEntity|postForObject|postForEntity|exchange)\s*\(\s*[a-zA-Z_]\w*`)
-	javaWebClient     = regexp.MustCompile(`\bWebClient\s*\.\s*create\s*\(\s*[a-zA-Z_]\w*`)
+	javaURLOpen      = regexp.MustCompile(`\bnew\s+URL\s*\(\s*[a-zA-Z_]\w*\s*\)\s*\.\s*(?:openStream|openConnection)\s*\(`)
+	javaHTTPURLConn  = regexp.MustCompile(`\(\s*HttpURLConnection\s*\)\s*[a-zA-Z_]\w*\s*\.\s*openConnection\s*\(`)
+	javaRestTemplate = regexp.MustCompile(`\b(?:restTemplate|RestTemplate)\s*\.\s*(?:getForObject|getForEntity|postForObject|postForEntity|exchange)\s*\(\s*[a-zA-Z_]\w*`)
+	javaWebClient    = regexp.MustCompile(`\bWebClient\s*\.\s*create\s*\(\s*[a-zA-Z_]\w*`)
 	// Java: user input sources
-	javaUserInput     = regexp.MustCompile(`request\.getParameter|@RequestParam|@PathVariable|@RequestBody`)
+	javaUserInput = regexp.MustCompile(`request\.getParameter|@RequestParam|@PathVariable|@RequestBody`)
 	// PHP: curl/file_get_contents with variable
-	phpCurlSetopt     = regexp.MustCompile(`\bcurl_setopt\s*\([^,]+,\s*CURLOPT_URL\s*,\s*\$`)
-	phpFileGetURL     = regexp.MustCompile(`\bfile_get_contents\s*\(\s*\$(?:_GET|_POST|_REQUEST|url|uri|link|input|param)`)
-	phpFopen          = regexp.MustCompile(`\bfopen\s*\(\s*\$(?:_GET|_POST|_REQUEST|url|uri|link|input)`)
+	phpCurlSetopt = regexp.MustCompile(`\bcurl_setopt\s*\([^,]+,\s*CURLOPT_URL\s*,\s*\$`)
+	phpFileGetURL = regexp.MustCompile(`\bfile_get_contents\s*\(\s*\$(?:_GET|_POST|_REQUEST|url|uri|link|input|param)`)
+	phpFopen      = regexp.MustCompile(`\bfopen\s*\(\s*\$(?:_GET|_POST|_REQUEST|url|uri|link|input)`)
 )
 
 // BATOU-SSRF-002: Internal Network Access
@@ -65,20 +64,20 @@ var (
 // BATOU-SSRF-003: DNS Rebinding
 var (
 	// Pattern: DNS resolution followed by separate HTTP request
-	goNetLookup  = regexp.MustCompile(`\bnet\.(?:LookupHost|LookupIP|LookupAddr|ResolveIPAddr|ResolveTCPAddr)\s*\(`)
+	goNetLookup     = regexp.MustCompile(`\bnet\.(?:LookupHost|LookupIP|LookupAddr|ResolveIPAddr|ResolveTCPAddr)\s*\(`)
 	pySocketResolve = regexp.MustCompile(`\bsocket\.(?:gethostbyname|getaddrinfo|gethostbyname_ex)\s*\(`)
-	jsDNSResolve = regexp.MustCompile(`\bdns\.(?:resolve|lookup|resolve4|resolve6)\s*\(`)
+	jsDNSResolve    = regexp.MustCompile(`\bdns\.(?:resolve|lookup|resolve4|resolve6)\s*\(`)
 )
 
 // BATOU-SSRF-004: Redirect Following
 var (
 	// Go: http.Client without CheckRedirect
-	goHTTPClient       = regexp.MustCompile(`&http\.Client\s*\{`)
-	goCheckRedirect    = regexp.MustCompile(`CheckRedirect\s*:`)
+	goHTTPClient    = regexp.MustCompile(`&http\.Client\s*\{`)
+	goCheckRedirect = regexp.MustCompile(`CheckRedirect\s*:`)
 	// Python: allow_redirects=True (often default, but explicit is a signal)
-	pyAllowRedirects   = regexp.MustCompile(`allow_redirects\s*=\s*True`)
+	pyAllowRedirects = regexp.MustCompile(`allow_redirects\s*=\s*True`)
 	// JS: follow/maxRedirects configuration
-	jsFollowRedirects  = regexp.MustCompile(`(?:follow\s*:\s*true|maxRedirects\s*:\s*[1-9]\d*|followRedirects?\s*:\s*true)`)
+	jsFollowRedirects = regexp.MustCompile(`(?:follow\s*:\s*true|maxRedirects\s*:\s*[1-9]\d*|followRedirects?\s*:\s*true)`)
 )
 
 func init() {
@@ -92,8 +91,8 @@ func init() {
 
 type URLFromUserInput struct{}
 
-func (r *URLFromUserInput) ID() string             { return "BATOU-SSRF-001" }
-func (r *URLFromUserInput) Name() string            { return "URLFromUserInput" }
+func (r *URLFromUserInput) ID() string                      { return "BATOU-SSRF-001" }
+func (r *URLFromUserInput) Name() string                    { return "URLFromUserInput" }
 func (r *URLFromUserInput) DefaultSeverity() rules.Severity { return rules.High }
 func (r *URLFromUserInput) Languages() []rules.Language {
 	return []rules.Language{rules.LangAny, rules.LangJava}
@@ -110,12 +109,13 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Pre-check: for JS/TS files, detect Angular HttpClient to suppress frontend HTTP call FPs
 	isAngularFile := false
 	if ctx.Language == rules.LangJavaScript || ctx.Language == rules.LangTypeScript {
-		if angularImport.MatchString(ctx.Content) {
+		if rules.GMatchFile(angularImport, ctx) {
 			isAngularFile = true
 		}
 	}
@@ -123,7 +123,7 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Pre-check: for Java files, detect user input sources for confidence boosting
 	javaHasUserInput := false
 	if ctx.Language == rules.LangJava {
-		javaHasUserInput = javaUserInput.MatchString(ctx.Content)
+		javaHasUserInput = rules.GMatchFile(javaUserInput, ctx)
 	}
 
 	for i, line := range lines {
@@ -139,14 +139,14 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if loc := goHTTPGetVar.FindString(line); loc != "" {
+			if loc := rules.GFindLower(goHTTPGetVar, line, lowered[i]); loc != "" {
 				if !hasURLValidation(lines, i) {
 					matched = loc
 					confidence = "medium"
 				}
 			}
 			if matched == "" {
-				if loc := goHTTPNewRequest.FindString(line); loc != "" {
+				if loc := rules.GFindLower(goHTTPNewRequest, line, lowered[i]); loc != "" {
 					if !hasURLValidation(lines, i) {
 						matched = loc
 						confidence = "medium"
@@ -154,14 +154,14 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangPython:
-			if loc := pyRequestsCall.FindString(line); loc != "" {
+			if loc := rules.GFindLower(pyRequestsCall, line, lowered[i]); loc != "" {
 				if !hasURLValidation(lines, i) {
 					matched = loc
 					confidence = "medium"
 				}
 			}
 			if matched == "" {
-				if loc := pyUrllibOpen.FindString(line); loc != "" {
+				if loc := rules.GFindLower(pyUrllibOpen, line, lowered[i]); loc != "" {
 					if !hasURLValidation(lines, i) {
 						matched = loc
 						confidence = "medium"
@@ -169,7 +169,7 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 			if matched == "" {
-				if loc := pyHttpClient.FindString(line); loc != "" {
+				if loc := rules.GFindLower(pyHttpClient, line, lowered[i]); loc != "" {
 					if !hasURLValidation(lines, i) {
 						matched = loc
 						confidence = "medium"
@@ -178,18 +178,18 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
 			// Skip Angular HttpClient calls — these are frontend HTTP calls, not server-side SSRF
-			if isAngularFile && angularHTTPClient.MatchString(line) {
+			if isAngularFile && rules.GMatchLower(angularHTTPClient, line, lowered[i]) {
 				continue
 			}
 
-			if loc := jsFetchVar.FindString(line); loc != "" {
+			if loc := rules.GFindLower(jsFetchVar, line, lowered[i]); loc != "" {
 				if !hasURLValidation(lines, i) {
 					matched = loc
 					confidence = "medium"
 				}
 			}
 			if matched == "" {
-				if loc := jsAxiosCall.FindString(line); loc != "" {
+				if loc := rules.GFindLower(jsAxiosCall, line, lowered[i]); loc != "" {
 					if !hasURLValidation(lines, i) {
 						matched = loc
 						confidence = "medium"
@@ -197,7 +197,7 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 			if matched == "" {
-				if loc := jsHTTPGet.FindString(line); loc != "" {
+				if loc := rules.GFindLower(jsHTTPGet, line, lowered[i]); loc != "" {
 					if !hasURLValidation(lines, i) {
 						matched = loc
 						confidence = "medium"
@@ -205,7 +205,7 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 			if matched == "" {
-				if loc := jsGotCall.FindString(line); loc != "" {
+				if loc := rules.GFindLower(jsGotCall, line, lowered[i]); loc != "" {
 					if !hasURLValidation(lines, i) {
 						matched = loc
 						confidence = "low"
@@ -213,7 +213,7 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangJava:
-			if loc := javaURLOpen.FindString(line); loc != "" {
+			if loc := rules.GFindLower(javaURLOpen, line, lowered[i]); loc != "" {
 				if !hasURLValidation(lines, i) {
 					matched = loc
 					if javaHasUserInput {
@@ -224,7 +224,7 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 			if matched == "" {
-				if loc := javaHTTPURLConn.FindString(line); loc != "" {
+				if loc := rules.GFindLower(javaHTTPURLConn, line, lowered[i]); loc != "" {
 					if !hasURLValidation(lines, i) {
 						matched = loc
 						if javaHasUserInput {
@@ -236,7 +236,7 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 			if matched == "" {
-				if loc := javaRestTemplate.FindString(line); loc != "" {
+				if loc := rules.GFindLower(javaRestTemplate, line, lowered[i]); loc != "" {
 					if !hasURLValidation(lines, i) {
 						matched = loc
 						if javaHasUserInput {
@@ -248,7 +248,7 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 			if matched == "" {
-				if loc := javaWebClient.FindString(line); loc != "" {
+				if loc := rules.GFindLower(javaWebClient, line, lowered[i]); loc != "" {
 					if !hasURLValidation(lines, i) {
 						matched = loc
 						if javaHasUserInput {
@@ -260,20 +260,20 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangPHP:
-			if loc := phpCurlSetopt.FindString(line); loc != "" {
+			if loc := rules.GFindLower(phpCurlSetopt, line, lowered[i]); loc != "" {
 				if !hasURLValidation(lines, i) {
 					matched = loc
 					confidence = "high"
 				}
 			}
 			if matched == "" {
-				if loc := phpFileGetURL.FindString(line); loc != "" {
+				if loc := rules.GFindLower(phpFileGetURL, line, lowered[i]); loc != "" {
 					matched = loc
 					confidence = "high"
 				}
 			}
 			if matched == "" {
-				if loc := phpFopen.FindString(line); loc != "" {
+				if loc := rules.GFindLower(phpFopen, line, lowered[i]); loc != "" {
 					matched = loc
 					confidence = "high"
 				}
@@ -302,7 +302,7 @@ func (r *URLFromUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 // hasURLValidation checks surrounding lines for URL validation patterns.
 func hasURLValidation(lines []string, idx int) bool {
-	start := idx - 8
+	start := idx - 12
 	if start < 0 {
 		start = 0
 	}
@@ -312,13 +312,36 @@ func hasURLValidation(lines []string, idx int) bool {
 	}
 
 	for _, l := range lines[start:end] {
+		// Skip comment-only lines so docstrings / file-header comments
+		// describing the vulnerable pattern don't accidentally suppress
+		// the rule. CVE-2023-24329 vuln has a "Naively allow-lists" comment
+		// that would otherwise match the allow-list token below.
+		trimmed := strings.TrimSpace(l)
+		if isComment(trimmed) {
+			continue
+		}
 		lower := strings.ToLower(l)
-		if strings.Contains(lower, "allowlist") || strings.Contains(lower, "whitelist") ||
+		// Hand-rolled validators / allow-lists. The "allowed_host" /
+		// "allow-list" / "allow-listed" / "host_is_safe" patterns cover the
+		// project-local helpers most CVE fixes spell out (see CVE-2023-24329
+		// safe). Adding `-` variants because hyphenated naming is common.
+		//
+		// NOTE: scheme/hostname allowlist tokens (`scheme not in`) are not
+		// included here — the same syntactic shape is used by both the
+		// vulnerable (`parsed.scheme not in ("http","https","")` — broken
+		// by urlparse bug) and safe variants, so suppressing on syntax
+		// alone would hide real CVE-2023-24329 vuln detections.
+		if strings.Contains(lower, "allowlist") || strings.Contains(lower, "allow-list") ||
+			strings.Contains(lower, "whitelist") || strings.Contains(lower, "white-list") ||
 			strings.Contains(lower, "allowedhost") || strings.Contains(lower, "allowed_host") ||
+			strings.Contains(lower, "allowed-host") ||
 			strings.Contains(lower, "validateurl") || strings.Contains(lower, "validate_url") ||
 			strings.Contains(lower, "isallowedurl") || strings.Contains(lower, "is_allowed_url") ||
 			strings.Contains(lower, "sanitizeurl") || strings.Contains(lower, "sanitize_url") ||
-			strings.Contains(lower, "parseurl") || strings.Contains(lower, "url.parse") {
+			strings.Contains(lower, "parseurl") || strings.Contains(lower, "url.parse") ||
+			strings.Contains(lower, "is_safe_url") || strings.Contains(lower, "issafeurl") ||
+			strings.Contains(lower, "_is_safe_") || strings.Contains(lower, "host_is_safe") ||
+			strings.Contains(lower, "hostname not in") || strings.Contains(lower, "netloc not in") {
 			return true
 		}
 	}
@@ -329,8 +352,8 @@ func hasURLValidation(lines []string, idx int) bool {
 
 type InternalNetworkAccess struct{}
 
-func (r *InternalNetworkAccess) ID() string             { return "BATOU-SSRF-002" }
-func (r *InternalNetworkAccess) Name() string            { return "InternalNetworkAccess" }
+func (r *InternalNetworkAccess) ID() string                      { return "BATOU-SSRF-002" }
+func (r *InternalNetworkAccess) Name() string                    { return "InternalNetworkAccess" }
 func (r *InternalNetworkAccess) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InternalNetworkAccess) Languages() []rules.Language {
 	return []rules.Language{rules.LangAny}
@@ -342,7 +365,8 @@ func (r *InternalNetworkAccess) Description() string {
 
 func (r *InternalNetworkAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -353,7 +377,7 @@ func (r *InternalNetworkAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Check for cloud metadata endpoint access (highest priority)
-		if loc := cloudMetadata.FindString(line); loc != "" {
+		if loc := rules.GFindLower(cloudMetadata, line, lowered[i]); loc != "" {
 			// Determine if this is in an HTTP request context
 			if isHTTPContext(line) {
 				findings = append(findings, rules.Finding{
@@ -374,7 +398,7 @@ func (r *InternalNetworkAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Check for internal IP addresses in HTTP request contexts
-		if loc := internalIPLiteral.FindString(line); loc != "" {
+		if loc := rules.GFindLower(internalIPLiteral, line, lowered[i]); loc != "" {
 			if isHTTPContext(line) && !isTestOrConfig(line, lines, i) {
 				confidence := "medium"
 				if strings.Contains(line, "169.254.169.254") {
@@ -402,13 +426,21 @@ func (r *InternalNetworkAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // isHTTPContext checks if the line is in an HTTP request context.
+// isHTTPContext returns true when the line looks like it actually
+// MAKES an HTTP request (call expression), not just contains an HTTP
+// URL string. The previous check returned true for any line containing
+// "http" — including config field defaults like
+// `OcisURL: "https://localhost:9200"`. Tightened to require an HTTP
+// call verb / construction pattern.
 func isHTTPContext(line string) bool {
-	lower := strings.ToLower(line)
-	return strings.Contains(lower, "http") || strings.Contains(lower, "fetch") ||
-		strings.Contains(lower, "request") || strings.Contains(lower, "curl") ||
-		strings.Contains(lower, "get(") || strings.Contains(lower, "post(") ||
-		strings.Contains(lower, "urlopen") || strings.Contains(lower, "axios")
+	return rules.GMatch(reHTTPCallContext, line)
 }
+
+// reHTTPCallContext matches identifiable HTTP-call call sites. Match
+// patterns include: http.Get/Post/etc. (Go stdlib + most clients),
+// fetch(...) (browser/Node), axios.X(...) (JS), urllib.urlopen,
+// requests.X (Python), curl, http.NewRequest, ServeHTTP.
+var reHTTPCallContext = regexp.MustCompile(`(?i)(?:http\.(?:Get|Post|Put|Delete|Patch|Head|Options|Do|NewRequest|Client|RoundTrip)\b|\bfetch\s*\(|\baxios\.\w+\s*\(|\bcurl\s+|urlopen\s*\(|\brequests\.(?:get|post|put|delete|patch|head|options|request)\s*\(|\.Do\s*\(\s*req\b|\bWebRequest\b|\bHttpClient\b|\.SendAsync\s*\(|\bresty\.\w+\s*\(|\bnew\s+XMLHttpRequest\b)`)
 
 // isTestOrConfig checks if the line is likely part of tests or configuration.
 func isTestOrConfig(line string, lines []string, idx int) bool {
@@ -438,8 +470,8 @@ func isTestOrConfig(line string, lines []string, idx int) bool {
 
 type DNSRebinding struct{}
 
-func (r *DNSRebinding) ID() string             { return "BATOU-SSRF-003" }
-func (r *DNSRebinding) Name() string            { return "DNSRebinding" }
+func (r *DNSRebinding) ID() string                      { return "BATOU-SSRF-003" }
+func (r *DNSRebinding) Name() string                    { return "DNSRebinding" }
 func (r *DNSRebinding) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DNSRebinding) Languages() []rules.Language {
 	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript}
@@ -454,7 +486,8 @@ func (r *DNSRebinding) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -477,7 +510,7 @@ func (r *DNSRebinding) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := dnsPattern.FindString(line); loc != "" {
+		if loc := rules.GFindLower(dnsPattern, line, lowered[i]); loc != "" {
 			// Check if there is an HTTP request within the following lines
 			// using the original hostname (not the resolved IP)
 			hasSubsequentRequest := false
@@ -521,8 +554,8 @@ func (r *DNSRebinding) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RedirectFollowing struct{}
 
-func (r *RedirectFollowing) ID() string             { return "BATOU-SSRF-004" }
-func (r *RedirectFollowing) Name() string            { return "RedirectFollowing" }
+func (r *RedirectFollowing) ID() string                      { return "BATOU-SSRF-004" }
+func (r *RedirectFollowing) Name() string                    { return "RedirectFollowing" }
 func (r *RedirectFollowing) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RedirectFollowing) Languages() []rules.Language {
 	return []rules.Language{rules.LangGo, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript}
@@ -537,7 +570,7 @@ func (r *RedirectFollowing) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Track if the file has user-controlled URL patterns
 	hasUserURL := fileHasUserURL(ctx.Content, ctx.Language)
@@ -570,7 +603,7 @@ func (r *RedirectFollowing) scanGoRedirects(lines []string) []rules.Finding {
 		}
 
 		// Look for http.Client{} without CheckRedirect
-		if goHTTPClient.MatchString(line) {
+		if rules.GMatch(goHTTPClient, line) {
 			// Scan forward to find the closing brace and check for CheckRedirect
 			hasCheckRedirect := false
 			end := i + 15
@@ -590,35 +623,35 @@ func (r *RedirectFollowing) scanGoRedirects(lines []string) []rules.Finding {
 
 			if !hasCheckRedirect {
 				findings = append(findings, rules.Finding{
-					RuleID:      r.ID(),
-					Severity:    r.DefaultSeverity(),
-					Title:       "HTTP client follows redirects without CheckRedirect (SSRF risk)",
-					Description: "An http.Client is created without a CheckRedirect function. With user-controlled URLs, an attacker could use redirects to bypass URL validation and reach internal services.",
-					LineNumber:  lineNum,
-					MatchedText: truncate(strings.TrimSpace(line), 120),
-					Suggestion:  "Set a CheckRedirect function on the http.Client that validates redirect URLs against the same allowlist used for the original URL.",
-					CWEID:       "CWE-918",
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					Title:         "HTTP client follows redirects without CheckRedirect (SSRF risk)",
+					Description:   "An http.Client is created without a CheckRedirect function. With user-controlled URLs, an attacker could use redirects to bypass URL validation and reach internal services.",
+					LineNumber:    lineNum,
+					MatchedText:   truncate(strings.TrimSpace(line), 120),
+					Suggestion:    "Set a CheckRedirect function on the http.Client that validates redirect URLs against the same allowlist used for the original URL.",
+					CWEID:         "CWE-918",
 					OWASPCategory: "A10:2021-SSRF",
-					Confidence:  "medium",
-					Tags:        []string{"ssrf", "redirect", "open-redirect"},
+					Confidence:    "medium",
+					Tags:          []string{"ssrf", "redirect", "open-redirect"},
 				})
 			}
 		}
 
 		// Also flag http.Get/http.Post directly (they use default client which follows redirects)
-		if goHTTPGetVar.MatchString(line) {
+		if rules.GMatch(goHTTPGetVar, line) {
 			findings = append(findings, rules.Finding{
-				RuleID:      r.ID(),
-				Severity:    r.DefaultSeverity(),
-				Title:       "Default HTTP client follows redirects with user URL",
-				Description: "The default http.Get/Post functions follow redirects automatically. With user-controlled URLs, redirects could reach internal services.",
-				LineNumber:  lineNum,
-				MatchedText: truncate(strings.TrimSpace(line), 120),
-				Suggestion:  "Use a custom http.Client with a CheckRedirect function that validates redirect targets.",
-				CWEID:       "CWE-918",
+				RuleID:        r.ID(),
+				Severity:      r.DefaultSeverity(),
+				Title:         "Default HTTP client follows redirects with user URL",
+				Description:   "The default http.Get/Post functions follow redirects automatically. With user-controlled URLs, redirects could reach internal services.",
+				LineNumber:    lineNum,
+				MatchedText:   truncate(strings.TrimSpace(line), 120),
+				Suggestion:    "Use a custom http.Client with a CheckRedirect function that validates redirect targets.",
+				CWEID:         "CWE-918",
 				OWASPCategory: "A10:2021-SSRF",
-				Confidence:  "low",
-				Tags:        []string{"ssrf", "redirect"},
+				Confidence:    "low",
+				Tags:          []string{"ssrf", "redirect"},
 			})
 		}
 	}
@@ -637,7 +670,7 @@ func (r *RedirectFollowing) scanPythonRedirects(lines []string) []rules.Finding 
 			continue
 		}
 
-		if loc := pyAllowRedirects.FindString(line); loc != "" {
+		if loc := rules.GFind(pyAllowRedirects, line); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -668,7 +701,7 @@ func (r *RedirectFollowing) scanJSRedirects(lines []string) []rules.Finding {
 			continue
 		}
 
-		if loc := jsFollowRedirects.FindString(line); loc != "" {
+		if loc := rules.GFind(jsFollowRedirects, line); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

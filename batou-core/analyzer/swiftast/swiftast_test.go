@@ -3,7 +3,6 @@ package swiftast
 import (
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/ast"
 	"github.com/turenlabs/batou-rules/rules"
 )

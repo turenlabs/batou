@@ -41,7 +41,7 @@ jobs:
       - name: Run tests
         env:
           CGO_ENABLED: '1'
-        run: go test -race -count=1 ./batou-core/... ./batou-rules/...
+        run: go test -race -count=1 -timeout 40m ./batou-core/... ./batou-rules/...
 
       - name: Build
         env:

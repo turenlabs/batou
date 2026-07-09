@@ -13,39 +13,36 @@ import (
 
 // RS-011: Unsafe block with raw pointer dereference
 var (
-	reUnsafeDeref     = regexp.MustCompile(`\bunsafe\s*\{`)
-	reRawPtrDerefStar = regexp.MustCompile(`\*(?:mut\s+|const\s+)?\w+\.\w+|\*\w+\s*[;,=]`)
-	rePtrOffset       = regexp.MustCompile(`\.offset\s*\(|\.add\s*\(|\.sub\s*\(`)
-	reDerefRaw        = regexp.MustCompile(`\*\s*[a-zA-Z_]\w*\s*(?:\.|\[|as\s)`)
+	reUnsafeDeref = regexp.MustCompile(`\bunsafe\s*\{`)
+	rePtrOffset   = regexp.MustCompile(`\.offset\s*\(|\.add\s*\(|\.sub\s*\(`)
+	reDerefRaw    = regexp.MustCompile(`\*\s*[a-zA-Z_]\w*\s*(?:\.|\[|as\s)`)
 )
 
 // RS-012: SQL injection via format! in query
 var (
-	reSQLFormatDirect  = regexp.MustCompile(`format!\s*\(\s*"[^"]*(?i:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s+`)
-	reSQLQueryFormat   = regexp.MustCompile(`(?:query|execute|prepare)\s*\(\s*&?\s*format!\s*\(`)
-	reSQLConcatDirect  = regexp.MustCompile(`"[^"]*(?i:SELECT|INSERT|UPDATE|DELETE)\s+[^"]*"\s*\.\s*to_owned|format!\s*\([^)]*(?i:SELECT|INSERT)`)
+	reSQLFormatDirect = regexp.MustCompile(`format!\s*\(\s*"[^"]*(?i:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s+`)
+	reSQLQueryFormat  = regexp.MustCompile(`(?:query|execute|prepare)\s*\(\s*&?\s*format!\s*\(`)
 )
 
 // RS-013: std::process::Command with user input
 var (
-	reCommandNewVar   = regexp.MustCompile(`Command::new\s*\(\s*&?\s*[a-zA-Z_]\w*\s*\)`)
-	reCommandArgVar   = regexp.MustCompile(`\.arg\s*\(\s*&?\s*format!\s*\(`)
+	reCommandNewVar    = regexp.MustCompile(`Command::new\s*\(\s*&?\s*[a-zA-Z_]\w*\s*\)`)
+	reCommandArgVar    = regexp.MustCompile(`\.arg\s*\(\s*&?\s*format!\s*\(`)
 	reCommandShellUser = regexp.MustCompile(`Command::new\s*\(\s*"(?:sh|bash|cmd|powershell)"\s*\)\s*\.\s*arg\s*\(\s*"-c"\s*\)\s*\.\s*arg\s*\(`)
 )
 
 // RS-014: unwrap() in production code
 var (
-	reUnwrapGeneric  = regexp.MustCompile(`\.unwrap\s*\(\s*\)`)
-	reExpectGeneric  = regexp.MustCompile(`\.expect\s*\(\s*"`)
+	reUnwrapGeneric = regexp.MustCompile(`\.unwrap\s*\(\s*\)`)
 	// Context to determine it's not a test
-	reTestAttr       = regexp.MustCompile(`#\[(?:test|cfg\s*\(\s*test\s*\))]`)
-	reTestMod        = regexp.MustCompile(`mod\s+tests?\s*\{`)
+	reTestAttr = regexp.MustCompile(`#\[(?:test|cfg\s*\(\s*test\s*\))]`)
+	reTestMod  = regexp.MustCompile(`mod\s+tests?\s*\{`)
 )
 
 // RS-015: transmute between incompatible types
 var (
-	reTransmuteCall   = regexp.MustCompile(`transmute\s*::\s*<[^>]+,\s*[^>]+>\s*\(`)
-	reTransmuteGeneric = regexp.MustCompile(`(?:std::mem::)?transmute\s*\(`)
+	reTransmuteCall      = regexp.MustCompile(`transmute\s*::\s*<[^>]+,\s*[^>]+>\s*\(`)
+	reTransmuteGeneric   = regexp.MustCompile(`(?:std::mem::)?transmute\s*\(`)
 	reTransmuteUnchecked = regexp.MustCompile(`transmute_copy\s*\(`)
 )
 
@@ -58,10 +55,10 @@ var (
 
 // RS-017: actix-web/warp/axum without TLS config
 var (
-	reActixBind      = regexp.MustCompile(`HttpServer::new.*\.bind\s*\(\s*"(?:0\.0\.0\.0|127\.0\.0\.1|localhost):\d+"`)
-	reWarpServe      = regexp.MustCompile(`warp::serve\s*\(.*\)\s*\.run\s*\(`)
-	reAxumBind       = regexp.MustCompile(`axum::Server::bind\s*\(|TcpListener::bind\s*\(`)
-	reTLSConfig      = regexp.MustCompile(`\.bind_rustls|\.bind_openssl|\.tls\s*\(|RustlsConfig|SslAcceptor|\.tls_config`)
+	reActixBind = regexp.MustCompile(`HttpServer::new.*\.bind\s*\(\s*"(?:0\.0\.0\.0|127\.0\.0\.1|localhost):\d+"`)
+	reWarpServe = regexp.MustCompile(`warp::serve\s*\(.*\)\s*\.run\s*\(`)
+	reAxumBind  = regexp.MustCompile(`axum::Server::bind\s*\(|TcpListener::bind\s*\(`)
+	reTLSConfig = regexp.MustCompile(`\.bind_rustls|\.bind_openssl|\.tls\s*\(|RustlsConfig|SslAcceptor|\.tls_config`)
 )
 
 // RS-018: FFI without proper bounds checking
@@ -69,8 +66,39 @@ var (
 	reExternBlock    = regexp.MustCompile(`extern\s+"C"\s*\{`)
 	reFFIFnDecl      = regexp.MustCompile(`pub\s+(?:unsafe\s+)?extern\s+"C"\s+fn\s+\w+\s*\(`)
 	reFFIRawPtr      = regexp.MustCompile(`\*(?:mut|const)\s+\w+`)
-	reCStringFromPtr  = regexp.MustCompile(`CStr::from_ptr\s*\(|CString::from_raw\s*\(`)
+	reCStringFromPtr = regexp.MustCompile(`CStr::from_ptr\s*\(|CString::from_raw\s*\(`)
 	reSliceFromPtr   = regexp.MustCompile(`slice::from_raw_parts\s*\(|Vec::from_raw_parts\s*\(`)
+)
+
+// RS-019: Hard-coded cryptographic key into a RustCrypto AEAD/cipher KeyInit
+// constructor (CWE-798 / CWE-321). The constructor receiver is the cipher type;
+// the key argument (arg 0) is the secret. We flag ONLY when that argument is a
+// byte/string literal, a byte-string literal, or an ALL_CAPS const reference —
+// never a value derived from OsRng / env::var / a KDF, which is the secure form.
+var (
+	// Specific RustCrypto / sodiumoxide AEAD + block-cipher KeyInit entry points.
+	reAEADKeyInit = regexp.MustCompile(`\b(?:Aes(?:128|256)Gcm(?:Siv)?|Aes(?:128|192|256)|ChaCha20Poly1305|XChaCha20Poly1305|ChaCha20|Aes128GcmSiv|Aes256GcmSiv|Aes256CbcEnc|Aes256CbcDec)::new(?:_from_slice|_from_slices)?\s*\(`)
+	// Generic KeyInit::new on an explicitly-typed Key. The receiver-bearing form.
+	reKeyInitNew = regexp.MustCompile(`\b(?:Key|GenericArray)::from_slice\s*\(\s*(?:b?"[^"]*"|&\[\s*0x|&[A-Z][A-Z0-9_]+\b)`)
+	// The key argument is a literal: a string/byte-string literal `b"..."` /
+	// `"..."`, an inline byte array `&[0x.., ..]` / `[0u8; N]` with literal
+	// contents, or a reference to an ALL_CAPS const (KEY, SECRET_KEY, ...).
+	reLiteralKeyArg = regexp.MustCompile(`::new(?:_from_slice|_from_slices)?\s*\(\s*(?:&?\s*b?"|&?\s*\[\s*0x|&?\s*\[\s*\d|&[A-Z][A-Z0-9_]{2,}\b|GenericArray::from_slice\s*\(\s*b?")`)
+	// Secure-derivation markers: if the key arg flows from any of these on the
+	// same line, it is NOT hard-coded. Suppresses the literal heuristic.
+	reSecureKeyOrigin = regexp.MustCompile(`OsRng|thread_rng|getrandom|from_entropy|env::var|std::env|derive_key|hkdf|Hkdf|Argon2|argon2|pbkdf2|Pbkdf2|scrypt|Scrypt|SystemRandom|rand_core|KeyInit::generate|generate_key|::generate\b`)
+)
+
+// RS-020: Session/auth cookie built without the Secure flag (CWE-614). Anchored
+// on the cookie::CookieBuilder / Cookie::build chain that terminates in
+// .finish()/.build() without a .secure(true) call, AND only when the cookie
+// name suggests a session/auth token. Explicit .secure(false) (local-dev) and
+// non-auth cookies are not flagged.
+var (
+	reCookieBuild     = regexp.MustCompile(`Cookie::build\s*\(|CookieBuilder::new\s*\(`)
+	reCookieName      = regexp.MustCompile(`(?i)(?:Cookie::build|CookieBuilder::new)\s*\(\s*(?:\(\s*)?["'](?:[^"']*(?:session|sess|sid|token|auth|jwt|csrf|xsrf|login|remember)[^"']*)["']`)
+	reCookieSecure    = regexp.MustCompile(`\.secure\s*\(\s*true\s*\)`)
+	reCookieSecureDev = regexp.MustCompile(`\.secure\s*\(\s*false\s*\)`)
 )
 
 func init() {
@@ -82,6 +110,8 @@ func init() {
 	rules.Register(RustRegexNoLimit{})
 	rules.Register(RustNoTLS{})
 	rules.Register(RustFFIBounds{})
+	rules.Register(RustHardcodedCryptoKey{})
+	rules.Register(RustInsecureCookie{})
 }
 
 // ---------------------------------------------------------------------------
@@ -90,15 +120,18 @@ func init() {
 
 type RustUnsafePtrDeref struct{}
 
-func (r RustUnsafePtrDeref) ID() string                      { return "BATOU-RS-011" }
-func (r RustUnsafePtrDeref) Name() string                    { return "RustUnsafePtrDeref" }
-func (r RustUnsafePtrDeref) Description() string             { return "Detects Rust unsafe blocks containing raw pointer dereferences or offset arithmetic, which bypass memory safety." }
+func (r RustUnsafePtrDeref) ID() string   { return "BATOU-RS-011" }
+func (r RustUnsafePtrDeref) Name() string { return "RustUnsafePtrDeref" }
+func (r RustUnsafePtrDeref) Description() string {
+	return "Detects Rust unsafe blocks containing raw pointer dereferences or offset arithmetic, which bypass memory safety."
+}
 func (r RustUnsafePtrDeref) DefaultSeverity() rules.Severity { return rules.High }
 func (r RustUnsafePtrDeref) Languages() []rules.Language     { return []rules.Language{rules.LangRust} }
 
 func (r RustUnsafePtrDeref) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inUnsafe := false
 	unsafeBraceDepth := 0
@@ -108,17 +141,17 @@ func (r RustUnsafePtrDeref) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reUnsafeDeref.MatchString(line) {
+		if rules.GMatchLower(reUnsafeDeref, line, lowered[i]) {
 			inUnsafe = true
 			unsafeBraceDepth = strings.Count(line, "{") - strings.Count(line, "}")
 		}
 
 		if inUnsafe {
-			if !reUnsafeDeref.MatchString(line) {
+			if !rules.GMatchLower(reUnsafeDeref, line, lowered[i]) {
 				unsafeBraceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 			}
 
-			if reDerefRaw.MatchString(line) || rePtrOffset.MatchString(line) {
+			if rules.GMatchLower(reDerefRaw, line, lowered[i]) || rules.GMatchLower(rePtrOffset, line, lowered[i]) {
 				matched := strings.TrimSpace(line)
 				if len(matched) > 120 {
 					matched = matched[:120] + "..."
@@ -155,15 +188,18 @@ func (r RustUnsafePtrDeref) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RustSQLFormat struct{}
 
-func (r RustSQLFormat) ID() string                      { return "BATOU-RS-012" }
-func (r RustSQLFormat) Name() string                    { return "RustSQLFormat" }
-func (r RustSQLFormat) Description() string             { return "Detects Rust SQL injection via format! macro building SQL query strings." }
+func (r RustSQLFormat) ID() string   { return "BATOU-RS-012" }
+func (r RustSQLFormat) Name() string { return "RustSQLFormat" }
+func (r RustSQLFormat) Description() string {
+	return "Detects Rust SQL injection via format! macro building SQL query strings."
+}
 func (r RustSQLFormat) DefaultSeverity() rules.Severity { return rules.High }
 func (r RustSQLFormat) Languages() []rules.Language     { return []rules.Language{rules.LangRust} }
 
 func (r RustSQLFormat) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -172,10 +208,10 @@ func (r RustSQLFormat) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reSQLQueryFormat.FindString(line); m != "" {
+		if m := rules.GFindLower(reSQLQueryFormat, line, lowered[i]); m != "" {
 			matched = m
 			desc = "A SQL query method (query/execute/prepare) receives a string built with format!(). User input interpolated via format! is not parameterized, enabling SQL injection."
-		} else if m := reSQLFormatDirect.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSQLFormatDirect, line, lowered[i]); m != "" {
 			matched = m
 			desc = "A format! macro builds a string containing SQL keywords (SELECT, INSERT, UPDATE, DELETE). If this string is used in a database query, interpolated values enable SQL injection."
 		}
@@ -211,15 +247,18 @@ func (r RustSQLFormat) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RustCommandUser struct{}
 
-func (r RustCommandUser) ID() string                      { return "BATOU-RS-013" }
-func (r RustCommandUser) Name() string                    { return "RustCommandUser" }
-func (r RustCommandUser) Description() string             { return "Detects Rust std::process::Command with variable program names or format! in arguments, enabling command injection." }
+func (r RustCommandUser) ID() string   { return "BATOU-RS-013" }
+func (r RustCommandUser) Name() string { return "RustCommandUser" }
+func (r RustCommandUser) Description() string {
+	return "Detects Rust std::process::Command with variable program names or format! in arguments, enabling command injection."
+}
 func (r RustCommandUser) DefaultSeverity() rules.Severity { return rules.High }
 func (r RustCommandUser) Languages() []rules.Language     { return []rules.Language{rules.LangRust} }
 
 func (r RustCommandUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -228,13 +267,13 @@ func (r RustCommandUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reCommandShellUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reCommandShellUser, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Command::new invokes a shell (sh/bash/cmd) with -c flag and a user-controlled argument. The shell interprets metacharacters in the argument, enabling arbitrary command injection."
-		} else if m := reCommandNewVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reCommandNewVar, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Command::new() receives a variable as the program name. If the variable is user-controlled, an attacker can execute any binary on the system."
-		} else if m := reCommandArgVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reCommandArgVar, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Command .arg() receives a format! string. If the formatted string contains user input and the command runs through a shell, this enables command injection."
 		}
@@ -270,9 +309,11 @@ func (r RustCommandUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RustUnwrapProd struct{}
 
-func (r RustUnwrapProd) ID() string                      { return "BATOU-RS-014" }
-func (r RustUnwrapProd) Name() string                    { return "RustUnwrapProd" }
-func (r RustUnwrapProd) Description() string             { return "Detects Rust unwrap()/expect() calls outside test code that can panic in production, causing denial of service." }
+func (r RustUnwrapProd) ID() string   { return "BATOU-RS-014" }
+func (r RustUnwrapProd) Name() string { return "RustUnwrapProd" }
+func (r RustUnwrapProd) Description() string {
+	return "Detects Rust unwrap()/expect() calls outside test code that can panic in production, causing denial of service."
+}
 func (r RustUnwrapProd) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r RustUnwrapProd) Languages() []rules.Language     { return []rules.Language{rules.LangRust} }
 
@@ -283,7 +324,8 @@ func (r RustUnwrapProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inTestMod := false
 	testBraceDepth := 0
@@ -294,7 +336,7 @@ func (r RustUnwrapProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Track test modules to skip
-		if reTestAttr.MatchString(line) || reTestMod.MatchString(line) {
+		if rules.GMatchLower(reTestAttr, line, lowered[i]) || rules.GMatchLower(reTestMod, line, lowered[i]) {
 			inTestMod = true
 			testBraceDepth = strings.Count(line, "{") - strings.Count(line, "}")
 			continue
@@ -308,7 +350,7 @@ func (r RustUnwrapProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reUnwrapGeneric.MatchString(line) {
+		if rules.GMatchLower(reUnwrapGeneric, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -340,15 +382,18 @@ func (r RustUnwrapProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RustTransmuteIncompat struct{}
 
-func (r RustTransmuteIncompat) ID() string                      { return "BATOU-RS-015" }
-func (r RustTransmuteIncompat) Name() string                    { return "RustTransmuteIncompat" }
-func (r RustTransmuteIncompat) Description() string             { return "Detects Rust transmute/transmute_copy calls which reinterpret memory between types, bypassing all type safety." }
+func (r RustTransmuteIncompat) ID() string   { return "BATOU-RS-015" }
+func (r RustTransmuteIncompat) Name() string { return "RustTransmuteIncompat" }
+func (r RustTransmuteIncompat) Description() string {
+	return "Detects Rust transmute/transmute_copy calls which reinterpret memory between types, bypassing all type safety."
+}
 func (r RustTransmuteIncompat) DefaultSeverity() rules.Severity { return rules.High }
 func (r RustTransmuteIncompat) Languages() []rules.Language     { return []rules.Language{rules.LangRust} }
 
 func (r RustTransmuteIncompat) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -357,13 +402,13 @@ func (r RustTransmuteIncompat) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reTransmuteCall.FindString(line); m != "" {
+		if m := rules.GFindLower(reTransmuteCall, line, lowered[i]); m != "" {
 			matched = m
 			desc = "transmute with explicit type parameters reinterprets the bits of one type as another. If the types have different sizes, layouts, or invariants, this causes undefined behavior including memory corruption."
-		} else if m := reTransmuteUnchecked.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reTransmuteUnchecked, line, lowered[i]); m != "" {
 			matched = m
 			desc = "transmute_copy copies the bits of a value and reinterprets them as another type. Unlike transmute, it does not check that the types are the same size, making it even more dangerous."
-		} else if m := reTransmuteGeneric.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reTransmuteGeneric, line, lowered[i]); m != "" {
 			matched = m
 			desc = "transmute call detected. std::mem::transmute reinterprets bits without any safety checks. Incorrect usage causes undefined behavior, invalid values, or memory corruption."
 		}
@@ -399,20 +444,23 @@ func (r RustTransmuteIncompat) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RustRegexNoLimit struct{}
 
-func (r RustRegexNoLimit) ID() string                      { return "BATOU-RS-016" }
-func (r RustRegexNoLimit) Name() string                    { return "RustRegexNoLimit" }
-func (r RustRegexNoLimit) Description() string             { return "Detects Rust Regex::new() with variable or format! patterns without size_limit, enabling ReDoS." }
+func (r RustRegexNoLimit) ID() string   { return "BATOU-RS-016" }
+func (r RustRegexNoLimit) Name() string { return "RustRegexNoLimit" }
+func (r RustRegexNoLimit) Description() string {
+	return "Detects Rust Regex::new() with variable or format! patterns without size_limit, enabling ReDoS."
+}
 func (r RustRegexNoLimit) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r RustRegexNoLimit) Languages() []rules.Language     { return []rules.Language{rules.LangRust} }
 
 func (r RustRegexNoLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Skip if size limits are configured
-	if reRegexSizeLimit.MatchString(ctx.Content) {
+	if rules.GMatchFile(reRegexSizeLimit, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -420,9 +468,9 @@ func (r RustRegexNoLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reRegexNew.FindString(line); m != "" {
+		if m := rules.GFindLower(reRegexNew, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reRegexSetNew.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRegexSetNew, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -457,20 +505,23 @@ func (r RustRegexNoLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RustNoTLS struct{}
 
-func (r RustNoTLS) ID() string                      { return "BATOU-RS-017" }
-func (r RustNoTLS) Name() string                    { return "RustNoTLS" }
-func (r RustNoTLS) Description() string             { return "Detects Rust web servers (actix-web, warp, axum) binding to addresses without TLS configuration." }
+func (r RustNoTLS) ID() string   { return "BATOU-RS-017" }
+func (r RustNoTLS) Name() string { return "RustNoTLS" }
+func (r RustNoTLS) Description() string {
+	return "Detects Rust web servers (actix-web, warp, axum) binding to addresses without TLS configuration."
+}
 func (r RustNoTLS) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r RustNoTLS) Languages() []rules.Language     { return []rules.Language{rules.LangRust} }
 
 func (r RustNoTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Skip if TLS is configured
-	if reTLSConfig.MatchString(ctx.Content) {
+	if rules.GMatchFile(reTLSConfig, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -479,13 +530,13 @@ func (r RustNoTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reActixBind.FindString(line); m != "" {
+		if m := rules.GFindLower(reActixBind, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Actix-web HttpServer binds to an address without TLS (bind instead of bind_rustls/bind_openssl). All HTTP traffic is transmitted in plaintext."
-		} else if m := reWarpServe.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reWarpServe, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Warp server runs without TLS (.run instead of .tls). All HTTP traffic is transmitted in plaintext."
-		} else if m := reAxumBind.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reAxumBind, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Axum server binds to an address without TLS configuration. All HTTP traffic is transmitted in plaintext."
 		}
@@ -521,20 +572,23 @@ func (r RustNoTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RustFFIBounds struct{}
 
-func (r RustFFIBounds) ID() string                      { return "BATOU-RS-018" }
-func (r RustFFIBounds) Name() string                    { return "RustFFIBounds" }
-func (r RustFFIBounds) Description() string             { return "Detects Rust FFI (extern \"C\") functions with raw pointer parameters or unsafe C string/slice conversions without bounds checking." }
+func (r RustFFIBounds) ID() string   { return "BATOU-RS-018" }
+func (r RustFFIBounds) Name() string { return "RustFFIBounds" }
+func (r RustFFIBounds) Description() string {
+	return "Detects Rust FFI (extern \"C\") functions with raw pointer parameters or unsafe C string/slice conversions without bounds checking."
+}
 func (r RustFFIBounds) DefaultSeverity() rules.Severity { return rules.High }
 func (r RustFFIBounds) Languages() []rules.Language     { return []rules.Language{rules.LangRust} }
 
 func (r RustFFIBounds) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Quick bail: no FFI in the file
-	if !reExternBlock.MatchString(ctx.Content) && !reFFIFnDecl.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reExternBlock, ctx) && !rules.GMatchFile(reFFIFnDecl, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -543,13 +597,13 @@ func (r RustFFIBounds) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if reFFIFnDecl.MatchString(line) && reFFIRawPtr.MatchString(line) {
+		if rules.GMatchLower(reFFIFnDecl, line, lowered[i]) && rules.GMatchLower(reFFIRawPtr, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			desc = "An extern \"C\" function accepts raw pointer parameters. Raw pointers from C code may be null, dangling, misaligned, or point to insufficient memory. Without validation, dereferencing these pointers causes undefined behavior."
-		} else if m := reCStringFromPtr.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reCStringFromPtr, line, lowered[i]); m != "" {
 			matched = m
 			desc = "CStr::from_ptr or CString::from_raw constructs a Rust string from a C pointer. If the C string is not null-terminated, not valid UTF-8, or the pointer is invalid, this causes undefined behavior or panics."
-		} else if m := reSliceFromPtr.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSliceFromPtr, line, lowered[i]); m != "" {
 			// Only flag in FFI context
 			if strings.Contains(ctx.Content, "extern \"C\"") {
 				matched = m
@@ -578,6 +632,141 @@ func (r RustFFIBounds) Scan(ctx *rules.ScanContext) []rules.Finding {
 				Tags:          []string{"rust", "ffi", "bounds-checking", "memory-safety"},
 			})
 		}
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// BATOU-RS-019: Hard-coded cryptographic key (CWE-798 / CWE-321)
+// ---------------------------------------------------------------------------
+
+type RustHardcodedCryptoKey struct{}
+
+func (r RustHardcodedCryptoKey) ID() string   { return "BATOU-RS-019" }
+func (r RustHardcodedCryptoKey) Name() string { return "RustHardcodedCryptoKey" }
+func (r RustHardcodedCryptoKey) Description() string {
+	return "Detects a hard-coded byte/string literal or ALL_CAPS const passed as the key to a RustCrypto AEAD/block-cipher KeyInit constructor (Aes256Gcm::new, ChaCha20Poly1305::new, Key::from_slice, ...). A hard-coded key is recoverable from the binary and cannot be rotated."
+}
+func (r RustHardcodedCryptoKey) DefaultSeverity() rules.Severity { return rules.High }
+func (r RustHardcodedCryptoKey) Languages() []rules.Language     { return []rules.Language{rules.LangRust} }
+
+func (r RustHardcodedCryptoKey) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Quick bail: no cipher KeyInit constructor in the file at all.
+	if !rules.GMatchFile(reAEADKeyInit, ctx) && !rules.GMatchFile(reKeyInitNew, ctx) {
+		return nil
+	}
+
+	var findings []rules.Finding
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		// Must be a cipher KeyInit constructor on this line.
+		isCipherCtor := rules.GMatchLower(reAEADKeyInit, line, lowered[i]) || rules.GMatchLower(reKeyInitNew, line, lowered[i])
+		if !isCipherCtor {
+			continue
+		}
+
+		// The key arg must be a literal/const. If it is derived from a CSPRNG /
+		// env / KDF on the same line, it is the SECURE form — skip.
+		if !rules.GMatchLower(reLiteralKeyArg, line, lowered[i]) && !rules.GMatchLower(reKeyInitNew, line, lowered[i]) {
+			continue
+		}
+		if rules.GMatchLower(reSecureKeyOrigin, line, lowered[i]) {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Hard-coded cryptographic key in cipher constructor",
+			Description:   "A cryptographic key passed to a RustCrypto AEAD/block-cipher KeyInit constructor is a hard-coded literal or compile-time constant. Anyone with the binary can extract it, and it cannot be rotated without a redeploy. This defeats the confidentiality/integrity the cipher is meant to provide.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    i + 1,
+			MatchedText:   truncate(line, 120),
+			Suggestion:    "Load the key from a secret manager (Vault, AWS KMS, environment) at runtime, or derive it from a high-entropy secret with a KDF (Argon2/HKDF/PBKDF2). For ephemeral keys use a CSPRNG: let key = Aes256Gcm::generate_key(&mut OsRng);",
+			CWEID:         "CWE-798",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+			Language:      ctx.Language,
+			Confidence:    "medium",
+			Tags:          []string{"rust", "crypto", "hardcoded-key", "secrets"},
+		})
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
+// BATOU-RS-020: Session/auth cookie without the Secure flag (CWE-614)
+// ---------------------------------------------------------------------------
+
+type RustInsecureCookie struct{}
+
+func (r RustInsecureCookie) ID() string   { return "BATOU-RS-020" }
+func (r RustInsecureCookie) Name() string { return "RustInsecureCookie" }
+func (r RustInsecureCookie) Description() string {
+	return "Detects a cookie::CookieBuilder / Cookie::build chain for a session/auth token cookie that finishes without a .secure(true) call, so the cookie is transmitted over plaintext HTTP and is exposed to network sniffing / MITM."
+}
+func (r RustInsecureCookie) DefaultSeverity() rules.Severity { return rules.Medium }
+func (r RustInsecureCookie) Languages() []rules.Language     { return []rules.Language{rules.LangRust} }
+
+func (r RustInsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Quick bail: no cookie builder in the file.
+	if !rules.GMatchFile(reCookieBuild, ctx) {
+		return nil
+	}
+
+	var findings []rules.Finding
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
+	for i, line := range lines {
+		if isCommentLine(line) {
+			continue
+		}
+
+		// Builder must START on this line AND name a security-relevant cookie.
+		if !rules.GMatchLower(reCookieName, line, lowered[i]) {
+			continue
+		}
+
+		// Collect the builder chain: this line plus following lines until the
+		// chain terminates in .finish()/.build() or a statement boundary (;).
+		// Builder chains in Rust are commonly written one method per line.
+		chain := line
+		if !strings.Contains(line, ";") && !strings.Contains(line, ".finish()") && !strings.Contains(line, ".build()") {
+			for j := i + 1; j < len(lines) && j < i+15; j++ {
+				chain += "\n" + lines[j]
+				if strings.Contains(lines[j], ";") || strings.Contains(lines[j], ".finish()") || strings.Contains(lines[j], ".build()") {
+					break
+				}
+			}
+		}
+
+		// Secure flag present (true) → safe. Explicit .secure(false) is a
+		// deliberate local-dev choice → not flagged (the developer opted in).
+		if reCookieSecure.MatchString(chain) || reCookieSecureDev.MatchString(chain) {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "Session/auth cookie without Secure flag",
+			Description:   "A cookie carrying a session or authentication token is built without calling .secure(true). Without the Secure attribute the browser will send the cookie over plaintext HTTP, exposing the session token to network eavesdroppers and MITM attackers. Pair with HttpOnly and SameSite for defense in depth.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    i + 1,
+			MatchedText:   truncate(chain, 160),
+			Suggestion:    "Add .secure(true) to the cookie builder so the cookie is only transmitted over HTTPS: Cookie::build((\"session\", value)).secure(true).http_only(true).same_site(SameSite::Strict).finish(). Use a config flag if you must disable Secure for local HTTP development.",
+			CWEID:         "CWE-614",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+			Language:      ctx.Language,
+			Confidence:    "medium",
+			Tags:          []string{"rust", "cookie", "secure-flag", "session"},
+		})
 	}
 	return findings
 }

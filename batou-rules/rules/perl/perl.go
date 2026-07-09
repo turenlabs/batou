@@ -14,32 +14,32 @@ var (
 	// system("cmd $var") - single string argument with interpolation
 	systemSingleInterp = regexp.MustCompile(`\bsystem\s*\(\s*"[^"]*\$[a-zA-Z_{]`)
 	// system($var) - variable as command
-	systemConcatVar    = regexp.MustCompile(`\bsystem\s*\(\s*\$`)
+	systemConcatVar = regexp.MustCompile(`\bsystem\s*\(\s*\$`)
 	// exec("cmd $var") or exec($var)
-	execWithVar        = regexp.MustCompile(`\bexec\s*\(\s*"[^"]*\$[a-zA-Z_{]`)
-	execConcatVar      = regexp.MustCompile(`\bexec\s*\(\s*\$`)
+	execWithVar   = regexp.MustCompile(`\bexec\s*\(\s*"[^"]*\$[a-zA-Z_{]`)
+	execConcatVar = regexp.MustCompile(`\bexec\s*\(\s*\$`)
 	// `cmd $var`
-	backtickWithVar    = regexp.MustCompile("`[^`]*\\$[a-zA-Z_{]")
+	backtickWithVar = regexp.MustCompile("`[^`]*\\$[a-zA-Z_{]")
 	// qx(cmd $var)
-	qxWithVar          = regexp.MustCompile(`qx\s*[\({/][^)\}/]*\$[a-zA-Z_{]`)
+	qxWithVar = regexp.MustCompile(`qx\s*[\({/][^)\}/]*\$[a-zA-Z_{]`)
 	// open(FH, "|cmd $var") or open($fh, "|$var")
-	openPipeWithVar    = regexp.MustCompile(`open\s*\([^)]*["']\|[^"']*\$[a-zA-Z_{]`)
+	openPipeWithVar = regexp.MustCompile(`open\s*\([^)]*["']\|[^"']*\$[a-zA-Z_{]`)
 )
 
 // PL-002: SQL Injection
 var (
 	// $dbh->do("....$var...") - interpolation inside the SQL string
-	dbiDoInterp       = regexp.MustCompile(`\$dbh->do\s*\(\s*"[^"]*\$[a-zA-Z_{][^"]*"`)
+	dbiDoInterp = regexp.MustCompile(`\$dbh->do\s*\(\s*"[^"]*\$[a-zA-Z_{][^"]*"`)
 	// $dbh->do("..." . $var) - concatenation
-	dbiDoConcatDot    = regexp.MustCompile(`\$dbh->do\s*\(\s*["'][^"']*["']\s*\.`)
+	dbiDoConcatDot = regexp.MustCompile(`\$dbh->do\s*\(\s*["'][^"']*["']\s*\.`)
 	// $dbh->prepare("...$var...") - interpolation inside prepare string
-	dbiPrepInterp     = regexp.MustCompile(`\$dbh->prepare\s*\(\s*"[^"]*\$[a-zA-Z_{][^"]*"`)
+	dbiPrepInterp = regexp.MustCompile(`\$dbh->prepare\s*\(\s*"[^"]*\$[a-zA-Z_{][^"]*"`)
 	// $dbh->prepare("..." . $var) - concatenation
-	dbiPrepConcat     = regexp.MustCompile(`\$dbh->prepare\s*\(\s*["'][^"']*["']\s*\.`)
+	dbiPrepConcat = regexp.MustCompile(`\$dbh->prepare\s*\(\s*["'][^"']*["']\s*\.`)
 	// $dbh->selectrow_*("...$var...") - interpolation
-	dbiSelectInterp   = regexp.MustCompile(`\$dbh->select(?:row|all)_\w+\s*\(\s*"[^"]*\$[a-zA-Z_{][^"]*"`)
+	dbiSelectInterp = regexp.MustCompile(`\$dbh->select(?:row|all)_\w+\s*\(\s*"[^"]*\$[a-zA-Z_{][^"]*"`)
 	// $dbh->selectrow_*("..." . $var) - concatenation
-	dbiSelectConcat   = regexp.MustCompile(`\$dbh->select(?:row|all)_\w+\s*\(\s*["'][^"']*["']\s*\.`)
+	dbiSelectConcat = regexp.MustCompile(`\$dbh->select(?:row|all)_\w+\s*\(\s*["'][^"']*["']\s*\.`)
 )
 
 // PL-003: Code Injection
@@ -53,11 +53,11 @@ var (
 // PL-004: Path Traversal
 var (
 	// Two-arg open: open(FH, $var) or open(my $fh, $var) - allows pipe injection
-	twoArgOpen      = regexp.MustCompile(`open\s*\(\s*(?:my\s+)?\$?\w+\s*,\s*\$`)
+	twoArgOpen = regexp.MustCompile(`open\s*\(\s*(?:my\s+)?\$?\w+\s*,\s*\$`)
 	// Three-arg open with user var: open(FH, '<', $var)
 	openWithUserVar = regexp.MustCompile(`open\s*\(\s*(?:my\s+)?\$?\w+\s*,\s*["'][<>]*["']\s*,\s*\$`)
 	// Three-arg open with path concat: open(FH, '<', "/path/" . $var)
-	openConcatPath  = regexp.MustCompile(`open\s*\(\s*(?:my\s+)?\$?\w+\s*,\s*["'][<>]*["']\s*,\s*["'][^"']*["']\s*\.\s*\$`)
+	openConcatPath = regexp.MustCompile(`open\s*\(\s*(?:my\s+)?\$?\w+\s*,\s*["'][<>]*["']\s*,\s*["'][^"']*["']\s*\.\s*\$`)
 )
 
 // PL-005: Regex DoS
@@ -71,7 +71,6 @@ var (
 var (
 	printParamDirect = regexp.MustCompile(`print\s+.*\$cgi->param\s*\(`)
 	printQParam      = regexp.MustCompile(`print\s+.*\$q->param\s*\(`)
-	printParamVar    = regexp.MustCompile(`print\s+.*param\s*\(`)
 	printUserVar     = regexp.MustCompile(`print\s+["'].*\$(?:input|user_input|name|data|query|value|content|body|text|message|comment)\b`)
 	headerWithParam  = regexp.MustCompile(`\$cgi->header.*\$|\$q->header.*\$`)
 )
@@ -123,15 +122,18 @@ func init() {
 
 type CommandInjection struct{}
 
-func (r *CommandInjection) ID() string                      { return "BATOU-PL-001" }
-func (r *CommandInjection) Name() string                    { return "PerlCommandInjection" }
-func (r *CommandInjection) Description() string             { return "Detects Perl command injection via system/exec/backticks/qx with variable interpolation." }
+func (r *CommandInjection) ID() string   { return "BATOU-PL-001" }
+func (r *CommandInjection) Name() string { return "PerlCommandInjection" }
+func (r *CommandInjection) Description() string {
+	return "Detects Perl command injection via system/exec/backticks/qx with variable interpolation."
+}
 func (r *CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *CommandInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -142,25 +144,25 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := systemSingleInterp.FindString(line); loc != "" {
+		if loc := rules.GFindLower(systemSingleInterp, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "system() with variable interpolation"
-		} else if loc := systemConcatVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(systemConcatVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "system() with variable argument"
-		} else if loc := execWithVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(execWithVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "exec() with variable interpolation"
-		} else if loc := execConcatVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(execConcatVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "exec() with variable argument"
-		} else if loc := backtickWithVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(backtickWithVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "backtick command with variable interpolation"
-		} else if loc := qxWithVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(qxWithVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "qx() with variable interpolation"
-		} else if loc := openPipeWithVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(openPipeWithVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "open() with pipe and variable interpolation"
 		}
@@ -192,15 +194,18 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SQLInjection struct{}
 
-func (r *SQLInjection) ID() string                      { return "BATOU-PL-002" }
-func (r *SQLInjection) Name() string                    { return "PerlSQLInjection" }
-func (r *SQLInjection) Description() string             { return "Detects Perl DBI SQL injection via string interpolation or concatenation instead of placeholders." }
+func (r *SQLInjection) ID() string   { return "BATOU-PL-002" }
+func (r *SQLInjection) Name() string { return "PerlSQLInjection" }
+func (r *SQLInjection) Description() string {
+	return "Detects Perl DBI SQL injection via string interpolation or concatenation instead of placeholders."
+}
 func (r *SQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *SQLInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -211,22 +216,22 @@ func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := dbiDoInterp.FindString(line); loc != "" {
+		if loc := rules.GFindLower(dbiDoInterp, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "$dbh->do() with variable interpolation"
-		} else if loc := dbiDoConcatDot.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(dbiDoConcatDot, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "$dbh->do() with string concatenation"
-		} else if loc := dbiPrepInterp.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(dbiPrepInterp, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "$dbh->prepare() with variable interpolation"
-		} else if loc := dbiPrepConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(dbiPrepConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "$dbh->prepare() with string concatenation"
-		} else if loc := dbiSelectInterp.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(dbiSelectInterp, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "DBI selectrow/selectall with variable interpolation"
-		} else if loc := dbiSelectConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(dbiSelectConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "DBI selectrow/selectall with string concatenation"
 		}
@@ -258,15 +263,18 @@ func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CodeInjection struct{}
 
-func (r *CodeInjection) ID() string                      { return "BATOU-PL-003" }
-func (r *CodeInjection) Name() string                    { return "PerlCodeInjection" }
-func (r *CodeInjection) Description() string             { return "Detects Perl code injection via eval() with variable or string eval." }
+func (r *CodeInjection) ID() string   { return "BATOU-PL-003" }
+func (r *CodeInjection) Name() string { return "PerlCodeInjection" }
+func (r *CodeInjection) Description() string {
+	return "Detects Perl code injection via eval() with variable or string eval."
+}
 func (r *CodeInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *CodeInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -278,16 +286,16 @@ func (r *CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 
 		// eval with variable argument: eval($code), eval $var
-		if loc := evalStringVar.FindString(line); loc != "" {
+		if loc := rules.GFindLower(evalStringVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "eval() with variable argument"
-		} else if loc := evalDollar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(evalDollar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "eval with variable expression"
-		} else if loc := evalQuoteInterp.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(evalQuoteInterp, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "eval with double-quoted string interpolation"
-		} else if loc := evalStringQuoted.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(evalStringQuoted, line, lowered[i]); loc != "" {
 			// Check it's not just an error-handling eval { } block
 			if !strings.Contains(line, "eval {") && !strings.Contains(line, "eval{") {
 				matched = loc
@@ -322,15 +330,18 @@ func (r *CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PathTraversal struct{}
 
-func (r *PathTraversal) ID() string                      { return "BATOU-PL-004" }
-func (r *PathTraversal) Name() string                    { return "PerlPathTraversal" }
-func (r *PathTraversal) Description() string             { return "Detects Perl path traversal via open() with user-controlled input or two-argument open." }
+func (r *PathTraversal) ID() string   { return "BATOU-PL-004" }
+func (r *PathTraversal) Name() string { return "PerlPathTraversal" }
+func (r *PathTraversal) Description() string {
+	return "Detects Perl path traversal via open() with user-controlled input or two-argument open."
+}
 func (r *PathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PathTraversal) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if file has user input sources
 	hasUserInput := strings.Contains(ctx.Content, "param(") ||
@@ -351,15 +362,15 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := twoArgOpen.FindString(line); loc != "" {
+		if loc := rules.GFindLower(twoArgOpen, line, lowered[i]); loc != "" {
 			// Two-arg open with variable is dangerous (allows |command)
 			matched = loc
 			desc = "two-argument open() with variable (allows pipe injection)"
 		} else if hasUserInput {
-			if loc := openWithUserVar.FindString(line); loc != "" {
+			if loc := rules.GFindLower(openWithUserVar, line, lowered[i]); loc != "" {
 				matched = loc
 				desc = "open() with user-controlled path"
-			} else if loc := openConcatPath.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(openConcatPath, line, lowered[i]); loc != "" {
 				matched = loc
 				desc = "open() with concatenated user path"
 			}
@@ -392,15 +403,18 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RegexDoS struct{}
 
-func (r *RegexDoS) ID() string                      { return "BATOU-PL-005" }
-func (r *RegexDoS) Name() string                    { return "PerlRegexDoS" }
-func (r *RegexDoS) Description() string             { return "Detects Perl regex denial of service via user input in regex without quotemeta/\\Q\\E." }
+func (r *RegexDoS) ID() string   { return "BATOU-PL-005" }
+func (r *RegexDoS) Name() string { return "PerlRegexDoS" }
+func (r *RegexDoS) Description() string {
+	return "Detects Perl regex denial of service via user input in regex without quotemeta/\\Q\\E."
+}
 func (r *RegexDoS) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RegexDoS) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check for quotemeta or \Q..\E usage which mitigates this
 	hasQuotemeta := strings.Contains(ctx.Content, "quotemeta") ||
@@ -419,13 +433,13 @@ func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := regexWithVar.FindString(line); loc != "" {
+		if loc := rules.GFindLower(regexWithVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "regex match with variable interpolation"
-		} else if loc := regexWithInterp.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(regexWithInterp, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "regex match with ${} interpolation"
-		} else if loc := qrWithVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(qrWithVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "qr// with variable interpolation"
 		}
@@ -457,15 +471,18 @@ func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CGIXSS struct{}
 
-func (r *CGIXSS) ID() string                      { return "BATOU-PL-006" }
-func (r *CGIXSS) Name() string                    { return "PerlCGIXSS" }
-func (r *CGIXSS) Description() string             { return "Detects Perl CGI XSS via printing CGI parameters without HTML encoding." }
+func (r *CGIXSS) ID() string   { return "BATOU-PL-006" }
+func (r *CGIXSS) Name() string { return "PerlCGIXSS" }
+func (r *CGIXSS) Description() string {
+	return "Detects Perl CGI XSS via printing CGI parameters without HTML encoding."
+}
 func (r *CGIXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CGIXSS) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *CGIXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check for HTML encoding which mitigates XSS
 	hasEncoding := strings.Contains(ctx.Content, "encode_entities") ||
@@ -487,16 +504,16 @@ func (r *CGIXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := printParamDirect.FindString(line); loc != "" {
+		if loc := rules.GFindLower(printParamDirect, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "print with $cgi->param() without encoding"
-		} else if loc := printQParam.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(printQParam, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "print with $q->param() without encoding"
-		} else if loc := headerWithParam.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(headerWithParam, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "CGI header with variable interpolation"
-		} else if loc := printUserVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(printUserVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "print with user-controlled variable"
 		}
@@ -528,15 +545,18 @@ func (r *CGIXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureFileOps struct{}
 
-func (r *InsecureFileOps) ID() string                      { return "BATOU-PL-007" }
-func (r *InsecureFileOps) Name() string                    { return "PerlInsecureFileOps" }
-func (r *InsecureFileOps) Description() string             { return "Detects Perl insecure file operations: two-argument open, chmod 0777, world-writable permissions." }
+func (r *InsecureFileOps) ID() string   { return "BATOU-PL-007" }
+func (r *InsecureFileOps) Name() string { return "PerlInsecureFileOps" }
+func (r *InsecureFileOps) Description() string {
+	return "Detects Perl insecure file operations: two-argument open, chmod 0777, world-writable permissions."
+}
 func (r *InsecureFileOps) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureFileOps) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *InsecureFileOps) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -548,22 +568,22 @@ func (r *InsecureFileOps) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 		severity := r.DefaultSeverity()
 
-		if loc := twoArgOpenBare.FindString(line); loc != "" {
+		if loc := rules.GFindLower(twoArgOpenBare, line, lowered[i]); loc != "" {
 			// Only flag two-arg open with variable (bare filehandle form)
 			if !strings.Contains(line, ", '<',") && !strings.Contains(line, ", '>',") &&
 				!strings.Contains(line, ", '>>',") && !strings.Contains(line, ", '<',") {
 				matched = loc
 				desc = "two-argument open() allows pipe injection"
 			}
-		} else if loc := chmod0777.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(chmod0777, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "chmod 0777 sets world-readable/writable/executable"
 			severity = rules.High
-		} else if loc := chmodWorldWrite.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(chmodWorldWrite, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "chmod 0666 sets world-readable/writable"
 			severity = rules.Medium
-		} else if loc := mkdirWorldWrite.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(mkdirWorldWrite, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "mkdir with 0777 creates world-writable directory"
 			severity = rules.High
@@ -596,15 +616,18 @@ func (r *InsecureFileOps) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type Deserialization struct{}
 
-func (r *Deserialization) ID() string                      { return "BATOU-PL-008" }
-func (r *Deserialization) Name() string                    { return "PerlDeserialization" }
-func (r *Deserialization) Description() string             { return "Detects Perl unsafe deserialization via Storable thaw/retrieve or YAML::Load from untrusted input." }
+func (r *Deserialization) ID() string   { return "BATOU-PL-008" }
+func (r *Deserialization) Name() string { return "PerlDeserialization" }
+func (r *Deserialization) Description() string {
+	return "Detects Perl unsafe deserialization via Storable thaw/retrieve or YAML::Load from untrusted input."
+}
 func (r *Deserialization) DefaultSeverity() rules.Severity { return rules.High }
 func (r *Deserialization) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
 func (r *Deserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -616,19 +639,19 @@ func (r *Deserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 		severity := r.DefaultSeverity()
 
-		if loc := storableThaw.FindString(line); loc != "" {
+		if loc := rules.GFindLower(storableThaw, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Storable::thaw() with variable input"
 			severity = rules.Critical
-		} else if loc := storableRetrieve.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(storableRetrieve, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Storable::retrieve() with variable input"
 			severity = rules.Critical
-		} else if loc := yamlLoadVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(yamlLoadVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "YAML::Load() with variable input"
 			severity = rules.High
-		} else if loc := yamlLoadFile.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(yamlLoadFile, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "YAML::LoadFile() with variable input"
 			severity = rules.High
@@ -661,9 +684,11 @@ func (r *Deserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LDAPInjection struct{}
 
-func (r *LDAPInjection) ID() string                      { return "BATOU-PL-009" }
-func (r *LDAPInjection) Name() string                    { return "PerlLDAPInjection" }
-func (r *LDAPInjection) Description() string             { return "Detects Perl LDAP injection via Net::LDAP search with interpolated filter." }
+func (r *LDAPInjection) ID() string   { return "BATOU-PL-009" }
+func (r *LDAPInjection) Name() string { return "PerlLDAPInjection" }
+func (r *LDAPInjection) Description() string {
+	return "Detects Perl LDAP injection via Net::LDAP search with interpolated filter."
+}
 func (r *LDAPInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LDAPInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
@@ -674,7 +699,8 @@ func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -685,13 +711,13 @@ func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := ldapSearchInterp.FindString(line); loc != "" {
+		if loc := rules.GFindLower(ldapSearchInterp, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Net::LDAP search with interpolated filter"
-		} else if loc := ldapSearchConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(ldapSearchConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Net::LDAP search with concatenated filter"
-		} else if loc := ldapFilterVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(ldapFilterVar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "LDAP filter from variable"
 		}
@@ -723,9 +749,11 @@ func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureRandomness struct{}
 
-func (r *InsecureRandomness) ID() string                      { return "BATOU-PL-010" }
-func (r *InsecureRandomness) Name() string                    { return "PerlInsecureRandomness" }
-func (r *InsecureRandomness) Description() string             { return "Detects Perl insecure random number generation via rand() or srand(time) in security contexts." }
+func (r *InsecureRandomness) ID() string   { return "BATOU-PL-010" }
+func (r *InsecureRandomness) Name() string { return "PerlInsecureRandomness" }
+func (r *InsecureRandomness) Description() string {
+	return "Detects Perl insecure random number generation via rand() or srand(time) in security contexts."
+}
 func (r *InsecureRandomness) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureRandomness) Languages() []rules.Language     { return []rules.Language{rules.LangPerl} }
 
@@ -752,7 +780,8 @@ func (r *InsecureRandomness) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -763,14 +792,14 @@ func (r *InsecureRandomness) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := srandTime.FindString(line); loc != "" {
+		if loc := rules.GFindLower(srandTime, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "srand(time) uses predictable seed"
-		} else if loc := srandFixed.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(srandFixed, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "srand() with fixed seed"
 		} else if hasCryptoContext {
-			if loc := randForSecurity.FindString(line); loc != "" {
+			if loc := rules.GFindLower(randForSecurity, line, lowered[i]); loc != "" {
 				matched = loc
 				desc = "rand() used in security-sensitive context"
 			}
@@ -816,16 +845,4 @@ func truncate(s string, maxLen int) string {
 		return s[:maxLen] + "..."
 	}
 	return s
-}
-
-func surroundingContext(lines []string, idx, radius int) string {
-	start := idx - radius
-	if start < 0 {
-		start = 0
-	}
-	end := idx + radius + 1
-	if end > len(lines) {
-		end = len(lines)
-	}
-	return strings.Join(lines[start:end], "\n")
 }

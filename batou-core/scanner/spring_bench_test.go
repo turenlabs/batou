@@ -10,11 +10,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
 	"github.com/turenlabs/batou-core/hook"
 	"github.com/turenlabs/batou-core/scanner"
 	"github.com/turenlabs/batou-rules/rules"
-
 	_ "github.com/turenlabs/batou-rules/rules/injection"
 	_ "github.com/turenlabs/batou-rules/rules/secrets"
 	_ "github.com/turenlabs/batou-rules/rules/crypto"

@@ -594,6 +594,267 @@ func (c *LuaCatalog) Sources() []taint.SourceDef {
 			Description: "lua-resty-redis set members (untrusted stored data)",
 			Assigns:     "return",
 		},
+		{
+			ID:          "lua.resty.redis.hkeys",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `red:hkeys\s*\(`,
+			ObjectType:  "resty.redis",
+			MethodName:  "red:hkeys",
+			Description: "lua-resty-redis hash field names (untrusted stored data)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.resty.redis.hvals",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `red:hvals\s*\(`,
+			ObjectType:  "resty.redis",
+			MethodName:  "red:hvals",
+			Description: "lua-resty-redis hash values (untrusted stored data)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.resty.redis.zrange",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `red:zrange\s*\(`,
+			ObjectType:  "resty.redis",
+			MethodName:  "red:zrange",
+			Description: "lua-resty-redis sorted set range (untrusted stored data)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.resty.redis.zrevrange",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `red:zrevrange\s*\(`,
+			ObjectType:  "resty.redis",
+			MethodName:  "red:zrevrange",
+			Description: "lua-resty-redis sorted set reverse range (untrusted stored data)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.resty.redis.zrangebyscore",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `red:zrangebyscore\s*\(`,
+			ObjectType:  "resty.redis",
+			MethodName:  "red:zrangebyscore",
+			Description: "lua-resty-redis sorted set range by score (untrusted stored data)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.resty.redis.lpop",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `red:lpop\s*\(`,
+			ObjectType:  "resty.redis",
+			MethodName:  "red:lpop",
+			Description: "lua-resty-redis list left pop (untrusted queued data)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.resty.redis.rpop",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `red:rpop\s*\(`,
+			ObjectType:  "resty.redis",
+			MethodName:  "red:rpop",
+			Description: "lua-resty-redis list right pop (untrusted queued data)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.resty.redis.lindex",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `red:lindex\s*\(`,
+			ObjectType:  "resty.redis",
+			MethodName:  "red:lindex",
+			Description: "lua-resty-redis list element at index (untrusted stored data)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.resty.redis.srandmember",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `red:srandmember\s*\(`,
+			ObjectType:  "resty.redis",
+			MethodName:  "red:srandmember",
+			Description: "lua-resty-redis random set member (untrusted stored data)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.resty.redis.spop",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `red:spop\s*\(`,
+			ObjectType:  "resty.redis",
+			MethodName:  "red:spop",
+			Description: "lua-resty-redis set pop (untrusted stored data)",
+			Assigns:     "return",
+		},
+
+		// --- SQL / SQLite second-order DB-read sources ---
+		// Rows/values returned by these read methods carry data that was
+		// previously written by application or external code; treating them
+		// as taint sources catches second-order injection (stored XSS, SQLi
+		// via queued search terms, command injection via stored job names).
+		// The query/prepare calls that *produce* these handles are already
+		// modeled as SQLi sinks in lua_sinks.go (lua.resty.mysql.query /
+		// .send_query, lua.luasql.execute, lua.luadbi.prepare, lua.lsqlite3.*).
+		{
+			ID:          "lua.resty.mysql.read_result",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:db|conn|mysql|m)\s*:\s*read_result\s*\(`,
+			ObjectType:  "resty.mysql",
+			MethodName:  "db:read_result",
+			Description: "lua-resty-mysql db:read_result() — rows from a query sent via send_query (untrusted stored data, second-order injection)",
+			Assigns:     "return",
+		},
+		// lua-resty-mysql db:query() also returns rows directly (the
+		// synchronous path; db:send_query + db:read_result is the async
+		// path). The same call is already a SQLi sink in lua_sinks.go
+		// (lua.resty.mysql.query) — sources and sinks coexist: the sink
+		// fires when arg[0] is tainted; the source taints the return
+		// value regardless. Mirrors how lua.resty.redis.* read methods
+		// and lua.tarantool.box.space.select are handled.
+		{
+			ID:          "lua.resty.mysql.query.result",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:db|conn|mysql|m)\s*:\s*query\s*\(`,
+			ObjectType:  "resty.mysql",
+			MethodName:  "db:query",
+			Description: "lua-resty-mysql db:query() result rows — second-order taint (data persisted by another writer flows into XSS / log / command sinks)",
+			Assigns:     "return",
+		},
+		// pgmoon (OpenResty PostgreSQL client) — pg:query() and
+		// pg:simple_query() return result arrays. Both calls are also
+		// SQLi sinks in lua_sinks.go (lua.pgmoon.query,
+		// lua.pgmoon.simple_query); see comment above on coexistence.
+		{
+			ID:          "lua.pgmoon.query.result",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:pg|pgmoon|conn|db)\s*:\s*query\s*\(`,
+			ObjectType:  "pgmoon",
+			MethodName:  "pg:query",
+			Description: "pgmoon pg:query() result rows — second-order taint (Postgres rows attackers may have written earlier)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.pgmoon.simple_query.result",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:pg|pgmoon|conn|db)\s*:\s*simple_query\s*\(`,
+			ObjectType:  "pgmoon",
+			MethodName:  "pg:simple_query",
+			Description: "pgmoon pg:simple_query() result rows — second-order taint (Postgres rows attackers may have written earlier)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.luasql.cursor.fetch",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:cur|cursor)\s*:\s*fetch\s*\(`,
+			ObjectType:  "luasql.cursor",
+			MethodName:  "cursor:fetch",
+			Description: "LuaSQL cursor:fetch() — a row from a cursor returned by conn:execute (untrusted stored data, second-order injection)",
+			Assigns:     "return",
+		},
+		// lua-cassandra / lua-resty-cassandra — peer:execute() and
+		// cluster:execute() return the result rows of a SELECT. The first
+		// argument of each call is already a CQL-injection sink
+		// (lua.cassandra.peer.execute / lua.cassandra.cluster.execute); these
+		// SrcDatabase entries cover the OTHER side of the same call — the
+		// returned rows carry data an earlier writer persisted, so they are
+		// untrusted (second-order taint) and chain into XSS / log / command /
+		// SSRF sinks when rendered or passed without re-escaping. Mirrors the
+		// existing lua-resty-mysql db:query() / pgmoon pg:query() read-result
+		// sources. (batch returns write acknowledgements, not row data, so it
+		// is intentionally not a read source.)
+		{
+			ID:          "lua.cassandra.peer.execute.result",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\bpeer\s*:\s*execute\s*\(`,
+			ObjectType:  "cassandra",
+			MethodName:  "peer:execute",
+			Description: "lua-cassandra peer:execute() result rows — second-order taint (Cassandra rows an attacker may have written earlier flow into XSS / log / command sinks)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.cassandra.cluster.execute.result",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\bcluster\s*:\s*execute\s*\(`,
+			ObjectType:  "cassandra.cluster",
+			MethodName:  "cluster:execute",
+			Description: "lua-resty-cassandra cluster:execute() result rows — second-order taint (Cassandra rows an attacker may have written earlier flow into XSS / log / command sinks)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.luadbi.statement.fetch",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:sth|stmt|statement)\s*:\s*fetch\s*\(`,
+			ObjectType:  "luadbi.statement",
+			MethodName:  "sth:fetch",
+			Description: "LuaDBI statement:fetch() — a row from a prepared statement (untrusted stored data, second-order injection)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.luadbi.statement.rows",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:sth|stmt|statement)\s*:\s*rows\s*\(`,
+			ObjectType:  "luadbi.statement",
+			MethodName:  "sth:rows",
+			Description: "LuaDBI statement:rows() iterator — rows from a prepared statement (untrusted stored data, second-order injection)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.lsqlite3.statement.get_value",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:stmt|statement|vm|prep)\s*:\s*get_value\s*\(`,
+			ObjectType:  "Statement",
+			MethodName:  "stmt:get_value",
+			Description: "lsqlite3 stmt:get_value(n) — a column value from a stepped row (untrusted stored data, second-order injection)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.lsqlite3.statement.get_values",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:stmt|statement|vm|prep)\s*:\s*get_values\s*\(`,
+			ObjectType:  "Statement",
+			MethodName:  "stmt:get_values",
+			Description: "lsqlite3 stmt:get_values() — the column values of a stepped row (untrusted stored data, second-order injection)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.lsqlite3.statement.get_named_values",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:stmt|statement|vm|prep)\s*:\s*get_named_values\s*\(`,
+			ObjectType:  "Statement",
+			MethodName:  "stmt:get_named_values",
+			Description: "lsqlite3 stmt:get_named_values() — column-name-keyed values of a stepped row (untrusted stored data, second-order injection)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.lsqlite3.statement.get_uvalues",
+			Category:    taint.SrcDatabase,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:stmt|statement|vm|prep)\s*:\s*get_uvalues\s*\(`,
+			ObjectType:  "Statement",
+			MethodName:  "stmt:get_uvalues",
+			Description: "lsqlite3 stmt:get_uvalues() — the unnamed column values of a stepped row (untrusted stored data, second-order injection)",
+			Assigns:     "return",
+		},
 
 		// --- OpenResty raw request socket ---
 		{
@@ -604,6 +865,240 @@ func (c *LuaCatalog) Sources() []taint.SourceDef {
 			ObjectType:  "ngx",
 			MethodName:  "ngx.req.socket",
 			Description: "OpenResty raw request socket (for reading request body)",
+			Assigns:     "return",
+		},
+
+		// --- Kong API Gateway PDK request sources (kong.request.*) ---
+		{
+			ID:          "lua.kong.request.get_query",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_query\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_query",
+			Description: "Kong PDK query arguments table",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_query_arg",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_query_arg\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_query_arg",
+			Description: "Kong PDK single query argument",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_header",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_header\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_header",
+			Description: "Kong PDK single request header value",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_headers",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_headers\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_headers",
+			Description: "Kong PDK request headers table",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_body",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_body\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_body",
+			Description: "Kong PDK parsed request body (form/JSON/multipart)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_raw_body",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_raw_body\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_raw_body",
+			Description: "Kong PDK raw request body string",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_path",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_path\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_path",
+			Description: "Kong PDK normalized request path",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_host",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_host\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_host",
+			Description: "Kong PDK request hostname (Host header derived)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_forwarded_scheme",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_forwarded_scheme\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_forwarded_scheme",
+			Description: "Kong PDK forwarded scheme (X-Forwarded-Proto derived)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_forwarded_host",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_forwarded_host\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_forwarded_host",
+			Description: "Kong PDK forwarded host (X-Forwarded-Host derived)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_forwarded_path",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_forwarded_path\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_forwarded_path",
+			Description: "Kong PDK forwarded path (X-Forwarded-Path derived)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_raw_forwarded_path",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_raw_forwarded_path\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_raw_forwarded_path",
+			Description: "Kong PDK raw forwarded path (X-Forwarded-Path, unnormalized)",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.request.get_forwarded_prefix",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.request\.get_forwarded_prefix\s*\(`,
+			ObjectType:  "kong.request",
+			MethodName:  "kong.request.get_forwarded_prefix",
+			Description: "Kong PDK forwarded path prefix (X-Forwarded-Prefix derived)",
+			Assigns:     "return",
+		},
+
+		// --- Kong service.response — upstream service response data ---
+		// Bodies and headers returned by the upstream service flow into plugin
+		// code during header_filter / body_filter / log phases. External services
+		// can return attacker-influenced content, so these are second-order
+		// taint sources whose data must be sanitized before reaching XSS,
+		// header-injection, log-injection, or SSRF sinks.
+		{
+			ID:          "lua.kong.service.response.get_header",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.service\.response\.get_header\s*\(`,
+			ObjectType:  "kong.service.response",
+			MethodName:  "kong.service.response.get_header",
+			Description: "Kong PDK upstream response single header value",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.service.response.get_headers",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.service\.response\.get_headers\s*\(`,
+			ObjectType:  "kong.service.response",
+			MethodName:  "kong.service.response.get_headers",
+			Description: "Kong PDK upstream response headers table",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.service.response.get_raw_body",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.service\.response\.get_raw_body\s*\(`,
+			ObjectType:  "kong.service.response",
+			MethodName:  "kong.service.response.get_raw_body",
+			Description: "Kong PDK raw upstream response body string",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.kong.service.response.get_body",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.service\.response\.get_body\s*\(`,
+			ObjectType:  "kong.service.response",
+			MethodName:  "kong.service.response.get_body",
+			Description: "Kong PDK decoded upstream response body",
+			Assigns:     "return",
+		},
+
+		// --- Kong client — forwarded client IP (X-Forwarded-For derived) ---
+		{
+			ID:          "lua.kong.client.get_forwarded_ip",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `kong\.client\.get_forwarded_ip\s*\(`,
+			ObjectType:  "kong.client",
+			MethodName:  "kong.client.get_forwarded_ip",
+			Description: "Kong PDK forwarded client IP (X-Forwarded-For derived)",
+			Assigns:     "return",
+		},
+
+		// --- Neovim plugin user-input source ---
+		// vim.fn.input(prompt) returns user-typed text; plugins routinely pipe
+		// it straight into vim.fn.system / vim.cmd without sanitization.
+		{
+			ID:          "lua.vim.fn.input",
+			Category:    taint.SrcUserInput,
+			Language:    rules.LangLua,
+			Pattern:     `vim\.fn\.input\s*\(`,
+			ObjectType:  "vim.fn",
+			MethodName:  "vim.fn.input",
+			Description: "Neovim vim.fn.input returns user-typed text from an interactive prompt",
+			Assigns:     "return",
+		},
+
+		// --- Message broker consumer trust-boundary sources (CWE-501 inbound) ---
+		// Symmetric to the producer trust-boundary sinks added in PR #476
+		// (lua.resty.kafka.producer.send, lua.resty.rabbitmqstomp.send,
+		// lua.resty.redis.publish). Anything pulled from a queue/topic was
+		// last touched by an outside process and must be treated as untrusted
+		// input on this side of the boundary. Mirrors java.kafka.consumerrecord.*,
+		// kotlin.kafka.consumerrecord.*, go.kafka.consumer.readmessage and the
+		// equivalent @KafkaListener / @RabbitListener annotation sources.
+		{
+			ID:          "lua.resty.kafka.consumer.fetch",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangLua,
+			Pattern:     `\b(?:consumer|cons|c)\s*:\s*fetch\s*\(`,
+			ObjectType:  "kafka.consumer",
+			MethodName:  "consumer:fetch",
+			Description: "lua-resty-kafka basic consumer:fetch(topic, partition, offset) returns a result table whose .records[i].value is an attacker-controllable message body produced upstream — treat as untrusted across the trust boundary (CWE-501).",
+			Assigns:     "return",
+		},
+		{
+			ID:          "lua.resty.rabbitmqstomp.receive",
+			Category:    taint.SrcExternal,
+			Language:    rules.LangLua,
+			Pattern:     `(?:rabbit|rabbitmq|rabbitmqstomp)\s*:\s*receive\s*\(`,
+			ObjectType:  "rabbitmqstomp",
+			MethodName:  "rabbit:receive",
+			Description: "lua-resty-rabbitmqstomp rabbit:receive() reads the next MESSAGE frame from a STOMP subscription; the returned body is attacker-controllable data published upstream — treat as untrusted across the trust boundary (CWE-501).",
 			Assigns:     "return",
 		},
 	}

@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/testutil"
 	"github.com/turenlabs/batou-rules/rules"
-
 	_ "github.com/turenlabs/batou-rules/rules/auth"
 	_ "github.com/turenlabs/batou-rules/rules/cors"
 	_ "github.com/turenlabs/batou-rules/rules/crypto"

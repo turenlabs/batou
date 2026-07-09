@@ -274,10 +274,14 @@ func TestIsTestFile(t *testing.T) {
 
 		// Exact filenames
 		{"tests/conftest.py", true},
+		{"conftest.py", true},
+		{"app/tests.py", true}, // Django single-file tests module
+		{"backend/api/tests.py", true},
 
 		// Test prefix pattern
 		{"test_utils.py", true},
 		{"tests/test_auth.py", true},
+		{"app/tests/test_views.py", true},
 
 		// Keywords
 		{"internal/mock_client.go", true},
@@ -289,6 +293,15 @@ func TestIsTestFile(t *testing.T) {
 		{"src/test/java/org/owasp/webgoat/SomeTest.java", true},
 		{"src/it/java/org/owasp/webgoat/IntegrationTest.java", true},
 		{"src/test/resources/config.xml", true},
+
+		// Go conventions: test helpers, fixtures loader, e2e
+		{"models/unittest/fixtures_loader.go", true},
+		{"internal/testutil/scan.go", true},
+		{"pkg/testutils/db.go", true},
+		{"app/testhelpers/auth.rb", true},
+		{"tests/integration/api_repo_test.go", true},
+		{"tests/integrations/lfs_test.go", true},
+		{"e2e/login.spec.ts", true},
 
 		// Java test class suffixes (case-sensitive)
 		{"src/main/java/FooTest.java", true},
@@ -310,6 +323,12 @@ func TestIsTestFile(t *testing.T) {
 		// Java files that look like tests but aren't
 		{"src/main/java/TestUtils.java", false},
 		{"src/main/java/Contest.java", false},
+		// Python production paths that contain "test" as a substring
+		// but not as an anchored segment — these MUST NOT be classified
+		// as tests.
+		{"app/views/contest.py", false},
+		{"app/protested.py", false},
+		{"app/handler.py", false},
 	}
 
 	for _, tt := range tests {
@@ -317,6 +336,91 @@ func TestIsTestFile(t *testing.T) {
 			got := IsTestFile(tt.path)
 			if got != tt.want {
 				t.Errorf("IsTestFile(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// IsInfraFile
+// ---------------------------------------------------------------------------
+
+func TestIsInfraFile(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		// Migration directories.
+		{"models/migrations/v1_22/v286.go", true},
+		{"db/migrate/20240101_create_users.rb", true},
+		{"app/migration/20240101.py", true},
+		{"schema/migrations/0001_initial.sql", true},
+
+		// Build tooling.
+		{"tools/lint-go-all.go", true},
+		{"build/tools/check_rules.py", true},
+		{"cmd/tools/codegen.go", true},
+
+		// Generator scripts.
+		{"modules/charset/generate/generate.go", true},
+		{"internal/codegen/main.go", true},
+		{"scripts/release.sh", true},
+
+		// Generator output files.
+		{"internal/proto/service_gen.go", true},
+		{"internal/proto/service.gen.go", true},
+		{"api/v1/types.pb.go", true},
+		{"web/types_generated.ts", true},
+
+		// Negative cases — these should NOT be infra.
+		{"models/user.go", false},
+		{"routers/api/repo.go", false},
+		{"services/auth/login.rb", false},
+		{"src/index.ts", false},
+		// migrate/ as a substring of a non-segment word — anchors matter.
+		{"src/migrator_lib.go", false},
+
+		// Mutual-exclusion with test files: a test file IS a test, not infra.
+		// (The scanner gives IsTestFile precedence; this check just verifies
+		// the test-file path isn't classified by infraDirSegments alone.)
+		{"models/migrations/migration_test.go", true}, // still in migrations/ → infra
+
+		// Python build / packaging / management infra.
+		{"setup.py", true},
+		{"project/setup.py", true},
+		{"setup.cfg", true},
+		{"backend/manage.py", true},                        // Django
+		{"app/migrations/0001_initial.py", true},           // Django migrations
+		{"venv/lib/python3.11/site-packages/foo.py", true}, // site-packages
+		{".venv/lib/python3.12/site-packages/bar.py", true},
+		{".tox/py311/lib/python3.11/site-packages/x.py", true},
+		{"backend/.tox/py310/x.py", true},
+		{"src/__pycache__/handler.cpython-311.pyc", true},
+		{"docs/conf.py", true}, // Sphinx docs/ build
+		{"project/docs/source/api.py", true},
+
+		// Python production paths that look adjacent but aren't infra.
+		{"app/views/contest.py", false},
+		{"app/protested.py", false},
+		{"app/services/env_config.py", false}, // not under /env/
+		{"app/environment.py", false},
+		{"app/migrator_helpers.py", false}, // not under /migrate/
+
+		// ember-cli-mirage: client-side mock server, dev/test only.
+		{"ghost/admin/mirage/config/members.js", true},
+		{"admin/mirage/config.js", true},
+		{"frontend/mirage/scenarios/default.js", true},
+		// Path-segment anchored: "mirage" as a substring of another word or a
+		// production filename must NOT match.
+		{"app/mirages_dashboard.js", false},  // "mirages" not a /mirage/ segment
+		{"src/components/Mirage.jsx", false}, // component named Mirage, not a dir
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got := IsInfraFile(tt.path)
+			if got != tt.want {
+				t.Errorf("IsInfraFile(%q) = %v, want %v", tt.path, got, tt.want)
 			}
 		})
 	}
@@ -377,6 +481,76 @@ func TestIsVendoredLibrary(t *testing.T) {
 	}
 }
 
+// Composer's per-component autoloader lives under a doubled
+// `composer/composer/` segment (apps/<app>/composer/composer/, lib/composer/
+// composer/), NOT under vendor/. Every file there is Composer-generated
+// (ClassLoader.php, InstalledVersions.php, autoload_*.php) so the whole tree
+// must classify as a vendored library and be skipped. Real app code under a
+// single /composer/ dir (holding the project's own composer.json/.lock) must
+// NOT match. Regression for the Nextcloud smoke-test FP class (128+ findings
+// in apps/*/composer/composer/ClassLoader.php scanned as app code).
+func TestIsVendoredLibrary_NestedComposerAutoloader(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		// The exact FP shape from nextcloud-server.
+		{"apps/encryption/composer/composer/ClassLoader.php", true},
+		{"apps/settings/composer/composer/InstalledVersions.php", true},
+		{"lib/composer/composer/ClassLoader.php", true},
+		{"apps/dav/composer/composer/autoload_static.php", true},
+		{"apps/files/composer/composer/platform_check.php", true},
+		// Absolute path (the scan emits absolute paths).
+		{"/srv/nextcloud/apps/oauth2/composer/composer/ClassLoader.php", true},
+
+		// Negative: a single /composer/ directory is the app's own composer
+		// manifest area, NOT the vendored autoloader — must NOT match.
+		{"apps/myapp/composer/MyService.php", false},
+		{"composer.json", false},
+		{"apps/myapp/composer.lock", false},
+		// "composer" appearing once in a normal path must not match.
+		{"src/composer_helper.php", false},
+		{"lib/Composer/Builder.php", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			if got := IsVendoredLibrary(tt.path); got != tt.want {
+				t.Errorf("IsVendoredLibrary(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+// CI test-runner shell scripts at the repo root (autotest*.sh — a Nextcloud/
+// ownCloud convention) are not under /tests/ or /benchmarks/, so the directory
+// segments don't catch them. They drive the test suite and intentionally
+// contain shell that reads as command-injection to a SAST. Regression for the
+// smoke-test "shell test scripts scanned as app code" FP class.
+func TestIsTestFile_AutotestShellScripts(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"autotest.sh", true},
+		{"autotest-external.sh", true},
+		{"autotest-checkers.sh", true},
+		{"/srv/nextcloud/autotest.sh", true},
+
+		// Negative: only the autotest* prefix + .sh suffix is the convention.
+		// A normal app shell script or a non-.sh file must NOT match.
+		{"scripts/deploy.sh", false}, // (note: /scripts/ is infra, but this asserts the autotest rule alone doesn't over-match)
+		{"bin/autotest_runner.go", false},
+		{"src/autotester.php", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			if got := IsTestFile(tt.path); got != tt.want {
+				t.Errorf("IsTestFile(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Edge cases
 // ---------------------------------------------------------------------------
@@ -410,6 +584,80 @@ func TestInBlockComment_Empty(t *testing.T) {
 func TestIsTestFile_EmptyPath(t *testing.T) {
 	if IsTestFile("") {
 		t.Error("empty path should not be a test file")
+	}
+}
+
+func TestIsTestFile_ScaleTestPaths(t *testing.T) {
+	tests := []string{
+		"scaletest/run.go",
+		"enterprise/scaletest/agentconn/run.go",
+		"scaletests/lib/setup.go",
+	}
+	for _, p := range tests {
+		if !IsTestFile(p) {
+			t.Errorf("IsTestFile(%q) = false, want true", p)
+		}
+	}
+}
+
+func TestIsTestFile_TestFixturePaths(t *testing.T) {
+	tests := []string{
+		"test_fixtures/sample.go",
+		"test-fixtures/sample.go",
+		"internal/test_fixtures/data.json",
+	}
+	for _, p := range tests {
+		if !IsTestFile(p) {
+			t.Errorf("IsTestFile(%q) = false, want true", p)
+		}
+	}
+}
+
+func TestIsInfraOrTestPath(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		// Test paths (Go).
+		{"foo_test.go", true},
+		{"agent/foo_test.go", true},
+		{"scaletest/run.go", true},
+		{"test_fixtures/sample.go", true},
+		// Infra paths (Go).
+		{"models/migrations/v1.go", true},
+		{"scripts/build.go", true},
+		{"tools/gen/main.go", true},
+		// Test paths (Python).
+		{"app/tests/test_views.py", true},
+		{"conftest.py", true},
+		{"tests/conftest.py", true},
+		{"backend/api/tests.py", true},
+		{"src/handler_test.py", true},
+		// Infra paths (Python).
+		{"app/migrations/0001_initial.py", true},
+		{"venv/lib/python3.11/site-packages/x.py", true},
+		{".venv/lib/python3.12/site-packages/y.py", true},
+		{"setup.py", true},
+		{"setup.cfg", true},
+		{"backend/manage.py", true},
+		{"docs/conf.py", true},
+		// Production paths (must NOT be flagged).
+		{"/app/handler.go", false},
+		{"internal/scanner/scanner.go", false},
+		{"cmd/server/main.go", false},
+		{"app/views/contest.py", false}, // "contest" must not match "/test/"
+		{"app/protested.py", false},     // "protested" must not match "/test/"
+		{"app/handler.py", false},       // no test/infra segment at all
+		{"app/services/env_config.py", false},
+		{"app/migrator_lib.py", false}, // not "/migrate/"
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got := IsInfraOrTestPath(tt.path)
+			if got != tt.want {
+				t.Errorf("IsInfraOrTestPath(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
 	}
 }
 

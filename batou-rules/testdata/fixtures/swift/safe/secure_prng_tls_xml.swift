@@ -47,9 +47,11 @@ func processBufferSafe(size: Int) {
     ptr.deallocate()
 }
 
-// Safe sharing — excluded activity types
-func shareWithRestrictions(data: String) {
-    let vc = UIActivityViewController(activityItems: [data], applicationActivities: nil)
+// Safe sharing — a fixed, non-sensitive marketing string (no user/secret data
+// crosses the share-sheet trust boundary), with risky destinations excluded.
+func shareWithRestrictions() {
+    let shareText = "Check out our app: https://apps.example.com"
+    let vc = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
     vc.excludedActivityTypes = [.airDrop, .copyToPasteboard, .mail]
 }
 

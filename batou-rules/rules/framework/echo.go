@@ -13,7 +13,6 @@ import (
 
 // BATOU-FW-ECHO-001: CORS wildcard
 var reEchoCORSWildcard = regexp.MustCompile(`AllowOrigins\s*:\s*\[\s*\]\s*string\s*\{\s*"\*"\s*\}`)
-var reEchoCORSAllowAll = regexp.MustCompile(`middleware\.CORSWithConfig\s*\(\s*middleware\.CORSConfig\s*\{`)
 var reEchoCORSDefault = regexp.MustCompile(`middleware\.CORS\s*\(\s*\)`)
 
 // BATOU-FW-ECHO-002: SQL injection via c.QueryParam
@@ -24,7 +23,6 @@ var reEchoSQLFmt = regexp.MustCompile(`fmt\.Sprintf\s*\(\s*"[^"]*(?:SELECT|INSER
 var reEchoStaticUser = regexp.MustCompile(`(?:e|echo)\.(?:Static|File)\s*\(\s*[^,]+,\s*(?:c\.(?:QueryParam|Param|FormValue)|[a-zA-Z_]\w*\s*\+)`)
 
 // BATOU-FW-ECHO-004: Template without escaping
-var reEchoHTMLUnescaped = regexp.MustCompile(`template\.HTML\s*\(`)
 var reEchoRenderRaw = regexp.MustCompile(`c\.HTML\s*\([^)]*template\.HTML`)
 
 // BATOU-FW-ECHO-005: JWT with hardcoded key
@@ -69,7 +67,8 @@ func (r *EchoCORSWildcard) Languages() []rules.Language { return []rules.Languag
 
 func (r *EchoCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -78,9 +77,9 @@ func (r *EchoCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reEchoCORSWildcard.FindString(line); m != "" {
+		if m := rules.GFindLower(reEchoCORSWildcard, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reEchoCORSDefault.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reEchoCORSDefault, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -124,7 +123,8 @@ func (r *EchoSQLInjection) Languages() []rules.Language { return []rules.Languag
 
 func (r *EchoSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -133,9 +133,9 @@ func (r *EchoSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reEchoSQLConcat.FindString(line); m != "" {
+		if m := rules.GFindLower(reEchoSQLConcat, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reEchoSQLFmt.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reEchoSQLFmt, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -179,14 +179,15 @@ func (r *EchoStaticTraversal) Languages() []rules.Language { return []rules.Lang
 
 func (r *EchoStaticTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reEchoStaticUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reEchoStaticUser, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -233,14 +234,15 @@ func (r *EchoTemplateUnescaped) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reEchoRenderRaw.FindString(line); m != "" {
+		if m := rules.GFindLower(reEchoRenderRaw, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -282,7 +284,8 @@ func (r *EchoJWTHardcoded) Languages() []rules.Language { return []rules.Languag
 
 func (r *EchoJWTHardcoded) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -291,9 +294,9 @@ func (r *EchoJWTHardcoded) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reEchoJWTHardcoded.FindString(line); m != "" {
+		if m := rules.GFindLower(reEchoJWTHardcoded, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reEchoJWTConfig.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reEchoJWTConfig, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -343,12 +346,12 @@ func (r *EchoNoCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "POST") && !strings.Contains(ctx.Content, "PUT") && !strings.Contains(ctx.Content, "DELETE") {
 		return nil
 	}
-	if reEchoCSRF.MatchString(ctx.Content) || reEchoCSRFConfig.MatchString(ctx.Content) {
+	if rules.GMatchFile(reEchoCSRF, ctx) || rules.GMatchFile(reEchoCSRFConfig, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
@@ -396,21 +399,22 @@ func (r *EchoBindNoValidation) Description() string {
 func (r *EchoBindNoValidation) Languages() []rules.Language { return []rules.Language{rules.LangGo} }
 
 func (r *EchoBindNoValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reEchoBind.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reEchoBind, ctx) {
 		return nil
 	}
-	if reEchoValidate.MatchString(ctx.Content) {
+	if rules.GMatchFile(reEchoValidate, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reEchoBind.MatchString(line) {
+		if rules.GMatchLower(reEchoBind, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -452,14 +456,15 @@ func (r *EchoDebugMode) Languages() []rules.Language { return []rules.Language{r
 
 func (r *EchoDebugMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reEchoDebug.FindString(line); m != "" {
+		if m := rules.GFindLower(reEchoDebug, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

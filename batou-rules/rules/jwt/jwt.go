@@ -36,8 +36,11 @@ var jwtRules = []rules.RegexRule{
 		Langs:    jwtAllLangs,
 		Patterns: []*regexp.Regexp{
 			regexp.MustCompile(`(?i)["'](?:alg|algorithm)["']\s*[=:]\s*["'](?:none|None|NONE|nOnE)["']`),
-			regexp.MustCompile(`(?i)(?:algorithms?\s*[=:]\s*\[?\s*["']none["']|verify\s*[=:]\s*(?:false|False|FALSE))`),
-			regexp.MustCompile(`(?i)(?:jwt\.decode|jwt_decode|JWT\.decode|Jose\.JWT\.Decode)\s*\([^)]*(?:verify\s*[=:]\s*(?:false|False)|options\s*[=:]\s*\{[^}]*(?:algorithms?\s*[=:]\s*\[?\s*["']none["']|verify\s*[=:]\s*false))`),
+			// `\bverify` prevents matching Go's `InsecureSkipVerify: false`
+			// (where `false` means verification is ENABLED — the opposite of
+			// the `verify=False` pattern this rule targets).
+			regexp.MustCompile(`(?i)(?:algorithms?\s*[=:]\s*\[?\s*["']none["']|\bverify\s*[=:]\s*(?:false|False|FALSE))`),
+			regexp.MustCompile(`(?i)(?:jwt\.decode|jwt_decode|JWT\.decode|Jose\.JWT\.Decode)\s*\([^)]*(?:\bverify\s*[=:]\s*(?:false|False)|options\s*[=:]\s*\{[^}]*(?:algorithms?\s*[=:]\s*\[?\s*["']none["']|\bverify\s*[=:]\s*false))`),
 			regexp.MustCompile(`(?i)(?:algorithms?\s*=\s*\[\s*["']none["'])`),
 		},
 		Title:    "JWT 'none' algorithm accepted",

@@ -19,17 +19,28 @@ var (
 	reLogPyLogger  = regexp.MustCompile(`(?i)logger\.(info|warning|error|debug|critical)\s*\(.*(?:request\.|req\.|params\[|query|body|user_input|form\[)`)
 )
 
+// reLogSanitized matches an inline sanitizer on a log line. Static — lifted to
+// a package var so it is not recompiled on every Scan() (4-layer review DN3).
+var reLogSanitized = regexp.MustCompile(`(?i)(?:\.replace\s*\(\s*[/'"]\s*[\[\\].*[rn]|\.replaceAll\s*\(\s*["']\\[rn]|\.gsub\s*\(\s*[/].*[rn]|strings\.Replace.+\\n|strip|sanitize|escape|encode|htmlspecialchars|htmlentities|CGI\.escape|ERB::Util\.html_escape)`)
+
 // Java
 var (
-	reLogJavaLogger     = regexp.MustCompile(`(?i)(?:log|logger|LOG)\.\w+\s*\(.*(?:request\.getParameter|req\.getParameter|getHeader)\s*\(`)
-	reLogJavaSlf4j      = regexp.MustCompile(`(?i)(?:log|logger|LOG)\.(?:info|warn|error|debug|trace)\s*\(.*(?:request\.getParameter|HttpServletRequest|getHeader|getQueryString)`)
-	reLogJavaSysOut     = regexp.MustCompile(`(?i)System\.(?:out|err)\.print(?:ln)?\s*\(.*(?:request\.getParameter|req\.getParameter|getHeader)`)
+	reLogJavaLogger = regexp.MustCompile(`(?i)(?:log|logger|LOG)\.\w+\s*\(.*(?:request\.getParameter|req\.getParameter|getHeader)\s*\(`)
+	reLogJavaSlf4j  = regexp.MustCompile(`(?i)(?:log|logger|LOG)\.(?:info|warn|error|debug|trace)\s*\(.*(?:request\.getParameter|HttpServletRequest|getHeader|getQueryString)`)
+	reLogJavaSysOut = regexp.MustCompile(`(?i)System\.(?:out|err)\.print(?:ln)?\s*\(.*(?:request\.getParameter|req\.getParameter|getHeader)`)
 )
 
 // Go
 var (
-	reLogGoLog  = regexp.MustCompile(`(?i)(?:log|slog)\.(?:Print|Fatal|Panic|Info|Warn|Error|Debug)(?:f|ln|w|Context)?\s*\(.*(?:r\.URL|r\.Form|r\.Header|r\.Body|c\.Query|c\.Param|r\.FormValue|r\.PostFormValue)`)
-	reLogGoZap  = regexp.MustCompile(`(?i)(?:zap|logger|sugar)\.(?:Info|Warn|Error|Debug|Fatal|Panic)(?:f|w)?\s*\(.*(?:r\.URL|r\.Form|r\.Header|c\.Query|c\.Param|r\.FormValue)`)
+	reLogGoLog = regexp.MustCompile(`(?i)(?:log|slog)\.(?:Print|Fatal|Panic|Info|Warn|Error|Debug)(?:f|ln|w|Context)?\s*\(.*(?:r\.URL|r\.Form|r\.Header|r\.Body|c\.Query|c\.Param|r\.FormValue|r\.PostFormValue)`)
+	reLogGoZap = regexp.MustCompile(`(?i)(?:zap|logger|sugar)\.(?:Info|Warn|Error|Debug|Fatal|Panic)(?:f|w)?\s*\(.*(?:r\.URL|r\.Form|r\.Header|c\.Query|c\.Param|r\.FormValue)`)
+	// Structured-logger field methods escape values automatically — log
+	// injection is not possible when values are passed as fields. zerolog
+	// `.Str("k", v)`, zap `.String("k", v)`, slog `slog.String("k", v)`,
+	// logrus `.WithField("k", v)` etc. all escape newlines/control chars.
+	// 24 LOG-001 FPs in owncloud/ocis on lines like
+	// `log.Info().Str("query", r.URL.RawQuery)`.
+	reLogGoStructuredFields = regexp.MustCompile(`\.(?:Str|String|Int(?:64|32|16|8)?|Uint(?:64|32|16|8)?|Float(?:64|32)?|Bool|Time|Dur|Err|Bytes|Hex|Interface|Any|Stringer|RawJSON|Fields|WithField|WithFields|With)\s*\(`)
 )
 
 // JS/TS
@@ -72,7 +83,7 @@ var (
 var reLineComment = regexp.MustCompile(`^\s*(?://|#|--|;|%|/\*|\*\s)`)
 
 func isCommentLine(line string) bool {
-	return reLineComment.MatchString(line)
+	return rules.GMatch(reLineComment, line)
 }
 
 func truncate(s string, maxLen int) string {
@@ -83,14 +94,104 @@ func truncate(s string, maxLen int) string {
 	return s
 }
 
+// reLogCallInvocation matches the opening of a logging-function call so we can
+// inspect its argument list. Mirrors the logger names used by the LOG-* rules.
+var reLogCallInvocation = regexp.MustCompile(`(?i)\b(?:log|logger|logging|console|winston|pino|bunyan|Rails\.logger|slog|zap|error_log|syslog|System\.out|System\.err|LOG|print|println|puts|fmt\.Print(?:f|ln)?)\b[.\w]*\s*\(`)
+
+// logArgIsOnlyStringMessage reports whether the *first* logging call on the
+// line has an argument list consisting of a single plain string literal
+// (single/double-quoted, or a backtick template with NO `${}` interpolation),
+// i.e. a static message. When a sensitive keyword (password/token/secret/...)
+// only appears here, it is part of the *message text*, not a credential value
+// being logged — a false positive for LOG-003 / LOG-004.
+//
+// Returns false when the call has multiple arguments (`log("secret", apiSecret)`),
+// string concatenation (`log("token: " + accessToken)`), interpolation
+// (`log(`pwd=${password}`)`), or the call spans multiple lines (unclosed `(`).
+func logArgIsOnlyStringMessage(line string) bool {
+	loc := rules.GFindIndex(reLogCallInvocation, line)
+	if loc == nil {
+		return false
+	}
+	// Position just after the opening "(".
+	rest := line[loc[1]:]
+
+	// Quote-aware scan to find the matching ")".
+	depth := 1
+	var quote byte // 0 = not in string; '\'' '"' '`' otherwise
+	hasInterp := false
+	end := -1
+	for i := 0; i < len(rest); i++ {
+		c := rest[i]
+		if quote != 0 {
+			if c == '\\' && quote != '`' {
+				i++ // skip escaped char (not for raw template literals)
+				continue
+			}
+			if quote == '`' && c == '$' && i+1 < len(rest) && rest[i+1] == '{' {
+				hasInterp = true
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch c {
+		case '\'', '"', '`':
+			quote = c
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				end = i
+			}
+		}
+		if end >= 0 {
+			break
+		}
+	}
+	if end < 0 {
+		// Unbalanced parens — call continues onto another line.
+		return false
+	}
+	inner := strings.TrimSpace(rest[:end])
+	if inner == "" {
+		return false
+	}
+	if hasInterp {
+		return false
+	}
+	// inner must be exactly one quoted literal: starts and ends with the same
+	// quote char and contains no unescaped occurrence of that quote in between.
+	q := inner[0]
+	if q != '\'' && q != '"' && q != '`' {
+		return false
+	}
+	if len(inner) < 2 || inner[len(inner)-1] != q {
+		return false
+	}
+	body := inner[1 : len(inner)-1]
+	for i := 0; i < len(body); i++ {
+		if body[i] == '\\' && q != '`' {
+			i++
+			continue
+		}
+		if body[i] == q {
+			return false // a second literal / concat — not a single message
+		}
+	}
+	return true
+}
+
 // ---------------------------------------------------------------------------
 // BATOU-LOG-001: Unsanitized User Input in Log Calls
 // ---------------------------------------------------------------------------
 
 type UnsanitizedLogInput struct{}
 
-func (r UnsanitizedLogInput) ID() string              { return "BATOU-LOG-001" }
-func (r UnsanitizedLogInput) Name() string            { return "Unsanitized User Input in Log Calls" }
+func (r UnsanitizedLogInput) ID() string                      { return "BATOU-LOG-001" }
+func (r UnsanitizedLogInput) Name() string                    { return "Unsanitized User Input in Log Calls" }
 func (r UnsanitizedLogInput) DefaultSeverity() rules.Severity { return rules.High }
 func (r UnsanitizedLogInput) Description() string {
 	return "Detects user-controlled input (request parameters, query strings, headers, form data) passed directly to logging functions without sanitization, enabling log injection attacks (CWE-117)."
@@ -105,7 +206,7 @@ func (r UnsanitizedLogInput) Languages() []rules.Language {
 
 func (r UnsanitizedLogInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -151,8 +252,14 @@ func (r UnsanitizedLogInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if isCommentLine(line) {
 			continue
 		}
+		// Skip structured-logger field calls — these escape values and
+		// are not vulnerable to log injection. Affects Go zerolog/zap/
+		// slog/logrus chained APIs the most (24 FPs in ocis).
+		if ctx.Language == rules.LangGo && rules.GMatch(reLogGoStructuredFields, line) {
+			continue
+		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -183,8 +290,8 @@ func (r UnsanitizedLogInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CRLFLogInjection struct{}
 
-func (r CRLFLogInjection) ID() string              { return "BATOU-LOG-002" }
-func (r CRLFLogInjection) Name() string            { return "CRLF Injection in Log Messages" }
+func (r CRLFLogInjection) ID() string                      { return "BATOU-LOG-002" }
+func (r CRLFLogInjection) Name() string                    { return "CRLF Injection in Log Messages" }
 func (r CRLFLogInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r CRLFLogInjection) Description() string {
 	return "Detects log calls using string concatenation or interpolation with user-controlled variables, which enables CRLF injection to forge log entries."
@@ -199,7 +306,7 @@ func (r CRLFLogInjection) Languages() []rules.Language {
 
 func (r CRLFLogInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -241,19 +348,17 @@ func (r CRLFLogInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return findings
 	}
 
-	// Check for presence of sanitization on the same line
-	reSanitized := regexp.MustCompile(`(?i)(?:\.replace\s*\(\s*[/'"]\s*[\[\\].*[rn]|\.replaceAll\s*\(\s*["']\\[rn]|\.gsub\s*\(\s*[/].*[rn]|strings\.Replace.+\\n|strip|sanitize|escape|encode|htmlspecialchars|htmlentities|CGI\.escape|ERB::Util\.html_escape)`)
-
+	// Check for presence of sanitization on the same line.
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		// Skip lines that already sanitize
-		if reSanitized.MatchString(line) {
+		if rules.GMatch(reLogSanitized, line) {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -284,8 +389,8 @@ func (r CRLFLogInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SensitiveDataInLogs struct{}
 
-func (r SensitiveDataInLogs) ID() string              { return "BATOU-LOG-003" }
-func (r SensitiveDataInLogs) Name() string            { return "Sensitive Data in Logs" }
+func (r SensitiveDataInLogs) ID() string                      { return "BATOU-LOG-003" }
+func (r SensitiveDataInLogs) Name() string                    { return "Sensitive Data in Logs" }
 func (r SensitiveDataInLogs) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r SensitiveDataInLogs) Description() string {
 	return "Detects logging of sensitive data such as passwords, tokens, API keys, credit card numbers, and SSNs. Sensitive data in logs can lead to credential leakage and regulatory violations."
@@ -299,8 +404,14 @@ func (r SensitiveDataInLogs) Languages() []rules.Language {
 }
 
 func (r SensitiveDataInLogs) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Translation / i18n JSON files contain UI message strings ("Reset
+	// password", "Log out", ...) — never credential values. Skip them.
+	if ctx.Language == rules.LangJSON || strings.HasSuffix(strings.ToLower(ctx.FilePath), ".json") {
+		return nil
+	}
+
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -325,7 +436,12 @@ func (r SensitiveDataInLogs) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
+				// Skip when the sensitive keyword only appears inside a static
+				// log *message* string (e.g. console.debug('... share token ...')).
+				if logArgIsOnlyStringMessage(line) {
+					break
+				}
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),

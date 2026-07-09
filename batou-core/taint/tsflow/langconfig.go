@@ -1,6 +1,8 @@
 package tsflow
 
 import (
+	"strings"
+
 	"github.com/turenlabs/batou-core/ast"
 	"github.com/turenlabs/batou-rules/rules"
 )
@@ -17,6 +19,25 @@ type langConfig struct {
 
 	// Allowlist/validation-aware sanitization config.
 	ifTypes map[string]bool // node types for if statements (e.g., "if_statement")
+
+	// classTypes are node types that define a class/struct whose method
+	// bodies are already analyzed as their own scopes by the per-function
+	// pass. The flat-script top-level walk (walkTopLevelScript) skips these
+	// so it does not descend into method bodies — descending would both
+	// double-report a method's internal flows and let a top-level variable
+	// leak taint into a method that shadows it via a parameter. Empty for
+	// languages that don't run the top-level walk.
+	classTypes map[string]bool
+
+	// instanceReceivers is the set of receiver tokens that name the current
+	// object instance (`self`, `this`, …). A field-access whose base segment
+	// is one of these (`self.x`, `this.data`) refers to instance state that is
+	// stable across the methods of a class, so the cross-method stored-state
+	// channel (field_global_state.go) treats `self.x` as a file-level field key
+	// that can carry taint from a writer method to a reader method. A bare
+	// function-local `obj.attr` is NOT promoted — its base is function-scoped.
+	// Empty for languages without a stored-state channel.
+	instanceReceivers map[string]bool
 
 	// extractCallName returns the method/function name from a call node.
 	extractCallName func(*ast.Node) string
@@ -44,6 +65,29 @@ type langConfig struct {
 	extractIfConsequence func(*ast.Node) *ast.Node
 	// extractIfAlternative returns the "else" body node (may be nil).
 	extractIfAlternative func(*ast.Node) *ast.Node
+
+	// findExtraScopes is an optional hook returning extra "function-like"
+	// AST nodes that the walker should treat as analysis scopes alongside
+	// the normal funcTypes set. Used for languages with DSL block handlers
+	// that aren't formal function definitions but DO carry per-block taint
+	// (e.g., Ruby Sinatra/Roda `get '/x' do ... end` route blocks). The
+	// returned nodes are passed through extractFuncName / extractFuncBody /
+	// extractFuncParams the same way regular func nodes are — those
+	// helpers must accept the extra node types too. Return nil when there
+	// are no extras.
+	findExtraScopes func(root *ast.Node) []*ast.Node
+
+	// barrierGuards describes the language-specific "barrier guard" shapes
+	// the walker recognises in an if-condition. A barrier
+	// guard is a validation check that constrains a tainted value to a safe
+	// character set or value domain on the guarded path — e.g.
+	// `if (/^[0-9]+$/.test(id)) { ... }` (JS strict-charset regex) or
+	// `if (id.matches("[A-Za-z0-9]+")) { ... }` (Java). When recognised, the
+	// SPECIFIC validated variable is marked sanitized for the SPECIFIC sink
+	// categories the guard neutralises (category-scoped, not wholesale taint
+	// deletion — mirroring inferPythonPathGuard's design). nil for languages
+	// that don't opt in, so their flows are byte-unchanged.
+	barrierGuards *barrierGuardConfig
 }
 
 // configs maps languages to their configurations.
@@ -64,6 +108,7 @@ var configs = map[rules.Language]*langConfig{
 	rules.LangGroovy:     groovyConfig(),
 	rules.LangPerl:       perlConfig(),
 	rules.LangZig:        zigConfig(),
+	rules.LangShell:      shellConfig(),
 }
 
 func getConfig(lang rules.Language) *langConfig {
@@ -76,14 +121,21 @@ func getConfig(lang rules.Language) *langConfig {
 
 func pythonConfig() *langConfig {
 	return &langConfig{
-		language:     rules.LangPython,
-		funcTypes:    map[string]bool{"function_definition": true, "decorated_definition": true},
-		callTypes:    map[string]bool{"call": true},
-		assignTypes:  map[string]bool{"assignment": true, "augmented_assignment": true},
-		varDeclTypes: map[string]bool{},
-		identType:    "identifier",
-		attrTypes:    map[string]bool{"attribute": true},
-		ifTypes:      map[string]bool{"if_statement": true},
+		language:  rules.LangPython,
+		funcTypes: map[string]bool{"function_definition": true, "decorated_definition": true},
+		callTypes: map[string]bool{"call": true},
+		// `named_expression` is the walrus operator `x := expr` (PEP 572).
+		// Treating it as an assignment seeds the target `x` from the value's
+		// taint, so `if (data := request.get_json()):` / `while (line :=
+		// f.readline()):` propagate. The node is Python-unique, so other
+		// languages are unaffected.
+		assignTypes:       map[string]bool{"assignment": true, "augmented_assignment": true, "named_expression": true},
+		varDeclTypes:      map[string]bool{},
+		identType:         "identifier",
+		attrTypes:         map[string]bool{"attribute": true},
+		ifTypes:           map[string]bool{"if_statement": true},
+		classTypes:        map[string]bool{"class_definition": true},
+		instanceReceivers: map[string]bool{"self": true, "cls": true},
 
 		extractCallName: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
@@ -115,6 +167,14 @@ func pythonConfig() *langConfig {
 			return ""
 		},
 		extractAssignLHS: func(n *ast.Node) string {
+			// Walrus `x := expr` (named_expression) uses the "name" field for
+			// its target rather than "left".
+			if n.Type() == "named_expression" {
+				if name := n.ChildByFieldName("name"); name != nil && name.Type() == "identifier" {
+					return name.Text()
+				}
+				return ""
+			}
 			lhs := n.ChildByFieldName("left")
 			if lhs == nil {
 				return ""
@@ -131,6 +191,10 @@ func pythonConfig() *langConfig {
 			return ""
 		},
 		extractAssignRHS: func(n *ast.Node) *ast.Node {
+			// Walrus `x := expr` stores the assigned expression in "value".
+			if n.Type() == "named_expression" {
+				return n.ChildByFieldName("value")
+			}
 			return n.ChildByFieldName("right")
 		},
 		extractAttrName: func(n *ast.Node) string {
@@ -179,12 +243,12 @@ func pythonConfig() *langConfig {
 				for i := 0; i < n.ChildCount(); i++ {
 					c := n.Child(i)
 					if c.Type() == "function_definition" {
-						return c.ChildByFieldName("body")
+						return pyResolveSuite(c, "body")
 					}
 				}
 				return nil
 			}
-			return n.ChildByFieldName("body")
+			return pyResolveSuite(n, "body")
 		},
 		extractFuncParams:    pyExtractParams,
 		extractIfCondition:   pyExtractIfCondition,
@@ -193,15 +257,57 @@ func pythonConfig() *langConfig {
 	}
 }
 
+// pyResolveSuite returns the real `block` suite for a Python compound
+// statement's body-like field (e.g. a function_definition's "body" or an
+// if_statement's "consequence").
+//
+// tree-sitter-python has a parser quirk: when a suite's first physical line is a
+// comment, the grammar assigns the body-like FIELD to the leading `comment`
+// node and emits the real `block` suite as a SEPARATE child that carries the
+// SAME field name. A plain `ChildByFieldName(fieldName)` therefore returns the
+// childless `comment` node, and every statement in the suite (the whole
+// function/if body) is silently dropped from Layer-3 dataflow — a severe,
+// Python-only recall loss.
+//
+// This helper recovers the block in that case and is byte-identical otherwise:
+// when the field already resolves to a `block` (the overwhelmingly common case)
+// it is returned unchanged; only a field that landed on a `comment` triggers the
+// sibling-block lookup. The lookup is scoped to the SAME field name, so an
+// if_statement's "consequence" never resolves to an unrelated suite.
+func pyResolveSuite(n *ast.Node, fieldName string) *ast.Node {
+	field := n.ChildByFieldName(fieldName)
+	if field == nil || field.Type() == "block" {
+		return field
+	}
+	if field.Type() == "comment" {
+		for i := 0; i < n.ChildCount(); i++ {
+			c := n.Child(i)
+			if c.Type() == "block" && c.FieldName() == fieldName {
+				return c
+			}
+		}
+	}
+	return field
+}
+
 func pyExtractIfCondition(n *ast.Node) *ast.Node {
 	return n.ChildByFieldName("condition")
 }
 
 func pyExtractIfConsequence(n *ast.Node) *ast.Node {
-	return n.ChildByFieldName("consequence")
+	// EXTENSION of the leading-comment suite fix: an if-body whose first line is
+	// a comment puts the "consequence" field on the comment node and emits the
+	// real block as a same-field sibling. processIfBranchAware walks ONLY the
+	// consequence node (and `return false`s), so without this recovery the whole
+	// if-body is dropped. Byte-identical when the consequence is already a block.
+	return pyResolveSuite(n, "consequence")
 }
 
 func pyExtractIfAlternative(n *ast.Node) *ast.Node {
+	// The "alternative" field resolves to an else_clause / elif_clause (never a
+	// bare comment), and the walker descends those via its all-named-children
+	// pass, so the leading-comment quirk does not drop else/elif bodies. Left
+	// as a plain field access intentionally — verified no loss here.
 	return n.ChildByFieldName("alternative")
 }
 
@@ -253,10 +359,27 @@ func pyExtractParams(n *ast.Node) []string {
 
 func jsConfig() *langConfig {
 	return &langConfig{
-		language:     rules.LangJavaScript,
-		funcTypes:    map[string]bool{"function_declaration": true, "arrow_function": true, "method_definition": true, "function": true},
-		callTypes:    map[string]bool{"call_expression": true, "new_expression": true},
-		assignTypes:  map[string]bool{"assignment_expression": true},
+		language:          rules.LangJavaScript,
+		instanceReceivers: map[string]bool{"this": true},
+		// function_expression: named/anonymous function literals used as
+		// callback arguments (Express, Mocha, Promise.then, etc.). Without
+		// this, the walker never recurses into `app.get("/...", function
+		// serveFile(req, res) { ... })` and multi-line indirection chains
+		// like CVE-2017-1000220 (`const name = req.params.name; const full
+		// = path.join(root, name); fs.readFile(full)`) are missed.
+		// generator_function_declaration: `function* foo() {...}`.
+		funcTypes: map[string]bool{"function_declaration": true, "function_expression": true, "generator_function_declaration": true, "arrow_function": true, "method_definition": true, "function": true},
+		callTypes: map[string]bool{"call_expression": true, "new_expression": true},
+		// augmented_assignment_expression: `q += tainted` is the dominant
+		// JS/TS string-building idiom (SQL/HTML/shell concatenation). It shares
+		// the `left`/`right` fields with assignment_expression, so the JS
+		// extractors handle it unchanged. Without this entry the `+=` node is
+		// never processed and an untainted-then-`+= param` accumulation is a
+		// silent false negative (the desugared `q = q + param` is detected).
+		// Mirrors PHP's config, which lists augmented_assignment_expression.
+		// The untainted-RHS taint-clear is Python-gated (walker.go), so a base
+		// `q = tainted; q += " safe"` correctly keeps its accumulated taint.
+		assignTypes:  map[string]bool{"assignment_expression": true, "augmented_assignment_expression": true},
 		varDeclTypes: map[string]bool{"variable_declarator": true},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{"member_expression": true},
@@ -264,6 +387,9 @@ func jsConfig() *langConfig {
 
 		extractCallName: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
+			if fn == nil {
+				fn = n.ChildByFieldName("constructor") // new_expression fallback
+			}
 			if fn == nil {
 				return ""
 			}
@@ -281,6 +407,9 @@ func jsConfig() *langConfig {
 		extractCallReceiver: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
 			if fn == nil {
+				fn = n.ChildByFieldName("constructor") // new_expression fallback
+			}
+			if fn == nil {
 				return ""
 			}
 			if fn.Type() == "member_expression" {
@@ -293,7 +422,16 @@ func jsConfig() *langConfig {
 		},
 		extractAssignLHS: func(n *ast.Node) string {
 			lhs := n.ChildByFieldName("left")
-			if lhs != nil && lhs.Type() == "identifier" {
+			if lhs == nil {
+				return ""
+			}
+			if lhs.Type() == "identifier" {
+				return lhs.Text()
+			}
+			// Shallow field-sensitive LHS: `obj.attr = val` →
+			// store under "obj.attr" so attribute reads at sinks can
+			// resolve the per-field taint. Matches Python's behaviour.
+			if lhs.Type() == "member_expression" {
 				return lhs.Text()
 			}
 			return ""
@@ -330,6 +468,7 @@ func jsConfig() *langConfig {
 		extractIfCondition:   genericExtractIfCondition,
 		extractIfConsequence: genericExtractIfConsequence,
 		extractIfAlternative: genericExtractIfAlternative,
+		barrierGuards:        jsBarrierGuardConfig(),
 	}
 }
 
@@ -391,14 +530,15 @@ func tsConfig() *langConfig {
 
 func javaConfig() *langConfig {
 	return &langConfig{
-		language:     rules.LangJava,
-		funcTypes:    map[string]bool{"method_declaration": true, "constructor_declaration": true},
-		callTypes:    map[string]bool{"method_invocation": true, "object_creation_expression": true},
-		assignTypes:  map[string]bool{"assignment_expression": true},
-		varDeclTypes: map[string]bool{"variable_declarator": true},
-		identType:    "identifier",
-		attrTypes:    map[string]bool{"field_access": true},
-		ifTypes:      map[string]bool{"if_statement": true},
+		language:          rules.LangJava,
+		instanceReceivers: map[string]bool{"this": true},
+		funcTypes:         map[string]bool{"method_declaration": true, "constructor_declaration": true},
+		callTypes:         map[string]bool{"method_invocation": true, "object_creation_expression": true},
+		assignTypes:       map[string]bool{"assignment_expression": true},
+		varDeclTypes:      map[string]bool{"variable_declarator": true},
+		identType:         "identifier",
+		attrTypes:         map[string]bool{"field_access": true},
+		ifTypes:           map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			name := n.ChildByFieldName("name")
@@ -421,7 +561,23 @@ func javaConfig() *langConfig {
 		},
 		extractAssignLHS: func(n *ast.Node) string {
 			lhs := n.ChildByFieldName("left")
-			if lhs != nil && lhs.Type() == "identifier" {
+			if lhs == nil {
+				return ""
+			}
+			if lhs.Type() == "identifier" {
+				return lhs.Text()
+			}
+			// Shallow field-sensitive LHS: `obj.f = src` / `this.data = src`
+			// parse to a `field_access` node whose Text() is the dotted path
+			// ("obj.f", "this.data"). Returning that text seeds the per-field
+			// key so a later attribute read (`stmt.executeQuery(obj.f)`,
+			// resolved via prefixTainted) and a bare-object read (resolved via
+			// anyFieldTainted, fromFieldAssign-stamped in processAssign) both
+			// surface the taint — without tainting a sibling `obj.g`. Without
+			// this branch the field write returned "" and the taint was
+			// silently dropped (a missed detection). Mirrors the JS, C#, and
+			// Python configs; the engine machinery is language-agnostic.
+			if lhs.Type() == "field_access" {
 				return lhs.Text()
 			}
 			return ""
@@ -471,6 +627,7 @@ func javaConfig() *langConfig {
 		extractIfCondition:   genericExtractIfCondition,
 		extractIfConsequence: genericExtractIfConsequence,
 		extractIfAlternative: genericExtractIfAlternative,
+		barrierGuards:        javaBarrierGuardConfig(),
 	}
 }
 
@@ -545,6 +702,11 @@ func phpConfig() *langConfig {
 			if obj != nil {
 				return obj.Text()
 			}
+			// scoped_call_expression (Class::method) — scope field holds the class name
+			scope := n.ChildByFieldName("scope")
+			if scope != nil {
+				return scope.Text()
+			}
 			return ""
 		},
 		extractAssignLHS: func(n *ast.Node) string {
@@ -582,11 +744,25 @@ func phpConfig() *langConfig {
 		extractFuncBody: func(n *ast.Node) *ast.Node {
 			return n.ChildByFieldName("body")
 		},
-		extractFuncParams:    phpExtractParams,
-		extractIfCondition:   genericExtractIfCondition,
-		extractIfConsequence: genericExtractIfConsequence,
+		extractFuncParams:  phpExtractParams,
+		extractIfCondition: genericExtractIfCondition,
+		// PHP's if_statement names the consequence block "body" (not the
+		// generic "consequence"), and the else side as an `else_clause` /
+		// `else_if_clause` wrapper under "alternative". Use PHP-specific
+		// extractors so branch-aware walking actually descends into the
+		// if-body — the dominant guard idiom `if (isset($_GET['x'])) { ...
+		// sink ... }` lives entirely inside that block.
+		extractIfConsequence: phpExtractIfConsequence,
 		extractIfAlternative: genericExtractIfAlternative,
+		barrierGuards:        phpBarrierGuardConfig(),
 	}
+}
+
+// phpExtractIfConsequence returns the consequence block of a PHP if_statement.
+// Tree-sitter-php names it "body" rather than the "consequence" field used by
+// most other grammars.
+func phpExtractIfConsequence(n *ast.Node) *ast.Node {
+	return n.ChildByFieldName("body")
 }
 
 func phpExtractCallArgs(n *ast.Node) []*ast.Node {
@@ -676,8 +852,35 @@ func rubyConfig() *langConfig {
 		},
 		extractAssignLHS: func(n *ast.Node) string {
 			lhs := n.ChildByFieldName("left")
-			if lhs != nil && lhs.Type() == "identifier" {
+			if lhs == nil {
+				return ""
+			}
+			switch lhs.Type() {
+			case "identifier":
 				return lhs.Text()
+			case "instance_variable", "class_variable", "global_variable":
+				// `@q = ...`, `@@cache = ...`, `$g = ...`. These are plain
+				// (dot-free) taint-map keys — `@q` reads resolve via the
+				// instance_variable branch in nodeIsTainted (Ruby-gated).
+				return lhs.Text()
+			case "call":
+				// Attribute setter `obj.cmd = ...`. Tree-sitter models a
+				// Ruby attribute write as a `call` node whose receiver is the
+				// object and whose method is the attribute name, with NO
+				// argument list. Use the full text ("obj.cmd") as a shallow
+				// field-sensitive key (isFieldKey splits on the dot), so
+				// assigning `obj.cmd` does NOT taint a sibling `obj.other`.
+				// Guard against real method calls (`obj.run(x)`): those have
+				// an `arguments` field and must not be treated as an l-value.
+				if lhs.ChildByFieldName("arguments") != nil {
+					return ""
+				}
+				if recv := lhs.ChildByFieldName("receiver"); recv != nil {
+					if m := lhs.ChildByFieldName("method"); m != nil {
+						return recv.Text() + "." + m.Text()
+					}
+				}
+				return ""
 			}
 			return ""
 		},
@@ -705,26 +908,133 @@ func rubyConfig() *langConfig {
 			return out
 		},
 		extractFuncName: func(n *ast.Node) string {
+			// Regular method or singleton_method.
 			name := n.ChildByFieldName("name")
 			if name != nil {
 				return name.Text()
 			}
+			// Sinatra/Roda DSL block: `get "/x" do |params| ... end`. The
+			// node passed in is the wrapping `call` (parent of the
+			// do_block) — use the call's method name as the scope name
+			// so summaries are keyed deterministically.
+			if n.Type() == "call" {
+				m := n.ChildByFieldName("method")
+				if m != nil {
+					return m.Text()
+				}
+			}
 			return ""
 		},
 		extractFuncBody: func(n *ast.Node) *ast.Node {
-			return n.ChildByFieldName("body")
+			// Regular method body.
+			if b := n.ChildByFieldName("body"); b != nil {
+				return b
+			}
+			// Sinatra/Roda DSL: the body is the do_block's body.
+			if n.Type() == "call" {
+				if blk := n.ChildByFieldName("block"); blk != nil {
+					if b := blk.ChildByFieldName("body"); b != nil {
+						return b
+					}
+					return blk
+				}
+			}
+			return nil
 		},
 		extractFuncParams:    rubyExtractParams,
 		extractIfCondition:   genericExtractIfCondition,
 		extractIfConsequence: genericExtractIfConsequence,
 		extractIfAlternative: genericExtractIfAlternative,
+		findExtraScopes:      rubyFindDSLScopes,
+		barrierGuards:        rubyBarrierGuardConfig(),
 	}
+}
+
+// rubyDSLRouteVerbsTaint is the set of Sinatra/Roda HTTP-verb DSL
+// handlers the tsflow walker treats as additional function-like scopes.
+// Mirrors graph/extractor_ruby.go's rubyDSLRouteVerbs (the canonical
+// list). Kept duplicated here to avoid an import cycle.
+var rubyDSLRouteVerbsTaint = map[string]bool{
+	"get":     true,
+	"post":    true,
+	"put":     true,
+	"patch":   true,
+	"delete":  true,
+	"options": true,
+	"head":    true,
+	"link":    true,
+	"unlink":  true,
+}
+
+// rubyFindDSLScopes walks the tree-sitter Ruby tree and returns every
+// Sinatra/Roda DSL route call (`get "/x" do ... end`, `post ...`, etc.)
+// whose method name matches an HTTP verb AND has a `do_block`. These
+// `call` nodes are then treated as analysis scopes by the walker — the
+// block body carries the request-handling taint that would otherwise be
+// invisible to the per-file tsflow walker because Sinatra apps don't
+// wrap routes in a `def`.
+//
+// Conservative: only bare-name verbs at the program / class-body level.
+// Receiver-style DSL calls (`Some::Router.get '/'`) are out of scope.
+func rubyFindDSLScopes(root *ast.Node) []*ast.Node {
+	if root == nil {
+		return nil
+	}
+	var out []*ast.Node
+	var visit func(n *ast.Node)
+	visit = func(n *ast.Node) {
+		if n == nil {
+			return
+		}
+		for i := 0; i < n.ChildCount(); i++ {
+			c := n.Child(i)
+			if c == nil || !c.IsNamed() {
+				continue
+			}
+			switch c.Type() {
+			case "method", "singleton_method":
+				// Already covered by funcTypes — don't recurse into the
+				// method body looking for nested DSL blocks (those would
+				// be DSL inside a method, which is rare and not worth
+				// modeling as a separate scope).
+				continue
+			case "class", "module":
+				if body := c.ChildByFieldName("body"); body != nil {
+					visit(body)
+				}
+			case "call":
+				// Sinatra DSL detection.
+				if recv := c.ChildByFieldName("receiver"); recv == nil {
+					if m := c.ChildByFieldName("method"); m != nil {
+						if rubyDSLRouteVerbsTaint[m.Text()] {
+							if blk := c.ChildByFieldName("block"); blk != nil {
+								out = append(out, c)
+							}
+						}
+					}
+				}
+			default:
+				visit(c)
+			}
+		}
+	}
+	visit(root)
+	return out
 }
 
 func rubyExtractParams(n *ast.Node) []string {
 	params := n.ChildByFieldName("parameters")
 	if params == nil {
-		return nil
+		// Sinatra/Roda DSL scope: a `call` node carrying a `do_block`. The
+		// block parameters live on the do_block child, not on the call.
+		if n.Type() == "call" {
+			if blk := n.ChildByFieldName("block"); blk != nil {
+				params = blk.ChildByFieldName("parameters")
+			}
+		}
+		if params == nil {
+			return nil
+		}
 	}
 	var names []string
 	for i := 0; i < params.ChildCount(); i++ {
@@ -778,6 +1088,18 @@ func cConfig() *langConfig {
 			if fn != nil && fn.Type() == "field_expression" {
 				arg := fn.ChildByFieldName("argument")
 				if arg != nil {
+					// A call-expression receiver — e.g. the inherited accessor
+					// chain `request().get(...)` in CppCMS, or `foo().bar()` —
+					// otherwise yields the full text "request()" (parens
+					// included), which can never match a catalog ObjectType.
+					// Use the CALLED function's name ("request") so the receiver
+					// resolves to its base object. Plain receivers
+					// (`obj.method()`) are unaffected.
+					if arg.Type() == "call_expression" {
+						if af := arg.ChildByFieldName("function"); af != nil {
+							return af.Text()
+						}
+					}
 					return arg.Text()
 				}
 			}
@@ -864,11 +1186,29 @@ func cExtractParams(n *ast.Node) []string {
 	var names []string
 	for i := 0; i < params.ChildCount(); i++ {
 		p := params.Child(i)
-		if p.Type() == "parameter_declaration" {
-			d := p.ChildByFieldName("declarator")
-			if d != nil && d.Type() == "identifier" {
-				names = append(names, d.Text())
-			}
+		if p.Type() != "parameter_declaration" {
+			continue
+		}
+		// The declarator may be a bare identifier (`int n`) or wrapped in a
+		// pointer_declarator (`char *s`), reference_declarator (`const T &r`),
+		// or array_declarator (`char *argv[]`). C/C++ parameters are positional,
+		// so each parameter_declaration contributes exactly one slot — drill
+		// through the wrappers with extractIdentText to recover the parameter
+		// name. An unnamed parameter (`void f(int)`) yields "_" so later
+		// parameters keep their correct positional index for arg→param
+		// interprocedural mapping. Without this, pointer/reference/array params
+		// (the overwhelmingly common C++ shape `void f(const std::string &s)`)
+		// were dropped entirely, so the callee had no parameters and no
+		// interprocedural arg→param→sink flow could be observed.
+		d := p.ChildByFieldName("declarator")
+		if d == nil {
+			names = append(names, "_")
+			continue
+		}
+		if name := extractIdentText(d, "identifier"); name != "" {
+			names = append(names, name)
+		} else {
+			names = append(names, "_")
 		}
 	}
 	return names
@@ -881,17 +1221,56 @@ func cExtractParams(n *ast.Node) []string {
 func cppConfig() *langConfig {
 	cfg := cConfig()
 	cfg.language = rules.LangCPP
-	// C++ adds qualified names (namespace::function) and scope resolution
+	// C++ adds qualified names (namespace::function) and scope resolution.
+	// tree-sitter-cpp parses `a::b::c` as right-leaning:
+	//   qualified_identifier(scope=a, name=qualified_identifier(scope=b, name=c))
+	// so we recurse through nested qualified_identifiers to reach the final
+	// identifier and concatenate the scope chain.
 	origExtractCallName := cfg.extractCallName
 	cfg.extractCallName = func(n *ast.Node) string {
 		fn := n.ChildByFieldName("function")
 		if fn != nil && fn.Type() == "qualified_identifier" {
-			name := fn.ChildByFieldName("name")
-			if name != nil {
-				return name.Text()
+			cur := fn
+			for cur != nil && cur.Type() == "qualified_identifier" {
+				nm := cur.ChildByFieldName("name")
+				if nm == nil {
+					break
+				}
+				if nm.Type() == "qualified_identifier" {
+					cur = nm
+					continue
+				}
+				return nm.Text()
 			}
 		}
 		return origExtractCallName(n)
+	}
+	// Extract namespace/scope as receiver for qualified_identifier calls
+	// e.g., YAML::Load → receiver "YAML", boost::archive::text_iarchive → receiver "boost::archive",
+	// crow::mustache::compile → receiver "crow::mustache".
+	origExtractCallReceiver := cfg.extractCallReceiver
+	cfg.extractCallReceiver = func(n *ast.Node) string {
+		fn := n.ChildByFieldName("function")
+		if fn != nil && fn.Type() == "qualified_identifier" {
+			var parts []string
+			cur := fn
+			for cur != nil && cur.Type() == "qualified_identifier" {
+				scope := cur.ChildByFieldName("scope")
+				if scope != nil {
+					parts = append(parts, scope.Text())
+				}
+				nm := cur.ChildByFieldName("name")
+				if nm != nil && nm.Type() == "qualified_identifier" {
+					cur = nm
+					continue
+				}
+				break
+			}
+			if len(parts) > 0 {
+				return strings.Join(parts, "::")
+			}
+		}
+		return origExtractCallReceiver(n)
 	}
 	return cfg
 }
@@ -902,14 +1281,15 @@ func cppConfig() *langConfig {
 
 func csharpConfig() *langConfig {
 	return &langConfig{
-		language:     rules.LangCSharp,
-		funcTypes:    map[string]bool{"method_declaration": true, "local_function_statement": true, "constructor_declaration": true},
-		callTypes:    map[string]bool{"invocation_expression": true, "object_creation_expression": true},
-		assignTypes:  map[string]bool{"assignment_expression": true},
-		varDeclTypes: map[string]bool{"variable_declarator": true},
-		identType:    "identifier",
-		attrTypes:    map[string]bool{"member_access_expression": true},
-		ifTypes:      map[string]bool{"if_statement": true},
+		language:          rules.LangCSharp,
+		instanceReceivers: map[string]bool{"this": true},
+		funcTypes:         map[string]bool{"method_declaration": true, "local_function_statement": true, "constructor_declaration": true},
+		callTypes:         map[string]bool{"invocation_expression": true, "object_creation_expression": true},
+		assignTypes:       map[string]bool{"assignment_expression": true},
+		varDeclTypes:      map[string]bool{"variable_declarator": true},
+		identType:         "identifier",
+		attrTypes:         map[string]bool{"member_access_expression": true},
+		ifTypes:           map[string]bool{"if_statement": true},
 
 		extractCallName: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
@@ -917,9 +1297,27 @@ func csharpConfig() *langConfig {
 				if fn.Type() == "identifier" {
 					return fn.Text()
 				}
+				if fn.Type() == "generic_name" {
+					// Foo<T>() at call site — return bare identifier.
+					if id := fn.ChildByFieldName("name"); id != nil {
+						return id.Text()
+					}
+					if fn.ChildCount() > 0 {
+						return fn.Child(0).Text()
+					}
+				}
 				if fn.Type() == "member_access_expression" {
 					name := fn.ChildByFieldName("name")
 					if name != nil {
+						// Strip generic type arguments: GetJsonAsync<object> -> GetJsonAsync.
+						if name.Type() == "generic_name" {
+							if id := name.ChildByFieldName("name"); id != nil {
+								return id.Text()
+							}
+							if name.ChildCount() > 0 {
+								return name.Child(0).Text()
+							}
+						}
 						return name.Text()
 					}
 				}
@@ -943,7 +1341,27 @@ func csharpConfig() *langConfig {
 		},
 		extractAssignLHS: func(n *ast.Node) string {
 			lhs := n.ChildByFieldName("left")
-			if lhs != nil && lhs.Type() == "identifier" {
+			if lhs == nil {
+				return ""
+			}
+			switch lhs.Type() {
+			case "identifier":
+				return lhs.Text()
+			case "member_access_expression":
+				// Attribute write `obj.field = source` — mirror Ruby's
+				// attribute-setter handling. Return the full dotted text
+				// ("obj.field") as a shallow field-sensitive key (isFieldKey
+				// splits on the dot), so assigning `obj.field` does NOT taint
+				// a sibling `obj.other`. The receiver lives on field
+				// "expression" and the attribute on field "name" (same shape
+				// extractCallReceiver/extractAttrName above use).
+				expr := lhs.ChildByFieldName("expression")
+				name := lhs.ChildByFieldName("name")
+				if expr != nil && name != nil {
+					return expr.Text() + "." + name.Text()
+				}
+				// Fall back to the node's full text when the field shape is
+				// unexpected; boundAccessPath / isFieldKey will normalise it.
 				return lhs.Text()
 			}
 			return ""
@@ -1155,12 +1573,43 @@ func kotlinExtractParams(n *ast.Node) []string {
 // Rust
 // ---------------------------------------------------------------------------
 
+// rustUnwrapTurbofishMethod unwraps a `generic_function` node (a turbofish
+// call such as `result.first_row_typed::<(String,)>()`) to the inner callee
+// ONLY when that callee is a `field_expression` (i.e. a method call on a
+// receiver). Method-call turbofish is the idiom data-extraction APIs use
+// (scylla `rows_typed::<T>()`, redis `get::<T>()`), and was previously
+// invisible to the matcher because the walker stopped at `generic_function`.
+//
+// Free-function turbofish (`serde_yaml::from_str::<Config>()`, inner =
+// scoped_identifier) is deliberately NOT unwrapped: typed deserialization into
+// a concrete struct is safe in Rust, and leaving those calls unmatched
+// preserves that contract without a separate type-argument sanitizer.
+func rustUnwrapTurbofishMethod(fn *ast.Node) *ast.Node {
+	if fn != nil && fn.Type() == "generic_function" {
+		if inner := fn.ChildByFieldName("function"); inner != nil && inner.Type() == "field_expression" {
+			return inner
+		}
+	}
+	return fn
+}
+
 func rustConfig() *langConfig {
 	return &langConfig{
-		language:     rules.LangRust,
-		funcTypes:    map[string]bool{"function_item": true},
-		callTypes:    map[string]bool{"call_expression": true},
-		assignTypes:  map[string]bool{"assignment_expression": true},
+		language:          rules.LangRust,
+		instanceReceivers: map[string]bool{"self": true},
+		funcTypes:         map[string]bool{"function_item": true},
+		callTypes:         map[string]bool{"call_expression": true},
+		// compound_assignment_expr: `q += &tainted` is the dominant Rust
+		// string-building idiom (String implements AddAssign<&str>), used to
+		// assemble SQL/shell/URL strings. tree-sitter-rust parses it as a
+		// distinct node from `assignment_expression`, but it shares the
+		// `left`/`right` fields, so the Rust extractAssignLHS/RHS handle it
+		// unchanged. Without this entry the `+=` node is never processed and an
+		// untainted-then-`+= tainted` accumulation is a silent false negative
+		// (the desugared `q = q + &tainted` form is already detected). Mirrors
+		// the JS/PHP configs. The untainted-RHS taint-clear is Python-gated
+		// (walker.go), so a base `q = tainted; q += " safe"` keeps its taint.
+		assignTypes:  map[string]bool{"assignment_expression": true, "compound_assignment_expr": true},
 		varDeclTypes: map[string]bool{"let_declaration": true},
 		identType:    "identifier",
 		attrTypes:    map[string]bool{"field_expression": true},
@@ -1168,6 +1617,7 @@ func rustConfig() *langConfig {
 
 		extractCallName: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
+			fn = rustUnwrapTurbofishMethod(fn)
 			if fn == nil {
 				return ""
 			}
@@ -1189,6 +1639,7 @@ func rustConfig() *langConfig {
 		},
 		extractCallReceiver: func(n *ast.Node) string {
 			fn := n.ChildByFieldName("function")
+			fn = rustUnwrapTurbofishMethod(fn)
 			if fn != nil && fn.Type() == "field_expression" {
 				v := fn.ChildByFieldName("value")
 				if v != nil {
@@ -1205,7 +1656,23 @@ func rustConfig() *langConfig {
 		},
 		extractAssignLHS: func(n *ast.Node) string {
 			lhs := n.ChildByFieldName("left")
-			if lhs != nil && lhs.Type() == "identifier" {
+			if lhs == nil {
+				return ""
+			}
+			if lhs.Type() == "identifier" {
+				return lhs.Text()
+			}
+			// Shallow field-sensitive LHS: `obj.f = src` / `self.data = src`
+			// parse to a `field_expression` node whose Text() is the dotted
+			// path ("obj.f", "self.data"). Returning that text seeds the
+			// per-field key so a later field read (resolved via prefixTainted
+			// on the attrTypes branch) and a bare-object read (resolved via
+			// anyFieldTainted, fromFieldAssign-stamped in processAssign) both
+			// surface the taint without tainting a sibling `obj.g`. Without
+			// this branch the field write returned "" and the taint was
+			// silently dropped (a missed detection). Mirrors the JS, C#, Java,
+			// and Python configs; the engine machinery is language-agnostic.
+			if lhs.Type() == "field_expression" {
 				return lhs.Text()
 			}
 			return ""
@@ -1771,10 +2238,11 @@ func perlConfig() *langConfig {
 		funcTypes: map[string]bool{"subroutine_declaration_statement": true},
 		ifTypes:   map[string]bool{"if_statement": true},
 		callTypes: map[string]bool{
-			"function_call_expression":            true,
-			"method_call_expression":              true,
-			"ambiguous_function_call_expression":  true,
-			"eval_expression":                     true,
+			"function_call_expression":           true,
+			"method_call_expression":             true,
+			"ambiguous_function_call_expression": true,
+			"eval_expression":                    true,
+			"substitution_regexp":                true, // s///e — replacement evaluated as code
 		},
 		assignTypes:  map[string]bool{"assignment_expression": true},
 		varDeclTypes: map[string]bool{},
@@ -1795,6 +2263,21 @@ func perlConfig() *langConfig {
 				}
 			case "eval_expression":
 				return "eval"
+			case "substitution_regexp":
+				// s/pattern/replacement/e — only flag when /e modifier is present
+				// (the replacement is evaluated as Perl code).
+				for i := 0; i < n.ChildCount(); i++ {
+					c := n.Child(i)
+					if c.Type() == "substitution_regexp_modifiers" {
+						mods := c.Text()
+						for _, ch := range mods {
+							if ch == 'e' {
+								return "subst_eval"
+							}
+						}
+					}
+				}
+				return "" // no /e modifier — not a code execution sink
 			}
 			return ""
 		},
@@ -1937,6 +2420,25 @@ func perlExtractCallArgs(n *ast.Node) []*ast.Node {
 			}
 		}
 		return out
+	}
+
+	// substitution_regexp (s///e): the "replacement" child is evaluated as code.
+	// Extract named children of the replacement node as taint-trackable arguments.
+	if n.Type() == "substitution_regexp" {
+		for i := 0; i < n.ChildCount(); i++ {
+			c := n.Child(i)
+			if c.Type() == "replacement" {
+				var out []*ast.Node
+				for j := 0; j < c.ChildCount(); j++ {
+					gc := c.Child(j)
+					if gc.IsNamed() {
+						out = append(out, gc)
+					}
+				}
+				return out
+			}
+		}
+		return nil
 	}
 
 	args := n.ChildByFieldName("arguments")
@@ -2111,6 +2613,152 @@ func zigExtractParams(n *ast.Node) []string {
 		}
 	}
 	return names
+}
+
+// ---------------------------------------------------------------------------
+// Shell / Bash (tree-sitter-bash grammar)
+//
+// Node types verified against smacker/go-tree-sitter/bash by parsing sample
+// scripts:
+//   - command:              command_name(field "name") + args(field "argument")
+//   - command_name:         wraps a `word` whose text is the command (eval, curl…)
+//   - variable_assignment:  variable_name(field "name") "=" value(field "value")
+//   - command_substitution: $(...) and `...`
+//   - simple_expansion:     $x / $1 ;  expansion: ${x}
+//   - function_definition:  name(field "name", a word) + body(field "body")
+//   - if_statement:         condition(field "condition") + body commands
+//
+// Matching model: the walker resolves a call's name via extractCallName, which
+// for a `command` node returns the command word (eval, sh, cp, curl, …). The
+// shell catalog's sink/source MethodName carries that bare command word, so
+// receiver-less command sinks fire. Variable expansions ($1, $VAR) are not
+// call nodes; those sources are caught by the regex-fallback engine via their
+// verified Pattern.
+// ---------------------------------------------------------------------------
+
+func shellConfig() *langConfig {
+	return &langConfig{
+		language:     rules.LangShell,
+		funcTypes:    map[string]bool{"function_definition": true},
+		callTypes:    map[string]bool{"command": true},
+		assignTypes:  map[string]bool{"variable_assignment": true},
+		varDeclTypes: map[string]bool{},
+		identType:    "variable_name",
+		attrTypes:    map[string]bool{},
+		ifTypes:      map[string]bool{"if_statement": true},
+
+		extractCallName: func(n *ast.Node) string {
+			// command → command_name(field "name") → word
+			cn := n.ChildByFieldName("name")
+			if cn == nil {
+				// Fallback: first command_name child.
+				for i := 0; i < n.ChildCount(); i++ {
+					c := n.Child(i)
+					if c.Type() == "command_name" {
+						cn = c
+						break
+					}
+				}
+			}
+			if cn == nil {
+				return ""
+			}
+			if cn.Type() == "command_name" {
+				// Unwrap to the inner word/identifier text.
+				for i := 0; i < cn.ChildCount(); i++ {
+					c := cn.Child(i)
+					if c.Type() == "word" || c.Type() == "command_name" {
+						return c.Text()
+					}
+				}
+				return cn.Text()
+			}
+			return cn.Text()
+		},
+		// Shell commands have no method receiver/object.
+		extractCallReceiver: func(n *ast.Node) string {
+			return ""
+		},
+		extractAssignLHS: func(n *ast.Node) string {
+			lhs := n.ChildByFieldName("name")
+			if lhs != nil && lhs.Type() == "variable_name" {
+				return lhs.Text()
+			}
+			return ""
+		},
+		extractAssignRHS: func(n *ast.Node) *ast.Node {
+			return n.ChildByFieldName("value")
+		},
+		extractAttrName: func(n *ast.Node) string {
+			return ""
+		},
+		extractAttrReceiver: func(n *ast.Node) string {
+			return ""
+		},
+		extractCallArgs: func(n *ast.Node) []*ast.Node {
+			// command arguments are children carried under the "argument"
+			// field (word / string / simple_expansion / concatenation / …).
+			var out []*ast.Node
+			for i := 0; i < n.ChildCount(); i++ {
+				c := n.Child(i)
+				if c.FieldName() == "argument" {
+					out = append(out, c)
+				}
+			}
+			return out
+		},
+		extractFuncName: func(n *ast.Node) string {
+			// Synthetic top-level scope (the program root).
+			if n.Type() == "program" {
+				return "__toplevel__"
+			}
+			name := n.ChildByFieldName("name")
+			if name != nil {
+				return name.Text()
+			}
+			return ""
+		},
+		extractFuncBody: func(n *ast.Node) *ast.Node {
+			// Synthetic top-level scope: the program node IS its own body.
+			if n.Type() == "program" {
+				return n
+			}
+			if body := n.ChildByFieldName("body"); body != nil {
+				return body
+			}
+			// Fallback: compound_statement child.
+			for i := 0; i < n.ChildCount(); i++ {
+				c := n.Child(i)
+				if c.Type() == "compound_statement" {
+					return c
+				}
+			}
+			return nil
+		},
+		// Bash functions have no formal parameter list; positional params
+		// ($1, $2, …) are referenced directly inside the body.
+		extractFuncParams: func(n *ast.Node) []string {
+			return nil
+		},
+		extractIfCondition:   genericExtractIfCondition,
+		extractIfConsequence: genericExtractIfConsequence,
+		extractIfAlternative: genericExtractIfAlternative,
+		findExtraScopes:      shellFindTopLevelScope,
+	}
+}
+
+// shellFindTopLevelScope returns the `program` root node as a synthetic
+// analysis scope. Unlike most languages, the bulk of a shell script's logic
+// (and its source→sink flows) lives at the top level, not inside a
+// function_definition. Treating the program root as a scope lets the walker
+// track `arg="$1"; curl "$arg"` written directly in the script body. Nested
+// function bodies are also reachable from here; they are additionally analysed
+// as their own scopes, and identical flows collapse during dedup.
+func shellFindTopLevelScope(root *ast.Node) []*ast.Node {
+	if root == nil || root.Type() != "program" {
+		return nil
+	}
+	return []*ast.Node{root}
 }
 
 // ---------------------------------------------------------------------------

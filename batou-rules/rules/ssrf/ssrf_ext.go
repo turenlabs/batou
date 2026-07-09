@@ -23,15 +23,21 @@ var (
 	reExtURLParseSecond = regexp.MustCompile(`(?i)(?:urllib|requests|http\.get|fetch|axios|\.openConnection|HttpClient)\s*[.(]`)
 
 	// Same-library patterns: parse + HTTP client from same ecosystem → no confusion
-	reSameLibGo     = regexp.MustCompile(`\bhttp\.(?:Get|Post|Head|Do|NewRequest)\s*\(`)
-	reSameLibPython = regexp.MustCompile(`\burllib\.request\.urlopen\s*\(`)
+	reSameLibGo = regexp.MustCompile(`\bhttp\.(?:Get|Post|Head|Do|NewRequest)\s*\(`)
+	// Python: urllib stdlib AND the `requests` package both delegate URL
+	// parsing to the same urllib3 / stdlib normaliser. Pairing `urlparse()`
+	// with `requests.{get,post,put,delete,head,patch,request,Session}` is
+	// not parser-confusion — the original rule was tuned for old shapes
+	// where `urlparse + httplib`-style mixed clients disagreed. Treat the
+	// `requests` package as same-library to avoid FPs on the standard
+	// "validate URL parts then fetch" pattern (see CVE-2023-24329 safe).
+	reSameLibPython = regexp.MustCompile(`\b(?:urllib\.request\.urlopen|requests\.(?:get|post|put|delete|head|patch|request|Session))\s*\(`)
 	reSameLibJS     = regexp.MustCompile(`\bfetch\s*\(`)
 
 	// BATOU-SSRF-007: Cloud metadata endpoint access
 	reExtCloudMetadata = regexp.MustCompile(`(?:169\.254\.169\.254|metadata\.google\.internal|metadata\.azure\.com|100\.100\.100\.200)`)
 
 	// BATOU-SSRF-008: SSRF via file:// protocol
-	reExtFileProtocol = regexp.MustCompile(`(?i)file://`)
 	reExtFileProtocolInURL = regexp.MustCompile(`(?i)(?:url|uri|href|src|path|endpoint)\s*[:=]\s*["']?\s*file://`)
 
 	// BATOU-SSRF-009: SSRF via redirect following
@@ -41,12 +47,11 @@ var (
 	reExtWebhookURL = regexp.MustCompile(`(?i)(?:webhook[_-]?url|callback[_-]?url|notify[_-]?url|hook[_-]?url|postback[_-]?url)\s*[:=]\s*(?:req\.(?:body|query|params)|request\.(?:POST|GET|data|json|form)|params\[)`)
 
 	// BATOU-SSRF-011: SSRF via PDF/image generation library
-	reExtPDFGen = regexp.MustCompile(`(?i)(?:wkhtmltopdf|puppeteer|phantom|html-pdf|pdfkit|imgkit|weasyprint|chrome\.(?:printToPDF|screenshot)|page\.(?:goto|pdf|screenshot)|gotenberg)`)
+	reExtPDFGen        = regexp.MustCompile(`(?i)(?:wkhtmltopdf|puppeteer|phantom|html-pdf|pdfkit|imgkit|weasyprint|chrome\.(?:printToPDF|screenshot)|page\.(?:goto|pdf|screenshot)|gotenberg)`)
 	reExtPDFGenWithURL = regexp.MustCompile(`(?i)(?:wkhtmltopdf|puppeteer|phantom|html-pdf|pdfkit|imgkit|weasyprint|gotenberg).*(?:req\.|request\.|params|user_?input|url|uri)`)
 
 	// BATOU-SSRF-012: SSRF via SVG processing (external entity)
 	reExtSVGProcess = regexp.MustCompile(`(?i)(?:svg|image).*(?:parse|render|convert|process|load)\s*\(`)
-	reExtSVGExternalRef = regexp.MustCompile(`(?i)(?:xlink:href|xmlns|href)\s*=\s*["']https?://`)
 	reExtSVGLibrary = regexp.MustCompile(`(?i)(?:librsvg|rsvg|cairosvg|inkscape|imagemagick|sharp|svg2png|svgexport)`)
 )
 
@@ -71,8 +76,8 @@ func init() {
 
 type DNSRebindingExt struct{}
 
-func (r *DNSRebindingExt) ID() string                     { return "BATOU-SSRF-005" }
-func (r *DNSRebindingExt) Name() string                   { return "DNSRebindingExt" }
+func (r *DNSRebindingExt) ID() string                      { return "BATOU-SSRF-005" }
+func (r *DNSRebindingExt) Name() string                    { return "DNSRebindingExt" }
 func (r *DNSRebindingExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DNSRebindingExt) Description() string {
 	return "Detects DNS resolution of user-supplied hostnames without IP validation, enabling DNS rebinding attacks."
@@ -83,14 +88,15 @@ func (r *DNSRebindingExt) Languages() []rules.Language {
 
 func (r *DNSRebindingExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtDNSLookupThenUse.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtDNSLookupThenUse, line, lowered[i]); m != "" {
 			// Check if there's IP validation nearby
 			if hasIPValidation(lines, i) {
 				continue
@@ -149,8 +155,8 @@ func hasIPValidation(lines []string, idx int) bool {
 
 type URLParserConfusion struct{}
 
-func (r *URLParserConfusion) ID() string                     { return "BATOU-SSRF-006" }
-func (r *URLParserConfusion) Name() string                   { return "URLParserConfusion" }
+func (r *URLParserConfusion) ID() string                      { return "BATOU-SSRF-006" }
+func (r *URLParserConfusion) Name() string                    { return "URLParserConfusion" }
 func (r *URLParserConfusion) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *URLParserConfusion) Description() string {
 	return "Detects use of URL parsing followed by a different HTTP client, which can lead to SSRF via URL parser disagreement."
@@ -161,7 +167,8 @@ func (r *URLParserConfusion) Languages() []rules.Language {
 
 func (r *URLParserConfusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -171,13 +178,13 @@ func (r *URLParserConfusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var parseMatch string
 		switch ctx.Language {
 		case rules.LangPython:
-			parseMatch = reExtURLParsePy.FindString(line)
+			parseMatch = rules.GFindLower(reExtURLParsePy, line, lowered[i])
 		case rules.LangJavaScript, rules.LangTypeScript:
-			parseMatch = reExtURLParseJS.FindString(line)
+			parseMatch = rules.GFindLower(reExtURLParseJS, line, lowered[i])
 		case rules.LangGo:
-			parseMatch = reExtURLParseGo.FindString(line)
+			parseMatch = rules.GFindLower(reExtURLParseGo, line, lowered[i])
 		case rules.LangJava:
-			parseMatch = reExtURLParseJava.FindString(line)
+			parseMatch = rules.GFindLower(reExtURLParseJava, line, lowered[i])
 		}
 		if parseMatch == "" {
 			continue
@@ -240,8 +247,8 @@ func (r *URLParserConfusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CloudMetadataAccess struct{}
 
-func (r *CloudMetadataAccess) ID() string                     { return "BATOU-SSRF-007" }
-func (r *CloudMetadataAccess) Name() string                   { return "CloudMetadataAccess" }
+func (r *CloudMetadataAccess) ID() string                      { return "BATOU-SSRF-007" }
+func (r *CloudMetadataAccess) Name() string                    { return "CloudMetadataAccess" }
 func (r *CloudMetadataAccess) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *CloudMetadataAccess) Description() string {
 	return "Detects access to cloud metadata endpoints (169.254.169.254, metadata.google.internal) which can expose cloud credentials."
@@ -252,14 +259,15 @@ func (r *CloudMetadataAccess) Languages() []rules.Language {
 
 func (r *CloudMetadataAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtCloudMetadata.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtCloudMetadata, line, lowered[i]); m != "" {
 			// Skip test/config patterns
 			lower := strings.ToLower(line)
 			if strings.Contains(lower, "test") || strings.Contains(lower, "mock") || strings.Contains(lower, "example") {
@@ -293,8 +301,8 @@ func (r *CloudMetadataAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FileProtocolSSRF struct{}
 
-func (r *FileProtocolSSRF) ID() string                     { return "BATOU-SSRF-008" }
-func (r *FileProtocolSSRF) Name() string                   { return "FileProtocolSSRF" }
+func (r *FileProtocolSSRF) ID() string                      { return "BATOU-SSRF-008" }
+func (r *FileProtocolSSRF) Name() string                    { return "FileProtocolSSRF" }
 func (r *FileProtocolSSRF) DefaultSeverity() rules.Severity { return rules.High }
 func (r *FileProtocolSSRF) Description() string {
 	return "Detects use of file:// protocol in URL variables which can be used for local file reading via SSRF."
@@ -305,14 +313,15 @@ func (r *FileProtocolSSRF) Languages() []rules.Language {
 
 func (r *FileProtocolSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtFileProtocolInURL.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtFileProtocolInURL, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -344,8 +353,8 @@ func (r *FileProtocolSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RedirectFollowingSSRF struct{}
 
-func (r *RedirectFollowingSSRF) ID() string                     { return "BATOU-SSRF-009" }
-func (r *RedirectFollowingSSRF) Name() string                   { return "RedirectFollowingSSRF" }
+func (r *RedirectFollowingSSRF) ID() string                      { return "BATOU-SSRF-009" }
+func (r *RedirectFollowingSSRF) Name() string                    { return "RedirectFollowingSSRF" }
 func (r *RedirectFollowingSSRF) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RedirectFollowingSSRF) Description() string {
 	return "Detects HTTP clients configured to follow redirects, which can bypass SSRF URL validation via open redirects."
@@ -359,14 +368,15 @@ func (r *RedirectFollowingSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtRedirectFollow.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtRedirectFollow, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -398,8 +408,8 @@ func (r *RedirectFollowingSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type BlindSSRFWebhook struct{}
 
-func (r *BlindSSRFWebhook) ID() string                     { return "BATOU-SSRF-010" }
-func (r *BlindSSRFWebhook) Name() string                   { return "BlindSSRFWebhook" }
+func (r *BlindSSRFWebhook) ID() string                      { return "BATOU-SSRF-010" }
+func (r *BlindSSRFWebhook) Name() string                    { return "BlindSSRFWebhook" }
 func (r *BlindSSRFWebhook) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *BlindSSRFWebhook) Description() string {
 	return "Detects user-controlled webhook/callback URLs that can be used for blind SSRF attacks."
@@ -410,14 +420,15 @@ func (r *BlindSSRFWebhook) Languages() []rules.Language {
 
 func (r *BlindSSRFWebhook) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtWebhookURL.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtWebhookURL, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -449,8 +460,8 @@ func (r *BlindSSRFWebhook) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PDFGenSSRF struct{}
 
-func (r *PDFGenSSRF) ID() string                     { return "BATOU-SSRF-011" }
-func (r *PDFGenSSRF) Name() string                   { return "PDFGenSSRF" }
+func (r *PDFGenSSRF) ID() string                      { return "BATOU-SSRF-011" }
+func (r *PDFGenSSRF) Name() string                    { return "PDFGenSSRF" }
 func (r *PDFGenSSRF) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PDFGenSSRF) Description() string {
 	return "Detects PDF/image generation libraries processing user-controlled URLs, which can be exploited for SSRF via HTML/CSS injection."
@@ -461,10 +472,11 @@ func (r *PDFGenSSRF) Languages() []rules.Language {
 
 func (r *PDFGenSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Only flag if there's both a PDF gen library and user input in the file
-	hasPDFLib := reExtPDFGen.MatchString(ctx.Content)
+	hasPDFLib := rules.GMatchFile(reExtPDFGen, ctx)
 	if !hasPDFLib {
 		return nil
 	}
@@ -474,7 +486,7 @@ func (r *PDFGenSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtPDFGenWithURL.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtPDFGenWithURL, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -506,8 +518,8 @@ func (r *PDFGenSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SVGProcessSSRF struct{}
 
-func (r *SVGProcessSSRF) ID() string                     { return "BATOU-SSRF-012" }
-func (r *SVGProcessSSRF) Name() string                   { return "SVGProcessSSRF" }
+func (r *SVGProcessSSRF) ID() string                      { return "BATOU-SSRF-012" }
+func (r *SVGProcessSSRF) Name() string                    { return "SVGProcessSSRF" }
 func (r *SVGProcessSSRF) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SVGProcessSSRF) Description() string {
 	return "Detects SVG processing libraries that may follow external references, enabling SSRF via crafted SVG files."
@@ -519,18 +531,19 @@ func (r *SVGProcessSSRF) Languages() []rules.Language {
 func (r *SVGProcessSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
-	hasSVGLib := reExtSVGLibrary.MatchString(ctx.Content)
+	hasSVGLib := rules.GMatchFile(reExtSVGLibrary, ctx)
 	if !hasSVGLib {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtSVGProcess.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtSVGProcess, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

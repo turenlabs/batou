@@ -15,8 +15,8 @@ import (
 	"go/parser"
 	"go/token"
 
-	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
+	"github.com/turenlabs/batou-rules/rules"
 )
 
 // GoParseResult holds a parsed Go file and its FileSet so that multiple
@@ -81,17 +81,19 @@ func AnalyzeGoWithAST(content string, filePath string, parsed *GoParseResult) []
 				return true
 			}
 			scopeName := fn.Name.Name
+			recvType := ""
 			if fn.Recv != nil && len(fn.Recv.List) > 0 {
-				scopeName = receiverTypeName(fn.Recv.List[0].Type) + "." + scopeName
+				recvType = receiverTypeName(fn.Recv.List[0].Type)
+				scopeName = recvType + "." + scopeName
 			}
-			flows := walkFunc(fset, fn.Type, fn.Body, scopeName, filePath, matcher)
+			flows := walkFunc(fset, fn.Type, fn.Body, scopeName, recvType, filePath, matcher)
 			allFlows = append(allFlows, flows...)
 
 		case *ast.FuncLit:
 			if fn.Body == nil {
 				return true
 			}
-			flows := walkFunc(fset, fn.Type, fn.Body, "__closure__", filePath, matcher)
+			flows := walkFunc(fset, fn.Type, fn.Body, "__closure__", "", filePath, matcher)
 			allFlows = append(allFlows, flows...)
 		}
 		return true

@@ -16,58 +16,53 @@ var (
 	// shell.execute or shell.open with broad scope in allowlist JSON
 	shellExecuteAll = regexp.MustCompile(`"shell"\s*:\s*\{[^}]*"execute"\s*:\s*true`)
 	// shell > open with wildcard or no restriction
-	shellOpenBroad = regexp.MustCompile(`"shell"\s*:\s*\{[^}]*"open"\s*:\s*(?:true|"[^"]*\.\*[^"]*")`)
 	// Tauri v2 TOML/JSON: "allow-execute" permission
 	shellAllowExecute = regexp.MustCompile(`"?shell:allow-execute"?`)
 	// Rust: Command::new with user input
 	rustCommandNew = regexp.MustCompile(`Command::new\s*\(\s*(?:&?\s*)?[a-zA-Z_]\w*\s*\)`)
 	// Rust: tauri::api::shell::open with variable
-	rustShellOpen = regexp.MustCompile(`(?:tauri::api::shell::open|shell::open|api::shell::open)\s*\(`)
 	// JS/TS: invoke("plugin:shell|execute"...) or Command.create
-	jsShellInvoke = regexp.MustCompile(`invoke\s*\(\s*['"]plugin:shell\|execute['"]`)
+	jsShellInvoke   = regexp.MustCompile(`invoke\s*\(\s*['"]plugin:shell\|execute['"]`)
 	jsCommandCreate = regexp.MustCompile(`Command\s*\.\s*create\s*\(`)
 )
 
 // BATOU-FW-TAURI-002: Overly permissive filesystem scope
 var (
 	// fs scope with $HOME/**, $APPDATA/**, or ** wildcard
-	fsScopeHomeStar  = regexp.MustCompile(`"(?:fs|allow)"\s*:\s*\{[^}]*"scope"\s*:\s*\[[^\]]*"\$HOME/\*\*"`)
-	fsScopeAppData   = regexp.MustCompile(`"(?:fs|allow)"\s*:\s*\{[^}]*"scope"\s*:\s*\[[^\]]*"\$APPDATA/\*\*"`)
-	fsScopeWildcard  = regexp.MustCompile(`"scope"\s*:\s*\[[^\]]*"\*\*"[^\]]*\]`)
+	fsScopeHomeStar = regexp.MustCompile(`"(?:fs|allow)"\s*:\s*\{[^}]*"scope"\s*:\s*\[[^\]]*"\$HOME/\*\*"`)
+	fsScopeAppData  = regexp.MustCompile(`"(?:fs|allow)"\s*:\s*\{[^}]*"scope"\s*:\s*\[[^\]]*"\$APPDATA/\*\*"`)
 	// Broad scope patterns in flat config
 	fsScopeBroadPath = regexp.MustCompile(`"scope"\s*:\s*\[\s*"\*\*"\s*\]`)
 	// Tauri v2 permissions
-	fsAllowAll       = regexp.MustCompile(`"?fs:allow-read"?\s*,\s*"?fs:allow-write"?`)
-	fsScopeRoot      = regexp.MustCompile(`"scope"\s*:\s*\[[^\]]*"(?:/\*\*|[A-Z]:\\\\\*\*)"`)
+	fsScopeRoot = regexp.MustCompile(`"scope"\s*:\s*\[[^\]]*"(?:/\*\*|[A-Z]:\\\\\*\*)"`)
 )
 
 // BATOU-FW-TAURI-003: IPC command injection
 var (
 	// Rust: #[tauri::command] fn without input validation (basic indicator)
-	tauriCommandAttr       = regexp.MustCompile(`#\[tauri::command\]`)
-	tauriCommandUnsafe     = regexp.MustCompile(`(?:std::process::Command|tokio::process::Command)::new\s*\(\s*(?:&?\s*)?[a-zA-Z_]\w*`)
+	tauriCommandAttr   = regexp.MustCompile(`#\[tauri::command\]`)
+	tauriCommandUnsafe = regexp.MustCompile(`(?:std::process::Command|tokio::process::Command)::new\s*\(\s*(?:&?\s*)?[a-zA-Z_]\w*`)
 	// JS/TS: invoke() with variable command name
-	jsInvokeVariable       = regexp.MustCompile(`invoke\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
+	jsInvokeVariable = regexp.MustCompile(`invoke\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
 	// JS: user input flows to invoke
-	jsInvokeUserInput      = regexp.MustCompile(`invoke\s*\(\s*(?:document\s*\.\s*getElementById|querySelector|event\s*\.\s*target|input\s*\.\s*value|userInput|user_input|cmdName|commandName)`)
+	jsInvokeUserInput = regexp.MustCompile(`invoke\s*\(\s*(?:document\s*\.\s*getElementById|querySelector|event\s*\.\s*target|input\s*\.\s*value|userInput|user_input|cmdName|commandName)`)
 )
 
 // BATOU-FW-TAURI-004: Dangerous protocol handler
 var (
 	// Custom protocol without origin check
-	customProtocolRust     = regexp.MustCompile(`register_uri_scheme_protocol\s*\(`)
-	tauriLocalhost         = regexp.MustCompile(`tauri://localhost`)
+	customProtocolRust = regexp.MustCompile(`register_uri_scheme_protocol\s*\(`)
+	tauriLocalhost     = regexp.MustCompile(`tauri://localhost`)
 	// Custom protocol without origin validation
-	protocolNoOriginCheck  = regexp.MustCompile(`register_uri_scheme_protocol\s*\(\s*"[^"]+"\s*,`)
 	// Dangerous scheme allowlist
-	dangerousScheme        = regexp.MustCompile(`"(?:open|scheme)"\s*:\s*(?:true|"(?:file|smb|nfs)://)`)
+	dangerousScheme = regexp.MustCompile(`"(?:open|scheme)"\s*:\s*(?:true|"(?:file|smb|nfs)://)`)
 )
 
 // BATOU-FW-TAURI-005: CSP bypass or missing CSP
 var (
 	// No CSP in security section: "security": {} with no "csp" key
-	securityNoCSP   = regexp.MustCompile(`"security"\s*:\s*\{[^}]*\}`)
-	securityCSP     = regexp.MustCompile(`"security"\s*:\s*\{[^}]*"csp"`)
+	securityNoCSP = regexp.MustCompile(`"security"\s*:\s*\{[^}]*\}`)
+	securityCSP   = regexp.MustCompile(`"security"\s*:\s*\{[^}]*"csp"`)
 	// unsafe-inline or unsafe-eval in CSP
 	cspUnsafeInline = regexp.MustCompile(`"csp"\s*:\s*"[^"]*unsafe-inline[^"]*"`)
 	cspUnsafeEval   = regexp.MustCompile(`"csp"\s*:\s*"[^"]*unsafe-eval[^"]*"`)
@@ -77,11 +72,11 @@ var (
 // BATOU-FW-TAURI-006: window.__TAURI__ exposure
 var (
 	// Direct reference to window.__TAURI__
-	tauriWindowExpose  = regexp.MustCompile(`window\s*\.\s*__TAURI__`)
+	tauriWindowExpose = regexp.MustCompile(`window\s*\.\s*__TAURI__`)
 	// withGlobalTauri: true or similar config exposing APIs
-	globalTauriConfig  = regexp.MustCompile(`"?withGlobalTauri"?\s*:\s*true`)
+	globalTauriConfig = regexp.MustCompile(`"?withGlobalTauri"?\s*:\s*true`)
 	// Accessing __TAURI__ and passing to untrusted context
-	tauriAPILeak       = regexp.MustCompile(`(?:postMessage|send|emit|broadcast)\s*\([^)]*__TAURI__`)
+	tauriAPILeak = regexp.MustCompile(`(?:postMessage|send|emit|broadcast)\s*\([^)]*__TAURI__`)
 )
 
 // BATOU-FW-TAURI-007: Dangerous Tauri v2 permissions
@@ -89,13 +84,12 @@ var (
 	// allow-execute in capability
 	permAllowExecute = regexp.MustCompile(`"shell:allow-execute"`)
 	// allow-open with broad scope
-	permAllowOpen    = regexp.MustCompile(`"shell:allow-open"`)
+	permAllowOpen = regexp.MustCompile(`"shell:allow-open"`)
 	// default permission with shell
-	permShellDefault = regexp.MustCompile(`"shell:default"`)
 	// fs with write access to broad scope
-	permFsWriteAll   = regexp.MustCompile(`"fs:allow-write"`)
+	permFsWriteAll = regexp.MustCompile(`"fs:allow-write"`)
 	// Broad scope with no window restriction
-	permAllWindows   = regexp.MustCompile(`"windows"\s*:\s*\[\s*"\*"\s*\]`)
+	permAllWindows = regexp.MustCompile(`"windows"\s*:\s*\[\s*"\*"\s*\]`)
 )
 
 // BATOU-FW-TAURI-008: Insecure updater config
@@ -103,10 +97,8 @@ var (
 	// Updater endpoint using HTTP (not HTTPS)
 	updaterHTTPEndpoint = regexp.MustCompile(`"(?:updater|endpoints?)"\s*:\s*(?:\[?\s*"http://[^"]+)`)
 	// Updater active but no pubkey
-	updaterActive       = regexp.MustCompile(`"updater"\s*:\s*\{[^}]*"active"\s*:\s*true`)
-	updaterPubkey       = regexp.MustCompile(`"updater"\s*:\s*\{[^}]*"pubkey"`)
+	updaterActive = regexp.MustCompile(`"updater"\s*:\s*\{[^}]*"active"\s*:\s*true`)
 	// Rust: tauri::updater without signature check
-	rustUpdaterNoSig    = regexp.MustCompile(`(?:tauri::updater|UpdateBuilder)`)
 	rustDangerousAccept = regexp.MustCompile(`dangerous_insecure_transport_protocol\s*\(\s*true\s*\)`)
 )
 
@@ -161,7 +153,8 @@ func (r *TauriShellAllowlist) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -174,32 +167,32 @@ func (r *TauriShellAllowlist) Scan(ctx *rules.ScanContext) []rules.Finding {
 		desc := ""
 		suggestion := ""
 
-		if shellAllTrue.MatchString(ctx.Content) && strings.Contains(line, "\"all\"") && strings.Contains(line, "true") {
+		if rules.GMatchFile(shellAllTrue, ctx) && strings.Contains(line, "\"all\"") && strings.Contains(line, "true") {
 			matched = true
 			title = "Tauri shell.all enabled - allows arbitrary command execution"
 			desc = "The Tauri shell allowlist has 'all: true', which permits the webview to execute any system command. A compromised webview or XSS vulnerability can lead to full system compromise."
 			suggestion = "Remove shell.all:true. Use a scoped sidecar with explicit allowed commands instead. Define specific commands in the shell.scope configuration."
-		} else if shellExecuteAll.MatchString(ctx.Content) && strings.Contains(line, "execute") && strings.Contains(line, "true") {
+		} else if rules.GMatchFile(shellExecuteAll, ctx) && strings.Contains(line, "execute") && strings.Contains(line, "true") {
 			matched = true
 			title = "Tauri shell.execute enabled - webview can execute commands"
 			desc = "Shell execute is enabled in the Tauri allowlist, permitting the webview to run system commands. This grants OS-level access to any code running in the webview."
 			suggestion = "Disable shell.execute and use scoped sidecars with predefined command names. Define allowed programs in shell.scope.allowedPrograms."
-		} else if shellAllowExecute.MatchString(line) {
+		} else if rules.GMatchLower(shellAllowExecute, line, lowered[i]) {
 			matched = true
 			title = "Tauri v2 shell:allow-execute permission grants command execution"
 			desc = "The shell:allow-execute permission allows the frontend to execute arbitrary shell commands. This is one of the most dangerous Tauri permissions."
 			suggestion = "Remove shell:allow-execute. Use scoped commands with specific allowed programs instead."
-		} else if rustCommandNew.MatchString(line) && isTauriProject(ctx.Content, ctx.FilePath) && ctx.Language == rules.LangRust {
+		} else if rules.GMatchLower(rustCommandNew, line, lowered[i]) && isTauriProject(ctx.Content, ctx.FilePath) && ctx.Language == rules.LangRust {
 			matched = true
 			title = "Tauri command handler spawns process with variable input"
 			desc = "A Tauri command handler uses Command::new with a variable argument, which could allow command injection if the value originates from the frontend."
 			suggestion = "Validate and sanitize the command argument. Use an allowlist of permitted programs. Never pass frontend input directly to Command::new."
-		} else if jsShellInvoke.MatchString(line) {
+		} else if rules.GMatchLower(jsShellInvoke, line, lowered[i]) {
 			matched = true
 			title = "Frontend invokes shell execute plugin directly"
 			desc = "The frontend JavaScript/TypeScript code directly invokes the shell execute plugin, which can execute system commands from the webview context."
 			suggestion = "Use scoped Tauri commands instead of direct shell plugin invocation. Implement validation in a Rust backend command."
-		} else if jsCommandCreate.MatchString(line) && isTauriProject(ctx.Content, ctx.FilePath) {
+		} else if rules.GMatchLower(jsCommandCreate, line, lowered[i]) && isTauriProject(ctx.Content, ctx.FilePath) {
 			matched = true
 			title = "Frontend creates shell Command object"
 			desc = "The frontend creates a Tauri shell Command object, enabling system command execution from the webview."
@@ -246,26 +239,27 @@ func (r *TauriFilesystemScope) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		matched := false
 		title := ""
 		desc := ""
 
-		if strings.Contains(line, "$HOME/**") || fsScopeHomeStar.MatchString(ctx.Content) && strings.Contains(line, "$HOME") {
+		if strings.Contains(line, "$HOME/**") || rules.GMatchFile(fsScopeHomeStar, ctx) && strings.Contains(line, "$HOME") {
 			matched = true
 			title = "Tauri filesystem scope includes entire home directory"
 			desc = "The filesystem scope grants access to $HOME/**, allowing the webview to read/write any file in the user's home directory including SSH keys, browser data, and credentials."
-		} else if strings.Contains(line, "$APPDATA/**") || fsScopeAppData.MatchString(ctx.Content) && strings.Contains(line, "$APPDATA") {
+		} else if strings.Contains(line, "$APPDATA/**") || rules.GMatchFile(fsScopeAppData, ctx) && strings.Contains(line, "$APPDATA") {
 			matched = true
 			title = "Tauri filesystem scope includes entire appdata directory"
 			desc = "The filesystem scope grants access to $APPDATA/**, allowing the webview to access data from other applications."
-		} else if fsScopeBroadPath.MatchString(line) {
+		} else if rules.GMatchLower(fsScopeBroadPath, line, lowered[i]) {
 			matched = true
 			title = "Tauri filesystem scope uses unrestricted wildcard"
 			desc = "The filesystem scope uses '**' which grants the webview access to the entire filesystem. This allows reading/writing any file the process has permissions for."
-		} else if fsScopeRoot.MatchString(line) {
+		} else if rules.GMatchLower(fsScopeRoot, line, lowered[i]) {
 			matched = true
 			title = "Tauri filesystem scope includes root directory"
 			desc = "The filesystem scope includes the root path wildcard, granting the webview access to the entire filesystem."
@@ -311,7 +305,8 @@ func (r *TauriIPCInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	if ctx.Language == rules.LangRust {
 		// Check for #[tauri::command] functions that use dangerous operations
@@ -325,7 +320,7 @@ func (r *TauriIPCInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 				continue
 			}
 
-			if tauriCommandAttr.MatchString(line) {
+			if rules.GMatchLower(tauriCommandAttr, line, lowered[i]) {
 				inTauriCommand = true
 				commandStartLine = i
 				braceDepth = 0
@@ -335,7 +330,7 @@ func (r *TauriIPCInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if inTauriCommand {
 				braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 
-				if tauriCommandUnsafe.MatchString(line) {
+				if rules.GMatchLower(tauriCommandUnsafe, line, lowered[i]) {
 					findings = append(findings, rules.Finding{
 						RuleID:        r.ID(),
 						Severity:      r.DefaultSeverity(),
@@ -364,7 +359,7 @@ func (r *TauriIPCInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 				continue
 			}
 
-			if jsInvokeVariable.MatchString(line) {
+			if rules.GMatchLower(jsInvokeVariable, line, lowered[i]) {
 				// Exclude invoke with string literal (that's normal usage)
 				if strings.Contains(line, "invoke('") || strings.Contains(line, "invoke(\"") || strings.Contains(line, "invoke(`") {
 					continue
@@ -384,7 +379,7 @@ func (r *TauriIPCInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 				})
 			}
 
-			if jsInvokeUserInput.MatchString(line) {
+			if rules.GMatchLower(jsInvokeUserInput, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      rules.Critical,
@@ -425,7 +420,8 @@ func (r *TauriProtocolHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -439,7 +435,7 @@ func (r *TauriProtocolHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 		suggestion := ""
 		confidence := "medium"
 
-		if customProtocolRust.MatchString(line) {
+		if rules.GMatchLower(customProtocolRust, line, lowered[i]) {
 			// Check if there's an origin validation nearby
 			hasOriginCheck := false
 			start := i
@@ -461,13 +457,13 @@ func (r *TauriProtocolHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 				suggestion = "Validate the request origin in custom protocol handlers. Only accept requests from your application's origin (tauri://localhost or your custom protocol)."
 				confidence = "medium"
 			}
-		} else if dangerousScheme.MatchString(line) {
+		} else if rules.GMatchLower(dangerousScheme, line, lowered[i]) {
 			matched = true
 			title = "Dangerous URI scheme enabled in Tauri configuration"
 			desc = "A potentially dangerous URI scheme (file://, smb://, or nfs://) is allowed in the shell open configuration. This can be exploited to read local files or connect to network shares (CVE-2025-31477)."
 			suggestion = "Restrict allowed URI schemes to https:// and mailto:// only. Remove file://, smb://, and nfs:// from the scheme allowlist."
 			confidence = "high"
-		} else if tauriLocalhost.MatchString(line) && ctx.Language != rules.LangRust {
+		} else if rules.GMatchLower(tauriLocalhost, line, lowered[i]) && ctx.Language != rules.LangRust {
 			// tauri://localhost in non-Rust code could be protocol confusion
 			if strings.Contains(line, "fetch") || strings.Contains(line, "XMLHttpRequest") || strings.Contains(line, "src=") {
 				matched = true
@@ -518,11 +514,12 @@ func (r *TauriCSPMissing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check for unsafe CSP directives
 	for i, line := range lines {
-		if cspUnsafeInline.MatchString(line) {
+		if rules.GMatchLower(cspUnsafeInline, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -538,7 +535,7 @@ func (r *TauriCSPMissing) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if cspUnsafeEval.MatchString(line) {
+		if rules.GMatchLower(cspUnsafeEval, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -554,7 +551,7 @@ func (r *TauriCSPMissing) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if cspWildcard.MatchString(line) {
+		if rules.GMatchLower(cspWildcard, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -572,7 +569,7 @@ func (r *TauriCSPMissing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Check for missing CSP in security block
-	if securityNoCSP.MatchString(ctx.Content) && !securityCSP.MatchString(ctx.Content) {
+	if rules.GMatchFile(securityNoCSP, ctx) && !rules.GMatchFile(securityCSP, ctx) {
 		// Find the security block line
 		for i, line := range lines {
 			if strings.Contains(line, "\"security\"") {
@@ -613,7 +610,8 @@ func (r *TauriWindowExposure) Description() string {
 
 func (r *TauriWindowExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -621,7 +619,7 @@ func (r *TauriWindowExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if globalTauriConfig.MatchString(line) {
+		if rules.GMatchLower(globalTauriConfig, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -637,7 +635,7 @@ func (r *TauriWindowExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if tauriAPILeak.MatchString(line) {
+		if rules.GMatchLower(tauriAPILeak, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -653,7 +651,7 @@ func (r *TauriWindowExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if tauriWindowExpose.MatchString(line) && !tauriAPILeak.MatchString(line) && !globalTauriConfig.MatchString(line) {
+		if rules.GMatchLower(tauriWindowExpose, line, lowered[i]) && !rules.GMatchLower(tauriAPILeak, line, lowered[i]) && !rules.GMatchLower(globalTauriConfig, line, lowered[i]) {
 			// Direct reference to window.__TAURI__ in JS/TS code
 			if strings.Contains(line, "eval") || strings.Contains(line, "innerHTML") ||
 				strings.Contains(line, "document.write") || strings.Contains(line, "postMessage") {
@@ -697,7 +695,8 @@ func (r *TauriDangerousPerms) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		matched := false
@@ -705,16 +704,16 @@ func (r *TauriDangerousPerms) Scan(ctx *rules.ScanContext) []rules.Finding {
 		desc := ""
 		severity := r.DefaultSeverity()
 
-		if permAllowExecute.MatchString(line) {
+		if rules.GMatchLower(permAllowExecute, line, lowered[i]) {
 			matched = true
 			title = "Tauri v2 shell:allow-execute permission is dangerous"
 			desc = "The capability grants shell:allow-execute, which allows the frontend to execute arbitrary shell commands. This is one of the most dangerous permissions in Tauri v2."
 			severity = rules.Critical
-		} else if permAllowOpen.MatchString(line) {
+		} else if rules.GMatchLower(permAllowOpen, line, lowered[i]) {
 			matched = true
 			title = "Tauri v2 shell:allow-open grants URI scheme access"
 			desc = "The capability grants shell:allow-open, which allows the frontend to open URIs. Without scope restrictions, this can be exploited with dangerous protocols like file://, smb://, or nfs:// (CVE-2025-31477)."
-		} else if permFsWriteAll.MatchString(line) {
+		} else if rules.GMatchLower(permFsWriteAll, line, lowered[i]) {
 			// Check if there's a restrictive scope nearby
 			hasScope := false
 			start := i - 5
@@ -736,7 +735,7 @@ func (r *TauriDangerousPerms) Scan(ctx *rules.ScanContext) []rules.Finding {
 				title = "Tauri v2 fs:allow-write without scope restriction"
 				desc = "The capability grants fs:allow-write without a visible scope restriction. Without scoping, the frontend can write to any file the process has access to."
 			}
-		} else if permAllWindows.MatchString(line) {
+		} else if rules.GMatchLower(permAllWindows, line, lowered[i]) {
 			// Broad window permission - check if combined with dangerous perms
 			hasDangerousPerm := strings.Contains(ctx.Content, "shell:allow-execute") ||
 				strings.Contains(ctx.Content, "shell:allow-open") ||
@@ -788,7 +787,8 @@ func (r *TauriInsecureUpdater) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -796,7 +796,7 @@ func (r *TauriInsecureUpdater) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if updaterHTTPEndpoint.MatchString(line) {
+		if rules.GMatchLower(updaterHTTPEndpoint, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -812,7 +812,7 @@ func (r *TauriInsecureUpdater) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if rustDangerousAccept.MatchString(line) {
+		if rules.GMatchLower(rustDangerousAccept, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -831,7 +831,7 @@ func (r *TauriInsecureUpdater) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 	// Check for active updater without pubkey (JSON only)
 	if ctx.Language == rules.LangJSON && isTauriConfig(ctx.FilePath) {
-		if updaterActive.MatchString(ctx.Content) && !strings.Contains(ctx.Content, "\"pubkey\"") {
+		if rules.GMatchFile(updaterActive, ctx) && !strings.Contains(ctx.Content, "\"pubkey\"") {
 			for i, line := range lines {
 				if strings.Contains(line, "\"updater\"") {
 					findings = append(findings, rules.Finding{

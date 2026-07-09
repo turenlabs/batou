@@ -21,44 +21,54 @@ var (
 
 // BATOU-MISC-005: Default/example configuration
 var (
-	reDefaultConfig    = regexp.MustCompile(`(?i)(?:example\.com|changeme|change_me|CHANGE_ME|default_?password|default_?secret|todo.?change|replace.?this|your.?secret.?here|your.?password.?here|enter.?your|set.?your|UPDATE_?ME|FIXME.?secret)`)
-	reSecretContext    = regexp.MustCompile(`(?i)(?:secret|password|key|token|credential|api_key|auth|database_url|connection_string)`)
+	reDefaultConfig = regexp.MustCompile(`(?i)(?:example\.com|changeme|change_me|CHANGE_ME|default_?password|default_?secret|todo.?change|replace.?this|your.?secret.?here|your.?password.?here|enter.?your|set.?your|UPDATE_?ME|FIXME.?secret)`)
+	reSecretContext = regexp.MustCompile(`(?i)(?:secret|password|key|token|credential|api_key|auth|database_url|connection_string)`)
 )
 
 // BATOU-MISC-006: Verbose error messages
 var (
-	reVerboseError       = regexp.MustCompile(`(?i)(?:res\.(?:send|json|status\s*\([^)]*\)\.(?:send|json))|response\.(?:write|body|send)|HttpResponse|JsonResponse|jsonify|render|echo)\s*\([^)]*(?:\.stack|\.message|\.toString\(\)|traceback|stackTrace|getStackTrace|\.getMessage\(\)|str\s*\(\s*(?:e|err|error|exception)\s*\)|format_exc)`)
+	reVerboseError = regexp.MustCompile(`(?i)(?:res\.(?:send|json|status\s*\([^)]*\)\.(?:send|json))|response\.(?:write|body|send)|HttpResponse|JsonResponse|jsonify|render|echo)\s*\([^)]*(?:\.stack|\.message|\.toString\(\)|traceback|stackTrace|getStackTrace|\.getMessage\(\)|str\s*\(\s*(?:e|err|error|exception)\s*\)|format_exc)`)
 )
 
 // BATOU-MISC-007: Admin interface exposed
+//
+// Tightening note (2026-04-25): the previous reAdminRoute pattern
+// `['"/]admin['"/]` matched any literal `'admin'` or `"admin"` string
+// in any context — role identifiers, i18n keys, CSS classes, test
+// fixture data, comparison literals — producing 71 FPs in
+// owncloud/web alone (a frontend repo with no HTTP routes at all).
+//
+// Tightened to require a URL-path shape: a leading slash plus the
+// `admin` segment, optionally followed by additional path segments.
+// `'admin'` as a bare role string no longer triggers — admin role
+// checks should be handled by separate auth rules, not this one.
 var (
-	reAdminRoute         = regexp.MustCompile(`(?i)(?:['"/]admin['"/]|admin_?panel|admin_?dashboard|admin_?interface|/admin\b)`)
-	reAdminAuthCheck     = regexp.MustCompile(`(?i)(?:isAdmin|is_admin|admin_?only|requireAdmin|require_admin|@admin_required|role\s*===?\s*['"]admin['"]|hasRole\s*\(\s*['"]admin['"])`)
-	reIPRestriction      = regexp.MustCompile(`(?i)(?:ip_?whitelist|ip_?allowlist|allowed_?ips|ip_?restrict|RemoteAddr|X-Forwarded-For|ipFilter|ip_filter|\.allow\s*\()`)
+	reAdminRoute     = regexp.MustCompile(`(?i)(?:['"]/admin(?:[/'"\s]|\b)|admin_?panel\b|admin_?dashboard\b|admin_?interface\b)`)
+	reAdminAuthCheck = regexp.MustCompile(`(?i)(?:isAdmin|is_admin|admin_?only|requireAdmin|require_admin|@admin_required|role\s*===?\s*['"]admin['"]|hasRole\s*\(\s*['"]admin['"])`)
+	reIPRestriction  = regexp.MustCompile(`(?i)(?:ip_?whitelist|ip_?allowlist|allowed_?ips|ip_?restrict|RemoteAddr|X-Forwarded-For|ipFilter|ip_filter|\.allow\s*\()`)
 )
 
 // BATOU-MISC-008: HTTPS redirect not enforced
 var (
-	reHTTPServer         = regexp.MustCompile(`(?i)(?:http\.createServer|http\.ListenAndServe|app\.listen|app\.run|server\.listen)\s*\(`)
-	reHTTPSRedirect      = regexp.MustCompile(`(?i)(?:https?.*redirect|forceSSL|force_ssl|requireHTTPS|require_https|SECURE_SSL_REDIRECT|HSTS|https_redirect|ssl_required|\.redirect.*https)`)
-	reHTTPSSetup         = regexp.MustCompile(`(?i)(?:https\.createServer|tls\.Listen|ListenAndServeTLS|ssl_context|SSLContext|\.useSSL|https_only)`)
+	reHTTPServer    = regexp.MustCompile(`(?i)(?:http\.createServer|http\.ListenAndServe|app\.listen|app\.run|server\.listen)\s*\(`)
+	reHTTPSRedirect = regexp.MustCompile(`(?i)(?:https?.*redirect|forceSSL|force_ssl|requireHTTPS|require_https|SECURE_SSL_REDIRECT|HSTS|https_redirect|ssl_required|\.redirect.*https)`)
+	reHTTPSSetup    = regexp.MustCompile(`(?i)(?:https\.createServer|tls\.Listen|ListenAndServeTLS|ssl_context|SSLContext|\.useSSL|https_only)`)
 )
 
 // BATOU-MISC-009: Directory listing enabled
 var (
-	reDirectoryListing   = regexp.MustCompile(`(?i)(?:autoindex\s+on|Options\s+\+?Indexes|directory\s+listing|serveIndex|express\.static.*index\s*:\s*false|DirectoryIndex\s+disabled|enable_listing\s*[:=]\s*true|list_directory\s*[:=]\s*True)`)
+	reDirectoryListing = regexp.MustCompile(`(?i)(?:autoindex\s+on|Options\s+\+?Indexes|directory\s+listing|serveIndex|express\.static.*index\s*:\s*false|DirectoryIndex\s+disabled|enable_listing\s*[:=]\s*true|list_directory\s*[:=]\s*True)`)
 )
 
 // BATOU-MISC-010: Insecure default permissions
 var (
-	reWorldReadWrite     = regexp.MustCompile(`(?i)(?:0o?777|0o?666|0o?776|0o?767|permissions?\s*[:=]\s*0o?777|chmod\s+(?:777|666)|os\.chmod\s*\([^,]+,\s*0o?777|os\.FileMode\s*\(\s*0o?777|stat\.S_IRWXO)`)
-	reOpenPerms          = regexp.MustCompile(`(?i)(?:umask\s*\(\s*0o?0+\s*\)|world.?(?:readable|writable)|others?.?(?:read|write))`)
+	reWorldReadWrite = regexp.MustCompile(`(?i)(?:0o?777|0o?666|0o?776|0o?767|permissions?\s*[:=]\s*0o?777|chmod\s+(?:777|666)|os\.chmod\s*\([^,]+,\s*0o?777|os\.FileMode\s*\(\s*0o?777|stat\.S_IRWXO)`)
+	reOpenPerms      = regexp.MustCompile(`(?i)(?:umask\s*\(\s*0o?0+\s*\)|world.?(?:readable|writable)|others?.?(?:read|write))`)
 )
 
 // BATOU-MISC-011: Stack traces in error responses
 var (
-	reStackTraceEnabled  = regexp.MustCompile(`(?i)(?:includeStackTrace|include_stack_trace|showStackTrace|show_stack_trace|stackTrace\s*[:=]\s*true|stack_trace\s*[:=]\s*True|displayErrors\s*[:=]\s*true|display_errors\s*[:=]\s*true)`)
-	reFullStackResponse  = regexp.MustCompile(`(?i)(?:err|error|exception|e)\.(?:stack|stackTrace|getStackTrace|backtrace|format_exc|traceback)\b`)
+	reStackTraceEnabled = regexp.MustCompile(`(?i)(?:includeStackTrace|include_stack_trace|showStackTrace|show_stack_trace|stackTrace\s*[:=]\s*true|stack_trace\s*[:=]\s*True|displayErrors\s*[:=]\s*true|display_errors\s*[:=]\s*true)`)
 )
 
 // ---------------------------------------------------------------------------
@@ -67,8 +77,8 @@ var (
 
 type DebugModeProd struct{}
 
-func (r *DebugModeProd) ID() string                     { return "BATOU-MISC-004" }
-func (r *DebugModeProd) Name() string                   { return "DebugModeProd" }
+func (r *DebugModeProd) ID() string                      { return "BATOU-MISC-004" }
+func (r *DebugModeProd) Name() string                    { return "DebugModeProd" }
 func (r *DebugModeProd) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DebugModeProd) Description() string {
 	return "Detects debug mode flags enabled without environment guards, which may be active in production and expose sensitive internal state."
@@ -79,7 +89,8 @@ func (r *DebugModeProd) Languages() []rules.Language {
 
 func (r *DebugModeProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -87,14 +98,14 @@ func (r *DebugModeProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		matched := ""
-		if loc := reExtDebugProd.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reExtDebugProd, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reExtDevMode.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reExtDevMode, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
 			// Skip if guarded by environment check
-			if reExtEnvGuard.MatchString(line) {
+			if rules.GMatchLower(reExtEnvGuard, line, lowered[i]) {
 				continue
 			}
 			// Skip if/ternary checks
@@ -132,8 +143,8 @@ func (r *DebugModeProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DefaultConfig struct{}
 
-func (r *DefaultConfig) ID() string                     { return "BATOU-MISC-005" }
-func (r *DefaultConfig) Name() string                   { return "DefaultConfig" }
+func (r *DefaultConfig) ID() string                      { return "BATOU-MISC-005" }
+func (r *DefaultConfig) Name() string                    { return "DefaultConfig" }
 func (r *DefaultConfig) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DefaultConfig) Description() string {
 	return "Detects default, example, or placeholder values in security-sensitive configuration (passwords, secrets, API keys)."
@@ -143,15 +154,23 @@ func (r *DefaultConfig) Languages() []rules.Language {
 }
 
 func (r *DefaultConfig) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Test files routinely use example.com fixtures and "default password"
+	// strings in migration descriptions. Skip them — the rule is for
+	// production-config artifacts, not test data.
+	if isMisconfigTestFile(ctx.FilePath) {
+		return nil
+	}
+
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if reDefaultConfig.MatchString(line) && reSecretContext.MatchString(line) {
+		if rules.GMatchLower(reDefaultConfig, line, lowered[i]) && rules.GMatchLower(reSecretContext, line, lowered[i]) {
 			matched := trimmed
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -183,8 +202,8 @@ func (r *DefaultConfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type VerboseErrorExposed struct{}
 
-func (r *VerboseErrorExposed) ID() string                     { return "BATOU-MISC-006" }
-func (r *VerboseErrorExposed) Name() string                   { return "VerboseErrorExposed" }
+func (r *VerboseErrorExposed) ID() string                      { return "BATOU-MISC-006" }
+func (r *VerboseErrorExposed) Name() string                    { return "VerboseErrorExposed" }
 func (r *VerboseErrorExposed) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *VerboseErrorExposed) Description() string {
 	return "Detects verbose error messages, exception details, or stack traces being sent in HTTP responses to users."
@@ -195,14 +214,15 @@ func (r *VerboseErrorExposed) Languages() []rules.Language {
 
 func (r *VerboseErrorExposed) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if loc := reVerboseError.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reVerboseError, line, lowered[i]); loc != "" {
 			matched := loc
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -234,8 +254,8 @@ func (r *VerboseErrorExposed) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AdminExposedNoIPRestriction struct{}
 
-func (r *AdminExposedNoIPRestriction) ID() string                     { return "BATOU-MISC-007" }
-func (r *AdminExposedNoIPRestriction) Name() string                   { return "AdminExposedNoIPRestriction" }
+func (r *AdminExposedNoIPRestriction) ID() string                      { return "BATOU-MISC-007" }
+func (r *AdminExposedNoIPRestriction) Name() string                    { return "AdminExposedNoIPRestriction" }
 func (r *AdminExposedNoIPRestriction) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AdminExposedNoIPRestriction) Description() string {
 	return "Detects admin interface routes without IP restriction or additional access controls beyond basic authentication."
@@ -247,23 +267,24 @@ func (r *AdminExposedNoIPRestriction) Languages() []rules.Language {
 func (r *AdminExposedNoIPRestriction) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
-	if !reAdminRoute.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reAdminRoute, ctx) {
 		return nil
 	}
-	if reIPRestriction.MatchString(ctx.Content) {
+	if rules.GMatchFile(reIPRestriction, ctx) {
 		return nil
 	}
-	if reAdminAuthCheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reAdminAuthCheck, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if loc := reAdminRoute.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reAdminRoute, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -292,8 +313,8 @@ func (r *AdminExposedNoIPRestriction) Scan(ctx *rules.ScanContext) []rules.Findi
 
 type HTTPSNotEnforced struct{}
 
-func (r *HTTPSNotEnforced) ID() string                     { return "BATOU-MISC-008" }
-func (r *HTTPSNotEnforced) Name() string                   { return "HTTPSNotEnforced" }
+func (r *HTTPSNotEnforced) ID() string                      { return "BATOU-MISC-008" }
+func (r *HTTPSNotEnforced) Name() string                    { return "HTTPSNotEnforced" }
 func (r *HTTPSNotEnforced) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *HTTPSNotEnforced) Description() string {
 	return "Detects HTTP server setups without HTTPS redirect enforcement, allowing plaintext traffic that can be intercepted."
@@ -306,17 +327,18 @@ func (r *HTTPSNotEnforced) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if HTTPS redirect or HTTPS setup is present
-	if reHTTPSRedirect.MatchString(ctx.Content) || reHTTPSSetup.MatchString(ctx.Content) {
+	if rules.GMatchFile(reHTTPSRedirect, ctx) || rules.GMatchFile(reHTTPSSetup, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if loc := reHTTPServer.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reHTTPServer, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -345,8 +367,8 @@ func (r *HTTPSNotEnforced) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DirectoryListingEnabled struct{}
 
-func (r *DirectoryListingEnabled) ID() string                     { return "BATOU-MISC-009" }
-func (r *DirectoryListingEnabled) Name() string                   { return "DirectoryListingEnabled" }
+func (r *DirectoryListingEnabled) ID() string                      { return "BATOU-MISC-009" }
+func (r *DirectoryListingEnabled) Name() string                    { return "DirectoryListingEnabled" }
 func (r *DirectoryListingEnabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DirectoryListingEnabled) Description() string {
 	return "Detects web server configurations that enable directory listing, exposing file structures and potentially sensitive files."
@@ -357,14 +379,15 @@ func (r *DirectoryListingEnabled) Languages() []rules.Language {
 
 func (r *DirectoryListingEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "//") {
 			continue
 		}
-		if loc := reDirectoryListing.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reDirectoryListing, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -392,8 +415,8 @@ func (r *DirectoryListingEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecurePermissions struct{}
 
-func (r *InsecurePermissions) ID() string                     { return "BATOU-MISC-010" }
-func (r *InsecurePermissions) Name() string                   { return "InsecurePermissions" }
+func (r *InsecurePermissions) ID() string                      { return "BATOU-MISC-010" }
+func (r *InsecurePermissions) Name() string                    { return "InsecurePermissions" }
 func (r *InsecurePermissions) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecurePermissions) Description() string {
 	return "Detects files or directories created with world-readable or world-writable permissions (777, 666), allowing any user on the system to access or modify them."
@@ -404,7 +427,8 @@ func (r *InsecurePermissions) Languages() []rules.Language {
 
 func (r *InsecurePermissions) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -412,9 +436,9 @@ func (r *InsecurePermissions) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		matched := ""
-		if loc := reWorldReadWrite.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reWorldReadWrite, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reOpenPerms.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reOpenPerms, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -445,8 +469,8 @@ func (r *InsecurePermissions) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type StackTracesEnabled struct{}
 
-func (r *StackTracesEnabled) ID() string                     { return "BATOU-MISC-011" }
-func (r *StackTracesEnabled) Name() string                   { return "StackTracesEnabled" }
+func (r *StackTracesEnabled) ID() string                      { return "BATOU-MISC-011" }
+func (r *StackTracesEnabled) Name() string                    { return "StackTracesEnabled" }
 func (r *StackTracesEnabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *StackTracesEnabled) Description() string {
 	return "Detects configuration flags that enable stack traces in error responses, leaking internal implementation details to users."
@@ -457,14 +481,15 @@ func (r *StackTracesEnabled) Languages() []rules.Language {
 
 func (r *StackTracesEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if loc := reStackTraceEnabled.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reStackTraceEnabled, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -499,4 +524,26 @@ func init() {
 	rules.Register(&DirectoryListingEnabled{})
 	rules.Register(&InsecurePermissions{})
 	rules.Register(&StackTracesEnabled{})
+}
+
+// isMisconfigTestFile returns true if the path looks like a test fixture or
+// test file. Used to suppress MISC-005 (default config) which fires on
+// example.com fixtures, "default password" migration descriptions, and
+// CLI test-arg strings — none of which are real production-config issues.
+func isMisconfigTestFile(path string) bool {
+	if path == "" {
+		return false
+	}
+	low := strings.ToLower(path)
+	return strings.HasSuffix(low, "_test.go") ||
+		strings.HasSuffix(low, ".test.ts") ||
+		strings.HasSuffix(low, ".test.js") ||
+		strings.HasSuffix(low, ".spec.ts") ||
+		strings.HasSuffix(low, ".spec.js") ||
+		strings.Contains(low, "/tests/") ||
+		strings.Contains(low, "/test/") ||
+		strings.Contains(low, "/__tests__/") ||
+		strings.Contains(low, "/migrations/") ||
+		strings.Contains(low, "_test.py") ||
+		strings.Contains(low, "test_")
 }

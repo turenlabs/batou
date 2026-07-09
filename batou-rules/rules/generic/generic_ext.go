@@ -13,10 +13,8 @@ import (
 
 // BATOU-GEN-013: Hardcoded IP address
 var (
-	reHardcodedIPv4 = regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b`)
-	reLocalIP       = regexp.MustCompile(`\b(?:127\.0\.0\.1|0\.0\.0\.0|localhost|::1)\b`)
-	reExampleIP     = regexp.MustCompile(`\b(?:192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2[0-9]|3[01])\.\d+\.\d+)\b`)
-	reIPInConfig    = regexp.MustCompile(`(?i)(?:host|server|addr|address|endpoint|url|bind|listen|connect|ip)\s*[:=]\s*['"]?(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}`)
+	reLocalIP    = regexp.MustCompile(`\b(?:127\.0\.0\.1|0\.0\.0\.0|localhost|::1)\b`)
+	reIPInConfig = regexp.MustCompile(`(?i)(?:host|server|addr|address|endpoint|url|bind|listen|connect|ip)\s*[:=]\s*['"]?(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}`)
 )
 
 // BATOU-GEN-014: TODO/FIXME/HACK in security-critical code
@@ -34,25 +32,24 @@ var (
 
 // BATOU-GEN-016: Empty catch/except block
 var (
-	reEmptyCatchJS   = regexp.MustCompile(`catch\s*\([^)]*\)\s*\{\s*\}`)
-	reEmptyCatchJava = regexp.MustCompile(`catch\s*\([^)]*\)\s*\{\s*\}`)
-	reEmptyExceptPy  = regexp.MustCompile(`except\s*(?:\w+\s*(?:as\s*\w+)?)?\s*:\s*$`)
+	reEmptyCatchJS    = regexp.MustCompile(`catch\s*\([^)]*\)\s*\{\s*\}`)
+	reEmptyExceptPy   = regexp.MustCompile(`except\s*(?:\w+\s*(?:as\s*\w+)?)?\s*:\s*$`)
 	rePassAfterExcept = regexp.MustCompile(`^\s*pass\s*$`)
-	reEmptyRescueRb  = regexp.MustCompile(`rescue\s*(?:=>?\s*\w+)?\s*$`)
+	reEmptyRescueRb   = regexp.MustCompile(`rescue\s*(?:=>?\s*\w+)?\s*$`)
 )
 
 // BATOU-GEN-017: chmod 777/666
 var (
-	reChmod777      = regexp.MustCompile(`chmod\s+(?:777|666|a\+rwx)\b`)
-	reChmodFunc777  = regexp.MustCompile(`(?:os\.chmod|chmod|File\.chmod|fs\.chmod(?:Sync)?)\s*\([^,]+,\s*(?:0o?777|0o?666|0x1ff|511)\b`)
-	reOsWriteAll    = regexp.MustCompile(`os\.(?:WriteFile|Create|OpenFile)\s*\([^,]+,\s*[^,]*,\s*(?:0o?777|0o?666)\b`)
+	reChmod777     = regexp.MustCompile(`chmod\s+(?:777|666|a\+rwx)\b`)
+	reChmodFunc777 = regexp.MustCompile(`(?:os\.chmod|chmod|File\.chmod|fs\.chmod(?:Sync)?)\s*\([^,]+,\s*(?:0o?777|0o?666|0x1ff|511)\b`)
+	reOsWriteAll   = regexp.MustCompile(`os\.(?:WriteFile|Create|OpenFile)\s*\([^,]+,\s*[^,]*,\s*(?:0o?777|0o?666)\b`)
 )
 
 // BATOU-GEN-018: dangerouslySetInnerHTML/v-html/[innerHTML]
 var (
-	reDangerousHTML  = regexp.MustCompile(`dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html\s*:`)
-	reVHTML          = regexp.MustCompile(`v-html\s*=\s*['"]`)
-	reInnerHTMLBind  = regexp.MustCompile(`\[innerHTML\]\s*=\s*['"]`)
+	reDangerousHTML   = regexp.MustCompile(`dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html\s*:`)
+	reVHTML           = regexp.MustCompile(`v-html\s*=\s*['"]`)
+	reInnerHTMLBind   = regexp.MustCompile(`\[innerHTML\]\s*=\s*['"]`)
 	reInnerHTMLAssign = regexp.MustCompile(`\.innerHTML\s*=\s*(?:[a-zA-Z_]\w*|` + "`" + `|['"][^'"]*\$)`)
 )
 
@@ -60,6 +57,24 @@ var (
 var (
 	reDisabledSecurity = regexp.MustCompile(`(?i)(?:csrf|xss|cors|auth|security|ssl|tls|https|hsts|csp|frame|clickjack|sanitiz|escap|encrypt|verify|validat|protect|secure|defense|guard|shield|firewall|waf|rate.?limit)\w*\s*[:=]\s*(?:false|0|['"]false['"]|['"]off['"]|['"]disabled?['"]|nil|null|None)`)
 	reSkipVerify       = regexp.MustCompile(`(?i)(?:InsecureSkipVerify|skip_?ssl|ssl_?verify|verify_?ssl|verify_?peer|check_?hostname|CURLOPT_SSL_VERIFYPEER|verify_?certs?)\s*[:=]\s*(?:true|false|0|False)`)
+	// reGenTestFile mirrors crypto/secrets test-file detection. Test
+	// fixtures routinely include mock objects with `SecureView: false`,
+	// `csrf: false` etc. as test inputs, not real production config.
+	reGenTestFile = regexp.MustCompile(`(?i)(_test\.go|_test\.py|\.test\.[jt]sx?|\.spec\.[jt]sx?|test_.*\.py|tests?/|__tests__/|spec/|fixtures?/|mock|fake|stub|example)`)
+	// Package manifests and lock files: `NODE_TLS_REJECT_UNAUTHORIZED=0`
+	// inside a `"scripts"` entry, `auth: false` in a generated lock file,
+	// etc. are build/test-tooling config, not production application config.
+	reGenPkgManifestFile = regexp.MustCompile(`(?i)(?:^|/)(?:package\.json|composer\.json|bower\.json)$|(?:^|/)[\w.-]*lock\.(?:json|ya?ml)$|(?:^|/)(?:package-lock\.json|yarn\.lock|pnpm-lock\.ya?ml|composer\.lock|Gemfile\.lock|Cargo\.lock|poetry\.lock|Pipfile\.lock|go\.sum)$`)
+	// docker-compose files are typically local-dev / example orchestration —
+	// `PROXY_TLS: 'false'` etc. there is a dev convenience, not prod config.
+	// Keep flagging (defence in depth) but at low confidence.
+	reGenDockerComposeFile = regexp.MustCompile(`(?i)(?:^|/)docker-compose[\w.-]*\.ya?ml$`)
+	// vue-router / SPA route configs use `auth: false` on a route's `meta`
+	// block to mark a *public* route ("this route does not require login") —
+	// a legitimate config value, not a disabled security feature.
+	reGenRouteConfigAuth = regexp.MustCompile(`(?i)^auth\s*[:=]\s*false\b`)
+	reGenRouteContext    = regexp.MustCompile(`(?i)(?:vue-router|RouteRecordRaw|RouteRecordNormalized|createRouter|createWebHistory|createWebHashHistory|RouteComponents|\bmeta\s*:\s*\{|\broutes\s*:\s*\[|defineRoute)`)
+	reGenMetaBlockNearby = regexp.MustCompile(`(?i)\bmeta\s*:\s*\{?`)
 )
 
 // BATOU-GEN-020: Sensitive data in URL query string
@@ -70,9 +85,8 @@ var (
 
 // BATOU-GEN-021: Insecure temporary file creation
 var (
-	reTmpFilePath    = regexp.MustCompile(`(?i)(?:['"/]tmp/|['"/]temp/|tempfile|tmpfile|os\.path\.join\s*\(\s*['"](?:/tmp|/temp))[^'"]*(?:\.(?:txt|log|json|xml|csv|dat|db|sql|key|pem|conf|cfg|ini|yaml|yml))?['"]?`)
-	reTmpInsecure    = regexp.MustCompile(`(?i)(?:mktemp\s+[^-]|mktemp\s*$|tmpnam|tempnam|os\.tmpnam|tmpfile\(\)|tempfile\.mktemp)\b`)
-	reTmpSecure      = regexp.MustCompile(`(?i)(?:tempfile\.mkstemp|tempfile\.NamedTemporaryFile|tempfile\.mkdtemp|os\.CreateTemp|ioutil\.TempFile|os\.MkdirTemp|File\.createTempFile|fs\.mkdtemp|mkstemp)\b`)
+	reTmpInsecure = regexp.MustCompile(`(?i)(?:mktemp\s+[^-]|mktemp\s*$|tmpnam|tempnam|os\.tmpnam|tmpfile\(\)|tempfile\.mktemp)\b`)
+	reTmpSecure   = regexp.MustCompile(`(?i)(?:tempfile\.mkstemp|tempfile\.NamedTemporaryFile|tempfile\.mkdtemp|os\.CreateTemp|ioutil\.TempFile|os\.MkdirTemp|File\.createTempFile|fs\.mkdtemp|mkstemp)\b`)
 )
 
 // ---------------------------------------------------------------------------
@@ -81,8 +95,8 @@ var (
 
 type HardcodedIPAddress struct{}
 
-func (r *HardcodedIPAddress) ID() string                     { return "BATOU-GEN-013" }
-func (r *HardcodedIPAddress) Name() string                   { return "HardcodedIPAddress" }
+func (r *HardcodedIPAddress) ID() string                      { return "BATOU-GEN-013" }
+func (r *HardcodedIPAddress) Name() string                    { return "HardcodedIPAddress" }
 func (r *HardcodedIPAddress) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *HardcodedIPAddress) Description() string {
 	return "Detects hardcoded IP addresses in source code, which can indicate environment-specific configurations that should be externalized."
@@ -93,16 +107,17 @@ func (r *HardcodedIPAddress) Languages() []rules.Language {
 
 func (r *HardcodedIPAddress) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if loc := reIPInConfig.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndexLower(reIPInConfig, line, lowered[i]); loc != nil {
 			// Skip localhost/loopback
-			if reLocalIP.MatchString(line) {
+			if rules.GMatchLower(reLocalIP, line, lowered[i]) {
 				continue
 			}
 			matched := line[loc[0]:loc[1]]
@@ -136,8 +151,8 @@ func (r *HardcodedIPAddress) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TodoInSecurityCode struct{}
 
-func (r *TodoInSecurityCode) ID() string                     { return "BATOU-GEN-014" }
-func (r *TodoInSecurityCode) Name() string                   { return "TodoInSecurityCode" }
+func (r *TodoInSecurityCode) ID() string                      { return "BATOU-GEN-014" }
+func (r *TodoInSecurityCode) Name() string                    { return "TodoInSecurityCode" }
 func (r *TodoInSecurityCode) DefaultSeverity() rules.Severity { return rules.Info }
 func (r *TodoInSecurityCode) Description() string {
 	return "Detects TODO/FIXME/HACK comments in security-critical code sections, indicating incomplete security implementations."
@@ -148,10 +163,11 @@ func (r *TodoInSecurityCode) Languages() []rules.Language {
 
 func (r *TodoInSecurityCode) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
-		if loc := reTodoSecurity.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndexLower(reTodoSecurity, line, lowered[i]); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -183,8 +199,8 @@ func (r *TodoInSecurityCode) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CommentedOutSecurityCode struct{}
 
-func (r *CommentedOutSecurityCode) ID() string                     { return "BATOU-GEN-015" }
-func (r *CommentedOutSecurityCode) Name() string                   { return "CommentedOutSecurityCode" }
+func (r *CommentedOutSecurityCode) ID() string                      { return "BATOU-GEN-015" }
+func (r *CommentedOutSecurityCode) Name() string                    { return "CommentedOutSecurityCode" }
 func (r *CommentedOutSecurityCode) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *CommentedOutSecurityCode) Description() string {
 	return "Detects commented-out security logic (authentication checks, encryption, CSRF protection) that may have been disabled during debugging."
@@ -195,13 +211,14 @@ func (r *CommentedOutSecurityCode) Languages() []rules.Language {
 
 func (r *CommentedOutSecurityCode) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		matched := ""
-		if loc := reCommentedAuth.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reCommentedAuth, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reCommentedCrypto.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reCommentedCrypto, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -235,8 +252,8 @@ func (r *CommentedOutSecurityCode) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type EmptyCatchBlock struct{}
 
-func (r *EmptyCatchBlock) ID() string                     { return "BATOU-GEN-016" }
-func (r *EmptyCatchBlock) Name() string                   { return "EmptyCatchBlock" }
+func (r *EmptyCatchBlock) ID() string                      { return "BATOU-GEN-016" }
+func (r *EmptyCatchBlock) Name() string                    { return "EmptyCatchBlock" }
 func (r *EmptyCatchBlock) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *EmptyCatchBlock) Description() string {
 	return "Detects empty catch/except/rescue blocks that silently swallow errors, potentially hiding security-relevant failures."
@@ -247,7 +264,8 @@ func (r *EmptyCatchBlock) Languages() []rules.Language {
 
 func (r *EmptyCatchBlock) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -257,11 +275,11 @@ func (r *EmptyCatchBlock) Scan(ctx *rules.ScanContext) []rules.Finding {
 		matched := ""
 		switch ctx.Language {
 		case rules.LangJavaScript, rules.LangTypeScript, rules.LangJava, rules.LangCSharp:
-			if loc := reEmptyCatchJS.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reEmptyCatchJS, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		case rules.LangPython:
-			if reEmptyExceptPy.MatchString(line) {
+			if rules.GMatchLower(reEmptyExceptPy, line, lowered[i]) {
 				// Check if next non-empty line is just 'pass'
 				for j := i + 1; j < len(lines) && j < i+3; j++ {
 					nextTrimmed := strings.TrimSpace(lines[j])
@@ -275,7 +293,7 @@ func (r *EmptyCatchBlock) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangRuby:
-			if reEmptyRescueRb.MatchString(line) {
+			if rules.GMatchLower(reEmptyRescueRb, line, lowered[i]) {
 				// Check if next non-empty line is just 'end' or empty
 				for j := i + 1; j < len(lines) && j < i+3; j++ {
 					nextTrimmed := strings.TrimSpace(lines[j])
@@ -320,8 +338,8 @@ func (r *EmptyCatchBlock) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnrestrictedFilePermissions struct{}
 
-func (r *UnrestrictedFilePermissions) ID() string                     { return "BATOU-GEN-017" }
-func (r *UnrestrictedFilePermissions) Name() string                   { return "UnrestrictedFilePermissions" }
+func (r *UnrestrictedFilePermissions) ID() string                      { return "BATOU-GEN-017" }
+func (r *UnrestrictedFilePermissions) Name() string                    { return "UnrestrictedFilePermissions" }
 func (r *UnrestrictedFilePermissions) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnrestrictedFilePermissions) Description() string {
 	return "Detects chmod 777 or 666 and equivalent programmatic calls that set world-readable/writable permissions."
@@ -332,7 +350,8 @@ func (r *UnrestrictedFilePermissions) Languages() []rules.Language {
 
 func (r *UnrestrictedFilePermissions) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -340,11 +359,11 @@ func (r *UnrestrictedFilePermissions) Scan(ctx *rules.ScanContext) []rules.Findi
 			continue
 		}
 		matched := ""
-		if loc := reChmod777.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reChmod777, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reChmodFunc777.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reChmodFunc777, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reOsWriteAll.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reOsWriteAll, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -378,8 +397,8 @@ func (r *UnrestrictedFilePermissions) Scan(ctx *rules.ScanContext) []rules.Findi
 
 type UnsafeInnerHTML struct{}
 
-func (r *UnsafeInnerHTML) ID() string                     { return "BATOU-GEN-018" }
-func (r *UnsafeInnerHTML) Name() string                   { return "UnsafeInnerHTML" }
+func (r *UnsafeInnerHTML) ID() string                      { return "BATOU-GEN-018" }
+func (r *UnsafeInnerHTML) Name() string                    { return "UnsafeInnerHTML" }
 func (r *UnsafeInnerHTML) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnsafeInnerHTML) Description() string {
 	return "Detects use of dangerouslySetInnerHTML (React), v-html (Vue), [innerHTML] (Angular), or direct innerHTML assignment which can lead to XSS."
@@ -390,7 +409,8 @@ func (r *UnsafeInnerHTML) Languages() []rules.Language {
 
 func (r *UnsafeInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -399,16 +419,16 @@ func (r *UnsafeInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		matched := ""
 		title := ""
-		if loc := reDangerousHTML.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reDangerousHTML, line, lowered[i]); loc != "" {
 			matched = loc
 			title = "React dangerouslySetInnerHTML renders unescaped HTML"
-		} else if loc := reVHTML.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reVHTML, line, lowered[i]); loc != "" {
 			matched = loc
 			title = "Vue v-html renders unescaped HTML"
-		} else if loc := reInnerHTMLBind.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reInnerHTMLBind, line, lowered[i]); loc != "" {
 			matched = loc
 			title = "Angular [innerHTML] renders unescaped HTML"
-		} else if loc := reInnerHTMLAssign.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reInnerHTMLAssign, line, lowered[i]); loc != "" {
 			matched = loc
 			title = "Direct innerHTML assignment with dynamic content"
 		}
@@ -443,8 +463,8 @@ func (r *UnsafeInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DisabledSecurityFeature struct{}
 
-func (r *DisabledSecurityFeature) ID() string                     { return "BATOU-GEN-019" }
-func (r *DisabledSecurityFeature) Name() string                   { return "DisabledSecurityFeature" }
+func (r *DisabledSecurityFeature) ID() string                      { return "BATOU-GEN-019" }
+func (r *DisabledSecurityFeature) Name() string                    { return "DisabledSecurityFeature" }
 func (r *DisabledSecurityFeature) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DisabledSecurityFeature) Description() string {
 	return "Detects security features explicitly disabled via configuration flags (CSRF protection, SSL verification, authentication, etc.)."
@@ -454,8 +474,29 @@ func (r *DisabledSecurityFeature) Languages() []rules.Language {
 }
 
 func (r *DisabledSecurityFeature) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Skip test/spec/fixture files — `SecureView: false`, `auth: false`
+	// etc. there are mock-component options, not production config.
+	if reGenTestFile.MatchString(ctx.FilePath) {
+		return nil
+	}
+	// Skip package manifests / lock files — `NODE_TLS_REJECT_UNAUTHORIZED=0`
+	// in a `"scripts"` entry (e.g. e2e test runner) or `auth: false` in a
+	// generated lock file is build/test tooling config, not app config.
+	if reGenPkgManifestFile.MatchString(ctx.FilePath) {
+		return nil
+	}
+
+	// vue-router / SPA route config detection: `auth: false` inside a route
+	// `meta` block means "this route is public", not a disabled security
+	// feature. Treat the whole file as a route module if it imports vue-router
+	// or has route-config shape (so the per-line check is cheap).
+	isRouteModule := rules.GMatchFile(reGenRouteContext, ctx)
+	// docker-compose files: keep flagging but downgrade confidence (dev/example).
+	isDockerCompose := reGenDockerComposeFile.MatchString(ctx.FilePath)
+
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -463,9 +504,9 @@ func (r *DisabledSecurityFeature) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		matched := ""
-		if loc := reDisabledSecurity.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reDisabledSecurity, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reSkipVerify.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reSkipVerify, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -473,8 +514,17 @@ func (r *DisabledSecurityFeature) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if strings.Contains(line, "if") || strings.Contains(line, "?") {
 				continue
 			}
+			// vue-router public-route marker: `auth: false` in a `meta` block.
+			if rules.GMatch(reGenRouteConfigAuth, trimmed) &&
+				(isRouteModule || hasNearbyLine(lines, i, 5, 0, reGenMetaBlockNearby)) {
+				continue
+			}
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
+			}
+			conf := "high"
+			if isDockerCompose {
+				conf = "low"
 			}
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
@@ -489,12 +539,32 @@ func (r *DisabledSecurityFeature) Scan(ctx *rules.ScanContext) []rules.Finding {
 				CWEID:         "CWE-16",
 				OWASPCategory: "A05:2021-Security Misconfiguration",
 				Language:      ctx.Language,
-				Confidence:    "high",
+				Confidence:    conf,
 				Tags:          []string{"generic", "disabled-security", "misconfiguration", "cwe-16"},
 			})
 		}
 	}
 	return findings
+}
+
+// hasNearbyLine reports whether re matches any line within [idx-before, idx+after].
+func hasNearbyLine(lines []string, idx, before, after int, re *regexp.Regexp) bool {
+	start := idx - before
+	if start < 0 {
+		start = 0
+	}
+	end := idx + after + 1
+	if end > len(lines) {
+		end = len(lines)
+	}
+	for _, l := range lines[start:end] {
+		// Fold-aware required-literal pre-gate (rules.GMatch): skips the
+		// backtracking (?i) regex on window lines that provably cannot match.
+		if rules.GMatch(re, l) {
+			return true
+		}
+	}
+	return false
 }
 
 // ---------------------------------------------------------------------------
@@ -503,8 +573,8 @@ func (r *DisabledSecurityFeature) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SensitiveDataInURL struct{}
 
-func (r *SensitiveDataInURL) ID() string                     { return "BATOU-GEN-020" }
-func (r *SensitiveDataInURL) Name() string                   { return "SensitiveDataInURL" }
+func (r *SensitiveDataInURL) ID() string                      { return "BATOU-GEN-020" }
+func (r *SensitiveDataInURL) Name() string                    { return "SensitiveDataInURL" }
 func (r *SensitiveDataInURL) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SensitiveDataInURL) Description() string {
 	return "Detects sensitive data (passwords, tokens, API keys) passed in URL query strings, which are logged in server logs, browser history, and referrer headers."
@@ -515,7 +585,8 @@ func (r *SensitiveDataInURL) Languages() []rules.Language {
 
 func (r *SensitiveDataInURL) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -523,9 +594,9 @@ func (r *SensitiveDataInURL) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		matched := ""
-		if loc := reSensitiveInURL.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reSensitiveInURL, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reSensitiveQuery.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reSensitiveQuery, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -559,8 +630,8 @@ func (r *SensitiveDataInURL) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureTempFile struct{}
 
-func (r *InsecureTempFile) ID() string                     { return "BATOU-GEN-021" }
-func (r *InsecureTempFile) Name() string                   { return "InsecureTempFile" }
+func (r *InsecureTempFile) ID() string                      { return "BATOU-GEN-021" }
+func (r *InsecureTempFile) Name() string                    { return "InsecureTempFile" }
 func (r *InsecureTempFile) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureTempFile) Description() string {
 	return "Detects insecure temporary file creation patterns (predictable names, race conditions) that can be exploited for symlink attacks or information disclosure."
@@ -573,17 +644,18 @@ func (r *InsecureTempFile) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if secure temp functions are used
-	if reTmpSecure.MatchString(ctx.Content) {
+	if rules.GMatchFile(reTmpSecure, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if loc := reTmpInsecure.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reTmpInsecure, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

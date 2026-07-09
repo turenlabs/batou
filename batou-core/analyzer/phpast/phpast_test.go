@@ -1,10 +1,9 @@
 package phpast
 
 import (
-	"testing"
-
 	"github.com/turenlabs/batou-core/ast"
 	"github.com/turenlabs/batou-rules/rules"
+	"testing"
 )
 
 func scanPHP(code string) []rules.Finding {
@@ -170,6 +169,92 @@ function handler($input) {
 		t.Error("expected SQL injection finding for concat in assignment")
 		for _, f := range findings {
 			t.Logf("  %s: %s (line %d)", f.RuleID, f.Title, f.LineNumber)
+		}
+	}
+}
+
+func TestTwigCreateTemplateSSTI(t *testing.T) {
+	code := `<?php
+function handler($twig, $input) {
+    $template = $twig->createTemplate($input);
+    return $template->render([]);
+}
+?>`
+	findings := scanPHP(code)
+	f := findByRule(findings, "BATOU-PHPAST-007")
+	if f == nil {
+		t.Error("expected SSTI finding for Twig createTemplate with variable")
+		for _, f := range findings {
+			t.Logf("  %s: %s (line %d)", f.RuleID, f.Title, f.LineNumber)
+		}
+		return
+	}
+	if f.CWEID != "CWE-1336" {
+		t.Errorf("expected CWE-1336, got %s", f.CWEID)
+	}
+}
+
+func TestTwigCreateTemplateSecondOrder(t *testing.T) {
+	// Template string arrives from a DB row — taint cannot trace it to a
+	// request source, but structurally it is still SSTI.
+	code := `<?php
+function renderStored($twig, $db) {
+    $row = $db->query("SELECT body FROM tpls")->fetch();
+    $tpl = $row['body'];
+    $template = $twig->createTemplate($tpl);
+    return $template->render([]);
+}
+?>`
+	findings := scanPHP(code)
+	if findByRule(findings, "BATOU-PHPAST-007") == nil {
+		t.Error("expected SSTI finding for second-order Twig createTemplate")
+		for _, f := range findings {
+			t.Logf("  %s: %s (line %d)", f.RuleID, f.Title, f.LineNumber)
+		}
+	}
+}
+
+func TestBladeCompileStringSSTI(t *testing.T) {
+	code := `<?php
+function handler($blade, $snippet) {
+    return $blade->compileString($snippet);
+}
+?>`
+	findings := scanPHP(code)
+	if findByRule(findings, "BATOU-PHPAST-007") == nil {
+		t.Error("expected SSTI finding for Blade compileString with variable")
+		for _, f := range findings {
+			t.Logf("  %s: %s (line %d)", f.RuleID, f.Title, f.LineNumber)
+		}
+	}
+}
+
+func TestTwigCreateTemplateLiteralSafe(t *testing.T) {
+	// A developer-authored literal template string must NOT be flagged.
+	code := `<?php
+$template = $twig->createTemplate("Hello {{ name }}");
+?>`
+	findings := scanPHP(code)
+	for _, f := range findings {
+		if f.RuleID == "BATOU-PHPAST-007" {
+			t.Errorf("should not flag createTemplate with literal string: %s", f.Title)
+		}
+	}
+}
+
+func TestNonSSTIMethodCallSafe(t *testing.T) {
+	// An unrelated method named like a sink elsewhere must not trip PHPAST-007.
+	code := `<?php
+$user->createTemplate($input);
+$x->render($data);
+?>`
+	findings := scanPHP(code)
+	// createTemplate is the only SSTI method here; render alone is not a
+	// compile-string sink in this analyzer. createTemplate on a non-engine
+	// receiver still flags (conservative) — assert render() does not.
+	for _, f := range findings {
+		if f.RuleID == "BATOU-PHPAST-007" && f.LineNumber == 3 {
+			t.Errorf("render() should not be flagged as SSTI compile sink: %s", f.Title)
 		}
 	}
 }

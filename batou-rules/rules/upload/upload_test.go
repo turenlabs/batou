@@ -45,6 +45,85 @@ uploaded.save("/uploads/" + secure_filename(uploaded.filename))
 	testutil.MustNotFindRule(t, result, "BATOU-UPLOAD-001")
 }
 
+// owncloud/web FP regression: a composable / helper merely *named* with
+// "upload" (useUpload, HandleUpload, …) must not trigger UPLOAD-001.
+// The JS alternation was tightened to the upload-library names
+// (multer/formidable/busboy); bare "upload" identifiers are not handlers.
+func TestUPLOAD001_FP_UploadNamedComposable(t *testing.T) {
+	content := `export function useUpload() {
+  const handleUpload = (item) => store.dispatch('uploadItem', item)
+  return { handleUpload }
+}
+`
+	result := testutil.ScanContent(t, "/app/composables/useUpload.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-UPLOAD-001")
+}
+
+func TestUPLOAD001_FP_FileMetadataUtil(t *testing.T) {
+	content := `export const isImage = (file) => /\.(png|jpe?g|gif|webp)$/i.test(file.name)
+export const uploadStatusLabel = (s) => s === 'done' ? 'Uploaded' : 'Pending'
+`
+	result := testutil.ScanContent(t, "/app/helpers/fileMeta.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-UPLOAD-001")
+}
+
+// --- BATOU-UPLOAD-005: Upload validated by extension only (no magic bytes) ---
+
+func TestUPLOAD005_TP_MulterExtensionOnly(t *testing.T) {
+	content := `const upload = multer({ dest: 'uploads/' })
+app.post('/avatar', upload.single('file'), (req, res) => {
+  const ext = req.file.originalname.split('.').pop()
+  if (ext === 'jpg' || ext === 'png') {
+    fs.writeFileSync('/uploads/' + req.file.originalname, req.file.buffer)
+  } else {
+    res.status(400).end()
+  }
+})
+`
+	result := testutil.ScanContent(t, "/app/routes/upload.js", content)
+	testutil.MustFindRule(t, result, "BATOU-UPLOAD-005")
+}
+
+func TestUPLOAD005_TP_FlaskFilesExtensionOnly(t *testing.T) {
+	content := `@app.route("/upload", methods=["POST"])
+def upload():
+    f = request.files["doc"]
+    if f.filename.endswith(".pdf"):
+        f.save("/uploads/" + f.filename)
+    return "ok"
+`
+	result := testutil.ScanContent(t, "/app/views.py", content)
+	testutil.MustFindRule(t, result, "BATOU-UPLOAD-005")
+}
+
+// owncloud/web FP regression: a generic file-metadata utility uses
+// `resource.extension` / `.endsWith('.txt')` for display logic but has
+// no upload handling at all. The file-level reUploadContext gate must
+// suppress UPLOAD-005 here.
+func TestUPLOAD005_FP_ResourceMetadataUtil(t *testing.T) {
+	content := `export function iconForResource(resource) {
+  const ext = resource.extension.toLowerCase()
+  if (ext === 'pdf') return 'application-pdf'
+  if (resource.name.endsWith('.txt')) return 'text-plain'
+  return resource.name.split('.').pop() === 'md' ? 'text-markdown' : 'unknown'
+}
+`
+	result := testutil.ScanContent(t, "/app/helpers/resourceIcons.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-UPLOAD-005")
+}
+
+func TestUPLOAD005_FP_PathLibUtility(t *testing.T) {
+	content := `func TrimExt(p string) string {
+	if strings.HasSuffix(p, ".tmp") {
+		return strings.TrimSuffix(p, ".tmp")
+	}
+	return p
+}
+`
+	result := testutil.ScanContent(t, "/app/internal/pathutil/pathutil.go", content)
+	testutil.MustNotFindRule(t, result, "BATOU-UPLOAD-005")
+}
+
 // --- BATOU-UPLOAD-002: File upload path traversal ---
 
 func TestUPLOAD002_PathTraversal_Python(t *testing.T) {

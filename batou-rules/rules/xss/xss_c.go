@@ -39,8 +39,8 @@ func init() {
 
 type CGIXSS struct{}
 
-func (r *CGIXSS) ID() string                     { return "BATOU-XSS-028" }
-func (r *CGIXSS) Name() string                   { return "CGIXSS" }
+func (r *CGIXSS) ID() string                      { return "BATOU-XSS-028" }
+func (r *CGIXSS) Name() string                    { return "CGIXSS" }
 func (r *CGIXSS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CGIXSS) Description() string {
 	return "Detects unescaped user input in HTML output from C/C++ CGI programs, which enables Cross-Site Scripting (XSS)."
@@ -51,24 +51,24 @@ func (r *CGIXSS) Languages() []rules.Language {
 
 func (r *CGIXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Only scan files that look like CGI programs (have getenv or Content-Type: text/html).
-	hasHTMLContentType := reCXSSContentTypeHTML.MatchString(ctx.Content)
-	hasGetenv := reCXSSGetenv.MatchString(ctx.Content)
+	hasHTMLContentType := rules.GMatchFile(reCXSSContentTypeHTML, ctx)
+	hasGetenv := rules.GMatchFile(reCXSSGetenv, ctx)
 	if !hasHTMLContentType && !hasGetenv {
 		return nil
 	}
 
 	// Skip if using safe content type (text/plain, application/json).
-	if reCXSSSafeContentType.MatchString(ctx.Content) {
+	if rules.GMatchFile(reCXSSSafeContentType, ctx) {
 		return nil
 	}
 
 	// Skip if using an HTML encoding/escaping function.
-	if reCXSSSafeFunction.MatchString(ctx.Content) {
+	if rules.GMatchFile(reCXSSSafeFunction, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLineXSS(line) {
@@ -77,13 +77,13 @@ func (r *CGIXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if loc := reCXSSPrintfHTML.FindString(line); loc != "" {
+		if loc := rules.GFind(reCXSSPrintfHTML, line); loc != "" {
 			matched = loc
-		} else if loc := reCXSSCoutHTML.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reCXSSCoutHTML, line); loc != "" {
 			matched = loc
-		} else if loc := reCXSSConcatHTML.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reCXSSConcatHTML, line); loc != "" {
 			matched = loc
-		} else if reCXSSFputsHTML.MatchString(line) {
+		} else if rules.GMatch(reCXSSFputsHTML, line) {
 			// fputs(variable, stdout) in a CGI context — check if variable
 			// looks user-controlled (near getenv usage).
 			if hasGetenv {

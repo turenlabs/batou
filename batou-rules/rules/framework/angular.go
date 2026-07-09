@@ -16,12 +16,10 @@ var reAngularBypassTrust = regexp.MustCompile(`bypassSecurityTrust(?:Html|Script
 var reAngularUserInput = regexp.MustCompile(`(?:this\.\w*[Ii]nput|this\.route|this\.activatedRoute|params\[|queryParams\[|req\.|request\.|formControl|\.value\b|user[Ii]nput|\.nativeElement)`)
 
 // BATOU-FW-ANGULAR-002: [innerHTML] binding
-var reAngularInnerHTMLBind = regexp.MustCompile(`\[innerHTML\]\s*=\s*["']`)
 var reAngularInnerHTMLUserData = regexp.MustCompile(`\[innerHTML\]\s*=\s*["'](?:\w*[Uu]ser\w*|\w*[Ii]nput\w*|\w*[Dd]ata\w*|\w*[Cc]ontent\w*|\w*[Hh]tml\w*|\w*[Mm]essage\w*)["']`)
 
 // BATOU-FW-ANGULAR-003: Disabled route guards
 var reAngularCanActivate = regexp.MustCompile(`canActivate\s*:\s*\[\s*\]`)
-var reAngularCanDeactivate = regexp.MustCompile(`canDeactivate\s*:\s*\[\s*\]`)
 var reAngularGuardReturnTrue = regexp.MustCompile(`canActivate\s*\([^)]*\)\s*(?::\s*\w+\s*)?\{[^}]*return\s+true\s*;?\s*\}`)
 
 // BATOU-FW-ANGULAR-004: HTTP interceptor missing token refresh
@@ -30,11 +28,9 @@ var reAngularIntercept = regexp.MustCompile(`intercept\s*\(\s*\w+\s*:\s*HttpRequ
 var reAngularTokenRefresh = regexp.MustCompile(`(?:refresh[Tt]oken|refreshAuth|tokenRefresh|401|isTokenExpired|jwt.*expir|expir.*jwt)`)
 
 // BATOU-FW-ANGULAR-005: JSONP callback with user input
-var reAngularJSONP = regexp.MustCompile(`\.jsonp\s*\(`)
 var reAngularJSONPUserInput = regexp.MustCompile(`\.jsonp\s*\(\s*(?:` + "`" + `[^` + "`" + `]*\$\{|['"][^'"]*['"]\s*\+\s*(?:this\.\w*[Ii]nput|this\.\w*[Pp]aram|user))`)
 
 // BATOU-FW-ANGULAR-006: Template injection via component template
-var reAngularTemplateInterp = regexp.MustCompile(`template\s*:\s*(?:` + "`" + `[^` + "`" + `]*\$\{|['"][^'"]*['"]\s*\+)`)
 var reAngularTemplateUserData = regexp.MustCompile(`template\s*:\s*(?:` + "`" + `[^` + "`" + `]*\$\{(?:this\.\w*[Uu]ser|this\.\w*[Ii]nput|this\.\w*[Dd]ata|this\.\w*[Pp]aram)` + `|['"][^'"]*['"]\s*\+\s*(?:this\.\w*[Uu]ser|this\.\w*[Ii]nput))`)
 
 func init() {
@@ -64,16 +60,17 @@ func (r *AngularBypassTrust) Languages() []rules.Language {
 
 func (r *AngularBypassTrust) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
-	hasUserInput := reAngularUserInput.MatchString(ctx.Content)
+	hasUserInput := rules.GMatchFile(reAngularUserInput, ctx)
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reAngularBypassTrust.FindString(line); m != "" {
+		if m := rules.GFindLower(reAngularBypassTrust, line, lowered[i]); m != "" {
 			confidence := "medium"
 			if hasUserInput {
 				confidence = "high"
@@ -121,14 +118,15 @@ func (r *AngularInnerHTML) Languages() []rules.Language {
 
 func (r *AngularInnerHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") || strings.HasPrefix(t, "<!--") {
 			continue
 		}
-		if m := reAngularInnerHTMLUserData.FindString(line); m != "" {
+		if m := rules.GFindLower(reAngularInnerHTMLUserData, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -172,7 +170,8 @@ func (r *AngularDisabledGuard) Languages() []rules.Language {
 
 func (r *AngularDisabledGuard) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -183,10 +182,10 @@ func (r *AngularDisabledGuard) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var title string
 
-		if m := reAngularCanActivate.FindString(line); m != "" {
+		if m := rules.GFindLower(reAngularCanActivate, line, lowered[i]); m != "" {
 			matched = m
 			title = "Angular route with empty canActivate guard"
-		} else if m := reAngularGuardReturnTrue.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reAngularGuardReturnTrue, line, lowered[i]); m != "" {
 			matched = m
 			title = "Angular guard always returns true (effectively disabled)"
 		}
@@ -235,28 +234,29 @@ func (r *AngularInterceptorNoRefresh) Languages() []rules.Language {
 }
 
 func (r *AngularInterceptorNoRefresh) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reAngularInterceptor.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reAngularInterceptor, ctx) {
 		return nil
 	}
-	if !reAngularIntercept.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reAngularIntercept, ctx) {
 		return nil
 	}
 	// Only flag interceptors that handle auth tokens
 	if !strings.Contains(ctx.Content, "Authorization") && !strings.Contains(ctx.Content, "Bearer") && !strings.Contains(ctx.Content, "token") {
 		return nil
 	}
-	if reAngularTokenRefresh.MatchString(ctx.Content) {
+	if rules.GMatchFile(reAngularTokenRefresh, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reAngularIntercept.MatchString(line) {
+		if rules.GMatchLower(reAngularIntercept, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -301,14 +301,15 @@ func (r *AngularJSONPInjection) Languages() []rules.Language {
 
 func (r *AngularJSONPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reAngularJSONPUserInput.FindString(line); m != "" {
+		if m := rules.GFindLower(reAngularJSONPUserInput, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -354,14 +355,15 @@ func (r *AngularTemplateInjection) Languages() []rules.Language {
 
 func (r *AngularTemplateInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reAngularTemplateUserData.FindString(line); m != "" {
+		if m := rules.GFindLower(reAngularTemplateUserData, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

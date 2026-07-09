@@ -13,16 +13,16 @@ import (
 
 // BATOU-CTR-001: Docker running as root
 var (
-	reDockerFROM      = regexp.MustCompile(`(?i)^FROM\s+`)
-	reDockerUSER      = regexp.MustCompile(`(?i)^USER\s+\S+`)
-	reDockerUserRoot  = regexp.MustCompile(`(?i)^USER\s+root\b`)
+	reDockerFROM     = regexp.MustCompile(`(?i)^FROM\s+`)
+	reDockerUSER     = regexp.MustCompile(`(?i)^USER\s+\S+`)
+	reDockerUserRoot = regexp.MustCompile(`(?i)^USER\s+root\b`)
 )
 
 // BATOU-CTR-002: Docker COPY/ADD with wildcard
 var (
-	reDockerCopyWild  = regexp.MustCompile(`(?i)^(?:COPY|ADD)\s+(?:\.\s|\.\/\s|\*\s|\.\.\s)`)
-	reDockerCopyDot   = regexp.MustCompile(`(?i)^(?:COPY|ADD)\s+\.\s+`)
-	reDockerCopyGlob  = regexp.MustCompile(`(?i)^(?:COPY|ADD)\s+\*`)
+	reDockerCopyWild = regexp.MustCompile(`(?i)^(?:COPY|ADD)\s+(?:\.\s|\.\/\s|\*\s|\.\.\s)`)
+	reDockerCopyDot  = regexp.MustCompile(`(?i)^(?:COPY|ADD)\s+\.\s+`)
+	reDockerCopyGlob = regexp.MustCompile(`(?i)^(?:COPY|ADD)\s+\*`)
 )
 
 // BATOU-CTR-003: Docker latest tag
@@ -34,7 +34,7 @@ var (
 
 // BATOU-CTR-004: Docker SSH port
 var (
-	reDockerExposeSSH  = regexp.MustCompile(`(?i)^EXPOSE\s+.*\b22\b`)
+	reDockerExposeSSH = regexp.MustCompile(`(?i)^EXPOSE\s+.*\b22\b`)
 )
 
 // BATOU-CTR-005: Docker privileged mode
@@ -46,34 +46,32 @@ var (
 // BATOU-CTR-006: Docker secrets in ENV/ARG
 var (
 	reDockerEnvSecret = regexp.MustCompile(`(?i)^(?:ENV|ARG)\s+\S*(?:PASSWORD|SECRET|TOKEN|KEY|CREDENTIAL|API_KEY|PRIVATE_KEY|AWS_SECRET|DB_PASS)\s*=\s*\S+`)
-	reDockerEnvSecVar = regexp.MustCompile(`(?i)^(?:ENV|ARG)\s+\S*(?:PASSWORD|SECRET|TOKEN|KEY|CREDENTIAL|API_KEY|PRIVATE_KEY|AWS_SECRET|DB_PASS)\b`)
 )
 
 // BATOU-CTR-007: Kubernetes privileged container
 var (
-	reK8sPrivileged     = regexp.MustCompile(`(?i)privileged\s*:\s*true`)
-	reK8sAllowPrivEsc   = regexp.MustCompile(`(?i)allowPrivilegeEscalation\s*:\s*true`)
+	reK8sPrivileged   = regexp.MustCompile(`(?i)privileged\s*:\s*true`)
+	reK8sAllowPrivEsc = regexp.MustCompile(`(?i)allowPrivilegeEscalation\s*:\s*true`)
 )
 
 // BATOU-CTR-008: Kubernetes hostNetwork/hostPID
 var (
-	reK8sHostNetwork    = regexp.MustCompile(`(?i)hostNetwork\s*:\s*true`)
-	reK8sHostPID        = regexp.MustCompile(`(?i)hostPID\s*:\s*true`)
-	reK8sHostIPC        = regexp.MustCompile(`(?i)hostIPC\s*:\s*true`)
+	reK8sHostNetwork = regexp.MustCompile(`(?i)hostNetwork\s*:\s*true`)
+	reK8sHostPID     = regexp.MustCompile(`(?i)hostPID\s*:\s*true`)
+	reK8sHostIPC     = regexp.MustCompile(`(?i)hostIPC\s*:\s*true`)
 )
 
 // BATOU-CTR-009: Kubernetes no resource limits
 var (
-	reK8sContainer      = regexp.MustCompile(`(?i)containers\s*:`)
-	reK8sResources      = regexp.MustCompile(`(?i)resources\s*:`)
-	reK8sLimits         = regexp.MustCompile(`(?i)limits\s*:`)
+	reK8sContainer = regexp.MustCompile(`(?i)containers\s*:`)
+	reK8sResources = regexp.MustCompile(`(?i)resources\s*:`)
+	reK8sLimits    = regexp.MustCompile(`(?i)limits\s*:`)
 )
 
 // BATOU-CTR-010: Terraform security group 0.0.0.0/0
 var (
-	reTFSecGroup       = regexp.MustCompile(`(?i)(?:resource\s+["']aws_security_group|ingress\s*\{)`)
-	reTFCIDRAll        = regexp.MustCompile(`(?i)(?:cidr_blocks|cidr_ipv6)\s*=\s*\[\s*["'](?:0\.0\.0\.0/0|::/0)["']`)
-	reTFIngressAll     = regexp.MustCompile(`(?i)(?:from_port|to_port)\s*=\s*0`)
+	reTFSecGroup = regexp.MustCompile(`(?i)(?:resource\s+["']aws_security_group|ingress\s*\{)`)
+	reTFCIDRAll  = regexp.MustCompile(`(?i)(?:cidr_blocks|cidr_ipv6)\s*=\s*\[\s*["'](?:0\.0\.0\.0/0|::/0)["']`)
 )
 
 // ---------------------------------------------------------------------------
@@ -118,8 +116,8 @@ func init() {
 
 type DockerRunAsRoot struct{}
 
-func (r *DockerRunAsRoot) ID() string                     { return "BATOU-CTR-001" }
-func (r *DockerRunAsRoot) Name() string                   { return "DockerRunAsRoot" }
+func (r *DockerRunAsRoot) ID() string                      { return "BATOU-CTR-001" }
+func (r *DockerRunAsRoot) Name() string                    { return "DockerRunAsRoot" }
 func (r *DockerRunAsRoot) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DockerRunAsRoot) Description() string {
 	return "Detects Dockerfiles that do not include a USER instruction, meaning the container will run as root, violating the principle of least privilege."
@@ -132,7 +130,7 @@ func (r *DockerRunAsRoot) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if ctx.Language != rules.LangDocker {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	hasFROM := false
 	hasUSER := false
@@ -193,8 +191,8 @@ func (r *DockerRunAsRoot) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DockerCopyWildcard struct{}
 
-func (r *DockerCopyWildcard) ID() string                     { return "BATOU-CTR-002" }
-func (r *DockerCopyWildcard) Name() string                   { return "DockerCopyWildcard" }
+func (r *DockerCopyWildcard) ID() string                      { return "BATOU-CTR-002" }
+func (r *DockerCopyWildcard) Name() string                    { return "DockerCopyWildcard" }
 func (r *DockerCopyWildcard) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DockerCopyWildcard) Description() string {
 	return "Detects Dockerfile COPY/ADD with wildcard or entire directory copy (COPY . or COPY *), which may accidentally include secrets, .env files, .git directories, or private keys."
@@ -208,7 +206,7 @@ func (r *DockerCopyWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -243,8 +241,8 @@ func (r *DockerCopyWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DockerLatestTag struct{}
 
-func (r *DockerLatestTag) ID() string                     { return "BATOU-CTR-003" }
-func (r *DockerLatestTag) Name() string                   { return "DockerLatestTag" }
+func (r *DockerLatestTag) ID() string                      { return "BATOU-CTR-003" }
+func (r *DockerLatestTag) Name() string                    { return "DockerLatestTag" }
 func (r *DockerLatestTag) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *DockerLatestTag) Description() string {
 	return "Detects Dockerfile FROM instructions using the :latest tag or no tag at all, making builds non-deterministic and potentially pulling vulnerable images."
@@ -258,7 +256,7 @@ func (r *DockerLatestTag) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -305,8 +303,8 @@ func (r *DockerLatestTag) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DockerExposeSSH struct{}
 
-func (r *DockerExposeSSH) ID() string                     { return "BATOU-CTR-004" }
-func (r *DockerExposeSSH) Name() string                   { return "DockerExposeSSH" }
+func (r *DockerExposeSSH) ID() string                      { return "BATOU-CTR-004" }
+func (r *DockerExposeSSH) Name() string                    { return "DockerExposeSSH" }
 func (r *DockerExposeSSH) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DockerExposeSSH) Description() string {
 	return "Detects Dockerfiles that expose SSH port 22, which is an anti-pattern for containers. Containers should be managed via orchestration, not SSH."
@@ -320,7 +318,7 @@ func (r *DockerExposeSSH) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -355,8 +353,8 @@ func (r *DockerExposeSSH) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DockerPrivileged struct{}
 
-func (r *DockerPrivileged) ID() string                     { return "BATOU-CTR-005" }
-func (r *DockerPrivileged) Name() string                   { return "DockerPrivileged" }
+func (r *DockerPrivileged) ID() string                      { return "BATOU-CTR-005" }
+func (r *DockerPrivileged) Name() string                    { return "DockerPrivileged" }
 func (r *DockerPrivileged) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DockerPrivileged) Description() string {
 	return "Detects Docker --privileged flag or dangerous --cap-add options (ALL, SYS_ADMIN) in Docker run commands, compose files, or scripts."
@@ -367,7 +365,7 @@ func (r *DockerPrivileged) Languages() []rules.Language {
 
 func (r *DockerPrivileged) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -376,10 +374,10 @@ func (r *DockerPrivileged) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		var m string
 		var title string
-		if loc := reDockerPrivileged.FindString(line); loc != "" {
+		if loc := rules.GFind(reDockerPrivileged, line); loc != "" {
 			m = loc
 			title = "Docker --privileged mode (full host access)"
-		} else if loc := reDockerCapAdd.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reDockerCapAdd, line); loc != "" {
 			m = loc
 			title = "Docker dangerous capability added"
 		}
@@ -411,8 +409,8 @@ func (r *DockerPrivileged) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DockerSecretsInEnv struct{}
 
-func (r *DockerSecretsInEnv) ID() string                     { return "BATOU-CTR-006" }
-func (r *DockerSecretsInEnv) Name() string                   { return "DockerSecretsInEnv" }
+func (r *DockerSecretsInEnv) ID() string                      { return "BATOU-CTR-006" }
+func (r *DockerSecretsInEnv) Name() string                    { return "DockerSecretsInEnv" }
 func (r *DockerSecretsInEnv) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DockerSecretsInEnv) Description() string {
 	return "Detects secrets (passwords, tokens, API keys) hardcoded in Dockerfile ENV or ARG instructions. These values are visible in the image metadata and layers."
@@ -426,7 +424,7 @@ func (r *DockerSecretsInEnv) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -461,8 +459,8 @@ func (r *DockerSecretsInEnv) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type K8sPrivilegedContainer struct{}
 
-func (r *K8sPrivilegedContainer) ID() string                     { return "BATOU-CTR-007" }
-func (r *K8sPrivilegedContainer) Name() string                   { return "K8sPrivilegedContainer" }
+func (r *K8sPrivilegedContainer) ID() string                      { return "BATOU-CTR-007" }
+func (r *K8sPrivilegedContainer) Name() string                    { return "K8sPrivilegedContainer" }
 func (r *K8sPrivilegedContainer) DefaultSeverity() rules.Severity { return rules.High }
 func (r *K8sPrivilegedContainer) Description() string {
 	return "Detects Kubernetes pod specs with privileged: true or allowPrivilegeEscalation: true in security contexts, granting the container full host access."
@@ -473,7 +471,7 @@ func (r *K8sPrivilegedContainer) Languages() []rules.Language {
 
 func (r *K8sPrivilegedContainer) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Only flag in YAML files that look like K8s manifests
 	if !strings.Contains(ctx.Content, "apiVersion") && !strings.Contains(ctx.Content, "kind:") {
@@ -487,10 +485,10 @@ func (r *K8sPrivilegedContainer) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		var m string
 		var title string
-		if loc := reK8sPrivileged.FindString(line); loc != "" {
+		if loc := rules.GFind(reK8sPrivileged, line); loc != "" {
 			m = loc
 			title = "Kubernetes privileged container (privileged: true)"
-		} else if loc := reK8sAllowPrivEsc.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reK8sAllowPrivEsc, line); loc != "" {
 			m = loc
 			title = "Kubernetes allowPrivilegeEscalation: true"
 		}
@@ -522,8 +520,8 @@ func (r *K8sPrivilegedContainer) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type K8sHostNamespace struct{}
 
-func (r *K8sHostNamespace) ID() string                     { return "BATOU-CTR-008" }
-func (r *K8sHostNamespace) Name() string                   { return "K8sHostNamespace" }
+func (r *K8sHostNamespace) ID() string                      { return "BATOU-CTR-008" }
+func (r *K8sHostNamespace) Name() string                    { return "K8sHostNamespace" }
 func (r *K8sHostNamespace) DefaultSeverity() rules.Severity { return rules.High }
 func (r *K8sHostNamespace) Description() string {
 	return "Detects Kubernetes pod specs with hostNetwork, hostPID, or hostIPC enabled, which shares the host's network/PID/IPC namespace with the container."
@@ -534,7 +532,7 @@ func (r *K8sHostNamespace) Languages() []rules.Language {
 
 func (r *K8sHostNamespace) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	if !strings.Contains(ctx.Content, "apiVersion") && !strings.Contains(ctx.Content, "kind:") {
 		return nil
@@ -547,13 +545,13 @@ func (r *K8sHostNamespace) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		var m string
 		var title string
-		if loc := reK8sHostNetwork.FindString(line); loc != "" {
+		if loc := rules.GFind(reK8sHostNetwork, line); loc != "" {
 			m = loc
 			title = "Kubernetes hostNetwork: true (shares host network)"
-		} else if loc := reK8sHostPID.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reK8sHostPID, line); loc != "" {
 			m = loc
 			title = "Kubernetes hostPID: true (shares host PID namespace)"
-		} else if loc := reK8sHostIPC.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reK8sHostIPC, line); loc != "" {
 			m = loc
 			title = "Kubernetes hostIPC: true (shares host IPC namespace)"
 		}
@@ -585,8 +583,8 @@ func (r *K8sHostNamespace) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type K8sNoResourceLimits struct{}
 
-func (r *K8sNoResourceLimits) ID() string                     { return "BATOU-CTR-009" }
-func (r *K8sNoResourceLimits) Name() string                   { return "K8sNoResourceLimits" }
+func (r *K8sNoResourceLimits) ID() string                      { return "BATOU-CTR-009" }
+func (r *K8sNoResourceLimits) Name() string                    { return "K8sNoResourceLimits" }
 func (r *K8sNoResourceLimits) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *K8sNoResourceLimits) Description() string {
 	return "Detects Kubernetes container specs without resource limits, which can lead to resource exhaustion (CPU/memory) affecting other pods on the same node."
@@ -600,9 +598,9 @@ func (r *K8sNoResourceLimits) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	hasContainers := reK8sContainer.MatchString(ctx.Content)
-	hasResources := reK8sResources.MatchString(ctx.Content)
-	hasLimits := reK8sLimits.MatchString(ctx.Content)
+	hasContainers := rules.GMatchFile(reK8sContainer, ctx)
+	hasResources := rules.GMatchFile(reK8sResources, ctx)
+	hasLimits := rules.GMatchFile(reK8sLimits, ctx)
 
 	if !hasContainers {
 		return nil
@@ -613,9 +611,9 @@ func (r *K8sNoResourceLimits) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Find the containers: line to anchor the finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
-		if reK8sContainer.MatchString(line) {
+		if rules.GMatch(reK8sContainer, line) {
 			return []rules.Finding{{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -643,8 +641,8 @@ func (r *K8sNoResourceLimits) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TerraformOpenIngress struct{}
 
-func (r *TerraformOpenIngress) ID() string                     { return "BATOU-CTR-010" }
-func (r *TerraformOpenIngress) Name() string                   { return "TerraformOpenIngress" }
+func (r *TerraformOpenIngress) ID() string                      { return "BATOU-CTR-010" }
+func (r *TerraformOpenIngress) Name() string                    { return "TerraformOpenIngress" }
 func (r *TerraformOpenIngress) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TerraformOpenIngress) Description() string {
 	return "Detects Terraform AWS security group rules with 0.0.0.0/0 or ::/0 ingress CIDR, allowing unrestricted inbound traffic from the entire internet."
@@ -659,19 +657,19 @@ func (r *TerraformOpenIngress) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Only flag in files that contain security group resources
-	if !reTFSecGroup.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reTFSecGroup, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reTFCIDRAll.FindString(line); m != "" {
+		if m := rules.GFind(reTFCIDRAll, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

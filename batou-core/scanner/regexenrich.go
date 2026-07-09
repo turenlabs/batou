@@ -7,6 +7,44 @@ import (
 	"github.com/turenlabs/batou-rules/rules"
 )
 
+// withinScanTaintAuthoritative lists languages whose taint engine has
+// mature-enough RECALL that, when it produces no flow for a taint-coverable
+// CWE in a scan, a regex-only match for that CWE can be treated as unconfirmed
+// noise and suppressed WITHIN the same scan (no prior cache entry needed).
+// Enabling a language here is a recall claim: it must be validated that
+// suppressing the regex layer does not drop genuine detections the taint
+// engine misses. Java is validated (OWASP-Java TPR held ~91% with FPR→~0).
+// Languages NOT listed keep the cache-based negative-confirmation path only,
+// because their taint engine still misses flows that the regex layer catches
+// (blanket within-scan suppression drove Python xss/trustbound and several
+// JS/Ruby CVE cases to ~0% TPR). Extend ONLY after per-language validation.
+var withinScanTaintAuthoritative = map[rules.Language]bool{
+	rules.LangJava: true,
+}
+
+// taintUnconfirmableRules lists regex rule IDs whose vulnerability SHAPE the
+// taint engine structurally cannot model, so a taint "clean" verdict for their
+// CWE is meaningless for them — the regex IS the only detection path. These
+// must NEVER be suppressed by the taint-clean negative-confirmation below
+// (doing so silently disables the detection, and — because the taint cache's
+// flow count for the shape is itself nondeterministic — does so flakily). Their
+// false positives are handled by the per-language scanner FP filter, not taint.
+//
+//   - BATOU-NOSQL-001: Mongo object-literal `$where: ...` NoSQL injection.
+//     tsflow keys its $where sink as a method call, so it stays inert for the
+//     object-property form (the #1228 detection is regex-only by design);
+//     jsScanHasNoSQLGuard handles its FPs.
+//   - BATOU-CS-025: C# LDAP injection via the `searcher.Filter = "..." + x`
+//     PROPERTY-ASSIGNMENT form. tsflow models the LDAP sink as a constructor
+//     call (`new DirectorySearcher(filter)`), so a `.Filter` attribute write is
+//     structurally unmodelled — once the `new DirectorySearcher(...)` taint sink
+//     began firing CWE-90 in the file, the taint-clean verdict for the SEPARATE
+//     `.Filter =` line would otherwise suppress this regex-only detection.
+var taintUnconfirmableRules = map[string]bool{
+	"BATOU-NOSQL-001": true,
+	"BATOU-CS-025":    true,
+}
+
 // taintCoverableCWEs lists CWE IDs for vulnerability categories that have
 // taint analysis coverage. For these CWEs, regex-only findings are treated
 // as enrichment (used for multi-layer confidence boost) rather than
@@ -50,6 +88,24 @@ var taintCoverableCWEs = map[string]bool{
 	"501": true, // Trust boundary violation
 }
 
+// cweAliases maps near-synonym CWEs to the canonical CWE the taint engine
+// reports. Eval-injection findings, for example, are tagged CWE-94 by
+// SnkEval, but several regex rules use the closely related CWE-95 (Eval
+// Injection) — without an alias the active-taint suppression pass misses
+// the cross-tag match and a regex CWE-95 finding survives next to its
+// CWE-94 taint twin.
+var cweAliases = map[string]string{
+	"95": "94", // Eval Injection ⇄ Code Injection (SnkEval)
+}
+
+// canonicalCWE returns the canonical CWE for taint-coverage matching.
+func canonicalCWE(cwe string) string {
+	if alias, ok := cweAliases[cwe]; ok {
+		return alias
+	}
+	return cwe
+}
+
 // SuppressRegexWhenTaintClean suppresses regex-only findings for
 // taint-coverable CWEs using two complementary strategies:
 //
@@ -57,15 +113,19 @@ var taintCoverableCWEs = map[string]bool{
 //     in this scan, regex-only findings for those same CWEs are redundant
 //     and suppressed (the taint findings are higher fidelity).
 //
-//  2. Negative confirmation: If taint analysis ran on this file and found
-//     zero flows, AND the file's content hash matches the taint cache entry
-//     in the call graph, then regex-only findings for ALL taint-coverable
-//     CWEs are suppressed. This is the key new behavior — taint confirmed
-//     the file is clean, so regex findings are false positives.
+//  2. Negative confirmation: If the taint engine actually RAN on this file
+//     and produced no flow for any taint-coverable CWE, regex-only findings
+//     for ALL taint-coverable CWEs are suppressed — the dataflow engine is
+//     the authority for these categories, so an unconfirmed regex match is
+//     enrichment, not a standalone finding. The "taint ran" signal comes
+//     from this scan (taintRan, set when a taint-supported language was
+//     analysed and the scan was not degraded by a timeout/panic); when that
+//     is unavailable it falls back to the persisted file taint cache (a
+//     matching content hash with zero flows from a prior scan).
 //
-// If neither condition holds (no taint findings AND no matching cache entry),
-// regex findings are kept as the only signal (first scan, no data).
-func SuppressRegexWhenTaintClean(findings []rules.Finding, cg *graph.CallGraph, filePath string, contentHash uint64) []rules.Finding {
+// If neither condition holds (no taint findings, taint did not run, and no
+// matching cache entry), regex findings are kept as the only signal.
+func SuppressRegexWhenTaintClean(findings []rules.Finding, cg *graph.CallGraph, filePath string, contentHash uint64, taintRan bool) []rules.Finding {
 	// First pass: check which taint-coverable CWEs have taint/AST findings.
 	taintActiveCWEs := make(map[string]bool)
 	for _, f := range findings {
@@ -75,18 +135,36 @@ func SuppressRegexWhenTaintClean(findings []rules.Finding, cg *graph.CallGraph, 
 		}
 		cwe := strings.TrimPrefix(f.CWEID, "CWE-")
 		if cwe != "" && taintCoverableCWEs[cwe] {
-			taintActiveCWEs[cwe] = true
+			taintActiveCWEs[canonicalCWE(cwe)] = true
 		}
 	}
 
-	// Check for negative taint confirmation from the cache.
-	// If taint ran on this file (same content hash) and found 0 flows,
-	// suppress regex findings for ALL taint-coverable CWEs.
+	// Negative confirmation: taint produced no finding for any coverable CWE.
 	negativeTaintClean := false
-	if len(taintActiveCWEs) == 0 && cg != nil {
-		if entry := cg.GetFileTaintCache(filePath); entry != nil {
-			if entry.ContentHash == contentHash && entry.FlowCount == 0 {
-				negativeTaintClean = true
+	if len(taintActiveCWEs) == 0 {
+		if taintRan {
+			// The taint engine executed on this file in THIS scan and found
+			// no coverable-CWE flow → regex-only matches for those CWEs are
+			// unconfirmed. No persisted cache entry required (a one-shot
+			// scan, e.g. the OWASP harness, has none).
+			negativeTaintClean = true
+		} else if cg != nil {
+			// Fall back to the persisted cache: a prior scan of identical
+			// content ran taint and found zero flows.
+			//
+			// TrustedForSuppression gates this on the entry being HMAC-signed
+			// by THIS machine's local key. A .batou/callgraph.json shipped in
+			// a repository can carry FlowCount==0 entries with a correct
+			// (attacker-computable) FNV content hash, which would otherwise
+			// silence real regex detections wholesale; without the local key
+			// it cannot forge a valid signature, so a poisoned entry is never
+			// trusted to suppress. Legitimate same-machine incremental caches
+			// (written by the user's own prior scan) verify and still suppress.
+			if entry := cg.GetFileTaintCache(filePath); entry != nil {
+				if entry.ContentHash == contentHash && entry.FlowCount == 0 &&
+					entry.TrustedForSuppression(filePath) {
+					negativeTaintClean = true
+				}
 			}
 		}
 	}
@@ -108,13 +186,22 @@ func SuppressRegexWhenTaintClean(findings []rules.Finding, cg *graph.CallGraph, 
 			continue
 		}
 
+		// Keep rules whose shape the taint engine structurally cannot model —
+		// a taint-clean verdict says nothing about them, so suppressing here
+		// would silently (and, given the cache's nondeterministic flow count,
+		// flakily) disable the detection. Their FPs are filtered per-language.
+		if taintUnconfirmableRules[f.RuleID] {
+			kept = append(kept, f)
+			continue
+		}
+
 		// If negative taint confirmation, suppress ALL taint-coverable CWEs.
 		if negativeTaintClean && taintCoverableCWEs[cwe] {
 			continue
 		}
 
 		// If active taint findings exist for this CWE, suppress regex.
-		if taintActiveCWEs[cwe] {
+		if taintActiveCWEs[canonicalCWE(cwe)] {
 			continue
 		}
 

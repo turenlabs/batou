@@ -1,10 +1,9 @@
 package pyast
 
 import (
-	"testing"
-
 	"github.com/turenlabs/batou-core/ast"
 	"github.com/turenlabs/batou-rules/rules"
+	"testing"
 )
 
 func scanPython(code string) []rules.Finding {
@@ -148,6 +147,264 @@ f = open("/etc/config.yaml")
 		if f.RuleID == "BATOU-PYAST-004" {
 			t.Errorf("should not flag open() with literal path: %s", f.Title)
 		}
+	}
+}
+
+// TestOpenVariableSuppressedByTraversalGuard covers the false-positive
+// suppression added to BATOU-PYAST-004: when the file already contains a
+// path-traversal denylist / sanitizer / resolve-and-startswith containment
+// check, the blind AST signal is silenced to avoid double-flagging safe
+// cases (the taint pipeline still inspects the same path with flow
+// awareness). Matches the OWASP BenchmarkPython pathtraver SAFE pattern.
+func TestOpenVariableSuppressedByTraversalGuard(t *testing.T) {
+	cases := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "dotdot-denylist-guard",
+			code: `
+def handler(request):
+    bar = request.args.get('name')
+    if '../' in bar:
+        return 'rejected'
+    f = open('/srv/' + bar, 'rb')
+`,
+		},
+		{
+			name: "secure_filename",
+			code: `
+from werkzeug.utils import secure_filename
+
+def handler(request):
+    bar = request.args.get('name')
+    bar = secure_filename(bar)
+    f = open('/srv/' + bar, 'rb')
+`,
+		},
+		{
+			name: "resolve-and-startswith",
+			code: `
+import pathlib
+
+def handler(request):
+    bar = request.args.get('name')
+    root = pathlib.Path('/srv')
+    p = (root / bar).resolve()
+    if not str(p).startswith(str(root)):
+        return 'rejected'
+    f = open(str(p), 'rb')
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			findings := scanPython(tc.code)
+			if f := findByRule(findings, "BATOU-PYAST-004"); f != nil {
+				t.Errorf("expected BATOU-PYAST-004 to be suppressed when traversal guard is present, got: %s", f.Title)
+			}
+		})
+	}
+}
+
+// TestOpenVariableSuppressedBySafeAssignment covers PR-PATHpy: BATOU-PYAST-004
+// also suppresses when the path variable (or any f-string interpolation
+// variable that feeds it) was overwritten by a safe last assignment — a
+// known sanitizer source, a constant default, or an OWASP Benchmark
+// "always case B" match statement. The taint pipeline still inspects the
+// flow precisely; the AST signal is the one being silenced.
+func TestOpenVariableSuppressedBySafeAssignment(t *testing.T) {
+	cases := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "fstring-prefix-always-case-B",
+			code: `
+def handler(request):
+    param = request.args.get('name')
+    possible = "ABC"
+    guess = possible[1]
+    match guess:
+        case 'A':
+            bar = param
+        case 'B':
+            bar = 'bob'
+        case 'C' | 'D':
+            bar = param
+        case _:
+            bar = 'fallback'
+    fileName = '/srv/' + bar
+    fd = open(fileName, 'rb')
+`,
+		},
+		{
+			name: "fstring-prefix-get_safe_value",
+			code: `
+def handler(scr):
+    param = scr.get_safe_value('name')
+    fileName = '/srv/' + param
+    fd = open(fileName, 'wb')
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			findings := scanPython(tc.code)
+			if f := findByRule(findings, "BATOU-PYAST-004"); f != nil {
+				t.Errorf("expected BATOU-PYAST-004 to be suppressed; got: %s", f.Title)
+			}
+		})
+	}
+}
+
+// TestOpenVariableSuppressedByContainmentGuard covers pyast-fpr: BATOU-PYAST-004
+// also suppresses when the path variable feeding open() is validated by a
+// containment / allowlist / startswith guard near the sink — extending the same
+// guard reasoning the taint layer already applies to the path sinks. The match
+// is pinned to the sink variable so a guard on an unrelated variable cannot
+// over-suppress (covered by TestOpenContainmentGuardOnOtherVarStillFires).
+func TestOpenVariableSuppressedByContainmentGuard(t *testing.T) {
+	cases := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "in-allowlist-membership",
+			code: `
+def handler(request):
+    p = request.args.get('f')
+    if p in ALLOWED:
+        with open(p) as fh:
+            return fh.read()
+`,
+		},
+		{
+			name: "not-in-denylist-early-return",
+			code: `
+def handler(request):
+    p = request.args.get('f')
+    if p not in ALLOWED:
+        return 'denied'
+    return open(p).read()
+`,
+		},
+		{
+			name: "startswith-prefix-containment",
+			code: `
+def handler(request):
+    p = request.args.get('f')
+    if p.startswith(BASE):
+        return open(p).read()
+    return 'denied'
+`,
+		},
+		{
+			name: "concat-path-with-member-guard",
+			code: `
+def handler(request):
+    bar = request.args.get('name')
+    if bar in ALLOWED:
+        f = open('/srv/' + bar, 'rb')
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			findings := scanPython(tc.code)
+			if f := findByRule(findings, "BATOU-PYAST-004"); f != nil {
+				t.Errorf("expected BATOU-PYAST-004 to be suppressed by containment guard; got: %s", f.Title)
+			}
+		})
+	}
+}
+
+// TestOpenContainmentGuardOnOtherVarStillFires guards over-suppression: a
+// containment guard on a DIFFERENT variable than the one passed to open() must
+// not silence the finding.
+func TestOpenContainmentGuardOnOtherVarStillFires(t *testing.T) {
+	code := `
+def handler(request):
+    q = request.args.get('q')
+    p = request.args.get('f')
+    if q in ALLOWED:
+        pass
+    with open(p) as fh:
+        return fh.read()
+`
+	findings := scanPython(code)
+	if findByRule(findings, "BATOU-PYAST-004") == nil {
+		t.Error("containment guard on unrelated variable (q) must NOT suppress open(p)")
+	}
+}
+
+// TestOpenVariableStillFiresWithoutGuard ensures the suppression heuristic
+// remains specific: a file with a variable open() and no recognised guard
+// still produces BATOU-PYAST-004.
+func TestOpenVariableStillFiresWithoutGuard(t *testing.T) {
+	code := `
+def handler(request):
+    bar = request.args.get('name')
+    f = open('/srv/' + bar, 'rb')
+`
+	findings := scanPython(code)
+	if findByRule(findings, "BATOU-PYAST-004") == nil {
+		t.Error("expected BATOU-PYAST-004 to fire when no traversal guard is present")
+	}
+}
+
+// TestOpenArgparseAttributeIsNotFlagged covers the argparse CLI idiom that
+// dominated the scan_harness Python sample: shadowsocks-android, magisk,
+// and bannedbook all use `open(args.input, ...)` / `open(opts.path)` in
+// their build scripts. The path IS user input — but the user is the
+// developer running the CLI, not a remote attacker.
+func TestOpenArgparseAttributeIsNotFlagged(t *testing.T) {
+	cases := map[string]string{
+		"args.input": `
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--input')
+args = parser.parse_args()
+f = open(args.input, 'rb')
+`,
+		"opts.output write": `
+opts = parser.parse_args()
+f = open(opts.output, 'wb')
+`,
+		"options.path": `
+options = parse_options()
+with open(options.path) as f:
+    pass
+`,
+		"flags.config": `
+flags = parser.parse_args()
+config = open(flags.config, 'r')
+`,
+	}
+	for name, code := range cases {
+		t.Run(name, func(t *testing.T) {
+			findings := scanPython(code)
+			for _, f := range findings {
+				if f.RuleID == "BATOU-PYAST-004" {
+					t.Errorf("argparse-shaped open(%s) should not fire PYAST-004: %s",
+						name, f.MatchedText)
+				}
+			}
+		})
+	}
+}
+
+// TestOpenNonArgparseAttributeStillFires guards over-suppression: an
+// attribute access on a non-argparse receiver (e.g. request.body.path)
+// still represents a real flow from external input.
+func TestOpenNonArgparseAttributeStillFires(t *testing.T) {
+	code := `
+def handler(request):
+    f = open(request.path, 'rb')
+`
+	findings := scanPython(code)
+	if findByRule(findings, "BATOU-PYAST-004") == nil {
+		t.Error("attribute access on non-argparse receiver (request.path) should still fire")
 	}
 }
 

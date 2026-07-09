@@ -3,10 +3,8 @@ package taint_test
 import (
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
-
 	// Register all catalogs.
 	_ "github.com/turenlabs/batou-core/taint/languages"
 )

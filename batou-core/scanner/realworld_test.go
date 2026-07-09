@@ -5,9 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/testutil"
-
 	// Register all rule packages.
 	_ "github.com/turenlabs/batou-rules/rules/auth"
 	_ "github.com/turenlabs/batou-rules/rules/container"
@@ -53,7 +51,6 @@ import (
 	_ "github.com/turenlabs/batou-rules/rules/websocket"
 	_ "github.com/turenlabs/batou-rules/rules/xss"
 	_ "github.com/turenlabs/batou-rules/rules/xxe"
-
 	// Taint analysis engine and language catalogs.
 	_ "github.com/turenlabs/batou-core/taint"
 	_ "github.com/turenlabs/batou-core/taint/languages"

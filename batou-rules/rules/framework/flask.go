@@ -67,7 +67,8 @@ func (r FlaskMisconfiguration) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re         *regexp.Regexp
@@ -114,7 +115,7 @@ func (r FlaskMisconfiguration) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if p.re.MatchString(line) {
+			if rules.GMatchLower(p.re, line, lowered[i]) {
 				matched := strings.TrimSpace(line)
 				if len(matched) > 120 {
 					matched = matched[:120] + "..."
@@ -164,7 +165,8 @@ func (r FlaskSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isPyComment(line) {
@@ -176,7 +178,7 @@ func (r FlaskSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 			matched = matched[:120] + "..."
 		}
 
-		if reFlaskRenderTemplateString.MatchString(line) || reFlaskRenderTemplateStringVar.MatchString(line) {
+		if rules.GMatchLower(reFlaskRenderTemplateString, line, lowered[i]) || rules.GMatchLower(reFlaskRenderTemplateStringVar, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -220,7 +222,8 @@ func (r FlaskPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isPyComment(line) {
@@ -232,7 +235,7 @@ func (r FlaskPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			matched = matched[:120] + "..."
 		}
 
-		if reFlaskSendFile.MatchString(line) {
+		if rules.GMatchLower(reFlaskSendFile, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -252,7 +255,7 @@ func (r FlaskPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reFlaskSendFromDir.MatchString(line) {
+		if rules.GMatchLower(reFlaskSendFromDir, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -296,7 +299,8 @@ func (r FlaskMarkupXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isPyComment(line) {
@@ -308,7 +312,7 @@ func (r FlaskMarkupXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			matched = matched[:120] + "..."
 		}
 
-		if reFlaskMarkup.MatchString(line) || reFlaskMarkupVar.MatchString(line) {
+		if rules.GMatchLower(reFlaskMarkup, line, lowered[i]) || rules.GMatchLower(reFlaskMarkupVar, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

@@ -37,7 +37,6 @@ var reGinSQLQuery = regexp.MustCompile(`(?:db\.(?:Raw|Exec|Query|QueryRow)|\.(?:
 var reGinSQLConcat = regexp.MustCompile(`(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\b[^"]*"\s*\+\s*c\.(?:Query|Param|PostForm|DefaultQuery)\s*\(`)
 
 // BATOU-FW-GIN-008: Cookie without Secure/HttpOnly flags
-var reGinSetCookie = regexp.MustCompile(`c\.SetCookie\s*\(`)
 var reGinSetCookieInsecure = regexp.MustCompile(`c\.SetCookie\s*\([^)]*,\s*false\s*,\s*false\s*\)`)
 
 // BATOU-FW-GIN-009: BasicAuth with hardcoded credentials
@@ -75,21 +74,22 @@ func (r *GinTrustedProxies) Description() string {
 func (r *GinTrustedProxies) Languages() []rules.Language { return []rules.Language{rules.LangGo} }
 
 func (r *GinTrustedProxies) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reGinEngine.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reGinEngine, ctx) {
 		return nil
 	}
-	if reGinSetTrustedProxies.MatchString(ctx.Content) {
+	if rules.GMatchFile(reGinSetTrustedProxies, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reGinEngine.MatchString(line) {
+		if rules.GMatchLower(reGinEngine, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -132,7 +132,8 @@ func (r *GinCORSWildcard) Languages() []rules.Language { return []rules.Language
 
 func (r *GinCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -141,9 +142,9 @@ func (r *GinCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reGinCORSWildcard.FindString(line); m != "" {
+		if m := rules.GFindLower(reGinCORSWildcard, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reGinCORSAllowAll.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reGinCORSAllowAll, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -186,21 +187,22 @@ func (r *GinBindNoValidation) Description() string {
 func (r *GinBindNoValidation) Languages() []rules.Language { return []rules.Language{rules.LangGo} }
 
 func (r *GinBindNoValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reGinShouldBind.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reGinShouldBind, ctx) {
 		return nil
 	}
-	if reGinBindingTag.MatchString(ctx.Content) {
+	if rules.GMatchFile(reGinBindingTag, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reGinShouldBind.MatchString(line) {
+		if rules.GMatchLower(reGinShouldBind, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -242,14 +244,15 @@ func (r *GinHTMLUnescaped) Languages() []rules.Language { return []rules.Languag
 
 func (r *GinHTMLUnescaped) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reGinHTMLUnescaped.FindString(line); m != "" {
+		if m := rules.GFindLower(reGinHTMLUnescaped, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -291,14 +294,15 @@ func (r *GinDebugMode) Languages() []rules.Language { return []rules.Language{ru
 
 func (r *GinDebugMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reGinDebugMode.FindString(line); m != "" {
+		if m := rules.GFindLower(reGinDebugMode, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -340,14 +344,15 @@ func (r *GinFilePathTraversal) Languages() []rules.Language { return []rules.Lan
 
 func (r *GinFilePathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reGinFilePath.FindString(line); m != "" {
+		if m := rules.GFindLower(reGinFilePath, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -389,7 +394,8 @@ func (r *GinSQLInjection) Languages() []rules.Language { return []rules.Language
 
 func (r *GinSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -397,9 +403,9 @@ func (r *GinSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		var matched string
-		if m := reGinSQLQuery.FindString(line); m != "" {
+		if m := rules.GFindLower(reGinSQLQuery, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reGinSQLConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reGinSQLConcat, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -443,14 +449,15 @@ func (r *GinInsecureCookie) Languages() []rules.Language { return []rules.Langua
 
 func (r *GinInsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reGinSetCookieInsecure.FindString(line); m != "" {
+		if m := rules.GFindLower(reGinSetCookieInsecure, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -492,14 +499,15 @@ func (r *GinHardcodedAuth) Languages() []rules.Language { return []rules.Languag
 
 func (r *GinHardcodedAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reGinBasicAuth.FindString(line); m != "" {
+		if m := rules.GFindLower(reGinBasicAuth, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -541,7 +549,8 @@ func (r *GinMiddlewareOrder) Languages() []rules.Language { return []rules.Langu
 
 func (r *GinMiddlewareOrder) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	firstRouteLine := -1
 	for i, line := range lines {
@@ -549,10 +558,10 @@ func (r *GinMiddlewareOrder) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if firstRouteLine == -1 && reGinRouteHandler.MatchString(line) {
+		if firstRouteLine == -1 && rules.GMatchLower(reGinRouteHandler, line, lowered[i]) {
 			firstRouteLine = i
 		}
-		if firstRouteLine >= 0 && reGinUseAuth.MatchString(line) && i > firstRouteLine {
+		if firstRouteLine >= 0 && rules.GMatchLower(reGinUseAuth, line, lowered[i]) && i > firstRouteLine {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

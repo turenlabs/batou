@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 )
 
@@ -269,6 +268,7 @@ func TestDedup_InterprocRanking(t *testing.T) {
 
 func TestDedup_AllASTLanguagePrefixes(t *testing.T) {
 	// Verify that isASTRuleID correctly identifies every AST analyzer prefix.
+	// One representative rule ID per analyzer package under batou-core/analyzer/.
 	prefixes := []struct {
 		ruleID string
 		lang   string
@@ -286,8 +286,15 @@ func TestDedup_AllASTLanguagePrefixes(t *testing.T) {
 		{"BATOU-RUST-AST-001", "Rust"},
 		{"BATOU-LUA-AST-001", "Lua"},
 		{"BATOU-GVY-AST-001", "Groovy"},
+		{"BATOU-PERL-AST-001", "Perl"},
+		{"BATOU-SH-AST-001", "Shell"},
+		{"BATOU-ZIG-AST-001", "Zig"},
+		{"BATOU-OWNCLOUD-AST-001", "PHP/ownCloud"},
 	}
 	for _, p := range prefixes {
+		if !isASTRuleID(p.ruleID) {
+			t.Errorf("%s (%s): isASTRuleID should be true", p.ruleID, p.lang)
+		}
 		f := rules.Finding{
 			RuleID:     p.ruleID,
 			LineNumber: 1,
@@ -302,17 +309,94 @@ func TestDedup_AllASTLanguagePrefixes(t *testing.T) {
 		}
 	}
 
-	// Non-AST rule IDs must NOT be classified as AST.
-	nonAST := []string{"BATOU-INJ-001", "BATOU-XSS-002", "BATOU-TAINT-sqli", "BATOU-INTERPROC-SQLI"}
+	// Non-AST rule IDs must NOT be classified as AST — including regex rule
+	// IDs that happen to contain "AST" as a substring (the FASTAPI family),
+	// which a substring match misclassified into the AST tier.
+	nonAST := []string{
+		"BATOU-INJ-001",
+		"BATOU-XSS-002",
+		"BATOU-TAINT-sqli",
+		"BATOU-INTERPROC-SQLI",
+		"BATOU-FW-FASTAPI-001",
+		"BATOU-FW-FASTAPI-002",
+		"BATOU-FW-FASTAPI-013",
+	}
 	for _, id := range nonAST {
-		f := rules.Finding{RuleID: id}
-		if isASTRuleID(f.RuleID) && !hasTag(f.Tags, "taint-analysis") && !hasTag(f.Tags, "interprocedural") {
-			// TAINT and INTERPROC are caught by tag checks before isASTRuleID,
-			// so only pure regex IDs could be false positives here.
-			if id == "BATOU-INJ-001" || id == "BATOU-XSS-002" {
-				t.Errorf("%s: should NOT be classified as AST rule", id)
-			}
+		if isASTRuleID(id) {
+			t.Errorf("%s: should NOT be classified as AST rule", id)
 		}
+	}
+
+	// Untagged regex findings with an AST-substring ID must land in the
+	// regex tier, not the AST tier.
+	f := rules.Finding{
+		RuleID:     "BATOU-FW-FASTAPI-002",
+		LineNumber: 1,
+		CWEID:      "CWE-346",
+		Severity:   rules.Critical,
+		Confidence: "high",
+		Tags:       []string{"framework", "fastapi", "cors"},
+	}
+	if tier := findingTier(&f); tier != tierRegex {
+		t.Errorf("BATOU-FW-FASTAPI-002: expected tier %d (regex), got %d", tierRegex, tier)
+	}
+}
+
+func TestDedup_FASTAPIRegexCriticalDoesNotBlock(t *testing.T) {
+	// Regression test for the regex-never-blocks invariant: BATOU-FW-FASTAPI-002
+	// escalates to Critical for CORS wildcard + credentials. When the substring
+	// "AST" in "FASTAPI" misclassified it into the AST tier it received
+	// ConfBaseAST (0.7) base confidence, so RiskScore = 1.0 × 0.7 = 0.7 hit the
+	// block threshold for a pure regex finding. At the correct regex base
+	// (high = 0.5) RiskScore is 0.5 — a hint, not a block.
+	f := rules.Finding{
+		RuleID:        "BATOU-FW-FASTAPI-002",
+		Severity:      rules.Critical,
+		SeverityLabel: rules.Critical.String(),
+		LineNumber:    10,
+		CWEID:         "CWE-346",
+		Confidence:    "high",
+		Tags:          []string{"framework", "fastapi", "cors"},
+	}
+	AssignBaseConfidenceScore(&f)
+	if f.ConfidenceScore != ConfBaseRegexHigh {
+		t.Errorf("expected regex-high base confidence %.2f, got %.2f", ConfBaseRegexHigh, f.ConfidenceScore)
+	}
+	ComputeRiskScore(&f)
+	if f.RiskScore >= RiskBlockThreshold {
+		t.Errorf("regex-only Critical finding must not reach block threshold: RiskScore %.2f >= %.2f", f.RiskScore, RiskBlockThreshold)
+	}
+	if f.ShouldBlock() {
+		t.Error("regex-only Critical FASTAPI-002 finding must not block")
+	}
+}
+
+func TestDedup_SameLineCWEDifferentFilesSurvive(t *testing.T) {
+	// Interprocedural findings can carry a caller-file FilePath that differs
+	// from the scanned file, so the dedup slice mixes findings from multiple
+	// files. Same (line, CWE) in different files are distinct issues — both
+	// must survive.
+	a := regexFinding(42, "CWE-89", rules.High, "high")
+	a.FilePath = "/app/handler.go"
+	b := interprocFinding(42, "CWE-89", rules.High, "high")
+	b.FilePath = "/app/caller.go"
+
+	got := DeduplicateFindings([]rules.Finding{a, b})
+	if len(got) != 2 {
+		t.Fatalf("expected 2 findings (same line+CWE, different files), got %d", len(got))
+	}
+
+	// Same file, same line+CWE still dedups to one.
+	c := regexFinding(42, "CWE-89", rules.High, "high")
+	c.FilePath = "/app/handler.go"
+	d := taintFinding(42, "CWE-89", rules.High, "high")
+	d.FilePath = "/app/handler.go"
+	got = DeduplicateFindings([]rules.Finding{c, d})
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding (same file+line+CWE), got %d", len(got))
+	}
+	if got[0].RuleID != "BATOU-TAINT-sqli" {
+		t.Errorf("expected taint winner within same file, got %s", got[0].RuleID)
 	}
 }
 

@@ -1,8 +1,8 @@
 package languages
 
 import (
-	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
+	"github.com/turenlabs/batou-rules/rules"
 )
 
 func (c *LuaCatalog) Sinks() []taint.SinkDef {
@@ -13,7 +13,7 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			Category:      taint.SnkCommand,
 			Language:      rules.LangLua,
 			Pattern:       `os\.execute\s*\(`,
-			ObjectType:    "",
+			ObjectType:    "os",
 			MethodName:    "os.execute",
 			DangerousArgs: []int{0},
 			Severity:      rules.Critical,
@@ -88,6 +88,25 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-94",
 			OWASPCategory: "A03:2021-Injection",
 		},
+		{
+			// package.loadlib(libname, funcname) links a C dynamic library
+			// (.so/.dll/.dylib) into the running process and returns one of
+			// its exported functions. An attacker-controlled libname (e.g.
+			// derived from a request parameter, an LSP/registry response, or a
+			// downloaded manifest) yields arbitrary native code execution — the
+			// Lua analogue of C dlopen() / Python ctypes.CDLL().
+			ID:            "lua.package.loadlib",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `package\.loadlib\s*\(`,
+			ObjectType:    "package",
+			MethodName:    "package.loadlib",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "package.loadlib(libname, funcname) loads a C dynamic library from a potentially tainted path and returns one of its functions — attacker-controlled libname yields arbitrary native code execution (RCE)",
+			CWEID:         "CWE-829",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
 
 		// --- SQL Injection (CWE-89) ---
 		{
@@ -113,6 +132,30 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			DangerousArgs: []int{0},
 			Severity:      rules.Critical,
 			Description:   "PostgreSQL query via ngx_postgres with potentially tainted input",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Sailor MVC raw SQL sink (CWE-89) ---
+		// Sailor's db module (sailor.db) exposes db.query / db.query_one which
+		// pass a raw SQL string straight to the underlying luasql/resty-mysql
+		// connection. The ORM's model:find / model:find_all explicitly DO NOT
+		// escape their where_string ("NOT ESCAPED, DONT USE IT UNLESS YOU WROTE
+		// THE WHERE STRING YOURSELF"), so request data concatenated into a query
+		// reaches db.query unsanitized. Use db.escape (sanitizer) to neutralize.
+		// NOTE: the dot-call db.query(...) is already covered by the existing
+		// lua.resty.mysql.query sink (the matcher normalizes `:`/`.`), so only
+		// the distinct db.query_one entry is added here to avoid a duplicate.
+		{
+			ID:            "lua.sailor.db.query_one",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangLua,
+			Pattern:       `\bdb\.query_one\s*\(`,
+			ObjectType:    "db",
+			MethodName:    "db.query_one",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Sailor db.query_one() executes a raw single-row SQL string; tainted input concatenated into the query is SQL injection",
 			CWEID:         "CWE-89",
 			OWASPCategory: "A03:2021-Injection",
 		},
@@ -186,6 +229,38 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			OWASPCategory: "A03:2021-Injection",
 		},
 
+		// Sailor controller output: page:write() emits a raw response body and
+		// page:render(view, params) interpolates params into a .lp view via
+		// <?=var?> tags with NO automatic HTML escaping — tainted request data
+		// passed here is reflected XSS. Scoped to the `page` receiver so generic
+		// :write()/:render() on other objects do not over-fire.
+		{
+			ID:            "lua.sailor.page.write",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangLua,
+			Pattern:       `page\s*:\s*write\s*\(`,
+			ObjectType:    "page",
+			MethodName:    "page:write",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Sailor page:write() emits an unescaped response body; tainted data here is reflected XSS",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.sailor.page.render",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangLua,
+			Pattern:       `page\s*:\s*render\s*\(`,
+			ObjectType:    "page",
+			MethodName:    "page:render",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Sailor page:render() interpolates params into a .lp view via <?=...?> with no auto-escaping; tainted data is reflected XSS",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
 		// --- Open Redirect (CWE-601) ---
 		{
 			ID:            "lua.ngx.redirect",
@@ -210,6 +285,24 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			DangerousArgs: []int{0},
 			Severity:      rules.High,
 			Description:   "OpenResty internal redirect with potentially tainted URI",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// Sailor controller redirect: page:redirect(route) sends a Location
+		// header / request redirect to the supplied route. A request-derived
+		// route is an open redirect. Scoped to the `page` receiver so generic
+		// :redirect() on other objects does not over-fire.
+		{
+			ID:            "lua.sailor.page.redirect",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangLua,
+			Pattern:       `page\s*:\s*redirect\s*\(`,
+			ObjectType:    "page",
+			MethodName:    "page:redirect",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Sailor page:redirect() sets the redirect target; a request-derived route is an open redirect",
 			CWEID:         "CWE-601",
 			OWASPCategory: "A01:2021-Broken Access Control",
 		},
@@ -286,6 +379,71 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-1336",
 			OWASPCategory: "A03:2021-Injection",
 		},
+		{
+			ID:            "lua.etlua.render",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `etlua\.render\s*\(`,
+			ObjectType:    "etlua",
+			MethodName:    "etlua.render",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "etlua template rendering with potentially tainted template string (SSTI)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.etlua.compile",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `etlua\.compile\s*\(`,
+			ObjectType:    "etlua",
+			MethodName:    "etlua.compile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "etlua template compilation with potentially tainted template string (SSTI)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.lustache.render",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `lustache:render\s*\(|lustache\.render\s*\(`,
+			ObjectType:    "lustache",
+			MethodName:    "lustache:render",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Lustache Mustache template rendering with potentially tainted template (SSTI)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.cosmo.fill",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `cosmo\.fill\s*\(`,
+			ObjectType:    "cosmo",
+			MethodName:    "cosmo.fill",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Cosmo template rendering with potentially tainted template (SSTI)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.penlight.template.substitute",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `pl\.template\.substitute\s*\(|template\.substitute\s*\(`,
+			ObjectType:    "pl.template",
+			MethodName:    "template.substitute",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Penlight pl.template substitution with potentially tainted template (SSTI)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
 
 		// --- SSRF / URL Fetch (CWE-918) ---
 		{
@@ -327,6 +485,19 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-918",
 			OWASPCategory: "A10:2021-Server-Side Request Forgery",
 		},
+		{
+			ID:            "lua.ngx.location.capture_multi",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangLua,
+			Pattern:       `ngx\.location\.capture_multi\s*\(`,
+			ObjectType:    "ngx",
+			MethodName:    "ngx.location.capture_multi",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "OpenResty multi-subrequest with potentially tainted URI table (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
 
 		// --- HTTP Header Injection (CWE-113) ---
 		{
@@ -363,7 +534,7 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			ID:            "lua.print.log",
 			Category:      taint.SnkLog,
 			Language:      rules.LangLua,
-			Pattern:       `print\s*\(`,
+			Pattern:       `\bprint\s*\(`,
 			ObjectType:    "",
 			MethodName:    "print",
 			DangerousArgs: []int{0},
@@ -371,21 +542,6 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			Description:   "Print output with potentially tainted data",
 			CWEID:         "CWE-117",
 			OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
-		},
-
-		// --- File operations (CWE-22) ---
-		{
-			ID:            "lua.os.rename",
-			Category:      taint.SnkFileWrite,
-			Language:      rules.LangLua,
-			Pattern:       `os\.rename\s*\(`,
-			ObjectType:    "",
-			MethodName:    "os.rename",
-			DangerousArgs: []int{0, 1},
-			Severity:      rules.High,
-			Description:   "File rename with potentially tainted paths",
-			CWEID:         "CWE-22",
-			OWASPCategory: "A01:2021-Broken Access Control",
 		},
 
 		// --- Dynamic code loading (CWE-94) ---
@@ -491,18 +647,166 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			OWASPCategory: "A03:2021-Injection",
 		},
 
+		// --- lsqlite3 (LuaSQLite3) SQL injection (CWE-89) ---
+		// lsqlite3 (http://lua.sqlite.org/) is the canonical SQLite3 binding
+		// for Lua, used by LuaRocks, Tasmota, OpenWrt packages, and many
+		// embedded Lua applications. The Database object (returned by
+		// sqlite3.open / sqlite3.open_memory) exposes raw-SQL methods that
+		// are SQL-injection sinks when the SQL string carries user input.
+		// Safe form uses placeholders + stmt:bind/bind_values; the canonical
+		// receiver is `db` but `database`, `sqlite`, and `sqlitedb` are also
+		// common (matched via the Database receiver heuristic in tsflow).
+		{
+			ID:            "lua.lsqlite3.exec",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:db|database|sqlite|sqlitedb)\s*:\s*exec\s*\(`,
+			ObjectType:    "Database",
+			MethodName:    "db:exec",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lsqlite3 db:exec with potentially tainted SQL (SQL injection — use db:prepare + stmt:bind_values with ? placeholders)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.lsqlite3.nrows",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:db|database|sqlite|sqlitedb)\s*:\s*nrows\s*\(`,
+			ObjectType:    "Database",
+			MethodName:    "db:nrows",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lsqlite3 db:nrows iterator with potentially tainted SQL (SQL injection)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.lsqlite3.rows",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:db|database|sqlite|sqlitedb)\s*:\s*rows\s*\(`,
+			ObjectType:    "Database",
+			MethodName:    "db:rows",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lsqlite3 db:rows iterator with potentially tainted SQL (SQL injection)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.lsqlite3.urows",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:db|database|sqlite|sqlitedb)\s*:\s*urows\s*\(`,
+			ObjectType:    "Database",
+			MethodName:    "db:urows",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lsqlite3 db:urows iterator with potentially tainted SQL (SQL injection)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.lsqlite3.first_row",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:db|database|sqlite|sqlitedb)\s*:\s*first_row\s*\(`,
+			ObjectType:    "Database",
+			MethodName:    "db:first_row",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lsqlite3 db:first_row with potentially tainted SQL (SQL injection)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.lsqlite3.prepare",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:db|database|sqlite|sqlitedb)\s*:\s*prepare\s*\(`,
+			ObjectType:    "Database",
+			MethodName:    "db:prepare",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lsqlite3 db:prepare with potentially tainted SQL (only safe when SQL is constant + values bound via stmt:bind*)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
 		// --- Tarantool SQL mode (CWE-89) ---
 		{
 			ID:            "lua.tarantool.box.execute",
 			Category:      taint.SnkSQLQuery,
 			Language:      rules.LangLua,
-			Pattern:       `box\.execute\s*\(`,
+			Pattern:       `\bbox\.execute\s*\(`,
 			ObjectType:    "tarantool",
 			MethodName:    "box.execute",
 			DangerousArgs: []int{0},
 			Severity:      rules.Critical,
 			Description:   "Tarantool SQL execution with potentially tainted query",
 			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Apache Cassandra / ScyllaDB CQL Injection (CWE-943) ---
+		// lua-cassandra / lua-resty-cassandra (used heavily by Kong).
+		// API: peer:execute(cql, args) / cluster:execute(cql, args) / :batch(statements)
+		// Tainted CQL string in the query structure enables CQL injection even when
+		// the call supports parameterized binding, because user input has already
+		// been baked into the statement before args are bound. Safe form uses
+		// ? placeholders with values passed via the args table.
+		{
+			ID:            "lua.cassandra.peer.execute",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `peer:execute\s*\(`,
+			ObjectType:    "cassandra",
+			MethodName:    "peer:execute",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-cassandra peer:execute with potentially tainted CQL (CQL injection — use ? placeholders + args table)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.cassandra.cluster.execute",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `cluster:execute\s*\(`,
+			ObjectType:    "cassandra.cluster",
+			MethodName:    "cluster:execute",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-resty-cassandra cluster:execute with potentially tainted CQL (CQL injection — use ? placeholders + args table)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.cassandra.peer.batch",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `peer:batch\s*\(`,
+			ObjectType:    "cassandra",
+			MethodName:    "peer:batch",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-cassandra peer:batch with potentially tainted CQL statements (CQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.cassandra.cluster.batch",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `cluster:batch\s*\(`,
+			ObjectType:    "cassandra.cluster",
+			MethodName:    "cluster:batch",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-resty-cassandra cluster:batch with potentially tainted CQL statements (CQL injection)",
+			CWEID:         "CWE-943",
 			OWASPCategory: "A03:2021-Injection",
 		},
 
@@ -548,13 +852,64 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-918",
 			OWASPCategory: "A10:2021-Server-Side Request Forgery",
 		},
+		{
+			// lua-resty-http low-level API: `local httpc = http.new(); httpc:connect(host, port)`
+			// then `httpc:request{...}`. When the host comes from request input, the
+			// connection target is attacker-controlled — SSRF at the connect boundary,
+			// distinct from the high-level httpc:request_uri(url) entry above.
+			ID:            "lua.resty.http.connect",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangLua,
+			Pattern:       `httpc:connect\s*\(`,
+			ObjectType:    "resty.http",
+			MethodName:    "httpc:connect",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "OpenResty lua-resty-http low-level connect with potentially tainted host (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			// lua-resty-websocket client: `local wb = client:new(); wb:connect("ws://host/path")`.
+			// A tainted ws:// / wss:// URI lets an attacker drive the WebSocket handshake
+			// to an arbitrary internal host — SSRF. Distinct from lua-http's
+			// http.websocket.new_from_uri entry (a different library).
+			ID:            "lua.resty.websocket.client.connect",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangLua,
+			Pattern:       `wb:connect\s*\(`,
+			ObjectType:    "resty.websocket",
+			MethodName:    "wb:connect",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "OpenResty lua-resty-websocket client connect with potentially tainted URI (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			// OpenResty UDP cosocket: `local sock = ngx.socket.udp(); sock:setpeername(host, port)`.
+			// The TCP cosocket connect is already modeled above; the UDP peer-name
+			// counterpart has the same SSRF exposure (e.g. driving DNS/syslog/UDP
+			// services on internal hosts) when the host is request-controlled.
+			ID:            "lua.ngx.socket.udp.setpeername",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangLua,
+			Pattern:       `:setpeername\s*\(`,
+			ObjectType:    "ngx.socket",
+			MethodName:    "udpsock:setpeername",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "OpenResty UDP cosocket setpeername with potentially tainted host (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
 
 		// --- Tarantool Code Injection (CWE-94) ---
 		{
 			ID:            "lua.tarantool.box.eval",
 			Category:      taint.SnkEval,
 			Language:      rules.LangLua,
-			Pattern:       `box\.eval\s*\(`,
+			Pattern:       `\bbox\.eval\s*\(`,
 			ObjectType:    "box",
 			MethodName:    "box.eval",
 			DangerousArgs: []int{0},
@@ -584,7 +939,7 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			ID:            "lua.lxp.parse",
 			Category:      taint.SnkDeserialize,
 			Language:      rules.LangLua,
-			Pattern:       `lxp%.new\s*\(|lom%.parse\s*\(|lxp_parse\s*\(`,
+			Pattern:       `lxp\.new\s*\(|lom\.parse\s*\(|lxp_parse\s*\(`,
 			ObjectType:    "lxp",
 			MethodName:    "lxp.new / lom.parse",
 			DangerousArgs: []int{0},
@@ -676,6 +1031,34 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			Description:   "math.randomseed with os.time/os.clock is predictable — attacker can reproduce the sequence",
 			CWEID:         "CWE-330",
 			OWASPCategory: "A02:2021-Cryptographic Failures",
+		},
+
+		// --- Format String Injection (CWE-134) ---
+		// Unlike Rust's format!/C++ fmt::format (which require a compile-time
+		// literal format string), Lua's string.format takes a *runtime* string
+		// as its first argument. When that format string carries user input an
+		// attacker injects conversion specifiers: %q/%s mismatches raise errors
+		// (DoS / information disclosure via error text), repeated %s past the
+		// supplied arguments throws "bad argument", and %d/%x on string values
+		// aborts the request. The dangerous argument is strictly the format
+		// string at arg 0 — a tainted *value* argument (arg 1+) is the normal,
+		// safe case (`string.format("%s", user)`), so DangerousArgs is pinned to
+		// [0] and a literal format string never fires. Receiver "string" matches
+		// ObjectType "string" exactly (same shape as the math.random sink above).
+		// Mirrors kotlin.string.format (also SnkLog) and the C/C++ printf-family
+		// CWE-134 sinks.
+		{
+			ID:            "lua.string.format",
+			Category:      taint.SnkLog,
+			Language:      rules.LangLua,
+			Pattern:       `string\.format\s*\(`,
+			ObjectType:    "string",
+			MethodName:    "string.format",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "string.format with a potentially tainted format string at arg 0 (CWE-134 format string injection — injected %s/%q/%d specifiers raise runtime errors / leak data). Keep the format string a literal and pass user input only as a value argument.",
+			CWEID:         "CWE-134",
+			OWASPCategory: "A03:2021-Injection",
 		},
 
 		// --- Weak Hash (CWE-328) ---
@@ -923,9 +1306,9 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 		// --- MongoDB / NoSQL Injection (CWE-943) ---
 		{
 			ID:            "lua.mongol.find",
-			Category:      taint.SnkSQLQuery,
+			Category:      taint.SnkNoSQL,
 			Language:      rules.LangLua,
-			Pattern:       `col:find\s*\(`,
+			Pattern:       `\bcol:find\s*\(`,
 			ObjectType:    "resty.mongol",
 			MethodName:    "col:find",
 			DangerousArgs: []int{0},
@@ -936,7 +1319,7 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 		},
 		{
 			ID:            "lua.mongol.find_one",
-			Category:      taint.SnkSQLQuery,
+			Category:      taint.SnkNoSQL,
 			Language:      rules.LangLua,
 			Pattern:       `col:find_one\s*\(`,
 			ObjectType:    "resty.mongol",
@@ -949,7 +1332,7 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 		},
 		{
 			ID:            "lua.mongol.insert",
-			Category:      taint.SnkSQLQuery,
+			Category:      taint.SnkNoSQL,
 			Language:      rules.LangLua,
 			Pattern:       `col:insert\s*\(`,
 			ObjectType:    "resty.mongol",
@@ -962,7 +1345,7 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 		},
 		{
 			ID:            "lua.mongol.update",
-			Category:      taint.SnkSQLQuery,
+			Category:      taint.SnkNoSQL,
 			Language:      rules.LangLua,
 			Pattern:       `col:update\s*\(`,
 			ObjectType:    "resty.mongol",
@@ -975,7 +1358,7 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 		},
 		{
 			ID:            "lua.mongol.delete",
-			Category:      taint.SnkSQLQuery,
+			Category:      taint.SnkNoSQL,
 			Language:      rules.LangLua,
 			Pattern:       `col:delete\s*\(`,
 			ObjectType:    "resty.mongol",
@@ -988,7 +1371,7 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 		},
 		{
 			ID:            "lua.mongol.aggregate",
-			Category:      taint.SnkSQLQuery,
+			Category:      taint.SnkNoSQL,
 			Language:      rules.LangLua,
 			Pattern:       `col:aggregate\s*\(`,
 			ObjectType:    "resty.mongol",
@@ -1026,6 +1409,1428 @@ func (c *LuaCatalog) Sinks() []taint.SinkDef {
 			Description:   "LuaFileSystem attributes with potentially tainted path (information disclosure)",
 			CWEID:         "CWE-22",
 			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "lua.lfs.dir",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangLua,
+			Pattern:       `lfs\.dir\s*\(`,
+			ObjectType:    "lfs",
+			MethodName:    "lfs.dir",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "LuaFileSystem directory listing with potentially tainted path (directory enumeration)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "lua.lfs.symlinkattributes",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangLua,
+			Pattern:       `lfs\.symlinkattributes\s*\(`,
+			ObjectType:    "lfs",
+			MethodName:    "lfs.symlinkattributes",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "LuaFileSystem symlink attribute reading with potentially tainted path",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Command Injection via OpenResty pipe (CWE-78) ---
+		{
+			ID:            "lua.ngx.pipe.spawn",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `ngx\.pipe\.spawn\s*\(`,
+			ObjectType:    "ngx.pipe",
+			MethodName:    "ngx.pipe.spawn",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "OpenResty pipe module process spawning with potentially tainted command",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Redis protected command call (CWE-77) ---
+		{
+			ID:            "lua.redis.pcall",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `redis\.pcall\s*\(`,
+			ObjectType:    "redis",
+			MethodName:    "redis.pcall",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Redis protected command call with potentially tainted arguments",
+			CWEID:         "CWE-77",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- LuaJIT FFI command execution (CWE-78) ---
+		{
+			ID:            "lua.ffi.c.system",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `ffi\.C\.system\s*\(`,
+			ObjectType:    "ffi.C",
+			MethodName:    "ffi.C.system",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "LuaJIT FFI call to C system() with potentially tainted command",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.ffi.c.popen",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `ffi\.C\.popen\s*\(`,
+			ObjectType:    "ffi.C",
+			MethodName:    "ffi.C.popen",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "LuaJIT FFI call to C popen() with potentially tainted command",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.ffi.c.exec",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `ffi\.C\.exec\w+\s*\(`,
+			ObjectType:    "ffi.C",
+			MethodName:    "ffi.C.execvp/ffi.C.execve/ffi.C.execv",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "LuaJIT FFI call to C exec family (execvp/execve/execv) with potentially tainted arguments",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- LuaPosix command execution (CWE-78) ---
+		{
+			ID:            "lua.posix.exec",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `posix\.exec[pe]*\s*\(`,
+			ObjectType:    "posix",
+			MethodName:    "posix.exec/posix.execp/posix.execpe",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "LuaPosix exec/execp/execpe with potentially tainted command",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- lua-resty-shell command execution (CWE-78) ---
+		// `local shell = require "resty.shell"` then `shell.run(cmd, stdin, timeout, max_size)`.
+		// When `cmd` is a STRING, it is passed to `sh -c` so shell metacharacters are
+		// interpreted (classic command injection). The TABLE form (e.g. {"ls","-la"})
+		// goes through execvp without a shell, so attacker control of an arg is still
+		// dangerous (path traversal, flag injection) but not classical OS command
+		// injection. We flag both because tsflow taint reaches arg-0 in either case.
+		{
+			ID:            "lua.resty.shell.run",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `\bshell\.run\s*\(`,
+			ObjectType:    "shell",
+			MethodName:    "shell.run",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-resty-shell shell.run with potentially tainted command (string form is passed to sh -c — shell metacharacters are interpreted; pass a fixed argv table or sanitize first)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Penlight command execution (CWE-78) ---
+		{
+			ID:            "lua.penlight.execute",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `pl\.utils\.execute(?:ex)?\s*\(|\butils\.execute(?:ex)?\s*\(`,
+			ObjectType:    "pl.utils",
+			MethodName:    "pl.utils.execute/pl.utils.executeex",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Penlight utils.execute/executeex command execution with potentially tainted input",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- luv/Luvit process spawning (CWE-78) ---
+		{
+			ID:            "lua.uv.spawn",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `uv\.spawn\s*\(`,
+			ObjectType:    "uv",
+			MethodName:    "uv.spawn",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "luv/Luvit libuv process spawning with potentially tainted command",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- HTTP Header Injection (CWE-113) ---
+		{
+			ID:            "lua.ngx.req.set_header",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangLua,
+			Pattern:       `ngx\.req\.set_header\s*\(`,
+			ObjectType:    "ngx",
+			MethodName:    "ngx.req.set_header",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "OpenResty request header manipulation with potentially tainted value (header injection)",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Log Injection (CWE-117) ---
+		{
+			ID:            "lua.io.write.log",
+			Category:      taint.SnkLog,
+			Language:      rules.LangLua,
+			Pattern:       `io\.write\s*\(`,
+			ObjectType:    "io",
+			MethodName:    "io.write",
+			DangerousArgs: []int{0},
+			Severity:      rules.Low,
+			Description:   "Standard I/O write with potentially tainted data (log injection if used for logging)",
+			CWEID:         "CWE-117",
+			OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
+		},
+		{
+			ID:            "lua.io.stderr.write",
+			Category:      taint.SnkLog,
+			Language:      rules.LangLua,
+			Pattern:       `io\.stderr:write\s*\(`,
+			ObjectType:    "io",
+			MethodName:    "io.stderr:write",
+			DangerousArgs: []int{0},
+			Severity:      rules.Low,
+			Description:   "Stderr write with potentially tainted data (log injection)",
+			CWEID:         "CWE-117",
+			OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
+		},
+
+		// --- Trust Boundary Violation (CWE-501) ---
+		{
+			ID:            "lua.ngx.shared.set",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangLua,
+			Pattern:       `ngx\.shared\.\w+:set\s*\(`,
+			ObjectType:    "ngx.shared",
+			MethodName:    "ngx.shared.DICT:set",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "OpenResty cross-request shared memory stores potentially tainted data (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "lua.ngx.shared.safe_set",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangLua,
+			Pattern:       `ngx\.shared\.\w+:safe_set\s*\(`,
+			ObjectType:    "ngx.shared",
+			MethodName:    "ngx.shared.DICT:safe_set",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "OpenResty cross-request shared memory safe_set with potentially tainted data",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+
+		// --- Deserialization (CWE-502) ---
+		{
+			ID:            "lua.cmsgpack.unpack",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangLua,
+			Pattern:       `cmsgpack\.unpack\s*\(`,
+			ObjectType:    "cmsgpack",
+			MethodName:    "cmsgpack.unpack",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "MessagePack deserialization of potentially tainted data (code execution risk)",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+		{
+			ID:            "lua.cmsgpack.unpack_one",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangLua,
+			Pattern:       `cmsgpack\.unpack_one\s*\(`,
+			ObjectType:    "cmsgpack",
+			MethodName:    "cmsgpack.unpack_one",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "MessagePack partial deserialization of potentially tainted data",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+		{
+			ID:            "lua.serpent.load",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangLua,
+			Pattern:       `serpent\.load\s*\(`,
+			ObjectType:    "serpent",
+			MethodName:    "serpent.load",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Serpent deserialization of Lua data (executes loadstring internally, code injection risk)",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+		{
+			ID:            "lua.marshal.decode",
+			Category:      taint.SnkDeserialize,
+			Language:      rules.LangLua,
+			Pattern:       `marshal\.decode\s*\(`,
+			ObjectType:    "marshal",
+			MethodName:    "marshal.decode",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-marshal binary deserialization of potentially tainted data (arbitrary code execution risk)",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+
+		// --- Log Injection (CWE-117) ---
+		{
+			ID:            "lua.print.log",
+			Category:      taint.SnkLog,
+			Language:      rules.LangLua,
+			Pattern:       `\bprint\s*\(`,
+			ObjectType:    "",
+			MethodName:    "print",
+			DangerousArgs: []int{0},
+			Severity:      rules.Low,
+			Description:   "Print output with potentially tainted data (log injection if used for logging/debugging)",
+			CWEID:         "CWE-117",
+			OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
+		},
+
+		// --- File Read via io.lines (CWE-22) ---
+		{
+			ID:            "lua.io.lines.file",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangLua,
+			Pattern:       `io\.lines\s*\(`,
+			ObjectType:    "io",
+			MethodName:    "io.lines",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "File line iterator with potentially tainted path (path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Command Injection via Penlight (CWE-78) ---
+		{
+			ID:            "lua.penlight.executeex",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `pl\.utils\.executeex\s*\(`,
+			ObjectType:    "pl.utils",
+			MethodName:    "pl.utils.executeex",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Penlight process execution with stdout/stderr capture — tainted command string enables code execution",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.penlight.execute",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `pl\.utils\.execute\s*\(`,
+			ObjectType:    "pl.utils",
+			MethodName:    "pl.utils.execute",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Penlight process execution wrapper — tainted command string enables code execution",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Command Injection via luaposix (CWE-78) ---
+		{
+			ID:            "lua.posix.execp",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `unistd\.execp\s*\(`,
+			ObjectType:    "posix.unistd",
+			MethodName:    "unistd.execp",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "POSIX execp with PATH search — tainted program name or args enable code execution",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Trust Boundary: OpenResty shared dict add/replace/incr (CWE-501) ---
+		{
+			ID:            "lua.ngx.shared.add",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangLua,
+			Pattern:       `ngx\.shared\.\w+:add\s*\(`,
+			ObjectType:    "ngx.shared",
+			MethodName:    "ngx.shared.DICT:add",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "OpenResty shared dict add stores potentially tainted data accessible across requests",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "lua.ngx.shared.replace",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangLua,
+			Pattern:       `ngx\.shared\.\w+:replace\s*\(`,
+			ObjectType:    "ngx.shared",
+			MethodName:    "ngx.shared.DICT:replace",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "OpenResty shared dict replace with potentially tainted data accessible across requests",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "lua.ngx.shared.incr",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangLua,
+			Pattern:       `ngx\.shared\.\w+:incr\s*\(`,
+			ObjectType:    "ngx.shared",
+			MethodName:    "ngx.shared.DICT:incr",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "OpenResty shared dict increment with potentially tainted value — can manipulate shared counters",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+
+		// --- HTTP Header Injection via lua-resty-core (CWE-113) ---
+		{
+			ID:            "lua.ngx.resp.add_header",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangLua,
+			Pattern:       `ngx\.resp\.add_header\s*\(`,
+			ObjectType:    "ngx.resp",
+			MethodName:    "ngx.resp.add_header",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "lua-resty-core response header append with potentially tainted value (CRLF injection)",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Log Injection via luaposix syslog (CWE-117) ---
+		{
+			ID:            "lua.posix.syslog",
+			Category:      taint.SnkLog,
+			Language:      rules.LangLua,
+			Pattern:       `syslog\.syslog\s*\(`,
+			ObjectType:    "posix.syslog",
+			MethodName:    "syslog.syslog",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "POSIX syslog write with potentially tainted message (log injection / log forging)",
+			CWEID:         "CWE-117",
+			OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
+		},
+
+		// --- Kong API Gateway PDK response sinks (CWE-79, CWE-113) ---
+		{
+			ID:            "lua.kong.response.exit",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangLua,
+			Pattern:       `kong\.response\.exit\s*\(`,
+			ObjectType:    "kong.response",
+			MethodName:    "kong.response.exit",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Kong PDK response body emitted to client without escaping (XSS)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.kong.response.set_raw_body",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangLua,
+			Pattern:       `kong\.response\.set_raw_body\s*\(`,
+			ObjectType:    "kong.response",
+			MethodName:    "kong.response.set_raw_body",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Kong PDK raw response body set without escaping (XSS)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.kong.response.set_header",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangLua,
+			Pattern:       `kong\.response\.set_header\s*\(`,
+			ObjectType:    "kong.response",
+			MethodName:    "kong.response.set_header",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "Kong PDK downstream response header set with tainted value (CRLF injection)",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.kong.response.add_header",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangLua,
+			Pattern:       `kong\.response\.add_header\s*\(`,
+			ObjectType:    "kong.response",
+			MethodName:    "kong.response.add_header",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "Kong PDK downstream response header append with tainted value (CRLF injection)",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Kong API Gateway PDK upstream request sinks (CWE-918, CWE-113) ---
+		{
+			ID:            "lua.kong.service.request.set_path",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangLua,
+			Pattern:       `kong\.service\.request\.set_path\s*\(`,
+			ObjectType:    "kong.service.request",
+			MethodName:    "kong.service.request.set_path",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Kong PDK upstream service request path set with tainted value (SSRF / path manipulation)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "lua.kong.service.request.set_header",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangLua,
+			Pattern:       `kong\.service\.request\.set_header\s*\(`,
+			ObjectType:    "kong.service.request",
+			MethodName:    "kong.service.request.set_header",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "Kong PDK upstream request header set with tainted value (header injection to backend)",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Kong API Gateway PDK log injection (CWE-117) ---
+		{
+			ID:            "lua.kong.log.err",
+			Category:      taint.SnkLog,
+			Language:      rules.LangLua,
+			Pattern:       `kong\.log\.err\s*\(`,
+			ObjectType:    "kong.log",
+			MethodName:    "kong.log.err",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Kong PDK error log write with tainted message (log injection / log forging)",
+			CWEID:         "CWE-117",
+			OWASPCategory: "A09:2021-Security Logging and Monitoring Failures",
+		},
+
+		// --- JWT signature bypass (CWE-345) ---
+		// lua-resty-jwt: jwt:load_jwt(token) parses claims without verifying the
+		// signature. Trusting jwt_obj.payload after load_jwt allows attackers to
+		// forge claims. The safe call is jwt:verify(secret, token) which checks
+		// the signature, or jwt:verify_jwt_obj(secret, jwt_obj) on a pre-loaded JWT.
+		{
+			ID:            "lua.resty.jwt.load_jwt",
+			Category:      taint.SnkCrypto,
+			Language:      rules.LangLua,
+			Pattern:       `jwt:load_jwt\s*\(`,
+			ObjectType:    "resty.jwt",
+			MethodName:    "jwt:load_jwt",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-resty-jwt load_jwt parses token without signature verification — claims (jwt_obj.payload) are attacker-controlled. Use jwt:verify(secret, token) instead.",
+			CWEID:         "CWE-345",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+		},
+		// --- SSRF via HTTP client libraries (CWE-918) ---
+		// LuaSec ssl.https.request — the HTTPS wrapper around LuaSocket
+		// (brunoos/luasec). Takes a URL string or table with .url field;
+		// tainted host/path enables SSRF to internal services.
+		{
+			ID:            "lua.ssl.https.request",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangLua,
+			Pattern:       `ssl\.https\.request\s*\(`,
+			ObjectType:    "ssl.https",
+			MethodName:    "ssl.https.request",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "LuaSec ssl.https.request with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		// Lua-cURL easy handle — curl.easy{url = tainted} or curl.easy(opts).
+		// Fully qualified module prefix keeps the pattern specific.
+		{
+			ID:            "lua.curl.easy",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangLua,
+			Pattern:       `[cC]URL\.easy\s*[\({]`,
+			ObjectType:    "cURL",
+			MethodName:    "cURL.easy",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Lua-cURL easy handle constructed with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		// daurnimator/lua-http — http.request.new_from_uri(uri) builds a
+		// request object and :go()/:send() performs the fetch. The URI is
+		// the primary SSRF vector.
+		{
+			ID:            "lua.http.request.new_from_uri",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangLua,
+			Pattern:       `http\.request\.new_from_uri\s*\(`,
+			ObjectType:    "http.request",
+			MethodName:    "http.request.new_from_uri",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-http request constructed from potentially tainted URI (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		// daurnimator/lua-http WebSocket client — http.websocket.new_from_uri(uri).
+		// Same SSRF risk as the HTTP request form but for ws/wss endpoints.
+		{
+			ID:            "lua.http.websocket.new_from_uri",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangLua,
+			Pattern:       `http\.websocket\.new_from_uri\s*\(|\bwebsocket\.new_from_uri\s*\(`,
+			ObjectType:    "http.websocket",
+			MethodName:    "http.websocket.new_from_uri",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-http WebSocket constructed from potentially tainted URI (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		// JakobGreen/lua-requests — Python-requests-style API. All HTTP
+		// verbs take the URL as the first argument, so a single entry with
+		// compound MethodName covers the full surface.
+		{
+			ID:            "lua.requests.http",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangLua,
+			Pattern:       `\brequests\.(?:get|post|put|delete|patch|head|options|request)\s*\(`,
+			ObjectType:    "requests",
+			MethodName:    "requests.get/requests.post/requests.put/requests.delete/requests.patch/requests.head/requests.options/requests.request",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-requests HTTP verb invoked with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		// --- SSTI: Lua template engines (CWE-1336) ---
+		// etlua (used in OpenResty/Kong stack): <% %> tags evaluate Lua code,
+		// so a tainted template string yields arbitrary Lua execution.
+		{
+			ID:            "lua.etlua.compile",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `etlua\.compile\s*\(`,
+			ObjectType:    "etlua",
+			MethodName:    "etlua.compile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "etlua.compile with tainted template string (SSTI: <% %> tags execute Lua)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.etlua.render",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `etlua\.render\s*\(`,
+			ObjectType:    "etlua",
+			MethodName:    "etlua.render",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "etlua.render with tainted template string (SSTI: compiles and executes embedded Lua)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		// lustache (Mustache.lua): tainted template strings break the logic-less
+		// guarantee and can leak data via partials / lambdas.
+		{
+			ID:            "lua.lustache.render",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `lustache:render\s*\(`,
+			ObjectType:    "lustache",
+			MethodName:    "lustache:render",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lustache:render with tainted template string (SSTI via Mustache template/partial expansion)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		// liluat: {% %} tags evaluate Lua code; both compile and render accept
+		// the raw template, so taint in either reaches code execution.
+		{
+			ID:            "lua.liluat.compile",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `liluat\.compile\s*\(`,
+			ObjectType:    "liluat",
+			MethodName:    "liluat.compile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "liluat.compile with tainted template string (SSTI: {% %} tags execute Lua)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.liluat.render",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `liluat\.render\s*\(`,
+			ObjectType:    "liluat",
+			MethodName:    "liluat.render",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "liluat.render with tainted template string (SSTI: compiles and executes embedded Lua)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		// cosmo (Kepler/Orbit stack): $name and $if{} directives are evaluated
+		// from the template string; tainted templates allow arbitrary expansion.
+		{
+			ID:            "lua.cosmo.fill",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `cosmo\.fill\s*\(`,
+			ObjectType:    "cosmo",
+			MethodName:    "cosmo.fill",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "cosmo.fill with tainted template string (SSTI: $-directives evaluated from template)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.cosmo.compile",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangLua,
+			Pattern:       `cosmo\.compile\s*\(`,
+			ObjectType:    "cosmo",
+			MethodName:    "cosmo.compile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "cosmo.compile with tainted template string (SSTI: $-directives evaluated from template)",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Neovim plugin API (CWE-78 command injection) ---
+		// vim.fn.system / vim.fn.systemlist: when called with a string, executes
+		// through the shell (sh -c). Neovim plugin ecosystem is massive and many
+		// plugins pass user config / LSP response data straight to these.
+		{
+			ID:            "lua.vim.fn.system",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.system\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.system",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim vim.fn.system executes shell command with potentially tainted input",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.fn.systemlist",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.systemlist\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.systemlist",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim vim.fn.systemlist executes shell command (list variant) with potentially tainted input",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.fn.jobstart",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.jobstart\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.jobstart",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim vim.fn.jobstart runs command via shell when passed a string (potentially tainted input)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.fn.termopen",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.termopen\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.termopen",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim vim.fn.termopen opens a terminal running shell command (potentially tainted input)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Neovim Ex-command evaluation (CWE-94 code injection) ---
+		// vim.cmd / nvim_exec / nvim_command execute arbitrary Ex commands,
+		// which include :!shell, :source, :lua — any tainted substring leads
+		// to Vim-script / Lua code injection.
+		{
+			ID:            "lua.vim.cmd",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.cmd\s*\(`,
+			ObjectType:    "vim",
+			MethodName:    "vim.cmd",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim vim.cmd evaluates Vim Ex commands (includes :!shell, :source, :lua) with potentially tainted input",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.api.nvim_exec",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.api\.nvim_exec\s*\(`,
+			ObjectType:    "vim.api",
+			MethodName:    "vim.api.nvim_exec",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim nvim_exec evaluates Vim Ex commands with potentially tainted input (code injection)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.api.nvim_command",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.api\.nvim_command\s*\(`,
+			ObjectType:    "vim.api",
+			MethodName:    "vim.api.nvim_command",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim nvim_command evaluates a Vim Ex command with potentially tainted input (code injection)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.api.nvim_exec_lua",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.api\.nvim_exec_lua\s*\(`,
+			ObjectType:    "vim.api",
+			MethodName:    "vim.api.nvim_exec_lua",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim nvim_exec_lua executes a Lua chunk built from potentially tainted input (code injection / RCE)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.api.nvim_eval",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.api\.nvim_eval\s*\(`,
+			ObjectType:    "vim.api",
+			MethodName:    "vim.api.nvim_eval",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim nvim_eval evaluates a Vimscript expression built from potentially tainted input (code injection)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.api.nvim_exec2",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.api\.nvim_exec2\s*\(`,
+			ObjectType:    "vim.api",
+			MethodName:    "vim.api.nvim_exec2",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim nvim_exec2 executes a multiline Vimscript block from potentially tainted input (code injection)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.fn.execute",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.execute\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.execute",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim vim.fn.execute runs a Vim Ex command (or list thereof) built from potentially tainted input (code injection)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.fn.eval",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.eval\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.eval",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim vim.fn.eval evaluates a Vimscript expression built from potentially tainted input (code injection)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.vim.fn.luaeval",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.luaeval\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.luaeval",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Neovim vim.fn.luaeval evaluates a Lua expression built from potentially tainted input (code injection / RCE)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Neovim plugin filesystem-mutation sinks (CWE-22 path traversal) ---
+		// The Neovim plugin ecosystem (lazy.nvim, mason.nvim, nvim-treesitter,
+		// LSP clients, …) routinely derives filesystem paths from data it does
+		// not control — LSP workspace-edit / showDocument requests, package
+		// registry manifests, downloaded archives, project-local config files.
+		// When such a path reaches one of these vim.fn.* operations the result
+		// is arbitrary file write / delete / move / read outside the intended
+		// directory.
+		{
+			ID:            "lua.vim.fn.writefile",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.writefile\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.writefile",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Neovim vim.fn.writefile({lines}, fname) writes a file at a potentially tainted path (arbitrary file write / path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "lua.vim.fn.delete",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.delete\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.delete",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Neovim vim.fn.delete(fname, {flags}) removes a file/directory at a potentially tainted path — with the \"rf\" flag it deletes recursively (arbitrary file deletion / path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "lua.vim.fn.rename",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.rename\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.rename",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Neovim vim.fn.rename(from, to) moves a file using potentially tainted paths (arbitrary file move / clobber / path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "lua.vim.fn.readfile",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangLua,
+			Pattern:       `vim\.fn\.readfile\s*\(`,
+			ObjectType:    "vim.fn",
+			MethodName:    "vim.fn.readfile",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Neovim vim.fn.readfile(fname) reads a file at a potentially tainted path (arbitrary file read / path traversal — information disclosure)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- Message broker / task queue producer trust-boundary sinks (CWE-501) ---
+		// When an OpenResty/Lua service publishes user-controlled values into one of
+		// these brokers, the payload crosses the process boundary and is later
+		// deserialized + re-processed by a consumer running in a privileged
+		// context — a CWE-501 trust-boundary violation. Mirrors Java PR #426,
+		// Kotlin PR #421, Rust PR #424, Swift PR #474, Go PR #445, C++ PR #439,
+		// C# PR #431.
+		{
+			ID:            "lua.resty.kafka.producer.send",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:p|producer|prod)\s*:\s*send\s*\(`,
+			ObjectType:    "kafka.producer",
+			MethodName:    "p:send",
+			DangerousArgs: []int{2},
+			Severity:      rules.Medium,
+			Description:   "lua-resty-kafka producer:send(topic, key, message) publishes tainted message to Kafka topic — consumer groups re-process the record in a privileged context (trust-boundary crossing, CWE-501). Validate/sanitize record values on both producer and consumer sides.",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "lua.resty.rabbitmqstomp.send",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:rabbit|rabbitmq|rmq|stomp)\s*:\s*send\s*\(`,
+			ObjectType:    "rabbitmqstomp",
+			MethodName:    "rabbit:send",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "lua-resty-rabbitmqstomp rabbit:send(msg, headers) publishes tainted message body to a RabbitMQ exchange via STOMP — consumers re-process the delivery in a privileged context (trust-boundary crossing, CWE-501). Validate/sanitize message bodies on both producer and consumer sides.",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "lua.resty.redis.publish",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangLua,
+			Pattern:       `\bred\s*:\s*publish\s*\(`,
+			ObjectType:    "resty.redis",
+			MethodName:    "red:publish",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "lua-resty-redis red:publish(channel, message) publishes tainted payload to a Redis pub/sub channel — subscribers re-process the message in a privileged context (trust-boundary crossing, CWE-501). Validate/sanitize payloads on both producer and consumer sides.",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+
+		// --- Elasticsearch / OpenSearch DSL + Mustache template injection (CWE-943, CWE-94) ---
+		// Targets the lua-elasticsearch (DhavalKapil/elasticsearch-lua) and lua-resty-elasticsearch
+		// clients. Methods on the Client class take a params table whose `body` field
+		// contains the query DSL (or NDJSON bulk operations) sent to the ES cluster.
+		// When user input is concatenated into the body, the attacker controls the
+		// query structure — DSL injection (CWE-943). For methods whose body field
+		// includes a `script` (Painless) or a Mustache template, tainted source
+		// extends to script-source injection (CWE-94). Mirrors java PR #462,
+		// kotlin PR #464, ruby PR #482, groovy PR #469, perl PR #467, js PR #457,
+		// csharp (#485 open). Method names below are unique to ES/OS clients
+		// (msearch, updateByQuery, deleteByQuery, reIndex, searchTemplate,
+		// renderSearchTemplate, putTemplate) and do not collide with other Lua
+		// DB libraries.
+		{
+			ID:            "lua.elasticsearch.client.bulk",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*bulk\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:bulk",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-elasticsearch client:bulk{body=...} sends NDJSON containing alternating action/document objects — a tainted body permits per-document field injection and cross-index data tampering (DSL injection, CWE-943). Construct bulk payloads from typed values, never string-concat user input into the NDJSON body.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.elasticsearch.client.msearch",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*msearch\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:msearch",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-elasticsearch client:msearch{body=...} body is NDJSON containing alternating header/query objects — a tainted body permits per-shard DSL injection and cross-index data exfiltration (CWE-943). Use bound query templates instead of string-concatenating user input into the NDJSON body.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.elasticsearch.client.updatebyquery",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*updateByQuery\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:updateByQuery",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-elasticsearch client:updateByQuery{body=...} body accepts a `script` (Painless) field and a `query` DSL — tainted source allows arbitrary code execution on the ES cluster and mass document mutation outside the intended scope (CWE-94). Pin the script to a stored Painless template and pass user values via the `params` map only.",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.elasticsearch.client.deletebyquery",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*deleteByQuery\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:deleteByQuery",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-elasticsearch client:deleteByQuery{body=...} with a tainted query DSL — DSL injection can delete documents outside the intended scope (bulk destructive op, CWE-943). Build queries from typed builders rather than concatenating user input into the body.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.elasticsearch.client.reindex",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*reIndex\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:reindex/client:reIndex",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-elasticsearch client:reIndex{body=...} body controls the source/dest indexes plus an optional `query` DSL and `script` (Painless) — tainted source can rewrite documents into attacker-controlled indices and run scripts on each match (CWE-943). Do not interpolate user input into the reindex body; use stored templates.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.elasticsearch.client.searchtemplate",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*searchTemplate\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:searchTemplate",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-elasticsearch client:searchTemplate{body=...} renders a Mustache template body and runs the resulting query DSL — tainted template source permits Mustache+DSL injection, controlling fields/filters after rendering (CWE-943). Use stored search templates referenced by id with bound `params` instead of inlining user input into the inline template.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.elasticsearch.client.rendersearchtemplate",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*renderSearchTemplate\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:renderSearchTemplate",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-elasticsearch client:renderSearchTemplate{body=...} renders a Mustache template inline — a tainted template source permits Mustache injection that mutates the produced query DSL before execution (CWE-943). Reference stored templates by id and pass user values via `params` only.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.elasticsearch.client.puttemplate",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*putTemplate\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:putTemplate",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-elasticsearch client:putTemplate{body=...} stores a server-side Mustache search template — later invocations render the attacker-supplied template against caller-supplied params, yielding persistent DSL injection (CWE-943). Treat stored-template bodies as code; never construct them from user input.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- lua-resty-redis Lua-script execution (CWE-94) ---
+		// Companion to existing lua.redis.eval (which catches redis.call('EVAL', ...)
+		// inside a Redis-server-side Lua sandbox). These entries cover the
+		// OpenResty / Nginx-side lua-resty-redis client where
+		// `red:eval(script, numkeys, ...)` and `red:evalsha(sha1, numkeys, ...)`
+		// dispatch EVAL / EVALSHA Redis commands to a connected Redis server.
+		// A tainted script body executes attacker-controlled Lua inside the
+		// server-side sandbox — the sandbox blocks shell access, but the
+		// attacker still has full Redis read/write across all keys, can DoS
+		// the server with tight loops, and can exfiltrate data through the
+		// reply channel. Tainted SHA1 in EVALSHA lets the attacker invoke
+		// any previously-loaded script by its hash (CWE-94 + CWE-829 chain).
+		{
+			ID:            "lua.resty.redis.eval",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `\bred\s*:\s*eval\s*\(`,
+			ObjectType:    "resty.redis",
+			MethodName:    "red:eval",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-resty-redis red:eval(script, numkeys, ...) sends EVAL to Redis — a tainted script executes arbitrary Lua in the server-side sandbox (CWE-94). The sandbox blocks shell access but the attacker still has full Redis read/write, denial-of-service via long-running scripts, and data exfiltration via the reply channel. Use SCRIPT LOAD + EVALSHA with a pinned SHA, or pre-validated literal scripts.",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.resty.redis.evalsha",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `\bred\s*:\s*evalsha\s*\(`,
+			ObjectType:    "resty.redis",
+			MethodName:    "red:evalsha",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-resty-redis red:evalsha(sha1, numkeys, ...) sends EVALSHA to Redis — a tainted SHA1 lets the caller pick any previously loaded script (CWE-94, CWE-829). If the application loads scripts dynamically from request data, this is equivalent to red:eval. Pin SHAs to compile-time constants and load scripts at startup, never from user input.",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- lua-resty-mysql asynchronous query (CWE-89) ---
+		// db:send_query(sql) is the asynchronous counterpart to db:query — it
+		// ships the SQL to the server without awaiting a result, commonly used
+		// for fire-and-forget log writes where input is concatenated. Same
+		// SQL-injection surface as db:query; treated as a Critical SQLi sink.
+		{
+			ID:            "lua.resty.mysql.send_query",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:mysql|conn|mysqlconn|m)\s*:\s*send_query\s*\(`,
+			ObjectType:    "resty.mysql",
+			MethodName:    "mysql:send_query",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "lua-resty-mysql db:send_query(sql) sends SQL asynchronously without awaiting a result — string-concatenated user input produces classic SQL injection (CWE-89). Use parameterized queries via prepared statements or quote with ndk.set_var.set_quote_sql_str before concatenation.",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Elasticsearch / OpenSearch DSL injection — basic search/scroll/count (CWE-943) ---
+		// Companion to the existing client:bulk / client:msearch / client:updateByQuery
+		// / client:deleteByQuery / client:reIndex / client:searchTemplate /
+		// client:renderSearchTemplate / client:putTemplate sinks. Covers the
+		// foundational read endpoints whose `body` field carries the query DSL.
+		// Same DSL-injection class as the existing entries; no Painless script
+		// support so SnkSQLQuery (the bucket the existing search-style ES sinks
+		// share) is the right category.
+		{
+			ID:            "lua.elasticsearch.client.search",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*search\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:search",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-elasticsearch client:search{body=...} executes a query DSL — concatenating user input into the body permits DSL injection that mutates filters, exposes documents outside the intended scope, or enables blind extraction (CWE-943). Build queries from typed builders or pass user values via match/term parameters, never inline into the DSL JSON.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.elasticsearch.client.scroll",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*scroll\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:scroll",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-elasticsearch client:scroll{body=...} continues a scrolled search — a tainted scroll_id or query body permits DSL injection that escalates from a single-page leak to a full-index walk (CWE-943). Use server-issued scroll IDs only and never interpolate user input into the scroll body.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.elasticsearch.client.count",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangLua,
+			Pattern:       `\b(?:client|es|elasticsearch|esclient|opensearch|os)\s*:\s*count\s*[({]`,
+			ObjectType:    "elasticsearch.client",
+			MethodName:    "client:count",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "lua-elasticsearch client:count{body=...} returns the count of documents matching a query DSL — tainted body permits DSL injection that bypasses access filters and reveals counts of restricted documents (information disclosure via boolean-blind oracle, CWE-943). Restrict the query body to typed builders or stored templates.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- CSV/formula injection sinks (CWE-1236) ---
+		{
+			ID:            "lua.csv.write",
+			Category:      taint.SnkCSV,
+			Language:      rules.LangLua,
+			Pattern:       `\bcsv\.write\s*\(|\bcsv\.openfile\s*\(`,
+			ObjectType:    "csv",
+			MethodName:    "csv.write/csv.openfile",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.Medium,
+			Description:   "lua-csv writers — string cells starting with =, +, -, @ become spreadsheet formulas when opened in Excel/Sheets (CSV/formula injection, CWE-1236). Sanitize at-risk cells with a leading single quote.",
+			CWEID:         "CWE-1236",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Upload (CWE-434) — OpenResty / lapis / Kong multipart upload sinks ---
+		{
+			ID:            "lua.openresty.get_body_file",
+			Category:      taint.SnkUpload,
+			Language:      rules.LangLua,
+			Pattern:       `ngx\.req\.get_body_file\s*\(`,
+			ObjectType:    "ngx.req",
+			MethodName:    "ngx.req.get_body_file",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "OpenResty ngx.req.get_body_file — path to a client-uploaded request body tempfile (CWE-434)",
+			CWEID:         "CWE-434",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+		{
+			ID:            "lua.openresty.upload_parse",
+			Category:      taint.SnkUpload,
+			Language:      rules.LangLua,
+			Pattern:       `resty\.upload(?:\.new)?\s*\(|\bupload\.new\s*\(`,
+			ObjectType:    "resty.upload",
+			MethodName:    "resty.upload.new",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "OpenResty lua-resty-upload Module.new — parses streaming multipart uploads; .read() yields tainted file part headers/body",
+			CWEID:         "CWE-434",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+		{
+			ID:            "lua.lapis.params_file",
+			Category:      taint.SnkUpload,
+			Language:      rules.LangLua,
+			Pattern:       `self\.params\.[A-Za-z_]+\.filename|self\.params\.[A-Za-z_]+\.content`,
+			ObjectType:    "lapis",
+			MethodName:    "params.<field>.filename/content",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "lapis self.params.<field>.{filename,content} — client-supplied multipart upload metadata/body (CWE-434)",
+			CWEID:         "CWE-434",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+		{
+			ID:            "lua.kong.request_get_body",
+			Category:      taint.SnkUpload,
+			Language:      rules.LangLua,
+			Pattern:       `kong\.request\.get_body\s*\(|kong\.request\.get_raw_body\s*\(`,
+			ObjectType:    "kong.request",
+			MethodName:    "kong.request.get_body",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Kong kong.request.get_body / get_raw_body — multipart upload body parser (CWE-434)",
+			CWEID:         "CWE-434",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+
+		// --- ReDoS: OpenResty PCRE regex with tainted pattern (CWE-1333) ---
+		// ngx.re.match(subject, regex, options) and ngx.re.gmatch(subject, regex)
+		// compile and run a PCRE expression (the OpenResty regex engine, which —
+		// unlike RE2 — backtracks). When the *pattern* argument carries user
+		// input an attacker can craft a catastrophically-backtracking expression
+		// (e.g. nested quantifiers like "(a+)+$") and hang the worker process —
+		// classic regular-expression denial of service. The subject at arg 0 is
+		// the normal place for user input (scanning untrusted data is the whole
+		// point of a match), so DangerousArgs is restricted to [1]: only a tainted
+		// *pattern* fires. A literal-string pattern at arg 1 carries no taint and
+		// therefore never fires. The (?:^|[^\w.]) prefix prevents substring
+		// matches inside identifiers like myngx.re.match( and ngx.re.matcher(.
+		// Classified SnkRegexDoS (medium DoS) not SnkEval (critical RCE) — a Lua
+		// PCRE pattern cannot execute code, only stall the matcher.
+		{
+			ID:            "lua.ngx.re.match.redos",
+			Category:      taint.SnkRegexDoS,
+			Language:      rules.LangLua,
+			Pattern:       `(?:^|[^\w.])ngx\.re\.(?:match|gmatch)\s*\(`,
+			ObjectType:    "ngx.re",
+			MethodName:    "ngx.re.match/ngx.re.gmatch",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "OpenResty ngx.re.match/gmatch with a potentially tainted PCRE pattern at arg 1 (ReDoS — a crafted backtracking expression hangs the worker; the subject at arg 0 is never the dangerous argument). Pin patterns to literals or escape user input before embedding it.",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+
+		// Fennel (https://fennel-lang.org) is the most widely-used Lisp dialect
+		// that compiles to Lua — heavily used in Neovim configuration and LÖVE2D
+		// game development. Handing attacker-controlled text to the Fennel
+		// compiler/evaluator yields arbitrary Lua, and therefore arbitrary code,
+		// execution — exactly like calling loadstring() on raw Lua. Both entries
+		// are scoped to the canonical `fennel` module receiver (the value returned
+		// by `require("fennel")`) so they only fire on the real API, not on
+		// unrelated .eval(/.compileString( method calls on other objects.
+		{
+			ID:            "lua.fennel.eval",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `\bfennel\.eval\s*\(`,
+			ObjectType:    "fennel",
+			MethodName:    "fennel.eval",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Fennel source evaluation (fennel.eval) compiles and runs a Fennel string as code; a tainted argument is arbitrary code execution. Never pass user input to fennel.eval.",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "lua.fennel.compilestring",
+			Category:      taint.SnkEval,
+			Language:      rules.LangLua,
+			Pattern:       `\bfennel\.compileString\s*\(`,
+			ObjectType:    "fennel",
+			MethodName:    "fennel.compileString",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Fennel source compilation (fennel.compileString) compiles an attacker-controllable Fennel string to Lua; loading/running the result is arbitrary code execution, like loadstring() on raw Lua.",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		// ngx.re.find(subject, regex, options?, ctx?, nth?) compiles and runs the
+		// same backtracking PCRE engine as match/gmatch. The regex is positional
+		// arg 1 (the subject at arg 0 is the normal place for untrusted data), so
+		// only a tainted *pattern* fires (ReDoS family completion — match/gmatch
+		// were modeled but find/gsub/sub were silently uncovered).
+		{
+			ID:            "lua.ngx.re.find.redos",
+			Category:      taint.SnkRegexDoS,
+			Language:      rules.LangLua,
+			Pattern:       `(?:^|[^\w.])ngx\.re\.find\s*\(`,
+			ObjectType:    "ngx.re",
+			MethodName:    "ngx.re.find",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "OpenResty ngx.re.find with a potentially tainted PCRE pattern at arg 1 (ReDoS — a crafted backtracking expression hangs the worker; the subject at arg 0 is never the dangerous argument). Pin patterns to literals or escape user input before embedding it.",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+		// ngx.re.gsub(subject, regex, replace, options?) — global PCRE replacement.
+		// The regex is positional arg 1; a tainted pattern is a ReDoS vector. The
+		// subject at arg 0 (untrusted data being scrubbed) is the normal use and
+		// must not fire — this is also why an ngx.re.gsub sanitizer entry (which
+		// neutralizes the *subject's* taint via a literal pattern) coexists here:
+		// the two key on different arguments and never conflict on real code.
+		{
+			ID:            "lua.ngx.re.gsub.redos",
+			Category:      taint.SnkRegexDoS,
+			Language:      rules.LangLua,
+			Pattern:       `(?:^|[^\w.])ngx\.re\.gsub\s*\(`,
+			ObjectType:    "ngx.re",
+			MethodName:    "ngx.re.gsub",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "OpenResty ngx.re.gsub with a potentially tainted PCRE pattern at arg 1 (ReDoS — a crafted backtracking expression hangs the worker; the subject at arg 0 is never the dangerous argument). Pin patterns to literals or escape user input before embedding it.",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
+		},
+		// ngx.re.sub(subject, regex, replace, options?) — single PCRE replacement;
+		// same backtracking engine and same arg layout as gsub.
+		{
+			ID:            "lua.ngx.re.sub.redos",
+			Category:      taint.SnkRegexDoS,
+			Language:      rules.LangLua,
+			Pattern:       `(?:^|[^\w.])ngx\.re\.sub\s*\(`,
+			ObjectType:    "ngx.re",
+			MethodName:    "ngx.re.sub",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "OpenResty ngx.re.sub with a potentially tainted PCRE pattern at arg 1 (ReDoS — a crafted backtracking expression hangs the worker; the subject at arg 0 is never the dangerous argument). Pin patterns to literals or escape user input before embedding it.",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A05:2021-Security Misconfiguration",
 		},
 	}
 }

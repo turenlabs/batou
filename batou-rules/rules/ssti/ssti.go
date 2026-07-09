@@ -49,7 +49,6 @@ var (
 
 // BATOU-SSTI-006: Pebble template from user string
 var (
-	rePebbleLiteral   = regexp.MustCompile(`(?i)\bnew\s+PebbleEngine\b`)
 	rePebbleCompile   = regexp.MustCompile(`(?i)\.compileTemplate\s*\(\s*(?:request\.|input|param|user|new\s+StringReader\s*\(\s*(?:request|input|param|user))`)
 	rePebbleGetLiteral = regexp.MustCompile(`(?i)pebbleEngine\.getLiteralTemplate\s*\(\s*(?:request\.|input|param|user)`)
 )
@@ -81,7 +80,6 @@ var (
 var (
 	reNunjucksRenderStr = regexp.MustCompile(`(?i)\bnunjucks\.renderString\s*\(\s*(?:req\.|request\.|user|input|param|data\b)`)
 	reNunjucksCompile   = regexp.MustCompile(`(?i)\bnunjucks\.compile\s*\(\s*(?:req\.|request\.|user|input|param|data\b)`)
-	reNunjucksFromStr   = regexp.MustCompile(`(?i)\bnew\s+nunjucks\.Environment\b`)
 )
 
 // BATOU-SSTI-011: Pug/Jade compile with user input
@@ -95,7 +93,6 @@ var (
 // BATOU-SSTI-012: Golang template.New().Parse with user input
 var (
 	reGoTemplateParse    = regexp.MustCompile(`(?i)template\.(?:New|Must)\s*\([^)]*\)\s*\.\s*Parse\s*\(\s*(?:r\.(?:FormValue|URL\.Query|Body|PostForm)|input|param|user|req\.)`)
-	reGoTemplateParseVar = regexp.MustCompile(`(?i)template\.(?:New|Must)\s*\([^)]*\)\s*\.\s*Parse\s*\(\s*[a-zA-Z_]\w*\s*\)`)
 	reGoHTMLTemplateParse = regexp.MustCompile(`(?i)(?:html/template|text/template).*\.Parse\s*\(\s*(?:r\.|input|param|user)`)
 )
 
@@ -136,14 +133,14 @@ func (r *Jinja2SSTI) Languages() []rules.Language {
 
 func (r *Jinja2SSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reJinja2RenderStr, reJinja2RenderVar} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -185,14 +182,14 @@ func (r *MakoSSTI) Languages() []rules.Language {
 
 func (r *MakoSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reMakoTemplate, reMakoFromString, reMakoTemplateLookup} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -234,14 +231,14 @@ func (r *TwigSmartySSTI) Languages() []rules.Language {
 
 func (r *TwigSmartySSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reTwigCreateTemplate, reTwigRenderStr, reSmartyFetch, reTwigFromString} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -283,14 +280,14 @@ func (r *VelocitySSTI) Languages() []rules.Language {
 
 func (r *VelocitySSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reVelocityEval, reVelocityMerge, reVelocityTemplate} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -332,14 +329,14 @@ func (r *ThymeleafSSTI) Languages() []rules.Language {
 
 func (r *ThymeleafSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reThymeleafFragment, reThymeleafExpression, reThymeleafPreProcess, reThymeleafViewReturn} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -381,14 +378,14 @@ func (r *PebbleSSTI) Languages() []rules.Language {
 
 func (r *PebbleSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{rePebbleCompile, rePebbleGetLiteral} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -430,14 +427,14 @@ func (r *FreemarkerSSTI) Languages() []rules.Language {
 
 func (r *FreemarkerSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reFreemarkerNew, reFreemarkerParse, reFreemarkerFromStr} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -479,14 +476,14 @@ func (r *ERBSSTI) Languages() []rules.Language {
 
 func (r *ERBSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reERBNew, reERBNewConcat, reERBNewInterp, reSlimEval, reHamlEval} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -528,14 +525,14 @@ func (r *HandlebarsSSTI) Languages() []rules.Language {
 
 func (r *HandlebarsSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reHandlebarsCompile, reHandlebarsPrecompile, reHandlebarsTemplate} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -577,14 +574,14 @@ func (r *NunjucksSSTI) Languages() []rules.Language {
 
 func (r *NunjucksSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reNunjucksRenderStr, reNunjucksCompile} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -626,14 +623,14 @@ func (r *PugSSTI) Languages() []rules.Language {
 
 func (r *PugSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{rePugCompile, rePugRender, reJadeCompile, reJadeRender} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -675,14 +672,14 @@ func (r *GoTemplateSSTI) Languages() []rules.Language {
 
 func (r *GoTemplateSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reGoTemplateParse, reGoHTMLTemplateParse} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),

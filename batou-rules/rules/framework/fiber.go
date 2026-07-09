@@ -67,7 +67,8 @@ func (r *FiberCORSWildcard) Languages() []rules.Language { return []rules.Langua
 
 func (r *FiberCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -76,9 +77,9 @@ func (r *FiberCORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reFiberCORSWildcard.FindString(line); m != "" {
+		if m := rules.GFindLower(reFiberCORSWildcard, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reFiberCORSDefault.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reFiberCORSDefault, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -122,14 +123,15 @@ func (r *FiberStaticTraversal) Languages() []rules.Language { return []rules.Lan
 
 func (r *FiberStaticTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reFiberStaticUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reFiberStaticUser, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -170,21 +172,22 @@ func (r *FiberBodyNoValidation) Description() string {
 func (r *FiberBodyNoValidation) Languages() []rules.Language { return []rules.Language{rules.LangGo} }
 
 func (r *FiberBodyNoValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reFiberBodyParser.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reFiberBodyParser, ctx) {
 		return nil
 	}
-	if reFiberValidation.MatchString(ctx.Content) {
+	if rules.GMatchFile(reFiberValidation, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reFiberBodyParser.MatchString(line) {
+		if rules.GMatchLower(reFiberBodyParser, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -226,14 +229,15 @@ func (r *FiberCookieInsecure) Languages() []rules.Language { return []rules.Lang
 
 func (r *FiberCookieInsecure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if !reFiberCookieInsecure.MatchString(line) {
+		if !rules.GMatchLower(reFiberCookieInsecure, line, lowered[i]) {
 			continue
 		}
 
@@ -287,7 +291,8 @@ func (r *FiberJWTWeak) Languages() []rules.Language { return []rules.Language{ru
 
 func (r *FiberJWTWeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -296,9 +301,9 @@ func (r *FiberJWTWeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reFiberJWTSecret.FindString(line); m != "" {
+		if m := rules.GFindLower(reFiberJWTSecret, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reFiberJWTHardcoded.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reFiberJWTHardcoded, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -341,21 +346,22 @@ func (r *FiberNoRateLimit) Description() string {
 func (r *FiberNoRateLimit) Languages() []rules.Language { return []rules.Language{rules.LangGo} }
 
 func (r *FiberNoRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reFiberApp.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reFiberApp, ctx) {
 		return nil
 	}
-	if reFiberLimiter.MatchString(ctx.Content) {
+	if rules.GMatchFile(reFiberLimiter, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reFiberApp.MatchString(line) {
+		if rules.GMatchLower(reFiberApp, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -398,14 +404,15 @@ func (r *FiberTemplateInjection) Languages() []rules.Language { return []rules.L
 
 func (r *FiberTemplateInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reFiberTemplateInject.FindString(line); m != "" {
+		if m := rules.GFindLower(reFiberTemplateInject, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -446,21 +453,22 @@ func (r *FiberNoHelmet) Description() string {
 func (r *FiberNoHelmet) Languages() []rules.Language { return []rules.Language{rules.LangGo} }
 
 func (r *FiberNoHelmet) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reFiberApp.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reFiberApp, ctx) {
 		return nil
 	}
-	if reFiberHelmet.MatchString(ctx.Content) {
+	if rules.GMatchFile(reFiberHelmet, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reFiberApp.MatchString(line) {
+		if rules.GMatchLower(reFiberApp, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

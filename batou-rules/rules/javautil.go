@@ -16,7 +16,7 @@ import (
 //   - String literal assignment: bar = "constant"
 //   - ESAPI/StringEscapeUtils/HtmlUtils sanitization
 //   - Always-true conditional branches (if-else and ternary)
-//   - Same-file method body analysis (doSomething pattern)
+//   - Same-file helper method body analysis (constant-return helpers)
 //   - Switch with safe default branch
 //   - Safe list/map extraction
 
@@ -71,7 +71,7 @@ var reJavaGetPropertyDefault = regexp.MustCompile(`getProperty\s*\([^,]+,\s*"([^
 // pattern like `"SELECT..." + bar + "..."` or `cmd + bar`. Returns empty string if not found.
 func JavaExtractConcatVar(line string) string {
 	// First try: "literal" + VAR (most specific)
-	m := reJavaConcatVar.FindStringSubmatch(line)
+	m := GFindSubmatch(reJavaConcatVar, line)
 	if len(m) > 1 {
 		v := m[1]
 		if !javaIsKeyword(v) {
@@ -140,34 +140,7 @@ func JavaExtractArgVar(line string) string {
 //   - String literals: "some text"
 //   - Sanitizer function calls (ESAPI, StringEscapeUtils, HtmlUtils)
 //   - Ternary with string-literal true-branch and tainted false-branch
-func javaRHSIsDefinitelySafe(rhs string) bool {
-	// String literal: bar = "constant";
-	if reJavaStringLiteral.MatchString(rhs) {
-		return true
-	}
-
-	// Sanitizer call: bar = StringEscapeUtils.escapeHtml(param);
-	if reJavaSanitizer.MatchString(rhs) {
-		return true
-	}
-
-	// Ternary: bar = COND ? "literal" : param;
-	// Only safe if the literal branch is the one always taken.
-	// Use text signals: "always" means condition is true (literal taken),
-	// "never" means condition is false (param taken, NOT safe).
-	if strings.Contains(rhs, "?") {
-		if reJavaTernaryLiteralParam.MatchString(rhs) {
-			return javaTernaryLiteralBranchIsAlwaysTaken(rhs)
-		}
-		// Reverse ternary: COND ? param : "literal" — safe only if condition always false
-		if reJavaTernaryParamLiteral.MatchString(rhs) {
-			return javaTernaryParamBranchIsNeverTaken(rhs)
-		}
-	}
-
-	return false
-}
-
+//
 // javaTernaryLiteralBranchIsAlwaysTaken checks if a ternary `COND ? "lit" : param`
 // always takes the literal branch. Uses text signals in the literal.
 func javaTernaryLiteralBranchIsAlwaysTaken(rhs string) bool {
@@ -236,13 +209,6 @@ func JavaSinkVarIsSafe(lines []string, sinkIdx int) bool {
 	}
 	line := lines[sinkIdx]
 
-	// Check 1 (global): param source is a known-safe method (returns hardcoded value).
-	// This check doesn't need a variable name — if param originates from getTheValue(),
-	// the entire file's injection/XSS findings are FPs.
-	if JavaParamSourceIsSafe(lines) {
-		return true
-	}
-
 	// Try concat variable first (e.g., "SELECT..." + bar)
 	varName := JavaExtractConcatVar(line)
 	if varName == "" {
@@ -266,35 +232,16 @@ func JavaSinkVarIsSafe(lines []string, sinkIdx int) bool {
 	return false
 }
 
-// JavaParamSourceIsSafe checks if the param variable originates from a
-// known-safe source method that returns a hardcoded value.
-func JavaParamSourceIsSafe(lines []string) bool {
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		// getTheValue() is a known-safe helper that always returns a hardcoded string
-		if strings.Contains(trimmed, ".getTheValue(") &&
-			(strings.HasPrefix(trimmed, "String param = ") ||
-				strings.HasPrefix(trimmed, "param = ")) {
-			return true
-		}
-	}
-	return false
-}
-
-// reJavaDoSomethingAssign matches: VAR = ...doSomething(...) or VAR = new Test().doSomething(...)
-var reJavaDoSomethingAssign = regexp.MustCompile(`(\w+)\s*=\s*.*\.?doSomething\(`)
-
-// reJavaMethodDecl matches a doSomething method declaration in the same file.
-var reJavaMethodDecl = regexp.MustCompile(`(?:public|private|protected)?\s*(?:static\s+)?String\s+doSomething\s*\(`)
+// reJavaHelperCallName extracts candidate method names from a call-bearing RHS
+// (`new Test().doSomething(param)` → Test, doSomething). Each candidate is
+// checked against same-file String-returning method declarations, so
+// constructor names and external calls fall out naturally.
+var reJavaHelperCallName = regexp.MustCompile(`([A-Za-z_]\w*)\s*\(`)
 
 // reJavaSwitchDefault matches a switch default label.
 var reJavaSwitchDefault = regexp.MustCompile(`^\s*default\s*:`)
 
 // reJavaSafeListAdd matches: list.add("literal")
-var reJavaSafeListAdd = regexp.MustCompile(`\.add\s*\(\s*"[^"]*"\s*\)`)
-
-// reJavaListGet matches: list.get(N)
-var reJavaListGet = regexp.MustCompile(`\.get\s*\(\s*\d+\s*\)`)
 
 // reJavaMapGet matches: map.get("key")
 var reJavaMapGet = regexp.MustCompile(`\.get\s*\(\s*"[^"]*"\s*\)`)
@@ -305,20 +252,31 @@ var reJavaMapPutSafe = regexp.MustCompile(`\.put\s*\(\s*"[^"]*"\s*,\s*"[^"]*"\s*
 // maxMethodBodyDepth limits recursion between javaVarIsSafeInBlock ↔ javaMethodBodyReturnIsSafe.
 const maxMethodBodyDepth = 2
 
-// JavaMethodBodyReturnIsSafe extracts a doSomething method body from the file
+// JavaMethodBodyReturnIsSafe extracts the named same-file helper method's body
 // and checks if the returned variable is always assigned a safe value.
-func JavaMethodBodyReturnIsSafe(lines []string) bool {
-	return javaMethodBodyReturnIsSafeD(lines, 0)
+func JavaMethodBodyReturnIsSafe(lines []string, methodName string) bool {
+	return javaMethodBodyReturnIsSafeD(lines, methodName, 0)
 }
 
-func javaMethodBodyReturnIsSafeD(lines []string, depth int) bool {
-	if depth >= maxMethodBodyDepth {
+// javaStringMethodDeclLine reports whether line declares a String-returning
+// method with the given name (`... String <name>(...)`).
+func javaStringMethodDeclLine(line, methodName string) bool {
+	idx := strings.Index(line, "String "+methodName)
+	if idx < 0 {
 		return false
 	}
-	// Find the doSomething method declaration
+	rest := strings.TrimLeft(line[idx+len("String "+methodName):], " \t")
+	return strings.HasPrefix(rest, "(")
+}
+
+func javaMethodBodyReturnIsSafeD(lines []string, methodName string, depth int) bool {
+	if depth >= maxMethodBodyDepth || methodName == "" {
+		return false
+	}
+	// Find the helper method declaration in this file.
 	methodStart := -1
 	for i, line := range lines {
-		if reJavaMethodDecl.MatchString(line) {
+		if javaStringMethodDeclLine(line, methodName) {
 			methodStart = i
 			break
 		}
@@ -350,10 +308,6 @@ func javaMethodBodyReturnIsSafeD(lines []string, depth int) bool {
 }
 
 // javaMethodBodyIsSafe checks if a method body's return variable is safe.
-func javaMethodBodyIsSafe(lines []string, bodyStart, bodyEnd int) bool {
-	return javaMethodBodyIsSafeD(lines, bodyStart, bodyEnd, 0)
-}
-
 func javaMethodBodyIsSafeD(lines []string, bodyStart, bodyEnd, depth int) bool {
 	// Find the return statement to identify the returned variable
 	retVar := ""
@@ -491,18 +445,6 @@ func javaVarIsSafeInBlockD(lines []string, blockStart, sinkIdx int, varName stri
 			}
 		}
 
-		// Safe list: bar = valuesList.get(N) — check the original line for
-		// a "safe" annotation comment (OWASP benchmark pattern)
-		if reJavaListGet.MatchString(rhs) {
-			origLine := lines[i]
-			if cmtIdx := strings.Index(origLine, "//"); cmtIdx >= 0 {
-				comment := strings.ToLower(origLine[cmtIdx:])
-				if strings.Contains(comment, "safe") && !strings.Contains(comment, "unsafe") {
-					return true
-				}
-			}
-		}
-
 		// Safe map: bar = map.get("key") where that specific key was put with a literal
 		if reJavaMapGet.MatchString(rhs) {
 			if javaMapGetKeyIsSafe(lines, blockStart, i, rhs) {
@@ -510,15 +452,19 @@ func javaVarIsSafeInBlockD(lines []string, blockStart, sinkIdx int, varName stri
 			}
 		}
 
-		// doSomething call: bar = ...doSomething(...)
-		if strings.Contains(rhs, "doSomething(") {
-			// Check 1: same-file doSomething method body returns safe value
-			if javaMethodBodyReturnIsSafeD(lines, depth+1) {
-				return true
-			}
-			// Check 2: external doSomething (ThingFactory) — safe if the argument is a literal
-			if javaDoSomethingArgIsSafe(lines, blockStart, i, rhs) {
-				return true
+		// Helper call: bar = ...helper(...) — safe when a same-file
+		// String-returning method of that name provably returns a constant.
+		// Helpers defined elsewhere stay unresolved (not safe): without the
+		// body there is no evidence.
+		if strings.Contains(rhs, "(") {
+			for _, m := range reJavaHelperCallName.FindAllStringSubmatch(rhs, 4) {
+				name := m[1]
+				if javaIsKeyword(name) {
+					continue
+				}
+				if javaMethodBodyReturnIsSafeD(lines, name, depth+1) {
+					return true
+				}
 			}
 		}
 
@@ -543,20 +489,6 @@ func javaVarIsSafeInBlockD(lines []string, blockStart, sinkIdx int, varName stri
 }
 
 // javaListOnlyHasLiterals checks if list.add() calls before lineIdx only add string literals.
-func javaListOnlyHasLiterals(lines []string, start, end int) bool {
-	hasAdd := false
-	for i := start; i < end; i++ {
-		trimmed := strings.TrimSpace(lines[i])
-		if strings.Contains(trimmed, ".add(") {
-			hasAdd = true
-			if !reJavaSafeListAdd.MatchString(trimmed) {
-				return false // non-literal add
-			}
-		}
-	}
-	return hasAdd
-}
-
 // reJavaMapGetKey extracts the key from map.get("key")
 var reJavaMapGetKey = regexp.MustCompile(`\.get\s*\(\s*"([^"]*)"`)
 
@@ -600,7 +532,7 @@ func JavaDigestVarIsSafe(lines []string, lineIdx int) bool {
 	}
 	line := lines[lineIdx]
 
-	m := reJavaGetInstanceVar.FindStringSubmatch(line)
+	m := GFindSubmatch(reJavaGetInstanceVar, line)
 	if len(m) < 2 {
 		return false
 	}
@@ -648,50 +580,10 @@ func javaIsKnownWeakHash(alg string) bool {
 		alg == "SHA1" || alg == "SHA-1" || alg == "SHA"
 }
 
-// reJavaDoSomethingArg extracts the argument from doSomething(argVar)
-var reJavaDoSomethingArg = regexp.MustCompile(`doSomething\s*\(\s*([a-zA-Z_]\w*)\s*\)`)
-
-// javaDoSomethingArgIsSafe checks if the argument passed to doSomething()
-// is a string literal or a variable assigned from a string literal.
-// This handles the ThingFactory.createThing().doSomething(safeVar) pattern.
-func javaDoSomethingArgIsSafe(lines []string, blockStart, callIdx int, rhs string) bool {
-	m := reJavaDoSomethingArg.FindStringSubmatch(rhs)
-	if len(m) < 2 {
-		return false
-	}
-	argName := m[1]
-	if javaIsKeyword(argName) {
-		return false
-	}
-
-	// Check if the argument variable is assigned from a literal
-	assignSuffix1 := argName + " = "
-	assignSuffix2 := "String " + argName + " = "
-	for i := callIdx - 1; i >= blockStart; i-- {
-		trimmed := strings.TrimSpace(lines[i])
-		var argRHS string
-		if strings.HasPrefix(trimmed, assignSuffix1) {
-			argRHS = strings.TrimSpace(trimmed[len(assignSuffix1):])
-		} else if strings.HasPrefix(trimmed, assignSuffix2) {
-			argRHS = strings.TrimSpace(trimmed[len(assignSuffix2):])
-		} else {
-			continue
-		}
-		// Strip inline comment first, then trailing semicolon
-		if idx := strings.Index(argRHS, "//"); idx >= 0 {
-			argRHS = strings.TrimSpace(argRHS[:idx])
-		}
-		argRHS = strings.TrimSuffix(argRHS, ";")
-		argRHS = strings.TrimSpace(argRHS)
-		return reJavaStringLiteral.MatchString(argRHS)
-	}
-	return false
-}
-
 // JavaGetPropertyDefault extracts the default value from a getProperty("key", "default") call.
 // Returns the default value string, or empty if not found.
 func JavaGetPropertyDefault(line string) string {
-	m := reJavaGetPropertyDefault.FindStringSubmatch(line)
+	m := GFindSubmatch(reJavaGetPropertyDefault, line)
 	if len(m) > 1 {
 		return m[1]
 	}
@@ -699,6 +591,3 @@ func JavaGetPropertyDefault(line string) string {
 }
 
 // javaLineIndent returns the number of leading whitespace characters.
-func javaLineIndent(line string) int {
-	return len(line) - len(strings.TrimLeft(line, " \t"))
-}

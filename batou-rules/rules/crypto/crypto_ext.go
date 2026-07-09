@@ -13,19 +13,18 @@ import (
 
 // BATOU-CRY-019: ECB mode encryption (no diffusion)
 var (
-	reECBModeGo     = regexp.MustCompile(`cipher\.NewCBCEncrypter|cipher\.NewCBCDecrypter`)
-	reECBModeJava   = regexp.MustCompile(`Cipher\.getInstance\s*\(\s*["']AES/ECB`)
-	reECBModePy     = regexp.MustCompile(`(?:AES\.MODE_ECB|mode\s*=\s*['"]ECB['"])`)
-	reECBModeJS     = regexp.MustCompile(`createCipher(?:iv)?\s*\(\s*['"]aes-\d+-ecb['"]`)
-	reECBModeCSharp = regexp.MustCompile(`(?:CipherMode\.ECB|Mode\s*=\s*CipherMode\.ECB)`)
+	reECBModeJava    = regexp.MustCompile(`Cipher\.getInstance\s*\(\s*["']AES/ECB`)
+	reECBModePy      = regexp.MustCompile(`(?:AES\.MODE_ECB|mode\s*=\s*['"]ECB['"])`)
+	reECBModeJS      = regexp.MustCompile(`createCipher(?:iv)?\s*\(\s*['"]aes-\d+-ecb['"]`)
+	reECBModeCSharp  = regexp.MustCompile(`(?:CipherMode\.ECB|Mode\s*=\s*CipherMode\.ECB)`)
 	reECBModeGeneric = regexp.MustCompile(`(?i)\bECB\b.*(?i)(?:cipher|encrypt|aes|block|mode)`)
 )
 
 // BATOU-CRY-020: Static/hardcoded IV/nonce
 var (
-	reStaticIVAllZero  = regexp.MustCompile(`(?i)\b(?:iv|nonce|initialization.?vector)\s*[:=]\s*(?:\[\]byte\s*\{(?:\s*0\s*,?\s*){4,}|b?["']\\x00|bytes\s*\(\s*(?:16|12|8)\s*\)|new\s+byte\s*\[\s*(?:16|12|8)\s*\])`)
-	reStaticIVRepeat   = regexp.MustCompile(`(?i)\b(?:iv|nonce)\s*[:=]\s*(?:\[\]byte\s*\{\s*(?:0x[0-9a-fA-F]{2}\s*,\s*){3,}|b?["'][^"']{8,}["'])`)
-	reIVFromConst      = regexp.MustCompile(`(?i)\b(?:iv|nonce)\s*[:=]\s*(?:FIXED_|STATIC_|DEFAULT_|CONST_)`)
+	reStaticIVAllZero = regexp.MustCompile(`(?i)\b(?:iv|nonce|initialization.?vector)\s*[:=]\s*(?:\[\]byte\s*\{(?:\s*0\s*,?\s*){4,}|b?["']\\x00|bytes\s*\(\s*(?:16|12|8)\s*\)|new\s+byte\s*\[\s*(?:16|12|8)\s*\])`)
+	reStaticIVRepeat  = regexp.MustCompile(`(?i)\b(?:iv|nonce)\s*[:=]\s*(?:\[\]byte\s*\{\s*(?:0x[0-9a-fA-F]{2}\s*,\s*){3,}|b?["'][^"']{8,}["'])`)
+	reIVFromConst     = regexp.MustCompile(`(?i)\b(?:iv|nonce)\s*[:=]\s*(?:FIXED_|STATIC_|DEFAULT_|CONST_)`)
 )
 
 // BATOU-CRY-021: Weak key derivation
@@ -37,23 +36,26 @@ var (
 
 // BATOU-CRY-022: Insecure random for cryptographic use
 var (
-	reCryptoCtxRandom  = regexp.MustCompile(`(?i)(?:key|iv|nonce|salt|token|secret|session)\s*[:=]\s*(?:rand\.|random\.|Math\.random|mt_rand|array_rand|Random\.)`)
-	reKeyGenMathRand   = regexp.MustCompile(`(?i)(?:generate|create|make|new).{0,20}(?:key|token|nonce|salt|iv|secret)\w*.*(?:rand\.|random\.|Math\.random|mt_rand)`)
+	reCryptoCtxRandom = regexp.MustCompile(`(?i)(?:key|iv|nonce|salt|token|secret|session)\s*[:=]\s*(?:rand\.|random\.|Math\.random|mt_rand|array_rand|Random\.)`)
+	reKeyGenMathRand  = regexp.MustCompile(`(?i)(?:generate|create|make|new).{0,20}(?:key|token|nonce|salt|iv|secret)\w*.*(?:rand\.|random\.|Math\.random|mt_rand)`)
 )
 
 // BATOU-CRY-023: RSA key size < 2048 bits
 var (
-	reRSASmallKeyPy   = regexp.MustCompile(`(?i)(?:RSA\.generate|rsa\.generate_private_key)\s*\(\s*(?:512|768|1024)\b`)
-	reRSASmallKeyRuby = regexp.MustCompile(`(?i)OpenSSL::PKey::RSA\.(?:new|generate)\s*\(\s*(?:512|768|1024)\b`)
+	reRSASmallKeyPy     = regexp.MustCompile(`(?i)(?:RSA\.generate|rsa\.generate_private_key)\s*\(\s*(?:512|768|1024)\b`)
+	reRSASmallKeyRuby   = regexp.MustCompile(`(?i)OpenSSL::PKey::RSA\.(?:new|generate)\s*\(\s*(?:512|768|1024)\b`)
 	reRSASmallKeyCSharp = regexp.MustCompile(`(?i)(?:RSACryptoServiceProvider|RSA\.Create)\s*\(\s*(?:512|768|1024)\b`)
-	reRSASmallKeyJS   = regexp.MustCompile(`(?i)(?:modulusLength|key_size|keySize)\s*:\s*(?:512|768|1024)\b`)
+	reRSASmallKeyJS     = regexp.MustCompile(`(?i)(?:modulusLength|key_size|keySize)\s*:\s*(?:512|768|1024)\b`)
 )
 
 // BATOU-CRY-024: Disabled certificate validation
 var (
-	reCertValidationOff = regexp.MustCompile(`(?i)(?:VERIFY_NONE|verify\s*(?:=|:)\s*(?:false|False|0)|CERT_NONE|SSL_VERIFY_NONE|ServerCertificateValidationCallback\s*=\s*\(\s*[^)]*\)\s*=>\s*true|checkServerIdentity\s*:\s*\(\)\s*=>\s*(?:undefined|null|true)|ServicePointManager\.ServerCertificateValidationCallback\s*=\s*delegate\s*\{?\s*return\s+true)`)
-	reCurlInsecure     = regexp.MustCompile(`(?i)(?:CURLOPT_SSL_VERIFYPEER\s*(?:,|=>)\s*(?:false|0)|CURLOPT_SSL_VERIFYHOST\s*(?:,|=>)\s*(?:false|0))`)
-	reHttpClientNoCert = regexp.MustCompile(`(?i)(?:SSLContext\.(?:getInstance|getDefault)|TrustAllCerts|AcceptAllCerts|NullHostnameVerifier|AllowAllHostnameVerifier|ALLOW_ALL_HOSTNAME_VERIFIER)`)
+	// `\bverify` word boundary prevents false positives on Go's
+	// `InsecureSkipVerify: false` (which means verification is ENABLED —
+	// the exact opposite of `verify=False` in Python's requests library).
+	reCertValidationOff = regexp.MustCompile(`(?i)(?:VERIFY_NONE|\bverify\s*(?:=|:)\s*(?:false|False|0)|CERT_NONE|SSL_VERIFY_NONE|ServerCertificateValidationCallback\s*=\s*\(\s*[^)]*\)\s*=>\s*true|checkServerIdentity\s*:\s*\(\)\s*=>\s*(?:undefined|null|true)|ServicePointManager\.ServerCertificateValidationCallback\s*=\s*delegate\s*\{?\s*return\s+true|InsecureSkipVerify\s*:\s*true)`)
+	reCurlInsecure      = regexp.MustCompile(`(?i)(?:CURLOPT_SSL_VERIFYPEER\s*(?:,|=>)\s*(?:false|0)|CURLOPT_SSL_VERIFYHOST\s*(?:,|=>)\s*(?:false|0))`)
+	reHttpClientNoCert  = regexp.MustCompile(`(?i)(?:SSLContext\.(?:getInstance|getDefault)|TrustAllCerts|AcceptAllCerts|NullHostnameVerifier|AllowAllHostnameVerifier|ALLOW_ALL_HOSTNAME_VERIFIER)`)
 )
 
 // BATOU-CRY-025: Deprecated TLS version
@@ -93,8 +95,8 @@ func init() {
 
 type ECBModeEncryption struct{}
 
-func (r *ECBModeEncryption) ID() string                     { return "BATOU-CRY-019" }
-func (r *ECBModeEncryption) Name() string                   { return "ECBModeEncryption" }
+func (r *ECBModeEncryption) ID() string                      { return "BATOU-CRY-019" }
+func (r *ECBModeEncryption) Name() string                    { return "ECBModeEncryption" }
 func (r *ECBModeEncryption) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ECBModeEncryption) Description() string {
 	return "Detects use of ECB (Electronic Codebook) mode for block cipher encryption, which does not provide diffusion and reveals patterns in encrypted data."
@@ -105,7 +107,7 @@ func (r *ECBModeEncryption) Languages() []rules.Language {
 
 func (r *ECBModeEncryption) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	langPats := map[rules.Language][]*regexp.Regexp{
 		rules.LangJava:       {reECBModeJava},
 		rules.LangPython:     {reECBModePy},
@@ -124,16 +126,16 @@ func (r *ECBModeEncryption) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range pats {
-			if m := p.FindString(line); m != "" {
+			if m := rules.GFind(p, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:       "ECB mode encryption (no diffusion)",
 					Description: "ECB mode encrypts each block independently, preserving patterns in the plaintext. Identical plaintext blocks produce identical ciphertext blocks (the 'ECB penguin' problem), leaking data structure.",
-					FilePath: ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
+					FilePath:    ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
 					Suggestion:    "Use AES-GCM or AES-CBC with HMAC. GCM provides both confidentiality and authenticity. Never use ECB mode for any purpose.",
 					CWEID:         "CWE-327",
 					OWASPCategory: "A02:2021-Cryptographic Failures",
-					Language: ctx.Language, Confidence: "high",
+					Language:      ctx.Language, Confidence: "high",
 					Tags: []string{"crypto", "ecb", "block-cipher"},
 				})
 				break
@@ -149,8 +151,8 @@ func (r *ECBModeEncryption) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type StaticIVNonce struct{}
 
-func (r *StaticIVNonce) ID() string                     { return "BATOU-CRY-020" }
-func (r *StaticIVNonce) Name() string                   { return "StaticIVNonce" }
+func (r *StaticIVNonce) ID() string                      { return "BATOU-CRY-020" }
+func (r *StaticIVNonce) Name() string                    { return "StaticIVNonce" }
 func (r *StaticIVNonce) DefaultSeverity() rules.Severity { return rules.High }
 func (r *StaticIVNonce) Description() string {
 	return "Detects static, all-zero, or constant-derived initialization vectors and nonces, which make encryption deterministic and compromise security."
@@ -161,7 +163,7 @@ func (r *StaticIVNonce) Languages() []rules.Language {
 
 func (r *StaticIVNonce) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	pats := []*regexp.Regexp{reStaticIVAllZero, reStaticIVRepeat, reIVFromConst}
 
 	for i, line := range lines {
@@ -171,16 +173,16 @@ func (r *StaticIVNonce) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range pats {
-			if m := p.FindString(line); m != "" {
+			if m := rules.GFind(p, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:       "Static or hardcoded IV/nonce",
 					Description: "A static, all-zero, or constant-derived IV/nonce makes encryption deterministic. For AES-GCM, nonce reuse is catastrophic (key recovery). For AES-CBC, it enables chosen-plaintext attacks.",
-					FilePath: ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
+					FilePath:    ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
 					Suggestion:    "Generate a fresh random IV/nonce for each encryption operation using a CSPRNG. For AES-GCM, use 12-byte random nonces. For AES-CBC, use 16-byte random IVs.",
 					CWEID:         "CWE-329",
 					OWASPCategory: "A02:2021-Cryptographic Failures",
-					Language: ctx.Language, Confidence: "high",
+					Language:      ctx.Language, Confidence: "high",
 					Tags: []string{"crypto", "iv", "nonce", "static"},
 				})
 				break
@@ -196,8 +198,8 @@ func (r *StaticIVNonce) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WeakKeyDerivation struct{}
 
-func (r *WeakKeyDerivation) ID() string                     { return "BATOU-CRY-021" }
-func (r *WeakKeyDerivation) Name() string                   { return "WeakKeyDerivation" }
+func (r *WeakKeyDerivation) ID() string                      { return "BATOU-CRY-021" }
+func (r *WeakKeyDerivation) Name() string                    { return "WeakKeyDerivation" }
 func (r *WeakKeyDerivation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WeakKeyDerivation) Description() string {
 	return "Detects use of plain hash functions (MD5, SHA-1, SHA-256) to derive encryption keys from passwords instead of proper key derivation functions (PBKDF2, scrypt, Argon2, HKDF)."
@@ -208,11 +210,11 @@ func (r *WeakKeyDerivation) Languages() []rules.Language {
 
 func (r *WeakKeyDerivation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Skip if proper KDF is present
-	if reProperKDFPresent.MatchString(ctx.Content) {
+	if rules.GMatchFile(reProperKDFPresent, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	pats := []*regexp.Regexp{reWeakKDF, reSimpleHashKey}
 
 	for i, line := range lines {
@@ -222,16 +224,16 @@ func (r *WeakKeyDerivation) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range pats {
-			if m := p.FindString(line); m != "" {
+			if m := rules.GFind(p, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:       "Weak key derivation: hash used instead of KDF",
 					Description: "Plain hash functions (MD5, SHA-256, etc.) are not suitable for deriving encryption keys from passwords. They are too fast (enabling brute-force) and lack salt support.",
-					FilePath: ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
+					FilePath:    ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
 					Suggestion:    "Use PBKDF2, scrypt, or Argon2id for password-based key derivation. Use HKDF for deriving keys from other key material. These provide computational hardness and salt support.",
 					CWEID:         "CWE-916",
 					OWASPCategory: "A02:2021-Cryptographic Failures",
-					Language: ctx.Language, Confidence: "high",
+					Language:      ctx.Language, Confidence: "high",
 					Tags: []string{"crypto", "kdf", "key-derivation"},
 				})
 				break
@@ -247,8 +249,8 @@ func (r *WeakKeyDerivation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureRandomCrypto struct{}
 
-func (r *InsecureRandomCrypto) ID() string                     { return "BATOU-CRY-022" }
-func (r *InsecureRandomCrypto) Name() string                   { return "InsecureRandomCrypto" }
+func (r *InsecureRandomCrypto) ID() string                      { return "BATOU-CRY-022" }
+func (r *InsecureRandomCrypto) Name() string                    { return "InsecureRandomCrypto" }
 func (r *InsecureRandomCrypto) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureRandomCrypto) Description() string {
 	return "Detects non-cryptographic random number generators used to generate cryptographic material (keys, IVs, nonces, salts, tokens)."
@@ -259,7 +261,7 @@ func (r *InsecureRandomCrypto) Languages() []rules.Language {
 
 func (r *InsecureRandomCrypto) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	pats := []*regexp.Regexp{reCryptoCtxRandom, reKeyGenMathRand}
 
 	for i, line := range lines {
@@ -269,16 +271,16 @@ func (r *InsecureRandomCrypto) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range pats {
-			if m := p.FindString(line); m != "" {
+			if m := rules.GFind(p, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:       "Insecure random used for cryptographic material",
 					Description: "Non-cryptographic PRNG (Math.random, random, mt_rand, etc.) used to generate keys, IVs, nonces, salts, or tokens. The output is predictable, making the cryptographic material weak.",
-					FilePath: ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
+					FilePath:    ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
 					Suggestion:    "Use a CSPRNG: crypto/rand (Go), secrets (Python), crypto.randomBytes (Node.js), SecureRandom (Java/Ruby), random_bytes (PHP), RNGCryptoServiceProvider (C#).",
 					CWEID:         "CWE-338",
 					OWASPCategory: "A02:2021-Cryptographic Failures",
-					Language: ctx.Language, Confidence: "high",
+					Language:      ctx.Language, Confidence: "high",
 					Tags: []string{"crypto", "random", "key-generation"},
 				})
 				break
@@ -294,8 +296,8 @@ func (r *InsecureRandomCrypto) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RSASmallKeyBroad struct{}
 
-func (r *RSASmallKeyBroad) ID() string                     { return "BATOU-CRY-023" }
-func (r *RSASmallKeyBroad) Name() string                   { return "RSASmallKeyBroad" }
+func (r *RSASmallKeyBroad) ID() string                      { return "BATOU-CRY-023" }
+func (r *RSASmallKeyBroad) Name() string                    { return "RSASmallKeyBroad" }
 func (r *RSASmallKeyBroad) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RSASmallKeyBroad) Description() string {
 	return "Detects RSA key generation with key sizes less than 2048 bits across Python, Ruby, C#, and JavaScript/TypeScript, in addition to Go and Java covered by CRY-006."
@@ -306,7 +308,7 @@ func (r *RSASmallKeyBroad) Languages() []rules.Language {
 
 func (r *RSASmallKeyBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	langPats := map[rules.Language][]*regexp.Regexp{
 		rules.LangPython:     {reRSASmallKeyPy},
@@ -327,16 +329,16 @@ func (r *RSASmallKeyBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range pats {
-			if m := p.FindString(line); m != "" {
+			if m := rules.GFind(p, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:       "RSA key size too small (< 2048 bits)",
 					Description: "RSA keys smaller than 2048 bits can be factored with current computing resources. NIST recommends a minimum of 2048 bits, with 3072+ bits for long-term security.",
-					FilePath: ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
+					FilePath:    ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
 					Suggestion:    "Use RSA-2048 or larger key sizes. For new applications, consider RSA-4096 or switch to elliptic curve cryptography (P-256 or Ed25519).",
 					CWEID:         "CWE-326",
 					OWASPCategory: "A02:2021-Cryptographic Failures",
-					Language: ctx.Language, Confidence: "high",
+					Language:      ctx.Language, Confidence: "high",
 					Tags: []string{"crypto", "rsa", "key-size"},
 				})
 				break
@@ -352,8 +354,8 @@ func (r *RSASmallKeyBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DisabledCertValidation struct{}
 
-func (r *DisabledCertValidation) ID() string                     { return "BATOU-CRY-024" }
-func (r *DisabledCertValidation) Name() string                   { return "DisabledCertValidation" }
+func (r *DisabledCertValidation) ID() string                      { return "BATOU-CRY-024" }
+func (r *DisabledCertValidation) Name() string                    { return "DisabledCertValidation" }
 func (r *DisabledCertValidation) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *DisabledCertValidation) Description() string {
 	return "Detects disabled TLS/SSL certificate validation across multiple languages and libraries, enabling man-in-the-middle attacks."
@@ -364,7 +366,7 @@ func (r *DisabledCertValidation) Languages() []rules.Language {
 
 func (r *DisabledCertValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	pats := []*regexp.Regexp{reCertValidationOff, reCurlInsecure, reHttpClientNoCert}
 
 	for i, line := range lines {
@@ -374,16 +376,16 @@ func (r *DisabledCertValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range pats {
-			if m := p.FindString(line); m != "" {
+			if m := rules.GFind(p, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:       "TLS/SSL certificate validation disabled",
 					Description: "Certificate validation is disabled, allowing connections to any server regardless of certificate validity. This enables man-in-the-middle attacks where an attacker can intercept, read, and modify all traffic.",
-					FilePath: ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
+					FilePath:    ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
 					Suggestion:    "Enable certificate validation. If custom CA certificates are needed, configure a custom trust store instead of disabling validation entirely.",
 					CWEID:         "CWE-295",
 					OWASPCategory: "A02:2021-Cryptographic Failures",
-					Language: ctx.Language, Confidence: "high",
+					Language:      ctx.Language, Confidence: "high",
 					Tags: []string{"crypto", "tls", "certificate-validation"},
 				})
 				break
@@ -399,8 +401,8 @@ func (r *DisabledCertValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DeprecatedTLSVersion struct{}
 
-func (r *DeprecatedTLSVersion) ID() string                     { return "BATOU-CRY-025" }
-func (r *DeprecatedTLSVersion) Name() string                   { return "DeprecatedTLSVersion" }
+func (r *DeprecatedTLSVersion) ID() string                      { return "BATOU-CRY-025" }
+func (r *DeprecatedTLSVersion) Name() string                    { return "DeprecatedTLSVersion" }
 func (r *DeprecatedTLSVersion) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DeprecatedTLSVersion) Description() string {
 	return "Detects explicit use or configuration of deprecated TLS versions (TLS 1.0, TLS 1.1, SSLv3) which have known vulnerabilities."
@@ -411,7 +413,7 @@ func (r *DeprecatedTLSVersion) Languages() []rules.Language {
 
 func (r *DeprecatedTLSVersion) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	pats := []*regexp.Regexp{reMinVersionOld, reTLSv10Explicit, reTLSv11Explicit}
 
 	for i, line := range lines {
@@ -421,20 +423,20 @@ func (r *DeprecatedTLSVersion) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range pats {
-			if m := p.FindString(line); m != "" {
+			if m := rules.GFind(p, line); m != "" {
 				// Only flag TLS version references in TLS/SSL context
-				if !reTLSContext.MatchString(line) && !reTLSContext.MatchString(nearbyLinesCE(lines, i, 5)) {
+				if !rules.GMatch(reTLSContext, line) && !reTLSContext.MatchString(nearbyLinesCE(lines, i, 5)) {
 					continue
 				}
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:       "Deprecated TLS version configured: " + m,
 					Description: "TLS 1.0 and TLS 1.1 are deprecated by RFC 8996. They have known vulnerabilities (BEAST, POODLE, Lucky13) and should not be used. SSLv3 is completely broken.",
-					FilePath: ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
+					FilePath:    ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
 					Suggestion:    "Set the minimum TLS version to 1.2. Prefer TLS 1.3 when supported. Remove any references to TLS 1.0, TLS 1.1, or SSLv3.",
 					CWEID:         "CWE-326",
 					OWASPCategory: "A02:2021-Cryptographic Failures",
-					Language: ctx.Language, Confidence: "high",
+					Language:      ctx.Language, Confidence: "high",
 					Tags: []string{"crypto", "tls", "deprecated"},
 				})
 				break
@@ -450,8 +452,8 @@ func (r *DeprecatedTLSVersion) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NullCipherTLS struct{}
 
-func (r *NullCipherTLS) ID() string                     { return "BATOU-CRY-026" }
-func (r *NullCipherTLS) Name() string                   { return "NullCipherTLS" }
+func (r *NullCipherTLS) ID() string                      { return "BATOU-CRY-026" }
+func (r *NullCipherTLS) Name() string                    { return "NullCipherTLS" }
 func (r *NullCipherTLS) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *NullCipherTLS) Description() string {
 	return "Detects TLS/SSL configuration with NULL cipher suites, empty cipher lists, or known insecure cipher suites (EXPORT, anon, RC4), which provide no encryption."
@@ -462,7 +464,7 @@ func (r *NullCipherTLS) Languages() []rules.Language {
 
 func (r *NullCipherTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	pats := []*regexp.Regexp{reNullCipher, reCipherNull, reTLSNoCipher, reInsecureCipher}
 
 	for i, line := range lines {
@@ -472,16 +474,16 @@ func (r *NullCipherTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range pats {
-			if m := p.FindString(line); m != "" {
+			if m := rules.GFind(p, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:       "Null cipher or insecure cipher suite in TLS configuration",
 					Description: "NULL cipher suites provide no encryption (plaintext), EXPORT ciphers use intentionally weak keys (40-56 bit), and anon ciphers provide no authentication. All traffic is exposed.",
-					FilePath: ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
+					FilePath:    ctx.FilePath, LineNumber: lineNum, MatchedText: truncateCE(trimmed, 120),
 					Suggestion:    "Use strong cipher suites only. For TLS 1.2: TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 and similar. For TLS 1.3: TLS_AES_256_GCM_SHA384. Remove all NULL, EXPORT, anon, RC4, and DES cipher suites.",
 					CWEID:         "CWE-327",
 					OWASPCategory: "A02:2021-Cryptographic Failures",
-					Language: ctx.Language, Confidence: "high",
+					Language:      ctx.Language, Confidence: "high",
 					Tags: []string{"crypto", "tls", "null-cipher"},
 				})
 				break

@@ -59,14 +59,13 @@ var (
 	// Model.objects.create(**request.POST) or (**request.data) or (**request.GET)
 	reDjangoMassAssign = regexp.MustCompile(`(?i)\.(?:objects\.create|update|create)\s*\(\s*\*\*\s*request\.(?:POST|GET|data)\b`)
 	// form = ModelForm(request.POST) without explicit fields
-	reDjangoFormBindAll = regexp.MustCompile(`(?i)=\s*\w+Form\s*\(\s*request\.(?:POST|GET|data)\b`)
 )
 
 // Comment detector for Python
 var rePyComment = regexp.MustCompile(`^\s*#`)
 
 func isPyComment(line string) bool {
-	return rePyComment.MatchString(line)
+	return rules.GMatch(rePyComment, line)
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +90,8 @@ func (r DjangoSettingsMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re         *regexp.Regexp
@@ -166,7 +166,7 @@ func (r DjangoSettingsMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if p.re.MatchString(line) {
+			if rules.GMatchLower(p.re, line, lowered[i]) {
 				matched := strings.TrimSpace(line)
 				if len(matched) > 120 {
 					matched = matched[:120] + "..."
@@ -216,7 +216,8 @@ func (r DjangoORMSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re         *regexp.Regexp
@@ -255,7 +256,7 @@ func (r DjangoORMSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndexLower(p.re, line, lowered[i]); loc != nil {
 				matched := strings.TrimSpace(line)
 				if len(matched) > 120 {
 					matched = matched[:120] + "..."
@@ -305,7 +306,8 @@ func (r DjangoTemplateXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isPyComment(line) {
@@ -317,7 +319,7 @@ func (r DjangoTemplateXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			matched = matched[:120] + "..."
 		}
 
-		if reDjangoSafeFilter.MatchString(line) {
+		if rules.GMatchLower(reDjangoSafeFilter, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -337,7 +339,7 @@ func (r DjangoTemplateXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reDjangoMarkSafe.MatchString(line) {
+		if rules.GMatchLower(reDjangoMarkSafe, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -381,13 +383,14 @@ func (r DjangoCsrfExempt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isPyComment(line) {
 			continue
 		}
-		if reDjangoCsrfExempt.MatchString(line) {
+		if rules.GMatchLower(reDjangoCsrfExempt, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
@@ -432,7 +435,8 @@ func (r DjangoMassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isPyComment(line) {
@@ -444,7 +448,7 @@ func (r DjangoMassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 			matched = matched[:120] + "..."
 		}
 
-		if reDjangoMassAssign.MatchString(line) {
+		if rules.GMatchLower(reDjangoMassAssign, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

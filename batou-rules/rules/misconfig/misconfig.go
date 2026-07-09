@@ -12,18 +12,18 @@ import (
 // BATOU-MISC-001: Debug mode enabled
 var (
 	// Python/Django: DEBUG = True
-	reDjangoDebug     = regexp.MustCompile(`\bDEBUG\s*=\s*True\b`)
+	reDjangoDebug = regexp.MustCompile(`\bDEBUG\s*=\s*True\b`)
 	// Python/Flask: app.debug = True or app.run(debug=True)
-	reFlaskDebug      = regexp.MustCompile(`\bapp\.debug\s*=\s*True\b`)
-	reFlaskRunDebug   = regexp.MustCompile(`\bapp\.run\s*\([^)]*debug\s*=\s*True`)
+	reFlaskDebug    = regexp.MustCompile(`\bapp\.debug\s*=\s*True\b`)
+	reFlaskRunDebug = regexp.MustCompile(`\bapp\.run\s*\([^)]*debug\s*=\s*True`)
 	// Ruby/Rails: config.consider_all_requests_local = true
-	reRailsDebug      = regexp.MustCompile(`config\.consider_all_requests_local\s*=\s*true`)
+	reRailsDebug = regexp.MustCompile(`config\.consider_all_requests_local\s*=\s*true`)
 	// PHP: display_errors = On, or ini_set('display_errors', '1')
-	rePHPDisplayErrors = regexp.MustCompile(`(?i)display_errors\s*=\s*['"]?(?:On|1|true)['"]?`)
-	rePHPIniDisplay    = regexp.MustCompile(`ini_set\s*\(\s*['"]display_errors['"]\s*,\s*['"](?:1|On|true)['"]`)
+	rePHPDisplayErrors  = regexp.MustCompile(`(?i)display_errors\s*=\s*['"]?(?:On|1|true)['"]?`)
+	rePHPIniDisplay     = regexp.MustCompile(`ini_set\s*\(\s*['"]display_errors['"]\s*,\s*['"](?:1|On|true)['"]`)
 	rePHPErrorReporting = regexp.MustCompile(`error_reporting\s*\(\s*E_ALL\s*\)`)
 	// JS/Express: NODE_ENV !== 'production' or explicit debug flags
-	reNodeEnvDev       = regexp.MustCompile(`NODE_ENV\s*=\s*['"](?:development|dev)['"]`)
+	reNodeEnvDev = regexp.MustCompile(`NODE_ENV\s*=\s*['"](?:development|dev)['"]`)
 	// Generic debug flags
 	reGenericDebugTrue = regexp.MustCompile(`(?i)\bdebug[_\-]?mode\s*[:=]\s*(?:true|1|['"]true['"]|['"]1['"])`)
 )
@@ -31,44 +31,44 @@ var (
 // BATOU-MISC-002: Verbose error disclosure
 var (
 	// JS/Node: res.send(err.stack) or res.status(500).send(err.stack)
-	reJSErrStack       = regexp.MustCompile(`res\.(?:\w+\s*\([^)]*\)\s*\.)*\w+\s*\(\s*(?:err|error)\.stack\b`)
-	reJSErrMessage     = regexp.MustCompile(`res\.(?:json|send)\s*\(\s*\{[^}]*(?:err|error)\.(?:message|stack)`)
-	reJSSendErr        = regexp.MustCompile(`res\.(?:send|json|status\s*\(\s*\d+\s*\)\s*\.(?:send|json))\s*\(\s*(?:err|error)\s*\)`)
+	reJSErrStack   = regexp.MustCompile(`res\.(?:\w+\s*\([^)]*\)\s*\.)*\w+\s*\(\s*(?:err|error)\.stack\b`)
+	reJSErrMessage = regexp.MustCompile(`res\.(?:json|send)\s*\(\s*\{[^}]*(?:err|error)\.(?:message|stack)`)
+	reJSSendErr    = regexp.MustCompile(`res\.(?:send|json|status\s*\(\s*\d+\s*\)\s*\.(?:send|json))\s*\(\s*(?:err|error)\s*\)`)
 	// Python: traceback.format_exc() in response, or returning str(e)
-	rePyTracebackResp  = regexp.MustCompile(`(?:return|response|Response)\s*.*traceback\.format_exc\s*\(`)
-	rePyStrException   = regexp.MustCompile(`(?:return|response|Response|jsonify)\s*.*str\s*\(\s*(?:e|ex|exc|err|error)\s*\)`)
+	rePyTracebackResp = regexp.MustCompile(`(?:return|response|Response)\s*.*traceback\.format_exc\s*\(`)
+	rePyStrException  = regexp.MustCompile(`(?:return|response|Response|jsonify)\s*.*str\s*\(\s*(?:e|ex|exc|err|error)\s*\)`)
 	// Java: printStackTrace() or e.getMessage() in response
-	reJavaPrintStack   = regexp.MustCompile(`\.printStackTrace\s*\(`)
-	reJavaErrInResp    = regexp.MustCompile(`(?:response|resp|res|writer)\.\w+\(.*(?:\.getMessage|\.getStackTrace|\.toString)\s*\(`)
+	reJavaPrintStack = regexp.MustCompile(`\.printStackTrace\s*\(`)
+	reJavaErrInResp  = regexp.MustCompile(`(?:response|resp|res|writer)\.\w+\(.*(?:\.getMessage|\.getStackTrace|\.toString)\s*\(`)
 	// PHP: var_dump or print_r of exceptions
-	rePHPVarDumpErr    = regexp.MustCompile(`(?:var_dump|print_r|var_export)\s*\(\s*\$(?:e|ex|err|error|exception)`)
+	rePHPVarDumpErr = regexp.MustCompile(`(?:var_dump|print_r|var_export)\s*\(\s*\$(?:e|ex|err|error|exception)`)
 	// Generic: stack trace patterns in HTTP responses
-	reStackTraceResp   = regexp.MustCompile(`(?i)(?:response|res|resp)\.\w+\(.*(?:stack_?trace|stackTrace|full_?error)`)
+	reStackTraceResp = regexp.MustCompile(`(?i)(?:response|res|resp)\.\w+\(.*(?:stack_?trace|stackTrace|full_?error)`)
 )
 
 // BATOU-MISC-003: Missing security headers (CWE-1021, CWE-693)
 var (
 	// Response handler patterns (where headers should be set)
-	reGoHTTPHandler      = regexp.MustCompile(`func\s+\w*\s*\(\s*\w+\s+http\.ResponseWriter`)
-	reGoHTTPWrite        = regexp.MustCompile(`\.Write\(|\.WriteHeader\(|json\.NewEncoder`)
-	reJSResHandler       = regexp.MustCompile(`(?:app|router)\.\s*(?:get|post|put|patch|delete|all|use)\s*\(`)
-	reJSResSend          = regexp.MustCompile(`res\.(?:send|json|render|status)\s*\(`)
-	rePyViewFunc         = regexp.MustCompile(`def\s+\w+\s*\(\s*(?:request|self)`)
-	rePyResponse         = regexp.MustCompile(`(?:HttpResponse|JsonResponse|Response|render|make_response)\s*\(`)
-	reJavaServlet        = regexp.MustCompile(`(?:doGet|doPost|service)\s*\(\s*HttpServletRequest`)
-	reJavaRespWrite      = regexp.MustCompile(`response\.(?:getWriter|getOutputStream|setStatus)\s*\(`)
-	rePHPHeader          = regexp.MustCompile(`\bheader\s*\(`)
-	rePHPEcho            = regexp.MustCompile(`\becho\b|\bprint\b`)
-	reRubyAction         = regexp.MustCompile(`def\s+(?:index|show|create|update|destroy|new|edit)\b`)
-	reRubyRender         = regexp.MustCompile(`render\s+`)
+	reGoHTTPHandler = regexp.MustCompile(`func\s+\w*\s*\(\s*\w+\s+http\.ResponseWriter`)
+	reGoHTTPWrite   = regexp.MustCompile(`\.Write\(|\.WriteHeader\(|json\.NewEncoder`)
+	reJSResHandler  = regexp.MustCompile(`(?:app|router)\.\s*(?:get|post|put|patch|delete|all|use)\s*\(`)
+	reJSResSend     = regexp.MustCompile(`res\.(?:send|json|render|status)\s*\(`)
+	rePyViewFunc    = regexp.MustCompile(`def\s+\w+\s*\(\s*(?:request|self)`)
+	rePyResponse    = regexp.MustCompile(`(?:HttpResponse|JsonResponse|Response|render|make_response)\s*\(`)
+	reJavaServlet   = regexp.MustCompile(`(?:doGet|doPost|service)\s*\(\s*HttpServletRequest`)
+	reJavaRespWrite = regexp.MustCompile(`response\.(?:getWriter|getOutputStream|setStatus)\s*\(`)
+	rePHPHeader     = regexp.MustCompile(`\bheader\s*\(`)
+	rePHPEcho       = regexp.MustCompile(`\becho\b|\bprint\b`)
+	reRubyAction    = regexp.MustCompile(`def\s+(?:index|show|create|update|destroy|new|edit)\b`)
+	reRubyRender    = regexp.MustCompile(`render\s+`)
 
 	// Security header indicators
-	reXFrameOptions      = regexp.MustCompile(`(?i)X-Frame-Options`)
-	reCSP                = regexp.MustCompile(`(?i)Content-Security-Policy`)
-	reHSTS               = regexp.MustCompile(`(?i)Strict-Transport-Security`)
+	reXFrameOptions = regexp.MustCompile(`(?i)X-Frame-Options`)
+	reCSP           = regexp.MustCompile(`(?i)Content-Security-Policy`)
+	reHSTS          = regexp.MustCompile(`(?i)Strict-Transport-Security`)
 	// Helmet/framework-level security header middleware
-	reHelmetJS           = regexp.MustCompile(`(?i)\bhelmet\b`)
-	reSecureHeaders      = regexp.MustCompile(`(?i)(?:secure[_-]?headers|SecurityMiddleware|security_headers|SecureHeaders)`)
+	reHelmetJS      = regexp.MustCompile(`(?i)\bhelmet\b`)
+	reSecureHeaders = regexp.MustCompile(`(?i)(?:secure[_-]?headers|SecurityMiddleware|security_headers|SecureHeaders)`)
 )
 
 func init() {
@@ -81,8 +81,8 @@ func init() {
 
 type DebugMode struct{}
 
-func (r *DebugMode) ID() string                    { return "BATOU-MISC-001" }
-func (r *DebugMode) Name() string                  { return "DebugMode" }
+func (r *DebugMode) ID() string                      { return "BATOU-MISC-001" }
+func (r *DebugMode) Name() string                    { return "DebugMode" }
 func (r *DebugMode) DefaultSeverity() rules.Severity { return rules.Medium }
 
 func (r *DebugMode) Description() string {
@@ -95,7 +95,8 @@ func (r *DebugMode) Languages() []rules.Language {
 
 func (r *DebugMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -112,41 +113,41 @@ func (r *DebugMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangPython:
-			if loc := reDjangoDebug.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reDjangoDebug, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Django DEBUG = True"
 				suggestion = "Set DEBUG = False in production settings. Use environment variables to configure: DEBUG = os.environ.get('DEBUG', 'False') == 'True'."
-			} else if loc := reFlaskDebug.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reFlaskDebug, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Flask debug mode enabled"
 				suggestion = "Set app.debug = False in production. Use environment variables: app.debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'."
-			} else if loc := reFlaskRunDebug.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reFlaskRunDebug, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Flask app.run(debug=True)"
 				suggestion = "Remove debug=True from app.run() in production. Use a proper WSGI server (gunicorn, uwsgi) instead of the development server."
 			}
 		case rules.LangRuby:
-			if loc := reRailsDebug.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reRailsDebug, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Rails consider_all_requests_local = true"
 				suggestion = "Set config.consider_all_requests_local = false in config/environments/production.rb."
 			}
 		case rules.LangPHP:
-			if loc := rePHPDisplayErrors.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePHPDisplayErrors, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "PHP display_errors enabled"
 				suggestion = "Set display_errors = Off in php.ini for production. Log errors to a file instead: log_errors = On."
-			} else if loc := rePHPIniDisplay.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(rePHPIniDisplay, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "PHP display_errors enabled via ini_set"
 				suggestion = "Remove ini_set('display_errors', '1') in production code. Configure error logging in php.ini."
-			} else if loc := rePHPErrorReporting.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(rePHPErrorReporting, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "PHP error_reporting(E_ALL) in production context"
 				suggestion = "Use error_reporting(0) or a restricted level in production. Log errors to a file instead of displaying them."
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := reNodeEnvDev.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reNodeEnvDev, line, lowered[i]); loc != "" {
 				// Only flag if it looks like a hardcoded setting, not a check
 				if !strings.Contains(line, "if") && !strings.Contains(line, "===") && !strings.Contains(line, "!==") {
 					matched = loc
@@ -158,7 +159,7 @@ func (r *DebugMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Generic debug mode flag for all languages
 		if matched == "" {
-			if loc := reGenericDebugTrue.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reGenericDebugTrue, line, lowered[i]); loc != "" {
 				// Skip if in a comment
 				if !strings.HasPrefix(trimmed, "//") && !strings.HasPrefix(trimmed, "#") {
 					matched = loc
@@ -197,8 +198,8 @@ func (r *DebugMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ErrorDisclosure struct{}
 
-func (r *ErrorDisclosure) ID() string                    { return "BATOU-MISC-002" }
-func (r *ErrorDisclosure) Name() string                  { return "ErrorDisclosure" }
+func (r *ErrorDisclosure) ID() string                      { return "BATOU-MISC-002" }
+func (r *ErrorDisclosure) Name() string                    { return "ErrorDisclosure" }
 func (r *ErrorDisclosure) DefaultSeverity() rules.Severity { return rules.Low }
 
 func (r *ErrorDisclosure) Description() string {
@@ -211,7 +212,8 @@ func (r *ErrorDisclosure) Languages() []rules.Language {
 
 func (r *ErrorDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -228,41 +230,41 @@ func (r *ErrorDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := reJSErrStack.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJSErrStack, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Error stack trace sent in response"
 				suggestion = "Log the full error server-side and return a generic error message to the client: res.status(500).json({error: 'Internal server error'})."
-			} else if loc := reJSErrMessage.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJSErrMessage, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Error details sent in response"
 				suggestion = "Log the full error server-side and return a generic error message to the client."
-			} else if loc := reJSSendErr.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJSSendErr, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Raw error object sent in response"
 				suggestion = "Never send raw error objects to clients. Log errors server-side and return a generic message."
 			}
 		case rules.LangPython:
-			if loc := rePyTracebackResp.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePyTracebackResp, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Traceback sent in HTTP response"
 				suggestion = "Log tracebacks server-side using logging.exception(). Return a generic error message to clients."
-			} else if loc := rePyStrException.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(rePyStrException, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Exception details sent in response"
 				suggestion = "Log exceptions server-side. Return a generic error message: return jsonify({'error': 'Internal server error'}), 500."
 			}
 		case rules.LangJava:
-			if loc := reJavaPrintStack.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJavaPrintStack, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "printStackTrace() called (may leak to client)"
 				suggestion = "Use a logging framework (SLF4J, Log4j) instead of printStackTrace(). Never expose stack traces in HTTP responses."
-			} else if loc := reJavaErrInResp.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJavaErrInResp, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Exception details written to HTTP response"
 				suggestion = "Log exception details server-side. Return a generic error message to clients."
 			}
 		case rules.LangPHP:
-			if loc := rePHPVarDumpErr.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePHPVarDumpErr, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Exception dumped to output"
 				suggestion = "Use error_log() for server-side logging. Return a generic error message to clients."
@@ -271,7 +273,7 @@ func (r *ErrorDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Generic stack trace in response
 		if matched == "" {
-			if loc := reStackTraceResp.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reStackTraceResp, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Stack trace or error details in response"
 				suggestion = "Log detailed errors server-side. Return generic error messages to clients."
@@ -307,8 +309,8 @@ func (r *ErrorDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingSecurityHeaders struct{}
 
-func (r *MissingSecurityHeaders) ID() string                    { return "BATOU-MISC-003" }
-func (r *MissingSecurityHeaders) Name() string                  { return "MissingSecurityHeaders" }
+func (r *MissingSecurityHeaders) ID() string                      { return "BATOU-MISC-003" }
+func (r *MissingSecurityHeaders) Name() string                    { return "MissingSecurityHeaders" }
 func (r *MissingSecurityHeaders) DefaultSeverity() rules.Severity { return rules.Medium }
 
 func (r *MissingSecurityHeaders) Description() string {
@@ -325,14 +327,14 @@ func (r *MissingSecurityHeaders) Languages() []rules.Language {
 func (r *MissingSecurityHeaders) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// If the file uses a security headers middleware (helmet, SecureHeaders, etc.),
 	// all headers are handled globally — no per-handler findings needed.
-	if reHelmetJS.MatchString(ctx.Content) || reSecureHeaders.MatchString(ctx.Content) {
+	if rules.GMatchFile(reHelmetJS, ctx) || rules.GMatchFile(reSecureHeaders, ctx) {
 		return nil
 	}
 
 	// Check if any security headers are set anywhere in the file
-	hasXFrame := reXFrameOptions.MatchString(ctx.Content)
-	hasCSP := reCSP.MatchString(ctx.Content)
-	hasHSTS := reHSTS.MatchString(ctx.Content)
+	hasXFrame := rules.GMatchFile(reXFrameOptions, ctx)
+	hasCSP := rules.GMatchFile(reCSP, ctx)
+	hasHSTS := rules.GMatchFile(reHSTS, ctx)
 
 	// If all three are present, no findings
 	if hasXFrame && hasCSP && hasHSTS {
@@ -341,7 +343,8 @@ func (r *MissingSecurityHeaders) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 	// Find response handler functions that write responses
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	isResponseHandler := false
 	handlerLine := 0
@@ -356,37 +359,37 @@ func (r *MissingSecurityHeaders) Scan(ctx *rules.ScanContext) []rules.Finding {
 		// Detect handler function start
 		switch ctx.Language {
 		case rules.LangGo:
-			if reGoHTTPHandler.MatchString(line) {
+			if rules.GMatchLower(reGoHTTPHandler, line, lowered[i]) {
 				isResponseHandler = true
 				handlerLine = i + 1
 				handlerMatch = trimmed
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if reJSResHandler.MatchString(line) {
+			if rules.GMatchLower(reJSResHandler, line, lowered[i]) {
 				isResponseHandler = true
 				handlerLine = i + 1
 				handlerMatch = trimmed
 			}
 		case rules.LangPython:
-			if rePyViewFunc.MatchString(line) {
+			if rules.GMatchLower(rePyViewFunc, line, lowered[i]) {
 				isResponseHandler = true
 				handlerLine = i + 1
 				handlerMatch = trimmed
 			}
 		case rules.LangJava:
-			if reJavaServlet.MatchString(line) {
+			if rules.GMatchLower(reJavaServlet, line, lowered[i]) {
 				isResponseHandler = true
 				handlerLine = i + 1
 				handlerMatch = trimmed
 			}
 		case rules.LangPHP:
-			if rePHPHeader.MatchString(line) {
+			if rules.GMatchLower(rePHPHeader, line, lowered[i]) {
 				isResponseHandler = true
 				handlerLine = i + 1
 				handlerMatch = trimmed
 			}
 		case rules.LangRuby:
-			if reRubyAction.MatchString(line) {
+			if rules.GMatchLower(reRubyAction, line, lowered[i]) {
 				isResponseHandler = true
 				handlerLine = i + 1
 				handlerMatch = trimmed
@@ -398,17 +401,17 @@ func (r *MissingSecurityHeaders) Scan(ctx *rules.ScanContext) []rules.Finding {
 			hasWrite := false
 			switch ctx.Language {
 			case rules.LangGo:
-				hasWrite = reGoHTTPWrite.MatchString(line)
+				hasWrite = rules.GMatchLower(reGoHTTPWrite, line, lowered[i])
 			case rules.LangJavaScript, rules.LangTypeScript:
-				hasWrite = reJSResSend.MatchString(line)
+				hasWrite = rules.GMatchLower(reJSResSend, line, lowered[i])
 			case rules.LangPython:
-				hasWrite = rePyResponse.MatchString(line)
+				hasWrite = rules.GMatchLower(rePyResponse, line, lowered[i])
 			case rules.LangJava:
-				hasWrite = reJavaRespWrite.MatchString(line)
+				hasWrite = rules.GMatchLower(reJavaRespWrite, line, lowered[i])
 			case rules.LangPHP:
-				hasWrite = rePHPEcho.MatchString(line)
+				hasWrite = rules.GMatchLower(rePHPEcho, line, lowered[i])
 			case rules.LangRuby:
-				hasWrite = reRubyRender.MatchString(line)
+				hasWrite = rules.GMatchLower(reRubyRender, line, lowered[i])
 			}
 
 			if hasWrite {

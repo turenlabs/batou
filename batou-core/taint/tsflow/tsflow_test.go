@@ -2,10 +2,8 @@ package tsflow
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
-
 	// Import taint language catalogs.
 	_ "github.com/turenlabs/batou-core/taint/languages"
 )
@@ -4557,6 +4555,244 @@ sub handler {
 	}
 }
 
+// --- Perl IPC command injection tests ---
+
+func TestPerl_IPCRun_CommandInjection(t *testing.T) {
+	code := `
+use CGI;
+use IPC::Run;
+sub handler {
+    my $cgi = CGI->new;
+    my $cmd = $cgi->param("cmd");
+    IPC::Run::run($cmd);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkCommand) {
+		t.Error("expected command injection flow for $cgi->param -> IPC::Run::run()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_IPCRunStart_CommandInjection(t *testing.T) {
+	code := `
+use CGI;
+use IPC::Run;
+sub handler {
+    my $cgi = CGI->new;
+    my $cmd = $cgi->param("cmd");
+    IPC::Run::start($cmd);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkCommand) {
+		t.Error("expected command injection flow for $cgi->param -> IPC::Run::start()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_IPCSystemSimpleRun_CommandInjection(t *testing.T) {
+	code := `
+use CGI;
+use IPC::System::Simple;
+sub handler {
+    my $cgi = CGI->new;
+    my $cmd = $cgi->param("cmd");
+    IPC::System::Simple::run($cmd);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkCommand) {
+		t.Error("expected command injection flow for $cgi->param -> IPC::System::Simple::run()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_IPCSystemSimpleCapture_CommandInjection(t *testing.T) {
+	code := `
+use CGI;
+use IPC::System::Simple;
+sub handler {
+    my $cgi = CGI->new;
+    my $cmd = $cgi->param("cmd");
+    my $output = IPC::System::Simple::capture($cmd);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkCommand) {
+		t.Error("expected command injection flow for $cgi->param -> IPC::System::Simple::capture()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+// --- Perl file operation tests ---
+
+func TestPerl_FileCopy_PathTraversal(t *testing.T) {
+	code := `
+use CGI;
+use File::Copy;
+sub handler {
+    my $cgi = CGI->new;
+    my $src = $cgi->param("file");
+    File::Copy::copy($src, "/tmp/dest");
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkFileWrite) {
+		t.Error("expected file write flow for $cgi->param -> File::Copy::copy()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_FileMove_PathTraversal(t *testing.T) {
+	code := `
+use CGI;
+use File::Copy;
+sub handler {
+    my $cgi = CGI->new;
+    my $dest = $cgi->param("dest");
+    File::Copy::move("/tmp/upload", $dest);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkFileWrite) {
+		t.Error("expected file write flow for $cgi->param -> File::Copy::move()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_FilePathRmtree_PathTraversal(t *testing.T) {
+	code := `
+use CGI;
+use File::Path;
+sub handler {
+    my $cgi = CGI->new;
+    my $dir = $cgi->param("dir");
+    File::Path::rmtree($dir);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkFileWrite) {
+		t.Error("expected file write flow for $cgi->param -> File::Path::rmtree()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_FilePathMakePath_PathTraversal(t *testing.T) {
+	code := `
+use CGI;
+use File::Path;
+sub handler {
+    my $cgi = CGI->new;
+    my $dir = $cgi->param("dir");
+    File::Path::make_path($dir);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkFileWrite) {
+		t.Error("expected file write flow for $cgi->param -> File::Path::make_path()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_Chmod_PathTraversal(t *testing.T) {
+	code := `
+use CGI;
+sub handler {
+    my $cgi = CGI->new;
+    my $file = $cgi->param("file");
+    chmod(0755, $file);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkFileWrite) {
+		t.Error("expected file write flow for $cgi->param -> chmod()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+// --- Perl template injection tests ---
+
+func TestPerl_TextTemplate_SSTI(t *testing.T) {
+	code := `
+use CGI;
+use Text::Template;
+sub handler {
+    my $cgi = CGI->new;
+    my $tpl_str = $cgi->param("template");
+    my $tmpl = Text::Template->new(TYPE => 'STRING', SOURCE => $tpl_str);
+    $tmpl->fill_in();
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkTemplate) {
+		t.Error("expected template injection flow for $cgi->param -> Text::Template->fill_in()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+// --- Perl SSRF additional tests ---
+
+func TestPerl_Furl_SSRF(t *testing.T) {
+	code := `
+use CGI;
+use Furl;
+sub handler {
+    my $cgi = CGI->new;
+    my $url = $cgi->param("url");
+    my $furl = Furl->new;
+    $furl->get($url);
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkURLFetch) {
+		t.Error("expected SSRF flow for $cgi->param -> Furl->get()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestPerl_AnyEventHTTP_SSRF(t *testing.T) {
+	code := `
+use CGI;
+use AnyEvent::HTTP;
+sub handler {
+    my $cgi = CGI->new;
+    my $url = $cgi->param("url");
+    http_get($url, sub { });
+}
+`
+	flows := Analyze(code, "/app/handler.pl", rules.LangPerl)
+	if !hasTaintFlow(flows, taint.SnkURLFetch) {
+		t.Error("expected SSRF flow for $cgi->param -> http_get()")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+
 func TestPython_FString_NoSource_NoFlow(t *testing.T) {
 	code := `
 def handler():
@@ -4723,6 +4959,55 @@ def handler():
 	flows := Analyze(code, "/app/handler.py", rules.LangPython)
 	if !hasTaintFlow(flows, taint.SnkSQLQuery) {
 		t.Error("expected SQL injection flow OUTSIDE the allowlist-guarded if block")
+	}
+}
+
+// TestPython_SubstringGuard_NoFlow covers the Python `'literal' in tainted`
+// validation pattern: when a file rejects user input containing a forbidden
+// substring (e.g. `'../'`) and returns early, the fallthrough must be
+// treated as sanitised. Mirrors OWASP BenchmarkPython pathtraver-SAFE 00005
+// / 00007 / 01180.
+func TestPython_SubstringGuard_NoFlow(t *testing.T) {
+	code := `
+from flask import request
+
+def handler():
+    bar = request.args.get("name")
+    if '../' in bar:
+        return "rejected"
+    open("/srv/" + bar, "rb")
+`
+	flows := Analyze(code, "/app/handler.py", rules.LangPython)
+	if hasTaintFlow(flows, taint.SnkFileRead) || hasTaintFlow(flows, taint.SnkFileWrite) {
+		t.Error("expected NO path-traversal flow after `'../' in bar` denylist with early return")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+// TestPython_SubstringGuard_CallReceiver_StillTainted ensures the
+// substring-guard heuristic is bounded to a bare tainted identifier on the
+// right-hand side. A membership check whose RHS is a call expression that
+// happens to mention a tainted variable (e.g.
+// `"k" in request.form.getlist(name)`) must NOT be treated as a validation
+// guard — otherwise unrelated code-injection FNs appear (regression seen on
+// OWASP codeinj BenchmarkTest00422).
+func TestPython_SubstringGuard_CallReceiver_StillTainted(t *testing.T) {
+	code := `
+from flask import request
+
+def handler():
+    param = ""
+    for name in request.form.keys():
+        if "marker" in request.form.getlist(name):
+            param = name
+            break
+    eval(param)
+`
+	flows := Analyze(code, "/app/handler.py", rules.LangPython)
+	if !hasTaintFlow(flows, taint.SnkEval) {
+		t.Error("expected eval() flow to persist when the `in` check operand is a call expression, not a bare identifier")
 	}
 }
 
@@ -5327,7 +5612,13 @@ function handler(req, res) {
 	}
 }
 
-func TestJS_FileRead_Sanitized_RealpathSync(t *testing.T) {
+// fs.realpathSync() alone is NOT a sanitizer: realpathSync("../../etc/passwd")
+// resolves to "/etc/passwd" — a real path OUTSIDE the safe base. The taint
+// flow must survive. (Previously asserted the opposite, which was unsound —
+// see the filepath.Clean note in go_sanitizers.go and the
+// os.path.normpath/realpath note in python_sanitizers.go; only canonicalize
+// + containment is a defence.)
+func TestJS_FileRead_RealpathSync_NotASanitizer(t *testing.T) {
 	code := `
 const fs = require('fs');
 function handler(req, res) {
@@ -5338,10 +5629,14 @@ function handler(req, res) {
 }
 `
 	flows := Analyze(code, "/app/handler.js", rules.LangJavaScript)
+	found := false
 	for _, f := range flows {
-		if f.Sink.Category == taint.SnkFileRead && f.Source.Category == taint.SrcUserInput && f.Sink.MethodName == "readFileSync" {
-			t.Error("fs.realpathSync should neutralize file read taint through readFileSync")
+		if f.Sink.Category == taint.SnkFileRead && f.Source.Category == taint.SrcUserInput {
+			found = true
 		}
+	}
+	if !found {
+		t.Error("fs.realpathSync alone must NOT neutralize FileRead taint — expected the traversal flow to still fire")
 	}
 }
 
@@ -5357,6 +5652,136 @@ function handler(req, res) {
 	for _, f := range flows {
 		if f.Sink.Category == taint.SnkEval {
 			t.Error("Boolean() coercion should neutralize eval taint flow")
+		}
+	}
+}
+
+// ── C++ trust boundary (CWE-501) ────────────────────────────────
+
+func TestCPP_TrustBoundary_DrogonSession(t *testing.T) {
+	code := `
+#include <drogon/HttpController.h>
+#include <drogon/Session.h>
+
+void handler(const drogon::HttpRequestPtr &req,
+             std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
+    auto session = req->session();
+    std::string role = req->getParameter("role");
+    session->insert("user_role", role);
+}
+`
+	flows := Analyze(code, "/app/controller.cpp", rules.LangCPP)
+	if !hasTaintFlow(flows, taint.SnkTrustBoundary) {
+		t.Error("expected trust boundary flow for getParameter -> session->insert")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestCPP_TrustBoundary_DrogonSession_Safe(t *testing.T) {
+	code := `
+#include <drogon/HttpController.h>
+#include <drogon/Session.h>
+
+void handler(const drogon::HttpRequestPtr &req,
+             std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
+    auto session = req->session();
+    std::string role = req->getParameter("role");
+    std::string validated = sanitize(role);
+    session->insert("user_role", validated);
+}
+`
+	flows := Analyze(code, "/app/controller.cpp", rules.LangCPP)
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkTrustBoundary {
+			t.Error("sanitize() should neutralize trust boundary taint flow")
+		}
+	}
+}
+
+// ── C++ YAML deserialization (CWE-502) ──────────────────────────
+
+func TestCPP_Deser_YAMLLoad(t *testing.T) {
+	code := `
+#include <yaml-cpp/yaml.h>
+#include <cstdlib>
+
+void parse_config() {
+    char *input = getenv("CONFIG_DATA");
+    YAML::Node config = YAML::Load(input);
+    std::string db = config["database"].as<std::string>();
+}
+`
+	flows := Analyze(code, "/app/config.cpp", rules.LangCPP)
+	if !hasTaintFlow(flows, taint.SnkDeserialize) {
+		t.Error("expected deserialization flow for getenv -> YAML::Load")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+// ── C++ header injection detection ──────────────────────────────
+
+func TestCPP_Header_Injection_Crow(t *testing.T) {
+	code := `
+#include <crow.h>
+#include <cstdlib>
+
+void handler(crow::response &res) {
+    char *input = getenv("USER_VALUE");
+    res.set_header("X-Custom", input);
+}
+`
+	flows := Analyze(code, "/app/handler.cpp", rules.LangCPP)
+	if !hasTaintFlow(flows, taint.SnkHeader) {
+		t.Error("expected header injection flow for getenv -> res.set_header")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+// ── C++ log injection sanitizer ─────────────────────────────────
+
+func TestCPP_Log_Structured_Safe(t *testing.T) {
+	code := `
+#include <spdlog/spdlog.h>
+#include <cstdlib>
+
+void log_action() {
+    char *username = getenv("USERNAME");
+    spdlog::info("login attempt, user={}", username);
+}
+`
+	flows := Analyze(code, "/app/logger.cpp", rules.LangCPP)
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkLog {
+			t.Error("spdlog structured logging with {} should neutralize log injection")
+		}
+	}
+}
+
+// ── C++ Drogon session modify trust boundary (CWE-501) ──────────
+
+func TestCPP_TrustBoundary_DrogonSessionModify(t *testing.T) {
+	code := `
+#include <drogon/HttpController.h>
+#include <drogon/Session.h>
+
+void update_prefs(const drogon::HttpRequestPtr &req,
+                  std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
+    auto session = req->session();
+    std::string prefs = req->getParameter("preferences");
+    session->modify("user_prefs", prefs);
+}
+`
+	flows := Analyze(code, "/app/prefs.cpp", rules.LangCPP)
+	if !hasTaintFlow(flows, taint.SnkTrustBoundary) {
+		t.Error("expected trust boundary flow for getParameter -> session->modify")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
 		}
 	}
 }

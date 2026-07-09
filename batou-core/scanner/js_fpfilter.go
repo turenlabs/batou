@@ -19,6 +19,12 @@ func jsFilterAllFindings(content string, findings []rules.Finding) []rules.Findi
 	lines := strings.Split(content, "\n")
 	kept := make([]rules.Finding, 0, len(findings))
 
+	// File-level context: a browser-side JS/TS file (Vite/React/Vue/Svelte/
+	// Next-client/etc.) cannot have classic Server-Side Request Forgery —
+	// the browser IS the user agent, not a server tricked into talking to
+	// attacker-chosen hosts. CWE-918 only fits a server-side fetch sink.
+	isBrowser := isBrowserSideJSFile(content)
+
 	for _, f := range findings {
 		lineIdx := f.LineNumber - 1
 		if lineIdx < 0 || lineIdx >= len(lines) {
@@ -39,9 +45,17 @@ func jsFilterAllFindings(content string, findings []rules.Finding) []rules.Findi
 		case "22": // Path Traversal
 			suppressed = jsScanHasPathGuard(lines, lineIdx)
 		case "918": // SSRF
-			suppressed = jsScanHasSSRFGuard(lines, lineIdx)
+			// Browser-side fetch cannot SSRF: there's no server to trick.
+			// Same applies to relative URL literals (`fetch('/api/x')`)
+			// even outside browser context — those are pinned to the
+			// process's own origin / working directory.
+			if isBrowser || jsFetchArgIsRelativeLiteral(lines[lineIdx]) {
+				suppressed = true
+			} else {
+				suppressed = jsScanHasSSRFGuard(lines, lineIdx)
+			}
 		case "943": // NoSQL Injection
-			suppressed = jsScanHasNoSQLGuard(lines, lineIdx)
+			suppressed = jsScanHasNoSQLGuard(lines, lineIdx, f.RuleID)
 		case "502": // Deserialization
 			suppressed = jsScanHasDeserGuard(lines, lineIdx)
 		case "1336": // SSTI
@@ -56,6 +70,64 @@ func jsFilterAllFindings(content string, findings []rules.Finding) []rules.Findi
 		kept = append(kept, f)
 	}
 	return kept
+}
+
+// isBrowserSideJSFile returns true when the file's content shows clear
+// browser/bundler signals: Vite env (`import.meta.env`), React/Vue/Svelte
+// imports, JSX elements, browser globals (`window.`, `document.`),
+// Next.js client directive, or webpack `process.env.NEXT_PUBLIC_`.
+// SSRF (CWE-918) is a server-side class and does not apply to browser
+// code, where `fetch()` runs in the user's browser against their own
+// origin (the user cannot be made to attack a private network they
+// don't already have access to via an SSRF chain).
+var (
+	reJSViteEnv         = regexp.MustCompile(`import\.meta\.env\b`)
+	reJSImportMetaURL   = regexp.MustCompile(`import\.meta\.url\b`)
+	reJSReactImport     = regexp.MustCompile(`(?m)^\s*import\b[^;\n]*\bfrom\s+['"](?:react|react-dom|vue|svelte|solid-js|preact|@angular/[^'"]+|next/[^'"]+|nuxt[^'"]*|astro[^'"]*|qwik[^'"]*|lit|lit-element|lit-html|@lit-labs/[^'"]+)['"]`)
+	reJSUseClientDir    = regexp.MustCompile(`^\s*(?:'use client'|"use client")`)
+	reJSWindowGlobal    = regexp.MustCompile(`\bwindow\.(?:location|document|history|navigator|localStorage|sessionStorage|fetch|alert|confirm)\b`)
+	reJSDocumentGlobal  = regexp.MustCompile(`\bdocument\.(?:getElementById|querySelector|querySelectorAll|createElement|body\b|head\b|cookie\b|location\b|title\b)\b`)
+	reJSNextPublicEnv   = regexp.MustCompile(`process\.env\.NEXT_PUBLIC_`)
+	reJSJSXReturn       = regexp.MustCompile(`(?m)^\s*return\s*\(\s*<[A-Za-z]`)
+	reJSReactCreate     = regexp.MustCompile(`React\.createElement\s*\(|ReactDOM\.(?:render|createRoot)\s*\(`)
+	reJSVueDefine       = regexp.MustCompile(`\bdefineComponent\s*\(|createApp\s*\(`)
+	reJSExportDefaultFC = regexp.MustCompile(`(?m)^\s*export\s+default\s+function\s+[A-Z]\w*\s*\(\s*\{\s*\w`)
+)
+
+func isBrowserSideJSFile(content string) bool {
+	// First scan a bounded prefix for cheap signals (most browser files
+	// show import statements / "use client" in the first ~4KB).
+	head := content
+	if len(head) > 8192 {
+		head = head[:8192]
+	}
+	if reJSViteEnv.MatchString(head) ||
+		reJSImportMetaURL.MatchString(head) ||
+		reJSReactImport.MatchString(head) ||
+		reJSUseClientDir.MatchString(head) ||
+		reJSNextPublicEnv.MatchString(head) ||
+		reJSReactCreate.MatchString(head) ||
+		reJSVueDefine.MatchString(head) ||
+		reJSExportDefaultFC.MatchString(head) {
+		return true
+	}
+	// Browser globals can appear anywhere; full scan as fallback.
+	return reJSWindowGlobal.MatchString(content) ||
+		reJSDocumentGlobal.MatchString(content) ||
+		reJSJSXReturn.MatchString(content)
+}
+
+// jsFetchArgIsRelativeLiteral returns true when the line's fetch/request
+// call passes a string literal that starts with '/' (relative path) — a
+// pattern used by browser frontends and tests calling their own backend
+// over the dev proxy / same-origin path. These cannot be SSRF because
+// the URL is fixed at the source.
+// Match `/api/...` but NOT `//attacker/...` (protocol-relative URLs are a
+// real security risk because they inherit the page's scheme).
+var reJSFetchRelativeLit = regexp.MustCompile(`\b(?:fetch|request|axios(?:\.[a-z]+)?|got(?:\.[a-z]+)?|http\.get|https\.get)\s*\(\s*(?:['"]/[^/'"\s][^'"]*['"]|\x60/[^/\x60][^\x60]*\x60)`)
+
+func jsFetchArgIsRelativeLiteral(line string) bool {
+	return reJSFetchRelativeLit.MatchString(line)
 }
 
 // --- Regex patterns for scanner-level JS FP filtering ---
@@ -112,11 +184,35 @@ var jsScYAMLSafe = regexp.MustCompile(`yaml\.safeLoad\s*\(|YAML\.parse\s*\(`)
 // SSTI safety patterns
 var jsScEJSStatic = regexp.MustCompile(`ejs\.render\s*\(\s*['"]`)
 var jsScResRender = regexp.MustCompile(`res\.render\s*\(\s*['"]`)
-var jsScHandlebars = regexp.MustCompile(`Handlebars\.compile\s*\(`)
+
+// jsScHandlebarsStatic only matches when the FIRST ARGUMENT to compile is a
+// string literal (`Handlebars.compile("Hello, {{name}}!")`). The earlier
+// pattern (which matched any `Handlebars.compile(`) over-suppressed
+// findings emitted on the same line as a non-literal call — the very thing
+// the SSTI rule is meant to catch.
+var jsScHandlebarsStatic = regexp.MustCompile(`Handlebars\.compile\s*\(\s*['"\x60]`)
 
 // --- Per-CWE guard checks ---
 
+// jsScHTTPRequestQuery matches `.query(` calls where the receiver is a
+// HTTP request / context object — Hono `c.req.query`, Express
+// `req.query` (when invoked), Koa `ctx.request.query`, Fastify
+// `request.query`, etc. These return URL query-string parameters, not
+// SQL results, so CWE-89 doesn't apply. Surfaced on honojs/hono itself
+// (index.ts:49 fires Critical CWE-89 on `c.req.query()`).
+var jsScHTTPRequestQuery = regexp.MustCompile(
+	`(?:\b(?:c|ctx|context)\.req(?:uest)?\.query\s*\(|` +
+		`\breq(?:uest)?\.query\s*\(|` +
+		`\bcontext\.query\s*\()`,
+)
+
 func jsScanHasSQLGuard(lines []string, sinkLine int) bool {
+	if sinkLine >= 0 && sinkLine < len(lines) {
+		// HTTP request-query accessor on the same line — never SQL.
+		if jsScHTTPRequestQuery.MatchString(lines[sinkLine]) {
+			return true
+		}
+	}
 	for i := max(0, sinkLine-5); i <= sinkLine && i < len(lines); i++ {
 		line := lines[i]
 		if jsScParamQuery.MatchString(line) || jsScKnexBuilder.MatchString(line) ||
@@ -129,10 +225,26 @@ func jsScanHasSQLGuard(lines []string, sinkLine int) bool {
 }
 
 func jsScanHasXSSGuard(lines []string, sinkLine int) bool {
+	// JSON-context signals (res.json / JSON.stringify / application/json
+	// content-type) describe how THIS response is encoded — they only
+	// neutralize XSS for the value they wrap on their own line. Matching
+	// them anywhere in a raw look-back window let a JSON response on a
+	// *sibling* statement or branch suppress a genuine reflected-XSS sink
+	// nearby (e.g. an `if (json) res.json(x); else res.send('<h1>'+x)`
+	// handler dropped the real CWE-79 to zero). Scope them to the sink line.
+	if sinkLine >= 0 && sinkLine < len(lines) {
+		sl := lines[sinkLine]
+		if jsScResJSON.MatchString(sl) || jsScJSONStringify.MatchString(sl) ||
+			jsScContentType.MatchString(sl) {
+			return true
+		}
+	}
+	// HTML value-sanitizers (escapeHtml/DOMPurify.sanitize/validator.escape/…)
+	// transform the tainted value, which may be assigned to a local on one
+	// line and used in the sink a line or two later — a bounded look-back is
+	// appropriate for these.
 	for i := max(0, sinkLine-5); i <= sinkLine && i < len(lines); i++ {
-		line := lines[i]
-		if jsScHTMLSanitizer.MatchString(line) || jsScResJSON.MatchString(line) ||
-			jsScJSONStringify.MatchString(line) || jsScContentType.MatchString(line) {
+		if jsScHTMLSanitizer.MatchString(lines[i]) {
 			return true
 		}
 	}
@@ -227,13 +339,27 @@ func jsScanHasSSRFGuard(lines []string, sinkLine int) bool {
 		jsScanHasRegexGuard(lines, sinkLine)
 }
 
-func jsScanHasNoSQLGuard(lines []string, sinkLine int) bool {
+func jsScanHasNoSQLGuard(lines []string, sinkLine int, ruleID string) bool {
 	for i := max(0, sinkLine-5); i <= sinkLine && i < len(lines); i++ {
 		line := lines[i]
 		if jsScMongoSanitize.MatchString(line) || jsScSchemaValid.MatchString(line) ||
 			jsScEqOperator.MatchString(line) {
 			return true
 		}
+	}
+	// BATOU-NOSQL-001 is the MongoDB `$where` rule: the tainted value is
+	// interpolated (template literal / string concat) into a JavaScript
+	// *expression* that Mongo evaluates server-side. A numeric coercion of
+	// some *other* nearby variable (e.g. `parseInt(userId)` while the raw
+	// `${threshold}` is what reaches `$where`) does NOT neutralize it, and
+	// the broad lookback also matches `parseInt`/`Number` appearing inside a
+	// /* ... */ comment block (the FP filter operates on raw text). Require
+	// the coercion to wrap the value ON the sink line itself for `$where`;
+	// only the operator/raw rules (NOSQL-002/003) keep the broad fallback,
+	// where `find({ id: parseInt(req.query.id) })` is genuinely safe.
+	if ruleID == "BATOU-NOSQL-001" {
+		return sinkLine >= 0 && sinkLine < len(lines) &&
+			jsScTypeCoerce.MatchString(lines[sinkLine])
 	}
 	return jsScanHasTypeCoercion(lines, sinkLine)
 }
@@ -257,7 +383,7 @@ func jsScanHasSSTIGuard(lines []string, sinkLine int) bool {
 	for i := max(0, sinkLine-5); i <= sinkLine && i < len(lines); i++ {
 		line := lines[i]
 		if jsScEJSStatic.MatchString(line) || jsScResRender.MatchString(line) ||
-			jsScHandlebars.MatchString(line) || jsScResJSON.MatchString(line) ||
+			jsScHandlebarsStatic.MatchString(line) || jsScResJSON.MatchString(line) ||
 			jsScJSONStringify.MatchString(line) {
 			return true
 		}
@@ -316,4 +442,3 @@ func jsScanHasRegexGuard(lines []string, sinkLine int) bool {
 	}
 	return false
 }
-

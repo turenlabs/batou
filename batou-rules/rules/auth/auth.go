@@ -22,10 +22,17 @@ var (
 // JWT "none" algorithm allowed in verify options (used by BATOU-AUTH-001)
 var reJWTNoneAlgorithm = regexp.MustCompile(`(?i)algorithms?\s*:\s*\[.*['"]none['"]`)
 
+// reAuthTestFile detects test / e2e / spec / fixture files. Hardcoded-
+// credential comparisons there (`stepUser === 'Admin'`,
+// `password === '%copied_password%'` in Cucumber steps) are test
+// assertions against fixtures, not production auth logic. Mirrors the
+// test-file detection used by the generic / secrets / crypto rules, plus
+// BDD-step and e2e directory conventions.
+var reAuthTestFile = regexp.MustCompile(`(?i)(_test\.[a-z0-9]+$|\.test\.[a-z0-9]+$|\.spec\.[a-z0-9]+$|/tests?/|/__tests__/|/e2e[\w-]*/|/steps?/|/features?/|/spec/|/fixtures?/|/mocks?/|/cypress/|/playwright/|/cucumber/|\.cy\.[a-z0-9]+$|\.feature$|test_[\w-]+\.py$|conftest\.py$|cucumber)`)
+
 // BATOU-AUTH-002: Missing auth check patterns
 var (
 	reGoHandleFunc       = regexp.MustCompile(`http\.HandleFunc\s*\(`)
-	reGoMuxHandle        = regexp.MustCompile(`\.Handle(?:Func)?\s*\(`)
 	reExpressRoute       = regexp.MustCompile(`(?:app|router)\.\s*(?:get|post|put|patch|delete|all)\s*\(\s*['"]\/(?:admin|dashboard|manage|internal|settings)`)
 	reDjangoView         = regexp.MustCompile(`^\s*def\s+\w+\(.*request`)
 	reDjangoLoginReq     = regexp.MustCompile(`@login_required`)
@@ -48,10 +55,10 @@ var reJWTBearerAuth = regexp.MustCompile(`(?i)(?:jsonwebtoken|PyJWT|\bjose\b|HTT
 
 // BATOU-AUTH-004: Session fixation patterns
 var (
-	reLoginHandler       = regexp.MustCompile(`(?i)(?:def\s+login|func.*login|function\s+login|\.post\s*\(\s*['"]\/login)`)
-	reSessionCyclePy     = regexp.MustCompile(`(?:session\.cycle_key|request\.session\.flush|request\.session\.create)`)
-	reSessionRegenPHP    = regexp.MustCompile(`session_regenerate_id\s*\(`)
-	reSessionRegenRuby   = regexp.MustCompile(`reset_session`)
+	reLoginHandler        = regexp.MustCompile(`(?i)(?:def\s+login|func.*login|function\s+login|\.post\s*\(\s*['"]\/login)`)
+	reSessionCyclePy      = regexp.MustCompile(`(?:session\.cycle_key|request\.session\.flush|request\.session\.create)`)
+	reSessionRegenPHP     = regexp.MustCompile(`session_regenerate_id\s*\(`)
+	reSessionRegenRuby    = regexp.MustCompile(`reset_session`)
 	reSessionRegenExpress = regexp.MustCompile(`req\.session\.regenerate\s*\(`)
 )
 
@@ -63,24 +70,24 @@ var (
 
 // BATOU-AUTH-006: Insecure cookie patterns
 var (
-	reGoCookieLiteral   = regexp.MustCompile(`http\.Cookie\s*\{`)
-	reGoCookieSecure    = regexp.MustCompile(`Secure\s*:\s*true`)
-	reGoCookieHTTPOnly  = regexp.MustCompile(`HttpOnly\s*:\s*true`)
-	reJSSetCookie       = regexp.MustCompile(`\.cookie\s*\(`)
-	reJSCookieSecure    = regexp.MustCompile(`secure\s*:\s*true`)
-	reJSCookieHTTPOnly  = regexp.MustCompile(`httpOnly\s*:\s*true`)
-	rePySetCookie       = regexp.MustCompile(`set_cookie\s*\(`)
-	rePyCookieSecure    = regexp.MustCompile(`secure\s*=\s*True`)
-	rePyCookieHTTPOnly  = regexp.MustCompile(`httponly\s*=\s*True`)
-	rePHPSetCookie      = regexp.MustCompile(`setcookie\s*\(`)
+	reGoCookieLiteral  = regexp.MustCompile(`http\.Cookie\s*\{`)
+	reGoCookieSecure   = regexp.MustCompile(`Secure\s*:\s*true`)
+	reGoCookieHTTPOnly = regexp.MustCompile(`HttpOnly\s*:\s*true`)
+	reJSSetCookie      = regexp.MustCompile(`\.cookie\s*\(`)
+	reJSCookieSecure   = regexp.MustCompile(`secure\s*:\s*true`)
+	reJSCookieHTTPOnly = regexp.MustCompile(`httpOnly\s*:\s*true`)
+	rePySetCookie      = regexp.MustCompile(`set_cookie\s*\(`)
+	rePyCookieSecure   = regexp.MustCompile(`secure\s*=\s*True`)
+	rePyCookieHTTPOnly = regexp.MustCompile(`httponly\s*=\s*True`)
+	rePHPSetCookie     = regexp.MustCompile(`setcookie\s*\(`)
 )
 
 // --- Rule 1: Hardcoded Credentials ---
 
 type HardcodedCredentialCheck struct{}
 
-func (r *HardcodedCredentialCheck) ID() string          { return "BATOU-AUTH-001" }
-func (r *HardcodedCredentialCheck) Name() string         { return "HardcodedCredentialCheck" }
+func (r *HardcodedCredentialCheck) ID() string                      { return "BATOU-AUTH-001" }
+func (r *HardcodedCredentialCheck) Name() string                    { return "HardcodedCredentialCheck" }
 func (r *HardcodedCredentialCheck) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *HardcodedCredentialCheck) Description() string {
 	return "Detects authentication checks comparing against hardcoded string values, which can be trivially bypassed."
@@ -94,8 +101,16 @@ func (r *HardcodedCredentialCheck) Languages() []rules.Language {
 }
 
 func (r *HardcodedCredentialCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Test / e2e / spec / fixture files: `stepUser === 'Admin'`,
+	// `password === '%copied_password%'` etc. are test assertions against
+	// fixtures, not production authentication checks.
+	if reAuthTestFile.MatchString(ctx.FilePath) {
+		return nil
+	}
+
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "*") {
@@ -105,33 +120,33 @@ func (r *HardcodedCredentialCheck) Scan(ctx *rules.ScanContext) []rules.Finding 
 		var matched string
 		switch ctx.Language {
 		case rules.LangGo, rules.LangJava, rules.LangCSharp:
-			if m := reHardcodedPasswordGo.FindString(line); m != "" {
+			if m := rules.GFindLower(reHardcodedPasswordGo, line, lowered[i]); m != "" {
 				matched = m
-			} else if m := reHardcodedUserCheck.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reHardcodedUserCheck, line, lowered[i]); m != "" {
 				matched = m
 			}
 		case rules.LangPython:
-			if m := reHardcodedPasswordPy.FindString(line); m != "" {
+			if m := rules.GFindLower(reHardcodedPasswordPy, line, lowered[i]); m != "" {
 				matched = m
-			} else if m := reHardcodedUserCheck.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reHardcodedUserCheck, line, lowered[i]); m != "" {
 				matched = m
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if m := reHardcodedPasswordJS.FindString(line); m != "" {
+			if m := rules.GFindLower(reHardcodedPasswordJS, line, lowered[i]); m != "" {
 				matched = m
-			} else if m := reHardcodedUserCheck.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reHardcodedUserCheck, line, lowered[i]); m != "" {
 				matched = m
 			}
 		case rules.LangPHP:
-			if m := reHardcodedCredPHP.FindString(line); m != "" {
+			if m := rules.GFindLower(reHardcodedCredPHP, line, lowered[i]); m != "" {
 				matched = m
-			} else if m := reHardcodedUserCheck.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reHardcodedUserCheck, line, lowered[i]); m != "" {
 				matched = m
 			}
 		default:
-			if m := reHardcodedPasswordGo.FindString(line); m != "" {
+			if m := rules.GFindLower(reHardcodedPasswordGo, line, lowered[i]); m != "" {
 				matched = m
-			} else if m := reHardcodedUserCheck.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reHardcodedUserCheck, line, lowered[i]); m != "" {
 				matched = m
 			}
 		}
@@ -157,7 +172,7 @@ func (r *HardcodedCredentialCheck) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 		// JWT "none" algorithm: allowing the "none" algorithm lets attackers
 		// forge tokens without a valid signature.
-		if m := reJWTNoneAlgorithm.FindString(line); m != "" {
+		if m := rules.GFindLower(reJWTNoneAlgorithm, line, lowered[i]); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -183,8 +198,8 @@ func (r *HardcodedCredentialCheck) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type MissingAuthCheck struct{}
 
-func (r *MissingAuthCheck) ID() string          { return "BATOU-AUTH-002" }
-func (r *MissingAuthCheck) Name() string         { return "MissingAuthCheck" }
+func (r *MissingAuthCheck) ID() string                      { return "BATOU-AUTH-002" }
+func (r *MissingAuthCheck) Name() string                    { return "MissingAuthCheck" }
 func (r *MissingAuthCheck) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingAuthCheck) Description() string {
 	return "Detects HTTP handlers and routes that appear to lack authentication middleware, especially for sensitive endpoints."
@@ -197,7 +212,8 @@ func (r *MissingAuthCheck) Languages() []rules.Language {
 
 func (r *MissingAuthCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	contentLower := strings.ToLower(ctx.Content)
 
 	switch ctx.Language {
@@ -210,7 +226,7 @@ func (r *MissingAuthCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		if !hasAuthMiddleware {
 			for i, line := range lines {
-				if reGoHandleFunc.MatchString(line) {
+				if rules.GMatchLower(reGoHandleFunc, line, lowered[i]) {
 					lineLower := strings.ToLower(line)
 					if strings.Contains(lineLower, "/admin") ||
 						strings.Contains(lineLower, "/dashboard") || strings.Contains(lineLower, "/manage") ||
@@ -222,10 +238,10 @@ func (r *MissingAuthCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 	case rules.LangJavaScript, rules.LangTypeScript:
-		hasAuthMiddleware := reExpressAuthMW.MatchString(ctx.Content)
+		hasAuthMiddleware := rules.GMatchFile(reExpressAuthMW, ctx)
 		if !hasAuthMiddleware {
 			for i, line := range lines {
-				if reExpressRoute.MatchString(line) {
+				if rules.GMatchLower(reExpressRoute, line, lowered[i]) {
 					findings = append(findings, r.makeFinding(ctx, i+1, strings.TrimSpace(line)))
 				}
 			}
@@ -234,7 +250,7 @@ func (r *MissingAuthCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
 	case rules.LangPython:
 		// Check for Django views without @login_required
 		for i, line := range lines {
-			if reDjangoView.MatchString(line) {
+			if rules.GMatchLower(reDjangoView, line, lowered[i]) {
 				lineLower := strings.ToLower(line)
 				if strings.Contains(lineLower, "admin") || strings.Contains(lineLower, "dashboard") ||
 					strings.Contains(lineLower, "manage") || strings.Contains(lineLower, "settings") {
@@ -284,8 +300,8 @@ func (r *MissingAuthCheck) makeFinding(ctx *rules.ScanContext, line int, matched
 
 type CORSWildcard struct{}
 
-func (r *CORSWildcard) ID() string          { return "BATOU-AUTH-003" }
-func (r *CORSWildcard) Name() string         { return "CORSWildcard" }
+func (r *CORSWildcard) ID() string                      { return "BATOU-AUTH-003" }
+func (r *CORSWildcard) Name() string                    { return "CORSWildcard" }
 func (r *CORSWildcard) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CORSWildcard) Description() string {
 	return "Detects overly permissive CORS configuration using wildcard origins, especially combined with credentials."
@@ -300,18 +316,19 @@ func (r *CORSWildcard) Languages() []rules.Language {
 
 func (r *CORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
-	hasCredentials := reCORSCredentials.MatchString(ctx.Content)
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
+	hasCredentials := rules.GMatchFile(reCORSCredentials, ctx)
 
 	for i, line := range lines {
 		var matched string
-		if m := reCORSAllowAll.FindString(line); m != "" {
+		if m := rules.GFindLower(reCORSAllowAll, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reCORSAllowAllOrigin.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reCORSAllowAllOrigin, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reCORSWildcardJS.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reCORSWildcardJS, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reCORSWildcardPy.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reCORSWildcardPy, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -347,8 +364,8 @@ func (r *CORSWildcard) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SessionFixation struct{}
 
-func (r *SessionFixation) ID() string          { return "BATOU-AUTH-004" }
-func (r *SessionFixation) Name() string         { return "SessionFixation" }
+func (r *SessionFixation) ID() string                      { return "BATOU-AUTH-004" }
+func (r *SessionFixation) Name() string                    { return "SessionFixation" }
 func (r *SessionFixation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SessionFixation) Description() string {
 	return "Detects login handlers that do not regenerate the session ID after successful authentication, enabling session fixation attacks."
@@ -362,15 +379,16 @@ func (r *SessionFixation) Languages() []rules.Language {
 
 func (r *SessionFixation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Stateless JWT/Bearer auth has no server-side sessions to regenerate.
-	if reJWTBearerAuth.MatchString(ctx.Content) {
+	if rules.GMatchFile(reJWTBearerAuth, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
-		if !reLoginHandler.MatchString(line) {
+		if !rules.GMatchLower(reLoginHandler, line, lowered[i]) {
 			continue
 		}
 
@@ -419,8 +437,8 @@ func (r *SessionFixation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WeakPasswordPolicy struct{}
 
-func (r *WeakPasswordPolicy) ID() string          { return "BATOU-AUTH-005" }
-func (r *WeakPasswordPolicy) Name() string         { return "WeakPasswordPolicy" }
+func (r *WeakPasswordPolicy) ID() string                      { return "BATOU-AUTH-005" }
+func (r *WeakPasswordPolicy) Name() string                    { return "WeakPasswordPolicy" }
 func (r *WeakPasswordPolicy) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *WeakPasswordPolicy) Description() string {
 	return "Detects password validation with weak requirements such as minimum length below 8 characters or missing complexity checks."
@@ -435,19 +453,20 @@ func (r *WeakPasswordPolicy) Languages() []rules.Language {
 
 func (r *WeakPasswordPolicy) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		var matched string
 
-		if m := reWeakPassLen.FindStringSubmatch(line); len(m) > 1 {
+		if m := rules.GFindSubmatchLower(reWeakPassLen, line, lowered[i]); len(m) > 1 {
 			val := parseSmallInt(m[1])
 			if val > 0 && val < 8 {
 				matched = strings.TrimSpace(line)
 			}
 		}
 		if matched == "" {
-			if m := reWeakPassMinLen.FindStringSubmatch(line); len(m) > 1 {
+			if m := rules.GFindSubmatchLower(reWeakPassMinLen, line, lowered[i]); len(m) > 1 {
 				val := parseSmallInt(m[1])
 				if val > 0 && val < 8 {
 					matched = strings.TrimSpace(line)
@@ -493,8 +512,8 @@ func parseSmallInt(s string) int {
 
 type InsecureCookie struct{}
 
-func (r *InsecureCookie) ID() string          { return "BATOU-AUTH-006" }
-func (r *InsecureCookie) Name() string         { return "InsecureCookie" }
+func (r *InsecureCookie) ID() string                      { return "BATOU-AUTH-006" }
+func (r *InsecureCookie) Name() string                    { return "InsecureCookie" }
 func (r *InsecureCookie) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureCookie) Description() string {
 	return "Detects cookies set without Secure, HttpOnly, or SameSite flags, which can expose session tokens to theft."
@@ -508,7 +527,7 @@ func (r *InsecureCookie) Languages() []rules.Language {
 
 func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	switch ctx.Language {
 	case rules.LangGo:
@@ -526,8 +545,9 @@ func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 func (r *InsecureCookie) scanGoCookies(ctx *rules.ScanContext, lines []string) []rules.Finding {
 	var findings []rules.Finding
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if !reGoCookieLiteral.MatchString(line) {
+		if !rules.GMatchLower(reGoCookieLiteral, line, lowered[i]) {
 			continue
 		}
 		// Look ahead up to 15 lines for closing brace to find the cookie struct
@@ -553,8 +573,9 @@ func (r *InsecureCookie) scanGoCookies(ctx *rules.ScanContext, lines []string) [
 
 func (r *InsecureCookie) scanJSCookies(ctx *rules.ScanContext, lines []string) []rules.Finding {
 	var findings []rules.Finding
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if !reJSSetCookie.MatchString(line) {
+		if !rules.GMatchLower(reJSSetCookie, line, lowered[i]) {
 			continue
 		}
 		end := i + 10
@@ -579,8 +600,9 @@ func (r *InsecureCookie) scanJSCookies(ctx *rules.ScanContext, lines []string) [
 
 func (r *InsecureCookie) scanPyCookies(ctx *rules.ScanContext, lines []string) []rules.Finding {
 	var findings []rules.Finding
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if !rePySetCookie.MatchString(line) {
+		if !rules.GMatchLower(rePySetCookie, line, lowered[i]) {
 			continue
 		}
 		end := i + 10
@@ -605,8 +627,9 @@ func (r *InsecureCookie) scanPyCookies(ctx *rules.ScanContext, lines []string) [
 
 func (r *InsecureCookie) scanPHPCookies(ctx *rules.ScanContext, lines []string) []rules.Finding {
 	var findings []rules.Finding
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if !rePHPSetCookie.MatchString(line) {
+		if !rules.GMatchLower(rePHPSetCookie, line, lowered[i]) {
 			continue
 		}
 		// PHP setcookie has positional args: setcookie(name, value, expire, path, domain, secure, httponly)
@@ -646,15 +669,15 @@ func (r *InsecureCookie) makeFinding(ctx *rules.ScanContext, line int, matched s
 // BATOU-AUTH-007: Privilege escalation patterns (CWE-269)
 var (
 	// C: setuid(0) / setgid(0)
-	reCSetuid0       = regexp.MustCompile(`\bsetuid\s*\(\s*0\s*\)`)
-	reCSetgid0       = regexp.MustCompile(`\bsetgid\s*\(\s*0\s*\)`)
+	reCSetuid0 = regexp.MustCompile(`\bsetuid\s*\(\s*0\s*\)`)
+	reCSetgid0 = regexp.MustCompile(`\bsetgid\s*\(\s*0\s*\)`)
 	// Python: os.setuid(0) / os.setgid(0)
-	rePySetuid0      = regexp.MustCompile(`\bos\.setuid\s*\(\s*0\s*\)`)
-	rePySetgid0      = regexp.MustCompile(`\bos\.setgid\s*\(\s*0\s*\)`)
+	rePySetuid0 = regexp.MustCompile(`\bos\.setuid\s*\(\s*0\s*\)`)
+	rePySetgid0 = regexp.MustCompile(`\bos\.setgid\s*\(\s*0\s*\)`)
 	// Shell/Makefile: chmod 777, chmod a+rwx
-	reChmod777       = regexp.MustCompile(`\bchmod\s+(?:777|a\+rwx)\b`)
+	reChmod777 = regexp.MustCompile(`\bchmod\s+(?:777|a\+rwx)\b`)
 	// Go: os.Chmod with 0777
-	reGoChmod777     = regexp.MustCompile(`os\.Chmod\s*\([^,]+,\s*0o?777\s*\)`)
+	reGoChmod777 = regexp.MustCompile(`os\.Chmod\s*\([^,]+,\s*0o?777\s*\)`)
 	// Dockerfile: USER root without later USER nonroot
 	reDockerUserRoot = regexp.MustCompile(`(?i)^\s*USER\s+root\s*$`)
 	reDockerUserNon  = regexp.MustCompile(`(?i)^\s*USER\s+\S+`)
@@ -664,8 +687,8 @@ var (
 
 type PrivilegeEscalation struct{}
 
-func (r *PrivilegeEscalation) ID() string                     { return "BATOU-AUTH-007" }
-func (r *PrivilegeEscalation) Name() string                   { return "PrivilegeEscalation" }
+func (r *PrivilegeEscalation) ID() string                      { return "BATOU-AUTH-007" }
+func (r *PrivilegeEscalation) Name() string                    { return "PrivilegeEscalation" }
 func (r *PrivilegeEscalation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PrivilegeEscalation) Description() string {
 	return "Detects privilege escalation patterns such as setuid(0), chmod 777, and Dockerfiles running as root."
@@ -679,7 +702,8 @@ func (r *PrivilegeEscalation) Languages() []rules.Language {
 
 func (r *PrivilegeEscalation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -719,7 +743,7 @@ func (r *PrivilegeEscalation) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, p := range langPatterns {
-			if m := p.re.FindString(line); m != "" {
+			if m := rules.GFindLower(p.re, line, lowered[i]); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -741,7 +765,7 @@ func (r *PrivilegeEscalation) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, p := range universalPatterns {
-			if m := p.re.FindString(line); m != "" {
+			if m := rules.GFindLower(p.re, line, lowered[i]); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -768,10 +792,10 @@ func (r *PrivilegeEscalation) Scan(ctx *rules.ScanContext) []rules.Finding {
 		lastUserRootLine := -1
 		hasNonRootAfter := false
 		for i, line := range lines {
-			if reDockerUserRoot.MatchString(line) {
+			if rules.GMatchLower(reDockerUserRoot, line, lowered[i]) {
 				lastUserRootLine = i
 				hasNonRootAfter = false
-			} else if reDockerUserNon.MatchString(line) && !reDockerUserRoot.MatchString(line) && lastUserRootLine >= 0 {
+			} else if rules.GMatchLower(reDockerUserNon, line, lowered[i]) && !rules.GMatchLower(reDockerUserRoot, line, lowered[i]) && lastUserRootLine >= 0 {
 				hasNonRootAfter = true
 			}
 		}

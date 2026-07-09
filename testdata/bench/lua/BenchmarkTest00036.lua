@@ -1,0 +1,5 @@
+local args = ngx.req.get_uri_args()
+local handle = io.popen("grep -r 'ERROR' /var/log/app.log")
+local result = handle:read("*a")
+handle:close()
+ngx.say(result)

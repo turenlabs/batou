@@ -13,14 +13,14 @@ import (
 
 // BATOU-REDIR-003: Open redirect via meta refresh tag
 var (
-	reMetaRefresh     = regexp.MustCompile(`(?i)<meta\s+[^>]*http-equiv\s*=\s*['"]refresh['"][^>]*content\s*=\s*['"][^'"]*url\s*=`)
-	reMetaRefreshVar  = regexp.MustCompile(`(?i)meta.*refresh.*url\s*=\s*['"]?\s*(?:\$\{|\+\s*\w+|%s|%v|\{\{|<%=|#\{)`)
+	reMetaRefresh    = regexp.MustCompile(`(?i)<meta\s+[^>]*http-equiv\s*=\s*['"]refresh['"][^>]*content\s*=\s*['"][^'"]*url\s*=`)
+	reMetaRefreshVar = regexp.MustCompile(`(?i)meta.*refresh.*url\s*=\s*['"]?\s*(?:\$\{|\+\s*\w+|%s|%v|\{\{|<%=|#\{)`)
 )
 
 // BATOU-REDIR-004: Open redirect via window.location
 var (
-	reWindowLocation     = regexp.MustCompile(`(?i)(?:window\.location|document\.location)\s*(?:\.\s*href\s*)?\s*=\s*(?:(?:req|request|params|query|body|searchParams|location\.(?:search|hash)|document\.(?:URL|referrer)|URLSearchParams)[\w.]*)`)
-	reWindowLocationGet  = regexp.MustCompile(`(?i)(?:window\.location|document\.location)\s*(?:\.\s*href\s*)?\s*=\s*\w+\.get\s*\(`)
+	reWindowLocation    = regexp.MustCompile(`(?i)(?:window\.location|document\.location)\s*(?:\.\s*href\s*)?\s*=\s*(?:(?:req|request|params|query|body|searchParams|location\.(?:search|hash)|document\.(?:URL|referrer)|URLSearchParams)[\w.]*)`)
+	reWindowLocationGet = regexp.MustCompile(`(?i)(?:window\.location|document\.location)\s*(?:\.\s*href\s*)?\s*=\s*\w+\.get\s*\(`)
 )
 
 // BATOU-REDIR-005: Redirect using unvalidated host header
@@ -36,13 +36,13 @@ var (
 
 // BATOU-REDIR-007: Open redirect via form action
 var (
-	reFormActionVar    = regexp.MustCompile(`(?i)<form\s+[^>]*action\s*=\s*['"]?\s*(?:\$\{|\{\{|<%=|#\{|%s)`)
-	reFormActionParam  = regexp.MustCompile(`(?i)(?:action|formAction)\s*[:=]\s*(?:req\.|request\.|params|query|body|searchParams|props\.)`)
+	reFormActionVar   = regexp.MustCompile(`(?i)<form\s+[^>]*action\s*=\s*['"]?\s*(?:\$\{|\{\{|<%=|#\{|%s)`)
+	reFormActionParam = regexp.MustCompile(`(?i)(?:action|formAction)\s*[:=]\s*(?:req\.|request\.|params|query|body|searchParams|props\.)`)
 )
 
 // BATOU-REDIR-008: Protocol-relative URL redirect
 var (
-	reProtocolRelative = regexp.MustCompile(`(?i)(?:redirect|location|href|window\.location|res\.redirect|sendRedirect|redirect_to|HttpResponseRedirect)\s*(?:[:=(]\s*)['"]//[^/]`)
+	reProtocolRelative    = regexp.MustCompile(`(?i)(?:redirect|location|href|window\.location|res\.redirect|sendRedirect|redirect_to|HttpResponseRedirect)\s*(?:[:=(]\s*)['"]//[^/]`)
 	reProtocolRelativeVar = regexp.MustCompile(`(?i)(?:redirect|location|href)\s*[:=]\s*['"]?\s*(?:\$\{|#\{|\+\s*)\s*['"]?//`)
 )
 
@@ -52,8 +52,8 @@ var (
 
 type MetaRefreshRedirect struct{}
 
-func (r *MetaRefreshRedirect) ID() string                     { return "BATOU-REDIR-003" }
-func (r *MetaRefreshRedirect) Name() string                   { return "MetaRefreshRedirect" }
+func (r *MetaRefreshRedirect) ID() string                      { return "BATOU-REDIR-003" }
+func (r *MetaRefreshRedirect) Name() string                    { return "MetaRefreshRedirect" }
 func (r *MetaRefreshRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MetaRefreshRedirect) Description() string {
 	return "Detects open redirect via HTML meta refresh tag with user-controlled URL, which bypasses server-side redirect protections."
@@ -64,16 +64,17 @@ func (r *MetaRefreshRedirect) Languages() []rules.Language {
 
 func (r *MetaRefreshRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
 		matched := ""
-		if loc := reMetaRefreshVar.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reMetaRefreshVar, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reMetaRefresh.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reMetaRefresh, line, lowered[i]); loc != "" {
 			// Only flag if there's dynamic content
 			if strings.ContainsAny(line, "${}+<%#") {
 				matched = loc
@@ -107,8 +108,8 @@ func (r *MetaRefreshRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WindowLocationRedirect struct{}
 
-func (r *WindowLocationRedirect) ID() string                     { return "BATOU-REDIR-004" }
-func (r *WindowLocationRedirect) Name() string                   { return "WindowLocationRedirect" }
+func (r *WindowLocationRedirect) ID() string                      { return "BATOU-REDIR-004" }
+func (r *WindowLocationRedirect) Name() string                    { return "WindowLocationRedirect" }
 func (r *WindowLocationRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WindowLocationRedirect) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -119,16 +120,17 @@ func (r *WindowLocationRedirect) Description() string {
 
 func (r *WindowLocationRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
 		matched := ""
-		if loc := reWindowLocation.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reWindowLocation, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reWindowLocationGet.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reWindowLocationGet, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -159,8 +161,8 @@ func (r *WindowLocationRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HostHeaderRedirect struct{}
 
-func (r *HostHeaderRedirect) ID() string                     { return "BATOU-REDIR-005" }
-func (r *HostHeaderRedirect) Name() string                   { return "HostHeaderRedirect" }
+func (r *HostHeaderRedirect) ID() string                      { return "BATOU-REDIR-005" }
+func (r *HostHeaderRedirect) Name() string                    { return "HostHeaderRedirect" }
 func (r *HostHeaderRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *HostHeaderRedirect) Description() string {
 	return "Detects redirect URLs constructed using the HTTP Host header, which is attacker-controlled and can be used for host header injection attacks."
@@ -171,13 +173,14 @@ func (r *HostHeaderRedirect) Languages() []rules.Language {
 
 func (r *HostHeaderRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
-		if loc := reHostHeaderRedirect.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reHostHeaderRedirect, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -205,8 +208,8 @@ func (r *HostHeaderRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LocationHrefRedirect struct{}
 
-func (r *LocationHrefRedirect) ID() string                     { return "BATOU-REDIR-006" }
-func (r *LocationHrefRedirect) Name() string                   { return "LocationHrefRedirect" }
+func (r *LocationHrefRedirect) ID() string                      { return "BATOU-REDIR-006" }
+func (r *LocationHrefRedirect) Name() string                    { return "LocationHrefRedirect" }
 func (r *LocationHrefRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LocationHrefRedirect) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -217,16 +220,17 @@ func (r *LocationHrefRedirect) Description() string {
 
 func (r *LocationHrefRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
 		matched := ""
-		if loc := reLocationHrefUserInput.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reLocationHrefUserInput, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reLocationHrefGet.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reLocationHrefGet, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -257,8 +261,8 @@ func (r *LocationHrefRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FormActionRedirect struct{}
 
-func (r *FormActionRedirect) ID() string                     { return "BATOU-REDIR-007" }
-func (r *FormActionRedirect) Name() string                   { return "FormActionRedirect" }
+func (r *FormActionRedirect) ID() string                      { return "BATOU-REDIR-007" }
+func (r *FormActionRedirect) Name() string                    { return "FormActionRedirect" }
 func (r *FormActionRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FormActionRedirect) Description() string {
 	return "Detects form action attributes set from user-controlled input, which can redirect form submissions to attacker-controlled servers."
@@ -269,16 +273,17 @@ func (r *FormActionRedirect) Languages() []rules.Language {
 
 func (r *FormActionRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
 		matched := ""
-		if loc := reFormActionVar.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reFormActionVar, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reFormActionParam.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reFormActionParam, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -309,8 +314,8 @@ func (r *FormActionRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ProtocolRelativeRedirect struct{}
 
-func (r *ProtocolRelativeRedirect) ID() string                     { return "BATOU-REDIR-008" }
-func (r *ProtocolRelativeRedirect) Name() string                   { return "ProtocolRelativeRedirect" }
+func (r *ProtocolRelativeRedirect) ID() string                      { return "BATOU-REDIR-008" }
+func (r *ProtocolRelativeRedirect) Name() string                    { return "ProtocolRelativeRedirect" }
 func (r *ProtocolRelativeRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ProtocolRelativeRedirect) Description() string {
 	return "Detects redirects using protocol-relative URLs (//evil.com) which redirect to external domains while bypassing URL validation that only checks for http:// or https:// prefixes."
@@ -321,16 +326,17 @@ func (r *ProtocolRelativeRedirect) Languages() []rules.Language {
 
 func (r *ProtocolRelativeRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
 		matched := ""
-		if loc := reProtocolRelative.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reProtocolRelative, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reProtocolRelativeVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reProtocolRelativeVar, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched != "" {

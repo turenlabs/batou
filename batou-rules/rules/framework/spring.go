@@ -30,11 +30,10 @@ var (
 // BATOU-FW-SPRING-003: Insecure CORS Configuration
 var (
 	// setAllowedOrigins(Arrays.asList("*")) or addAllowedOrigin("*")
-	corsAllowAllOrigins    = regexp.MustCompile(`(?:setAllowedOrigins|addAllowedOrigin)\s*\([^)]*"\s*\*\s*"`)
-	corsAllowCredentials   = regexp.MustCompile(`setAllowCredentials\s*\(\s*true\s*\)`)
+	corsAllowAllOrigins  = regexp.MustCompile(`(?:setAllowedOrigins|addAllowedOrigin)\s*\([^)]*"\s*\*\s*"`)
+	corsAllowCredentials = regexp.MustCompile(`setAllowCredentials\s*\(\s*true\s*\)`)
 	// @CrossOrigin(origins = "*") or @CrossOrigin without restrictions
-	crossOriginWildcard    = regexp.MustCompile(`@CrossOrigin\s*\(\s*(?:origins\s*=\s*(?:"\s*\*\s*"|\{[^}]*"\s*\*\s*"[^}]*\}))?[^)]*\)`)
-	crossOriginNoArgs      = regexp.MustCompile(`@CrossOrigin\s*$`)
+	crossOriginNoArgs = regexp.MustCompile(`@CrossOrigin\s*$`)
 )
 
 // BATOU-FW-SPRING-004: Actuator Exposure
@@ -52,7 +51,7 @@ var (
 	// @Query with nativeQuery=true and string concat/interpolation
 	nativeQueryAnnotation = regexp.MustCompile(`@Query\s*\([^)]*nativeQuery\s*=\s*true`)
 	// String concat in @Query value
-	queryStringConcat = regexp.MustCompile(`@Query\s*\(\s*(?:value\s*=\s*)?"[^"]*"\s*\+`)
+	queryStringConcat        = regexp.MustCompile(`@Query\s*\(\s*(?:value\s*=\s*)?"[^"]*"\s*\+`)
 	queryStringConcatReverse = regexp.MustCompile(`\+\s*"[^"]*"\s*[,)].*nativeQuery\s*=\s*true`)
 	// EntityManager.createNativeQuery with concat
 	emNativeQueryConcat = regexp.MustCompile(`(?:entityManager|em)\s*\.\s*createNativeQuery\s*\(\s*(?:"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+)`)
@@ -73,7 +72,6 @@ var (
 	cookieHttpOnlyFalse = regexp.MustCompile(`\.setHttpOnly\s*\(\s*false\s*\)`)
 	cookieSecureFalse   = regexp.MustCompile(`\.setSecure\s*\(\s*false\s*\)`)
 	// new Cookie(...) without subsequent setHttpOnly/setSecure
-	newCookie = regexp.MustCompile(`new\s+Cookie\s*\(`)
 )
 
 // BATOU-FW-SPRING-008: Frame Options Disabled (clickjacking)
@@ -93,7 +91,7 @@ var (
 
 // BATOU-FW-SPRING-010: Session Fixation
 var (
-	sessionFixationNone = regexp.MustCompile(`\.sessionFixation\s*\(\s*\)\s*\.\s*none\s*\(`)
+	sessionFixationNone   = regexp.MustCompile(`\.sessionFixation\s*\(\s*\)\s*\.\s*none\s*\(`)
 	sessionFixationLambda = regexp.MustCompile(`\.sessionFixation\s*\(\s*\w+\s*->\s*\w+\s*\.\s*none`)
 )
 
@@ -114,15 +112,18 @@ func init() {
 
 type CSRFDisabled struct{}
 
-func (r *CSRFDisabled) ID() string                      { return "BATOU-FW-SPRING-001" }
-func (r *CSRFDisabled) Name() string                    { return "CSRFDisabled" }
-func (r *CSRFDisabled) Description() string             { return "Detects Spring Security configurations that disable CSRF protection." }
+func (r *CSRFDisabled) ID() string   { return "BATOU-FW-SPRING-001" }
+func (r *CSRFDisabled) Name() string { return "CSRFDisabled" }
+func (r *CSRFDisabled) Description() string {
+	return "Detects Spring Security configurations that disable CSRF protection."
+}
 func (r *CSRFDisabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *CSRFDisabled) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *CSRFDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -131,11 +132,11 @@ func (r *CSRFDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if loc := csrfDisableLegacy.FindString(line); loc != "" {
+		if loc := rules.GFindLower(csrfDisableLegacy, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := csrfDisableLambda.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(csrfDisableLambda, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := csrfDisableKotlin.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(csrfDisableKotlin, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 
@@ -173,15 +174,20 @@ func (r *CSRFDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OverlyPermissiveAccess struct{}
 
-func (r *OverlyPermissiveAccess) ID() string                      { return "BATOU-FW-SPRING-002" }
-func (r *OverlyPermissiveAccess) Name() string                    { return "OverlyPermissiveAccess" }
-func (r *OverlyPermissiveAccess) Description() string             { return "Detects overly broad permitAll() rules that bypass authentication on all endpoints." }
+func (r *OverlyPermissiveAccess) ID() string   { return "BATOU-FW-SPRING-002" }
+func (r *OverlyPermissiveAccess) Name() string { return "OverlyPermissiveAccess" }
+func (r *OverlyPermissiveAccess) Description() string {
+	return "Detects overly broad permitAll() rules that bypass authentication on all endpoints."
+}
 func (r *OverlyPermissiveAccess) DefaultSeverity() rules.Severity { return rules.High }
-func (r *OverlyPermissiveAccess) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
+func (r *OverlyPermissiveAccess) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
 
 func (r *OverlyPermissiveAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -192,10 +198,10 @@ func (r *OverlyPermissiveAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var title string
 
-		if loc := permitAllWildcard.FindString(line); loc != "" {
+		if loc := rules.GFindLower(permitAllWildcard, line, lowered[i]); loc != "" {
 			matched = loc
 			title = "permitAll() on wildcard path '/**' bypasses all authentication"
-		} else if loc := anyRequestPermitAll.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(anyRequestPermitAll, line, lowered[i]); loc != "" {
 			matched = loc
 			title = "anyRequest().permitAll() disables authentication for all endpoints"
 		}
@@ -227,19 +233,22 @@ func (r *OverlyPermissiveAccess) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureCORS struct{}
 
-func (r *InsecureCORS) ID() string                      { return "BATOU-FW-SPRING-003" }
-func (r *InsecureCORS) Name() string                    { return "InsecureCORS" }
-func (r *InsecureCORS) Description() string             { return "Detects insecure CORS configurations that allow all origins with credentials." }
+func (r *InsecureCORS) ID() string   { return "BATOU-FW-SPRING-003" }
+func (r *InsecureCORS) Name() string { return "InsecureCORS" }
+func (r *InsecureCORS) Description() string {
+	return "Detects insecure CORS configurations that allow all origins with credentials."
+}
 func (r *InsecureCORS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecureCORS) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *InsecureCORS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// File-level checks for dangerous CORS combos
-	hasAllowAllOrigins := corsAllowAllOrigins.MatchString(ctx.Content)
-	hasAllowCredentials := corsAllowCredentials.MatchString(ctx.Content)
+	hasAllowAllOrigins := rules.GMatchFile(corsAllowAllOrigins, ctx)
+	hasAllowCredentials := rules.GMatchFile(corsAllowCredentials, ctx)
 
 	if hasAllowAllOrigins && hasAllowCredentials {
 		// Find the line with allow-all origins
@@ -248,7 +257,7 @@ func (r *InsecureCORS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if isComment(trimmed) {
 				continue
 			}
-			if loc := corsAllowAllOrigins.FindString(line); loc != "" {
+			if loc := rules.GFindLower(corsAllowAllOrigins, line, lowered[i]); loc != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      rules.High,
@@ -274,7 +283,7 @@ func (r *InsecureCORS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if isComment(trimmed) {
 				continue
 			}
-			if loc := corsAllowAllOrigins.FindString(line); loc != "" {
+			if loc := rules.GFindLower(corsAllowAllOrigins, line, lowered[i]); loc != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      rules.Medium,
@@ -347,9 +356,11 @@ func (r *InsecureCORS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ActuatorExposure struct{}
 
-func (r *ActuatorExposure) ID() string                      { return "BATOU-FW-SPRING-004" }
-func (r *ActuatorExposure) Name() string                    { return "ActuatorExposure" }
-func (r *ActuatorExposure) Description() string             { return "Detects exposed Spring Boot Actuator endpoints without authentication." }
+func (r *ActuatorExposure) ID() string   { return "BATOU-FW-SPRING-004" }
+func (r *ActuatorExposure) Name() string { return "ActuatorExposure" }
+func (r *ActuatorExposure) Description() string {
+	return "Detects exposed Spring Boot Actuator endpoints without authentication."
+}
 func (r *ActuatorExposure) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ActuatorExposure) Languages() []rules.Language {
 	return []rules.Language{rules.LangJava, rules.LangYAML, rules.LangAny}
@@ -357,7 +368,8 @@ func (r *ActuatorExposure) Languages() []rules.Language {
 
 func (r *ActuatorExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -365,7 +377,7 @@ func (r *ActuatorExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := actuatorPermitAll.FindString(line); loc != "" {
+		if loc := rules.GFindLower(actuatorPermitAll, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -384,7 +396,7 @@ func (r *ActuatorExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if loc := actuatorExposeAll.FindString(line); loc != "" {
+		if loc := rules.GFindLower(actuatorExposeAll, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -403,7 +415,7 @@ func (r *ActuatorExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if loc := actuatorSecurityOff.FindString(line); loc != "" {
+		if loc := rules.GFindLower(actuatorSecurityOff, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -430,15 +442,18 @@ func (r *ActuatorExposure) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NativeQueryInjection struct{}
 
-func (r *NativeQueryInjection) ID() string                      { return "BATOU-FW-SPRING-005" }
-func (r *NativeQueryInjection) Name() string                    { return "NativeQueryInjection" }
-func (r *NativeQueryInjection) Description() string             { return "Detects SQL injection via native JPA queries with string concatenation." }
+func (r *NativeQueryInjection) ID() string   { return "BATOU-FW-SPRING-005" }
+func (r *NativeQueryInjection) Name() string { return "NativeQueryInjection" }
+func (r *NativeQueryInjection) Description() string {
+	return "Detects SQL injection via native JPA queries with string concatenation."
+}
 func (r *NativeQueryInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *NativeQueryInjection) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *NativeQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -447,7 +462,7 @@ func (r *NativeQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// @Query with string concat and nativeQuery=true
-		if nativeQueryAnnotation.MatchString(line) && (queryStringConcat.MatchString(line) || queryStringConcatReverse.MatchString(line)) {
+		if rules.GMatchLower(nativeQueryAnnotation, line, lowered[i]) && (rules.GMatchLower(queryStringConcat, line, lowered[i]) || rules.GMatchLower(queryStringConcatReverse, line, lowered[i])) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -468,7 +483,7 @@ func (r *NativeQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Also check multi-line: @Query on one line, concat on next
-		if nativeQueryAnnotation.MatchString(line) && i+1 < len(lines) {
+		if rules.GMatchLower(nativeQueryAnnotation, line, lowered[i]) && i+1 < len(lines) {
 			nextLine := lines[i+1]
 			if strings.Contains(nextLine, "+") && (strings.Contains(nextLine, "\"") || strings.Contains(line, "+")) {
 				// Look for string concatenation pattern in the query value
@@ -496,7 +511,7 @@ func (r *NativeQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// EntityManager.createNativeQuery with concatenation
-		if loc := emNativeQueryConcat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(emNativeQueryConcat, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -516,7 +531,7 @@ func (r *NativeQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// EntityManager.createQuery (HQL injection)
-		if loc := emCreateQueryConcat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(emCreateQueryConcat, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -543,9 +558,11 @@ func (r *NativeQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MassAssignment struct{}
 
-func (r *MassAssignment) ID() string                      { return "BATOU-FW-SPRING-006" }
-func (r *MassAssignment) Name() string                    { return "MassAssignment" }
-func (r *MassAssignment) Description() string             { return "Detects @ModelAttribute usage without field binding restrictions." }
+func (r *MassAssignment) ID() string   { return "BATOU-FW-SPRING-006" }
+func (r *MassAssignment) Name() string { return "MassAssignment" }
+func (r *MassAssignment) Description() string {
+	return "Detects @ModelAttribute usage without field binding restrictions."
+}
 func (r *MassAssignment) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MassAssignment) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
@@ -553,25 +570,26 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only flag if @ModelAttribute exists but no @InitBinder with field restrictions
-	if !modelAttributeAnnotation.MatchString(ctx.Content) {
+	if !rules.GMatchFile(modelAttributeAnnotation, ctx) {
 		return nil
 	}
 
-	hasFieldRestriction := initBinderAnnotation.MatchString(ctx.Content) &&
-		binderFieldRestriction.MatchString(ctx.Content)
+	hasFieldRestriction := rules.GMatchFile(initBinderAnnotation, ctx) &&
+		rules.GMatchFile(binderFieldRestriction, ctx)
 
 	if hasFieldRestriction {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 
-		if modelAttributeAnnotation.MatchString(line) {
+		if rules.GMatchLower(modelAttributeAnnotation, line, lowered[i]) {
 			// Only flag @ModelAttribute on method parameters (in controller methods)
 			if strings.Contains(line, "(") || (i+1 < len(lines) && strings.Contains(lines[i+1], "(")) {
 				continue // Likely a method-level annotation for model population
@@ -603,15 +621,18 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureCookie struct{}
 
-func (r *InsecureCookie) ID() string                      { return "BATOU-FW-SPRING-007" }
-func (r *InsecureCookie) Name() string                    { return "InsecureCookie" }
-func (r *InsecureCookie) Description() string             { return "Detects cookies created without HttpOnly or Secure flags." }
+func (r *InsecureCookie) ID() string   { return "BATOU-FW-SPRING-007" }
+func (r *InsecureCookie) Name() string { return "InsecureCookie" }
+func (r *InsecureCookie) Description() string {
+	return "Detects cookies created without HttpOnly or Secure flags."
+}
 func (r *InsecureCookie) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureCookie) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -619,7 +640,7 @@ func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := cookieHttpOnlyFalse.FindString(line); loc != "" {
+		if loc := rules.GFindLower(cookieHttpOnlyFalse, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -638,7 +659,7 @@ func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if loc := cookieSecureFalse.FindString(line); loc != "" {
+		if loc := rules.GFindLower(cookieSecureFalse, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -665,15 +686,18 @@ func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FrameOptionsDisabled struct{}
 
-func (r *FrameOptionsDisabled) ID() string                      { return "BATOU-FW-SPRING-008" }
-func (r *FrameOptionsDisabled) Name() string                    { return "FrameOptionsDisabled" }
-func (r *FrameOptionsDisabled) Description() string             { return "Detects disabled X-Frame-Options header allowing clickjacking attacks." }
+func (r *FrameOptionsDisabled) ID() string   { return "BATOU-FW-SPRING-008" }
+func (r *FrameOptionsDisabled) Name() string { return "FrameOptionsDisabled" }
+func (r *FrameOptionsDisabled) Description() string {
+	return "Detects disabled X-Frame-Options header allowing clickjacking attacks."
+}
 func (r *FrameOptionsDisabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FrameOptionsDisabled) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *FrameOptionsDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -682,9 +706,9 @@ func (r *FrameOptionsDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if loc := frameOptionsDisable.FindString(line); loc != "" {
+		if loc := rules.GFindLower(frameOptionsDisable, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := frameOptionsLambda.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(frameOptionsLambda, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 
@@ -708,7 +732,7 @@ func (r *FrameOptionsDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Also detect disabling all headers
-		if loc := headersDisable.FindString(line); loc != "" {
+		if loc := rules.GFindLower(headersDisable, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -725,7 +749,7 @@ func (r *FrameOptionsDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 				Confidence:    "high",
 				Tags:          []string{"spring", "security-headers", "headers"},
 			})
-		} else if loc := headersLambdaDisable.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(headersLambdaDisable, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -752,15 +776,18 @@ func (r *FrameOptionsDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DispatcherForward struct{}
 
-func (r *DispatcherForward) ID() string                      { return "BATOU-FW-SPRING-009" }
-func (r *DispatcherForward) Name() string                    { return "DispatcherForward" }
-func (r *DispatcherForward) Description() string             { return "Detects request dispatcher forward and ModelAndView with user-controlled paths." }
+func (r *DispatcherForward) ID() string   { return "BATOU-FW-SPRING-009" }
+func (r *DispatcherForward) Name() string { return "DispatcherForward" }
+func (r *DispatcherForward) Description() string {
+	return "Detects request dispatcher forward and ModelAndView with user-controlled paths."
+}
 func (r *DispatcherForward) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DispatcherForward) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *DispatcherForward) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	hasUserInput := strings.Contains(ctx.Content, "request.getParameter") ||
 		strings.Contains(ctx.Content, "@RequestParam") ||
@@ -772,7 +799,7 @@ func (r *DispatcherForward) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := dispatcherForward.FindString(line); loc != "" {
+		if loc := rules.GFindLower(dispatcherForward, line, lowered[i]); loc != "" {
 			confidence := "medium"
 			if hasUserInput {
 				confidence = "high"
@@ -795,7 +822,7 @@ func (r *DispatcherForward) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if loc := modelAndViewUserInput.FindString(line); loc != "" && hasUserInput {
+		if loc := rules.GFindLower(modelAndViewUserInput, line, lowered[i]); loc != "" && hasUserInput {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -822,15 +849,18 @@ func (r *DispatcherForward) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SessionFixation struct{}
 
-func (r *SessionFixation) ID() string                      { return "BATOU-FW-SPRING-010" }
-func (r *SessionFixation) Name() string                    { return "SessionFixation" }
-func (r *SessionFixation) Description() string             { return "Detects Spring Security session fixation protection being disabled." }
+func (r *SessionFixation) ID() string   { return "BATOU-FW-SPRING-010" }
+func (r *SessionFixation) Name() string { return "SessionFixation" }
+func (r *SessionFixation) Description() string {
+	return "Detects Spring Security session fixation protection being disabled."
+}
 func (r *SessionFixation) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SessionFixation) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *SessionFixation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -839,9 +869,9 @@ func (r *SessionFixation) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if loc := sessionFixationNone.FindString(line); loc != "" {
+		if loc := rules.GFindLower(sessionFixationNone, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := sessionFixationLambda.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(sessionFixationLambda, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 

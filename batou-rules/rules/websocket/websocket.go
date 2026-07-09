@@ -35,14 +35,12 @@ var (
 
 // BATOU-WS-004: WebSocket without rate limiting
 var (
-	reWSBroadcast       = regexp.MustCompile(`(?i)(?:broadcast|\.send\s*\(|\.emit\s*\(|clients\.forEach|for\s+.*\bclient\b.*\.send)`)
 	reWSRateLimit       = regexp.MustCompile(`(?i)(?:rate.?limit|rateLimit|throttle|debounce|max_messages|message_count|flood|spam|cooldown|bucket)`)
 )
 
 // BATOU-WS-005: WebSocket broadcasting sensitive data
 var (
 	reWSSensitiveBroadcast = regexp.MustCompile(`(?i)(?:broadcast|\.send|\.emit)\s*\([^)]*(?:password|passwd|secret|token|api_key|apiKey|credit.?card|ssn|social_security|private_key|privateKey)`)
-	reWSBroadcastAll       = regexp.MustCompile(`(?i)(?:broadcast|sendAll|emitAll|io\.emit|wss\.clients\.forEach)\s*\(`)
 )
 
 // BATOU-WS-006: WebSocket without TLS (ws:// not wss://)
@@ -94,7 +92,7 @@ func hasNearbyPattern(lines []string, idx, before, after int, re *regexp.Regexp)
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if re.MatchString(l) {
+		if rules.GMatch(re, l) {
 			return true
 		}
 	}
@@ -119,7 +117,7 @@ func (r *WSNoOriginValidation) Languages() []rules.Language {
 
 func (r *WSNoOriginValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
@@ -127,7 +125,7 @@ func (r *WSNoOriginValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		// Explicit "accept all origins" patterns
 		for _, re := range []*regexp.Regexp{reWSCheckOriginFalse, reWSOriginAllowed} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -148,7 +146,7 @@ func (r *WSNoOriginValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 		}
 		// WebSocket setup without origin check
-		if m := reWSUpgradeNoOrigin.FindString(line); m != "" {
+		if m := rules.GFind(reWSUpgradeNoOrigin, line); m != "" {
 			if !hasNearbyPattern(lines, i, 10, 10, reWSOriginCheck) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -190,13 +188,13 @@ func (r *WSNoAuthentication) Languages() []rules.Language {
 
 func (r *WSNoAuthentication) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reWSHandler.FindString(line); m != "" {
+		if m := rules.GFind(reWSHandler, line); m != "" {
 			if !hasNearbyPattern(lines, i, 5, 20, reWSAuth) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -238,14 +236,14 @@ func (r *WSMessageEval) Languages() []rules.Language {
 
 func (r *WSMessageEval) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reWSMsgToEval, reWSMessageEval, reWSMsgToExecPy} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -287,13 +285,13 @@ func (r *WSNoRateLimit) Languages() []rules.Language {
 
 func (r *WSNoRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reWSOnMessage.FindString(line); m != "" {
+		if m := rules.GFind(reWSOnMessage, line); m != "" {
 			if !hasNearbyPattern(lines, i, 10, 30, reWSRateLimit) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -335,13 +333,13 @@ func (r *WSSensitiveBroadcast) Languages() []rules.Language {
 
 func (r *WSSensitiveBroadcast) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reWSSensitiveBroadcast.FindString(line); m != "" {
+		if m := rules.GFind(reWSSensitiveBroadcast, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -381,14 +379,14 @@ func (r *WSInsecure) Languages() []rules.Language {
 
 func (r *WSInsecure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		// Skip if the line also contains wss:// or is clearly a conditional/comparison
-		if reWSSecureURL.MatchString(line) {
+		if rules.GMatch(reWSSecureURL, line) {
 			continue
 		}
 		// Skip localhost/127.0.0.1 connections (development)
@@ -397,7 +395,7 @@ func (r *WSInsecure) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reWSInsecureConnect, reWSInsecureURL} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -439,13 +437,13 @@ func (r *WSCSWSH) Languages() []rules.Language {
 
 func (r *WSCSWSH) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reWSNoCORSCheck.FindString(line); m != "" {
+		if m := rules.GFind(reWSNoCORSCheck, line); m != "" {
 			// Check if cookie/session-based auth is used nearby
 			if hasNearbyPattern(lines, i, 10, 10, reWSCookieAuth) {
 				// Check if there's a CSRF token/origin check
@@ -491,14 +489,14 @@ func (r *WSMessageInjection) Languages() []rules.Language {
 
 func (r *WSMessageInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reWSMsgToSQL, reWSMsgToMongo, reWSMsgToQuery} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),

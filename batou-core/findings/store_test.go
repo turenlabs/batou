@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 )
 
@@ -441,7 +440,7 @@ func TestComputeDeltas_ActiveToSuppressed_WithoutSuppressedParam(t *testing.T) {
 	}
 }
 
-// TestComputeDeltas_SuppressedNotResentOnSubsequentScans verifies the re-emit bug:
+// TestComputeDeltas_SuppressedNotResentOnSubsequentScans verifies the downstream re-send bug:
 // Once a finding is suppressed, subsequent scans should NOT re-emit it in
 // deltas.Suppressed. Only the first scan where it transitions active→suppressed
 // should include it.
@@ -470,7 +469,7 @@ func TestComputeDeltas_SuppressedNotResentOnSubsequentScans(t *testing.T) {
 
 	// Scan 3 should NOT re-report the finding as suppressed
 	if len(deltas.Suppressed) != 0 {
-		t.Errorf("scan 3: expected 0 suppressed (already suppressed), got %d — this is the re-emit bug", len(deltas.Suppressed))
+		t.Errorf("scan 3: expected 0 suppressed (already suppressed), got %d — this is the downstream re-send bug", len(deltas.Suppressed))
 		for _, r := range deltas.Suppressed {
 			t.Logf("  re-emitted: %s status=%s count=%d", r.RuleID, r.Status, r.Count)
 		}
@@ -492,7 +491,7 @@ func TestComputeDeltas_SuppressedNotResentOnSubsequentScans(t *testing.T) {
 // TestConcurrentOpenSave verifies that concurrent Open+Save calls don't
 // corrupt the store. Two goroutines open, upsert, and save simultaneously.
 func TestConcurrentOpenSave(t *testing.T) {
-	t.Skip("flaky: file rename race on macOS CI — see turenio/batou-commercial#64")
+	t.Skip("flaky: file rename race on macOS CI")
 	dir := t.TempDir()
 
 	// Seed the store with one record
@@ -553,13 +552,13 @@ func TestLockFileCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	if s.lockFile == nil {
+	if s.lock == nil {
 		t.Fatal("expected lock file to be acquired")
 	}
 	if err := s.Save(); err != nil {
 		t.Fatalf("save: %v", err)
 	}
-	if s.lockFile != nil {
+	if s.lock != nil {
 		t.Error("expected lock file to be nil after Save")
 	}
 

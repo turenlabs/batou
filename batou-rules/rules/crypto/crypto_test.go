@@ -116,6 +116,57 @@ func TestCRY003_Fixture_WeakCrypto_JS(t *testing.T) {
 	}
 }
 
+// owncloud/web FP: the French article "des" inside an l10n translation bundle.
+func TestCRY003_Safe_TranslationJSON(t *testing.T) {
+	content := `{
+  "files_overview": "Liste des fichiers et des dossiers",
+  "reset": "Réinitialiser des permissions"
+}`
+	result := testutil.ScanContent(t, "/app/l10n/messages.fr.json", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-003")
+}
+
+// owncloud/web FP: transitive package names ("browserify-des", "des.js") in a lockfile.
+func TestCRY003_Safe_Lockfile(t *testing.T) {
+	content := `  /browserify-des@1.0.2:
+    resolution: {integrity: sha512-aaa}
+    dependencies:
+      cipher-base: 1.0.4
+      des.js: 1.1.0
+      inherits: 2.0.4
+`
+	result := testutil.ScanContent(t, "/app/pnpm-lock.yaml", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-003")
+}
+
+// owncloud/web FP shape generalized: a bare "des" word in a translation string inside a
+// .ts/.vue file (which scans as JS) — no crypto context, must not fire.
+func TestCRY003_Safe_TranslationStringInTS(t *testing.T) {
+	content := `const labels = {
+  remove: $gettext('Supprimer des éléments'),
+  edit: $gettext('Modifier des permissions'),
+}`
+	result := testutil.ScanContent(t, "/app/i18n/labels.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-003")
+}
+
+// TP retained: a weak-cipher reference with crypto context still fires via the fallback.
+func TestCRY003_GoImportDES(t *testing.T) {
+	content := `import (
+	"crypto/des"
+	"crypto/cipher"
+)`
+	result := testutil.ScanContent(t, "/app/legacy_crypto.go", content)
+	testutil.MustFindRule(t, result, "BATOU-CRY-003")
+}
+
+// TP retained: a config value selecting Blowfish in a non-lockfile data file.
+func TestCRY003_ConfigWeakCipher(t *testing.T) {
+	content := `cipher_algorithm = "Blowfish"`
+	result := testutil.ScanContent(t, "/app/crypto.toml", content)
+	testutil.MustFindRule(t, result, "BATOU-CRY-003")
+}
+
 // --- BATOU-CRY-004: Hardcoded IV ---
 
 func TestCRY004_GoByteIV(t *testing.T) {
@@ -334,6 +385,67 @@ func TestCRY012_Safe_EnvVar(t *testing.T) {
 encryption_key = os.environ.get("ENCRYPTION_KEY")`
 	result := testutil.ScanContent(t, "/app/config.py", content)
 	testutil.MustNotFindRule(t, result, "BATOU-CRY-012")
+}
+
+// owncloud/web FPs: Vue/JSX template list-render keys and DOM attributes are
+// scanned as JS but are not hardcoded secrets.
+func TestCRY012_Safe_VueBoundKeyAttr(t *testing.T) {
+	content := `<template>
+  <ul>
+    <li v-for="instance in instances" :key="instance.url">{{ instance.name }}</li>
+  </ul>
+</template>`
+	result := testutil.ScanContent(t, "/app/components/InstancesList.vue", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-012")
+}
+
+func TestCRY012_Safe_VueElementKeyAttr(t *testing.T) {
+	// `key="..."` inside an opening HTML element tag.
+	content := `<template>
+  <div>
+    <h2 key="public-link-error">Link error</h2>
+  </div>
+</template>`
+	result := testutil.ScanContent(t, "/app/pages/ResolvePublicLink.vue", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-012")
+}
+
+func TestCRY012_Safe_VueBareKeyAttrLine(t *testing.T) {
+	// Multi-line element: `key="..."` alone on its own line (no JS-assignment shape).
+	content := `<template>
+  <oc-spinner
+    v-if="loading"
+    key="avatar-loading"
+  />
+</template>`
+	result := testutil.ScanContent(t, "/app/components/Avatar.vue", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-012")
+}
+
+func TestCRY012_Safe_TSXKeyProp(t *testing.T) {
+	content := `function List() {
+  return <ul><Row key="row-header" /><Row key="row-footer" /></ul>;
+}`
+	result := testutil.ScanContent(t, "/app/List.tsx", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-012")
+}
+
+// TPs retained: real hardcoded keys/secrets in JS/TS code (not markup) still fire.
+func TestCRY012_JSHardcodedSecretAssignment(t *testing.T) {
+	content := `const crypto = require('crypto');
+const key = "sk_live_4242424242424242";
+const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);`
+	result := testutil.ScanContent(t, "/app/payments.ts", content)
+	testutil.MustFindRule(t, result, "BATOU-CRY-012")
+}
+
+func TestCRY012_JSHardcodedSecretBareAssignment(t *testing.T) {
+	content := `function sign(payload) {
+  secret = "hunter2hunter2hunter2";
+  return hmac(secret, payload);
+}`
+	result := testutil.ScanContent(t, "/app/sign.js", content)
+	testutil.MustFindRule(t, result, "BATOU-CRY-012")
 }
 
 // --- BATOU-CRY-013: Unauthenticated Encryption ---
@@ -593,6 +705,55 @@ func TestCRY017_Safe_GoConstantTimeCompare(t *testing.T) {
 valid := subtle.ConstantTimeCompare([]byte(token), []byte(expected))`
 	result := testutil.ScanContent(t, "/app/auth.go", content)
 	testutil.MustNotFindRule(t, result, "BATOU-CRY-017")
+}
+
+// owncloud/web FP: a reflexive comparison (both operands are the same value)
+// cannot leak through timing.
+func TestCRY017_Safe_ReflexiveCompare(t *testing.T) {
+	content := `if (token === token) { return true; }`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-017")
+}
+
+func TestCRY017_Safe_ReflexiveIdentifierCompare(t *testing.T) {
+	content := `function isCurrent(accessToken) {
+  return accessToken === accessToken;
+}`
+	result := testutil.ScanContent(t, "/app/stores/auth.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-017")
+}
+
+// FP: length comparison leaks length, not content — not the targeted channel.
+func TestCRY017_Safe_LengthCompare(t *testing.T) {
+	content := `if (token.length === expectedToken.length) { return false; }`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-017")
+}
+
+// FP: comparison against a numeric literal is an existence/expiry check.
+func TestCRY017_Safe_NumericLiteralCompare(t *testing.T) {
+	content := `if (client_secret_expires_at === 0) { refresh(); }`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-CRY-017")
+}
+
+// TPs retained: real secret/token equality checks still fire.
+func TestCRY017_JSHeaderTokenCompare(t *testing.T) {
+	content := `function authorize(req) {
+  if (req.headers['x-api-token'] === apiToken) {
+    return true;
+  }
+}`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustFindRule(t, result, "BATOU-CRY-017")
+}
+
+func TestCRY017_GoTokenCompareStillFires(t *testing.T) {
+	content := `func check(signature, expected string) bool {
+	return signature == expected
+}`
+	result := testutil.ScanContent(t, "/app/verify.go", content)
+	testutil.MustFindRule(t, result, "BATOU-CRY-017")
 }
 
 // --- BATOU-CRY-018: Hardcoded IV Broad ---

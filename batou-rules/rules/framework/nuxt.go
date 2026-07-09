@@ -16,22 +16,22 @@ var (
 	reNuxtVHtml = regexp.MustCompile(`v-html\s*=\s*["']`)
 
 	// BATOU-FW-NUXT-002: runtimeConfig exposing secrets
-	reNuxtPublicRuntime   = regexp.MustCompile(`(?:publicRuntimeConfig|public\s*:\s*\{)`)
+	reNuxtPublicRuntime    = regexp.MustCompile(`(?:publicRuntimeConfig|public\s*:\s*\{)`)
 	reNuxtRuntimeSensitive = regexp.MustCompile(`(?i)(?:secret|key|token|password|credential|api_key|apiKey|private|database|db_)`)
 
 	// BATOU-FW-NUXT-003: Server API without authentication
-	reNuxtDefineHandler     = regexp.MustCompile(`defineEventHandler\s*\(`)
-	reNuxtDefineHandlerOld  = regexp.MustCompile(`export\s+default\s+defineEventHandler\s*\(`)
+	reNuxtDefineHandler    = regexp.MustCompile(`defineEventHandler\s*\(`)
+	reNuxtDefineHandlerOld = regexp.MustCompile(`export\s+default\s+defineEventHandler\s*\(`)
 
 	// BATOU-FW-NUXT-004: SSR injection via user-controlled meta/head
-	reNuxtUseHead       = regexp.MustCompile(`useHead\s*\(\s*\{`)
-	reNuxtUseSeoMeta    = regexp.MustCompile(`useSeoMeta\s*\(\s*\{`)
-	reNuxtHeadDynamic   = regexp.MustCompile(`(?:title|description|innerHTML|content)\s*:\s*(?:route\.|query\.|params\.|req\.|event\.|useRoute)`)
+	reNuxtUseHead     = regexp.MustCompile(`useHead\s*\(\s*\{`)
+	reNuxtUseSeoMeta  = regexp.MustCompile(`useSeoMeta\s*\(\s*\{`)
+	reNuxtHeadDynamic = regexp.MustCompile(`(?:title|description|innerHTML|content)\s*:\s*(?:route\.|query\.|params\.|req\.|event\.|useRoute)`)
 
 	// BATOU-FW-NUXT-005: Proxy/redirect with user input
-	reNuxtSendRedirect  = regexp.MustCompile(`sendRedirect\s*\(\s*event\s*,\s*(?:query\.|getQuery|getRouterParam|event\.(?:context|node)\.)`)
-	reNuxtProxyRequest  = regexp.MustCompile(`proxyRequest\s*\(\s*event\s*,\s*(?:query\.|getQuery|getRouterParam|event\.)`)
-	reNuxtNavigateTo    = regexp.MustCompile(`navigateTo\s*\(\s*(?:route\.|useRoute|query\.|to\.|params\.)`)
+	reNuxtSendRedirect = regexp.MustCompile(`sendRedirect\s*\(\s*event\s*,\s*(?:query\.|getQuery|getRouterParam|event\.(?:context|node)\.)`)
+	reNuxtProxyRequest = regexp.MustCompile(`proxyRequest\s*\(\s*event\s*,\s*(?:query\.|getQuery|getRouterParam|event\.)`)
+	reNuxtNavigateTo   = regexp.MustCompile(`navigateTo\s*\(\s*(?:route\.|useRoute|query\.|to\.|params\.)`)
 
 	// BATOU-FW-NUXT-006: Middleware bypass via direct API access
 	reNuxtMiddlewareDef = regexp.MustCompile(`defineNuxtRouteMiddleware\s*\(`)
@@ -64,14 +64,15 @@ func (r *NuxtVHtml) Languages() []rules.Language {
 
 func (r *NuxtVHtml) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "<!--") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reNuxtVHtml.FindString(line); m != "" {
+		if m := rules.GFindLower(reNuxtVHtml, line, lowered[i]); m != "" {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -114,12 +115,13 @@ func (r *NuxtPublicRuntimeSecrets) Languages() []rules.Language {
 }
 
 func (r *NuxtPublicRuntimeSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reNuxtPublicRuntime.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNuxtPublicRuntime, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inPublicBlock := false
 	braceDepth := 0
@@ -130,7 +132,7 @@ func (r *NuxtPublicRuntimeSecrets) Scan(ctx *rules.ScanContext) []rules.Finding 
 			continue
 		}
 
-		if reNuxtPublicRuntime.MatchString(line) {
+		if rules.GMatchLower(reNuxtPublicRuntime, line, lowered[i]) {
 			inPublicBlock = true
 			braceDepth = strings.Count(line, "{") - strings.Count(line, "}")
 			continue
@@ -139,7 +141,7 @@ func (r *NuxtPublicRuntimeSecrets) Scan(ctx *rules.ScanContext) []rules.Finding 
 		if inPublicBlock {
 			braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 
-			if reNuxtRuntimeSensitive.MatchString(line) {
+			if rules.GMatchLower(reNuxtRuntimeSensitive, line, lowered[i]) {
 				matched := t
 				if len(matched) > 120 {
 					matched = matched[:120] + "..."
@@ -201,14 +203,15 @@ func (r *NuxtServerAPINoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reNuxtDefineHandler.MatchString(line) || reNuxtDefineHandlerOld.MatchString(line) {
+		if rules.GMatchLower(reNuxtDefineHandler, line, lowered[i]) || rules.GMatchLower(reNuxtDefineHandlerOld, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -251,20 +254,21 @@ func (r *NuxtSSRInjection) Languages() []rules.Language {
 }
 
 func (r *NuxtSSRInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
-	hasHeadComposable := reNuxtUseHead.MatchString(ctx.Content) || reNuxtUseSeoMeta.MatchString(ctx.Content)
+	hasHeadComposable := rules.GMatchFile(reNuxtUseHead, ctx) || rules.GMatchFile(reNuxtUseSeoMeta, ctx)
 	if !hasHeadComposable {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reNuxtHeadDynamic.MatchString(line) {
+		if rules.GMatchLower(reNuxtHeadDynamic, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -308,7 +312,8 @@ func (r *NuxtOpenRedirect) Languages() []rules.Language {
 
 func (r *NuxtOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -318,13 +323,13 @@ func (r *NuxtOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 		var title string
-		if m := reNuxtSendRedirect.FindString(line); m != "" {
+		if m := rules.GFindLower(reNuxtSendRedirect, line, lowered[i]); m != "" {
 			matched = m
 			title = "Nuxt sendRedirect with user-controlled URL (open redirect)"
-		} else if m := reNuxtProxyRequest.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reNuxtProxyRequest, line, lowered[i]); m != "" {
 			matched = m
 			title = "Nuxt proxyRequest with user-controlled target (SSRF/redirect)"
-		} else if m := reNuxtNavigateTo.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reNuxtNavigateTo, line, lowered[i]); m != "" {
 			matched = m
 			title = "Nuxt navigateTo with user-controlled URL (open redirect)"
 		}
@@ -377,7 +382,8 @@ func (r *NuxtMiddlewareBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if this middleware handles auth but only on the client side
 	hasAuth := false
@@ -401,7 +407,7 @@ func (r *NuxtMiddlewareBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reNuxtMiddlewareDef.MatchString(line) && hasClientOnly {
+		if rules.GMatchLower(reNuxtMiddlewareDef, line, lowered[i]) && hasClientOnly {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

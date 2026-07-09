@@ -131,6 +131,59 @@ user = User.new(params[:user])`
 	}
 }
 
+// RailsGoat documented mass-assignment idioms: the unfiltered hash is bound to
+// a variable first (permit! / to_unsafe_h on its own line) and only passed to
+// the model write on a later line, so the inline `params[:` patterns miss it.
+// permit! / to_unsafe_h are themselves the vulnerability and must fire.
+
+func TestMASS003_RailsGoat_PermitBang_VariableIndirection(t *testing.T) {
+	// railsgoat users_controller.rb: permit! assigned, model write is elsewhere.
+	content := `def user_params
+  params.require(:user).permit!
+end
+
+def update
+  @user.update(user_params)
+end`
+	result := testutil.ScanContent(t, "/app/controllers/users_controller.rb", content)
+	testutil.MustFindRule(t, result, "BATOU-MASS-003")
+}
+
+func TestMASS003_RailsGoat_ToUnsafeH_VariableIndirection(t *testing.T) {
+	// railsgoat admin_controller.rb: to_unsafe_h drains the filtered hash, then
+	// a later .update(filtered_params) writes it — variable indirection.
+	content := `def update_user
+  user_params = params[:user].to_unsafe_h
+  filtered_params = user_params.reject { |k, v| v.blank? }
+  user.update(filtered_params)
+end`
+	result := testutil.ScanContent(t, "/app/controllers/admin_controller.rb", content)
+	testutil.MustFindRule(t, result, "BATOU-MASS-003")
+}
+
+func TestMASS003_Safe_PermitAllowlist_NoPermitBang(t *testing.T) {
+	// The safe idiom: an explicit allowlist via permit(:a, :b) — no permit! and
+	// no to_unsafe_h — must NOT trip the new branch.
+	content := `def user_params
+  params.require(:user).permit(:email, :first_name, :last_name)
+end
+
+def update
+  @user.update(user_params)
+end`
+	result := testutil.ScanContent(t, "/app/controllers/users_controller.rb", content)
+	testutil.MustNotFindRule(t, result, "BATOU-MASS-003")
+}
+
+func TestMASS003_Safe_SliceAllowlistBeforePermitBang(t *testing.T) {
+	// .slice(:a, :b).permit! restricts the hash to developer-chosen keys before
+	// permit!, so permit! only blesses an allowlisted set — the safe idiom seen
+	// in real Rails apps. Must NOT trip the permit! branch.
+	content := `more_params = params.slice(:period, :order, :group).permit!`
+	result := testutil.ScanContent(t, "/app/controllers/items_controller.rb", content)
+	testutil.MustNotFindRule(t, result, "BATOU-MASS-003")
+}
+
 // --- BATOU-MASS-004: Java Mass Assignment ---
 
 func TestMASS004_ModelAttribute(t *testing.T) {

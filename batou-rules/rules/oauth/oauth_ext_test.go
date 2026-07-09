@@ -110,3 +110,55 @@ func TestOAuth011_HttpOnlyCookie_Safe(t *testing.T) {
 	result := testutil.ScanContent(t, "/app/auth.js", content)
 	testutil.MustNotFindRule(t, result, "BATOU-OAUTH-011")
 }
+
+// ---------------------------------------------------------------------------
+// BATOU-OAUTH-005: PKCE not used — FP gates (owncloud/web)
+// ---------------------------------------------------------------------------
+
+func TestOAuth005_HandRolledNoPKCE_Fires(t *testing.T) {
+	// Hand-rolled auth-code flow with no PKCE anywhere and no PKCE library.
+	content := `const authConfig = {
+  response_type: 'code',
+  client_id: clientId,
+  redirect_uri: redirectUri,
+  scope: 'openid profile'
+};
+buildAuthorizeUrl(authConfig);`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustFindRule(t, result, "BATOU-OAUTH-005")
+}
+
+func TestOAuth005_ExplicitPKCE_Safe(t *testing.T) {
+	content := `const params = {
+  response_type: 'code',
+  client_id: clientId,
+  code_challenge: challenge,
+  code_challenge_method: 'S256'
+};`
+	result := testutil.ScanContent(t, "/app/auth.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-OAUTH-005")
+}
+
+func TestOAuth005_OidcClientTsLibrary_Safe(t *testing.T) {
+	// oidc-client-ts performs PKCE automatically for the auth-code flow.
+	content := `import { UserManager, WebStorageStateStore } from 'oidc-client-ts'
+
+const settings = {
+  authority: 'https://idp.example.com',
+  client_id: 'web',
+  response_mode: 'query',
+  response_type: 'code', // "code" triggers auth code grant flow
+  redirect_uri: 'https://app.example.com/callback'
+}
+
+const userManager = new UserManager(settings)`
+	result := testutil.ScanContent(t, "/app/userManager.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-OAUTH-005")
+}
+
+func TestOAuth005_OpenidClientLibrary_Safe(t *testing.T) {
+	content := `const { Issuer } = require('openid-client');
+const params = { response_type: 'code', scope: 'openid' };`
+	result := testutil.ScanContent(t, "/app/oidc.js", content)
+	testutil.MustNotFindRule(t, result, "BATOU-OAUTH-005")
+}

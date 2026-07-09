@@ -17,10 +17,16 @@ var (
 	reWhereTemplateLiteral = regexp.MustCompile("`[^`]*\\$where[^`]*\\$\\{")
 	// $where with string concatenation: "$where": "..." + variable
 	// Handle double-quoted and single-quoted strings separately to allow the
-	// other quote type inside (e.g., "this.name == '" + var)
-	reWhereConcatStr = regexp.MustCompile(`(?i)['"]\$where['"]\s*(?::|=>)\s*(?:"[^"]*"\s*\+|'[^']*'\s*\+|[^"'\s][^,}]*\+)`)
+	// other quote type inside (e.g., "this.name == '" + var).
+	// The key quotes are OPTIONAL (['"]?): real Mongo/Node code uses the bare
+	// JS object-key form `$where: "..." + x` as often as the quoted-key form,
+	// so a quote-required pattern misses the bare-key case (e.g. NodeGoat).
+	reWhereConcatStr = regexp.MustCompile(`(?i)['"]?\$where['"]?\s*(?::|=>)\s*(?:"[^"]*"\s*\+|'[^']*'\s*\+|[^"'` + "`" + `\s][^,}]*\+)`)
 	// $where with template literal value: $where: `this.x === '${...}'`
-	reWhereTemplateLiteralValue = regexp.MustCompile("(?i)['\"]\\$where['\"]\\s*(?::|=>)\\s*`[^`]*\\$\\{")
+	// Key quotes OPTIONAL — see note above; the `${` requirement keeps this
+	// tight to interpolated templates (a static `$where: ` + "`...`" + ` body
+	// with no `${` is not flagged).
+	reWhereTemplateLiteralValue = regexp.MustCompile("(?i)['\"]?\\$where['\"]?\\s*(?::|=>)\\s*`[^`]*\\$\\{")
 	// $where with f-string (Python): "$where": f"this.x == '{var}'"
 	reWhereFString = regexp.MustCompile(`(?i)['"]\$where['"]\s*(?::|=>)\s*f["']`)
 	// $where with .format() (Python)
@@ -77,7 +83,7 @@ var (
 var reLineComment = regexp.MustCompile(`^\s*(?://|#|--|;|%|/\*)`)
 
 func isCommentLine(line string) bool {
-	return reLineComment.MatchString(line)
+	return rules.GMatch(reLineComment, line)
 }
 
 func truncate(s string, maxLen int) string {
@@ -94,8 +100,8 @@ func truncate(s string, maxLen int) string {
 
 type WhereInjection struct{}
 
-func (r WhereInjection) ID() string                     { return "BATOU-NOSQL-001" }
-func (r WhereInjection) Name() string                   { return "MongoDB $where Injection" }
+func (r WhereInjection) ID() string                      { return "BATOU-NOSQL-001" }
+func (r WhereInjection) Name() string                    { return "MongoDB $where Injection" }
 func (r WhereInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r WhereInjection) Description() string {
 	return "Detects MongoDB $where operator with string interpolation or concatenation, enabling server-side JavaScript execution."
@@ -108,7 +114,7 @@ func (r WhereInjection) Languages() []rules.Language {
 
 func (r WhereInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -136,7 +142,7 @@ func (r WhereInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if p.lang != rules.LangAny && p.lang != ctx.Language {
 				continue
 			}
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -167,8 +173,8 @@ func (r WhereInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OperatorInjection struct{}
 
-func (r OperatorInjection) ID() string                     { return "BATOU-NOSQL-002" }
-func (r OperatorInjection) Name() string                   { return "MongoDB Operator Injection" }
+func (r OperatorInjection) ID() string                      { return "BATOU-NOSQL-002" }
+func (r OperatorInjection) Name() string                    { return "MongoDB Operator Injection" }
 func (r OperatorInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r OperatorInjection) Description() string {
 	return "Detects patterns where user input is used as MongoDB query operators, enabling query manipulation via operator injection ($gt, $ne, etc.)."
@@ -181,7 +187,7 @@ func (r OperatorInjection) Languages() []rules.Language {
 
 func (r OperatorInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -210,7 +216,7 @@ func (r OperatorInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if p.lang != rules.LangAny && p.lang != ctx.Language {
 				continue
 			}
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -241,8 +247,8 @@ func (r OperatorInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RawQueryInjection struct{}
 
-func (r RawQueryInjection) ID() string                     { return "BATOU-NOSQL-003" }
-func (r RawQueryInjection) Name() string                   { return "MongoDB Raw Query Injection" }
+func (r RawQueryInjection) ID() string                      { return "BATOU-NOSQL-003" }
+func (r RawQueryInjection) Name() string                    { return "MongoDB Raw Query Injection" }
 func (r RawQueryInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r RawQueryInjection) Description() string {
 	return "Detects raw MongoDB queries with user-controlled input in $regex, aggregation pipelines, mapReduce, or server-side eval."
@@ -255,7 +261,7 @@ func (r RawQueryInjection) Languages() []rules.Language {
 
 func (r RawQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -277,7 +283,7 @@ func (r RawQueryInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),

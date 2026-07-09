@@ -62,14 +62,11 @@ func hasNearbyPattern(lines []string, idx int, pat *regexp.Regexp) bool {
 var (
 	reJNDILookup       = regexp.MustCompile(`\.lookup\s*\(\s*[a-zA-Z_]\w*`)
 	reJNDILookupConcat = regexp.MustCompile(`\.lookup\s*\(\s*"[^"]*"\s*\+`)
-	reInitialContext    = regexp.MustCompile(`new\s+InitialContext\s*\(`)
-	reDirContext        = regexp.MustCompile(`new\s+(?:InitialDirContext|InitialLdapContext)\s*\(`)
-	reJNDIContext       = regexp.MustCompile(`(?:InitialContext|Context|DirContext|LdapContext)`)
+	reJNDIContext      = regexp.MustCompile(`(?:InitialContext|Context|DirContext|LdapContext)`)
 )
 
 // JAVA-002: Expression Language Injection
 var (
-	reELEval        = regexp.MustCompile(`\.eval\s*\(\s*[a-zA-Z_]\w*`)
 	reELValueExpr   = regexp.MustCompile(`\.createValueExpression\s*\(\s*[^"'\s)]`)
 	reELMethodExpr  = regexp.MustCompile(`\.createMethodExpression\s*\(\s*[^"'\s)]`)
 	reELExprFactory = regexp.MustCompile(`ExpressionFactory\.newInstance`)
@@ -78,11 +75,10 @@ var (
 
 // JAVA-003: Spring SpEL Injection
 var (
-	reSpELParser        = regexp.MustCompile(`SpelExpressionParser\s*\(\s*\)`)
-	reSpELParseExpr     = regexp.MustCompile(`\.parseExpression\s*\(\s*[a-zA-Z_]\w*`)
-	reSpELParseConcat   = regexp.MustCompile(`\.parseExpression\s*\(\s*"[^"]*"\s*\+`)
-	reSpELValue         = regexp.MustCompile(`@Value\s*\(\s*"#\{`)
-	reSpELRequestParam  = regexp.MustCompile(`request\.getParameter|@RequestParam|@PathVariable|@RequestBody`)
+	reSpELParser       = regexp.MustCompile(`SpelExpressionParser\s*\(\s*\)`)
+	reSpELParseExpr    = regexp.MustCompile(`\.parseExpression\s*\(\s*[a-zA-Z_]\w*`)
+	reSpELParseConcat  = regexp.MustCompile(`\.parseExpression\s*\(\s*"[^"]*"\s*\+`)
+	reSpELRequestParam = regexp.MustCompile(`request\.getParameter|@RequestParam|@PathVariable|@RequestBody`)
 )
 
 // JAVA-004: Hibernate HQL Injection
@@ -97,12 +93,10 @@ var (
 var (
 	reJDBCDriverManager = regexp.MustCompile(`DriverManager\.getConnection\s*\(\s*[a-zA-Z_]\w*`)
 	reJDBCConnConcat    = regexp.MustCompile(`DriverManager\.getConnection\s*\(\s*"[^"]*"\s*\+`)
-	reJDBCDataSource    = regexp.MustCompile(`\.getConnection\s*\(\s*"[^"]*"\s*\+`)
 )
 
 // JAVA-006: Java RMI Deserialization
 var (
-	reRMIRegistryBind   = regexp.MustCompile(`\.(?:bind|rebind|lookup)\s*\(`)
 	reRMILocateRegistry = regexp.MustCompile(`LocateRegistry\.(?:getRegistry|createRegistry)\s*\(`)
 	reRMINaming         = regexp.MustCompile(`Naming\.(?:bind|rebind|lookup)\s*\(`)
 	reRMIContext        = regexp.MustCompile(`(?:Registry|UnicastRemoteObject|LocateRegistry|Naming)`)
@@ -110,30 +104,25 @@ var (
 
 // JAVA-007: Insecure SSL/TLS TrustManager
 var (
-	reX509TrustManager      = regexp.MustCompile(`implements\s+X509TrustManager`)
-	reTrustAllCerts         = regexp.MustCompile(`new\s+X509TrustManager\s*\(\s*\)\s*\{`)
+	reX509TrustManager        = regexp.MustCompile(`implements\s+X509TrustManager`)
+	reTrustAllCerts           = regexp.MustCompile(`new\s+X509TrustManager\s*\(\s*\)\s*\{`)
 	reCheckServerTrustedEmpty = regexp.MustCompile(`checkServerTrusted\s*\([^)]*\)\s*\{?\s*\}`)
-	reTrustManagerFactory    = regexp.MustCompile(`TrustManagerFactory`)
-	reSSLContextInit         = regexp.MustCompile(`SSLContext\.getInstance\s*\(`)
-	reSSLContextInitNull     = regexp.MustCompile(`\.init\s*\(\s*null\s*,\s*\w+\s*,`)
 )
 
 // JAVA-008: Unrestricted File Upload
 var (
-	reMultipartFile        = regexp.MustCompile(`MultipartFile\b`)
-	reTransferTo           = regexp.MustCompile(`\.transferTo\s*\(`)
-	reGetOriginalFilename  = regexp.MustCompile(`\.getOriginalFilename\s*\(`)
-	reFileExtCheck         = regexp.MustCompile(`(?i)(?:endsWith|contains|matches|contentType|getContentType|getMimeType|extension)`)
+	reMultipartFile       = regexp.MustCompile(`MultipartFile\b`)
+	reTransferTo          = regexp.MustCompile(`\.transferTo\s*\(`)
+	reGetOriginalFilename = regexp.MustCompile(`\.getOriginalFilename\s*\(`)
+	reFileExtCheck        = regexp.MustCompile(`(?i)(?:endsWith|contains|matches|contentType|getContentType|getMimeType|extension)`)
 )
 
 // JAVA-009: Server-Side Template Injection (extended Java patterns)
 var (
-	reVelocityEvaluate   = regexp.MustCompile(`Velocity\.evaluate\s*\(`)
-	reVelocityMerge      = regexp.MustCompile(`\.merge\s*\(\s*[a-zA-Z_]\w*`)
-	reFreemarkerProcess  = regexp.MustCompile(`\.process\s*\(\s*[a-zA-Z_]\w*`)
-	reFreemarkerNewTmpl  = regexp.MustCompile(`new\s+Template\s*\(\s*[^"'\s)]`)
-	reThymeleafProcess   = regexp.MustCompile(`templateEngine\.process\s*\(\s*[a-zA-Z_]\w*`)
-	reSSTIUserInput      = regexp.MustCompile(`request\.getParameter|@RequestParam|@PathVariable`)
+	reVelocityEvaluate  = regexp.MustCompile(`Velocity\.evaluate\s*\(`)
+	reFreemarkerNewTmpl = regexp.MustCompile(`new\s+Template\s*\(\s*[^"'\s)]`)
+	reThymeleafProcess  = regexp.MustCompile(`templateEngine\.process\s*\(\s*[a-zA-Z_]\w*`)
+	reSSTIUserInput     = regexp.MustCompile(`request\.getParameter|@RequestParam|@PathVariable`)
 )
 
 // JAVA-010: Improper Certificate/Hostname Validation
@@ -142,68 +131,71 @@ var (
 	reHostnameVerifierNoOp     = regexp.MustCompile(`NoopHostnameVerifier`)
 	reHostnameVerifierReturn   = regexp.MustCompile(`verify\s*\([^)]*\)\s*\{\s*return\s+true`)
 	reHostnameVerifierImpl     = regexp.MustCompile(`implements\s+HostnameVerifier`)
-	reSetHostnameVerifier      = regexp.MustCompile(`\.setHostnameVerifier\s*\(`)
 )
 
 // JAVA-011: Hardcoded JDBC Credentials
 var (
-	reJDBCPasswordInline   = regexp.MustCompile(`DriverManager\.getConnection\s*\(\s*"[^"]*"\s*,\s*"[^"]+"\s*,\s*"[^"]+"`)
-	reJDBCURLPassword      = regexp.MustCompile(`"jdbc:[^"]*password=[^"]*"`)
+	reJDBCPasswordInline    = regexp.MustCompile(`DriverManager\.getConnection\s*\(\s*"[^"]*"\s*,\s*"[^"]+"\s*,\s*"[^"]+"`)
+	reJDBCURLPassword       = regexp.MustCompile(`"jdbc:[^"]*password=[^"]*"`)
 	reDataSourceSetPassword = regexp.MustCompile(`\.setPassword\s*\(\s*"[^"]+"`)
-	rePropertiesPassword   = regexp.MustCompile(`(?i)(?:password|passwd)\s*=\s*"[^"]+"`)
 )
 
 // JAVA-012: Regex DoS (ReDoS)
 var (
-	rePatternCompileVar   = regexp.MustCompile(`Pattern\.compile\s*\(\s*[a-zA-Z_]\w*`)
+	rePatternCompileVar    = regexp.MustCompile(`Pattern\.compile\s*\(\s*[a-zA-Z_]\w*`)
 	rePatternCompileConcat = regexp.MustCompile(`Pattern\.compile\s*\(\s*"[^"]*"\s*\+`)
-	reStringMatchesVar    = regexp.MustCompile(`\.matches\s*\(\s*[a-zA-Z_]\w*`)
-	reReqParam            = regexp.MustCompile(`request\.getParameter|@RequestParam|@PathVariable|@RequestBody`)
+	reStringMatchesVar     = regexp.MustCompile(`\.matches\s*\(\s*[a-zA-Z_]\w*`)
+	reReqParam             = regexp.MustCompile(`request\.getParameter|@RequestParam|@PathVariable|@RequestBody`)
 )
 
 // JAVA-013: Information Exposure in Error Messages
 var (
-	rePrintStackTrace      = regexp.MustCompile(`\.printStackTrace\s*\(`)
-	rePrintStackTraceResp  = regexp.MustCompile(`\.printStackTrace\s*\(\s*(?:response|res|out|writer|outputStream)`)
-	reExceptionToResponse  = regexp.MustCompile(`(?:response\.getWriter\s*\(\s*\)\s*\.\s*(?:print|println|write)|out\.print(?:ln)?|writer\.write|writer\.println)\s*\([^)]*(?:\.getMessage|\.toString|\.getStackTrace|stackTrace)`)
-	reExceptionCatchAll    = regexp.MustCompile(`catch\s*\(\s*(?:Exception|Throwable)\s+\w+\s*\)`)
-	reResponseGetWriter    = regexp.MustCompile(`response\.getWriter|response\.getOutputStream`)
+	rePrintStackTrace     = regexp.MustCompile(`\.printStackTrace\s*\(`)
+	rePrintStackTraceResp = regexp.MustCompile(`\.printStackTrace\s*\(\s*(?:response|res|out|writer|outputStream)`)
+	reExceptionToResponse = regexp.MustCompile(`(?:response\.getWriter\s*\(\s*\)\s*\.\s*(?:print|println|write)|out\.print(?:ln)?|writer\.write|writer\.println)\s*\([^)]*(?:\.getMessage|\.toString|\.getStackTrace|stackTrace)`)
+	reResponseGetWriter   = regexp.MustCompile(`response\.getWriter|response\.getOutputStream`)
 )
 
 // JAVA-014: Insecure Random in Security Context
 var (
-	reJavaUtilRandom        = regexp.MustCompile(`\bnew\s+Random\s*\(`)
-	reJavaRandomImport      = regexp.MustCompile(`\bjava\.util\.Random\b`)
-	reThreadLocalRandom     = regexp.MustCompile(`ThreadLocalRandom\.current\(\)`)
-	reJavaSecurityContext   = regexp.MustCompile(`(?i)(token|password|key|secret|nonce|salt|otp|csrf|session|uuid|auth|api[_\-]?key|encrypt|hash|credential|certificate)`)
-	reJavaSecureRandom      = regexp.MustCompile(`SecureRandom`)
+	reJavaUtilRandom      = regexp.MustCompile(`\bnew\s+Random\s*\(`)
+	reJavaRandomImport    = regexp.MustCompile(`\bjava\.util\.Random\b`)
+	reThreadLocalRandom   = regexp.MustCompile(`ThreadLocalRandom\.current\(\)`)
+	reJavaSecurityContext = regexp.MustCompile(`(?i)(token|password|key|secret|nonce|salt|otp|csrf|session|uuid|auth|api[_\-]?key|encrypt|hash|credential|certificate)`)
+	reJavaSecureRandom    = regexp.MustCompile(`SecureRandom`)
 )
 
 // JAVA-015: Missing HttpOnly/Secure on Cookies (broader pattern)
 var (
-	reNewCookie            = regexp.MustCompile(`new\s+Cookie\s*\(`)
-	reAddCookie            = regexp.MustCompile(`\.addCookie\s*\(`)
-	reSetHttpOnly          = regexp.MustCompile(`\.setHttpOnly\s*\(\s*true`)
-	reSetSecure            = regexp.MustCompile(`\.setSecure\s*\(\s*true`)
-	reCookieSensitiveName  = regexp.MustCompile(`(?i)(?:session|token|auth|jwt|csrf|api[_\-]?key|remember)`)
+	reNewCookie           = regexp.MustCompile(`new\s+Cookie\s*\(`)
+	reSetHttpOnly         = regexp.MustCompile(`\.setHttpOnly\s*\(\s*true`)
+	reSetSecure           = regexp.MustCompile(`\.setSecure\s*\(\s*true`)
+	reCookieSensitiveName = regexp.MustCompile(`(?i)(?:session|token|auth|jwt|csrf|api[_\-]?key|remember)`)
 )
 
 // JAVA-016: SSRF via URL class
 var (
-	reNewURL            = regexp.MustCompile(`new\s+URL\s*\(\s*[a-zA-Z_]\w*`)
-	reNewURLConcat      = regexp.MustCompile(`new\s+URL\s*\(\s*"[^"]*"\s*\+`)
-	reURLOpenConnection = regexp.MustCompile(`\.openConnection\s*\(`)
-	reURLOpenStream     = regexp.MustCompile(`\.openStream\s*\(`)
-	reHttpClientExec    = regexp.MustCompile(`(?:HttpClient|CloseableHttpClient)\s*.*\.execute\s*\(`)
-	reURICreate         = regexp.MustCompile(`URI\.create\s*\(\s*[a-zA-Z_]\w*`)
+	reNewURL       = regexp.MustCompile(`new\s+URL\s*\(\s*[a-zA-Z_]\w*`)
+	reNewURLConcat = regexp.MustCompile(`new\s+URL\s*\(\s*"[^"]*"\s*\+`)
+	reURICreate    = regexp.MustCompile(`URI\.create\s*\(\s*[a-zA-Z_]\w*`)
+	// Host-allowlist guard: matches an allowlist-style .contains call on a
+	// constant set / list of trusted hosts/URLs/domains. When present in the
+	// same file as a SSRF sink, the developer has clearly implemented the
+	// canonical CWE-918 mitigation (OWASP SSRF Prevention Cheat Sheet) — the
+	// per-line URI.create / new URL findings on the parse step would
+	// otherwise FP. Mirrors the body-scope javaSSRFAllowlistAnyContainsRe
+	// the tsflow taint engine uses (see batou-core/taint/tsflow/walker.go).
+	reJavaSSRFHostAllowlist = regexp.MustCompile(
+		`(?i)(?:ALLOW(?:ED)?(?:_)?(?:HOSTS?|URLS?|DOMAINS?|LIST)|WHITELIST|HOST_?WHITELIST)\s*\.\s*contains\s*\(` +
+			`|\b(?:isAllowedHost|isAllowedUrl|isSafeUrl|isSafeHost|validateUrl|validateHost|checkAllowedHost)\s*\(`,
+	)
 )
 
 // JAVA-017: Zip Slip
 var (
-	reZipEntryGetName    = regexp.MustCompile(`\.getName\s*\(\s*\)`)
-	reZipInputStream     = regexp.MustCompile(`ZipInputStream|ZipFile|JarInputStream|JarFile`)
-	reFileOutputZip      = regexp.MustCompile(`new\s+File\s*\([^)]*(?:getName|entryName|entry\.getName|zipEntry)`)
-	rePathNormalize      = regexp.MustCompile(`(?:normalize|canonical|startsWith|contains\s*\(\s*"\.\.")`)
+	reZipEntryGetName = regexp.MustCompile(`\.getName\s*\(\s*\)`)
+	reZipInputStream  = regexp.MustCompile(`ZipInputStream|ZipFile|JarInputStream|JarFile`)
+	rePathNormalize   = regexp.MustCompile(`(?:normalize|canonical|startsWith|contains\s*\(\s*"\.\.")`)
 )
 
 // JAVA-018: Thread Safety Issues (SimpleDateFormat)
@@ -215,23 +207,33 @@ var (
 	reSynchronized           = regexp.MustCompile(`synchronized`)
 )
 
+// JAVA-031: MyBatis ${} String-Substitution SQL Injection
+var (
+	reMyBatisAnnotation = regexp.MustCompile(`@(?:Select|Insert|Update|Delete|SelectProvider|InsertProvider|UpdateProvider|DeleteProvider)\b`)
+	reMyBatisXMLTag     = regexp.MustCompile(`<(?:select|insert|update|delete)\b`)
+	reMyBatisDollarSub  = regexp.MustCompile(`\$\{[^}]+\}`)
+)
+
 // ---------------------------------------------------------------------------
 // JAVA-001: JNDI Injection
 // ---------------------------------------------------------------------------
 
 type JNDIInjection struct{}
 
-func (r *JNDIInjection) ID() string                      { return "BATOU-JAVA-001" }
-func (r *JNDIInjection) Name() string                    { return "JNDIInjection" }
-func (r *JNDIInjection) Description() string             { return "Detects JNDI lookup with user-controlled input, enabling remote code execution via Log4Shell-style attacks." }
+func (r *JNDIInjection) ID() string   { return "BATOU-JAVA-001" }
+func (r *JNDIInjection) Name() string { return "JNDIInjection" }
+func (r *JNDIInjection) Description() string {
+	return "Detects JNDI lookup with user-controlled input, enabling remote code execution via Log4Shell-style attacks."
+}
 func (r *JNDIInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JNDIInjection) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *JNDIInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
-	hasJNDI := reJNDIContext.MatchString(ctx.Content)
+	hasJNDI := rules.GMatchFile(reJNDIContext, ctx)
 	if !hasJNDI {
 		return nil
 	}
@@ -244,10 +246,10 @@ func (r *JNDIInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reJNDILookupConcat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reJNDILookupConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "JNDI lookup with string concatenation"
-		} else if loc := reJNDILookup.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reJNDILookup, line, lowered[i]); loc != "" {
 			// Only flag if user input is nearby
 			if hasNearbyPattern(lines, i, reSpELRequestParam) {
 				matched = loc
@@ -283,17 +285,20 @@ func (r *JNDIInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ELInjection struct{}
 
-func (r *ELInjection) ID() string                      { return "BATOU-JAVA-002" }
-func (r *ELInjection) Name() string                    { return "ELInjection" }
-func (r *ELInjection) Description() string             { return "Detects Java Expression Language (EL) injection where user input is evaluated as EL expressions." }
+func (r *ELInjection) ID() string   { return "BATOU-JAVA-002" }
+func (r *ELInjection) Name() string { return "ELInjection" }
+func (r *ELInjection) Description() string {
+	return "Detects Java Expression Language (EL) injection where user input is evaluated as EL expressions."
+}
 func (r *ELInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ELInjection) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *ELInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
-	hasELFactory := reELExprFactory.MatchString(ctx.Content)
+	hasELFactory := rules.GMatchFile(reELExprFactory, ctx)
 	if !hasELFactory && !strings.Contains(ctx.Content, "ValueExpression") && !strings.Contains(ctx.Content, "MethodExpression") {
 		return nil
 	}
@@ -306,15 +311,15 @@ func (r *ELInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reELConcat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reELConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "EL expression created with string concatenation"
-		} else if loc := reELValueExpr.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reELValueExpr, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reReqParam) {
 				matched = loc
 				detail = "EL value expression with user-controlled input"
 			}
-		} else if loc := reELMethodExpr.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reELMethodExpr, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reReqParam) {
 				matched = loc
 				detail = "EL method expression with user-controlled input"
@@ -349,17 +354,20 @@ func (r *ELInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SpELInjection struct{}
 
-func (r *SpELInjection) ID() string                      { return "BATOU-JAVA-003" }
-func (r *SpELInjection) Name() string                    { return "SpELInjection" }
-func (r *SpELInjection) Description() string             { return "Detects Spring Expression Language (SpEL) injection where user input is parsed as SpEL expressions." }
+func (r *SpELInjection) ID() string   { return "BATOU-JAVA-003" }
+func (r *SpELInjection) Name() string { return "SpELInjection" }
+func (r *SpELInjection) Description() string {
+	return "Detects Spring Expression Language (SpEL) injection where user input is parsed as SpEL expressions."
+}
 func (r *SpELInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *SpELInjection) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *SpELInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
-	hasSpEL := reSpELParser.MatchString(ctx.Content) || strings.Contains(ctx.Content, "SpelExpression")
+	hasSpEL := rules.GMatchFile(reSpELParser, ctx) || strings.Contains(ctx.Content, "SpelExpression")
 	if !hasSpEL {
 		return nil
 	}
@@ -372,10 +380,10 @@ func (r *SpELInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reSpELParseConcat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reSpELParseConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "SpEL expression parsed with string concatenation"
-		} else if loc := reSpELParseExpr.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reSpELParseExpr, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reSpELRequestParam) {
 				matched = loc
 				detail = "SpEL expression parsed with user-controlled input"
@@ -410,18 +418,21 @@ func (r *SpELInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HQLInjection struct{}
 
-func (r *HQLInjection) ID() string                      { return "BATOU-JAVA-004" }
-func (r *HQLInjection) Name() string                    { return "HQLInjection" }
-func (r *HQLInjection) Description() string             { return "Detects Hibernate HQL/JPQL queries built with string concatenation." }
+func (r *HQLInjection) ID() string   { return "BATOU-JAVA-004" }
+func (r *HQLInjection) Name() string { return "HQLInjection" }
+func (r *HQLInjection) Description() string {
+	return "Detects Hibernate HQL/JPQL queries built with string concatenation."
+}
 func (r *HQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *HQLInjection) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *HQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Skip if using CriteriaBuilder (safe API)
-	if reCriteriaBuilder.MatchString(ctx.Content) {
+	if rules.GMatchFile(reCriteriaBuilder, ctx) {
 		return nil
 	}
 
@@ -432,11 +443,11 @@ func (r *HQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if loc := reHQLCreateQuery.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reHQLCreateQuery, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reHQLCreateQueryV.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reHQLCreateQueryV, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := reHQLSession.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reHQLSession, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reReqParam) {
 				matched = loc
 			}
@@ -470,15 +481,20 @@ func (r *HQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JDBCConnectionInjection struct{}
 
-func (r *JDBCConnectionInjection) ID() string                      { return "BATOU-JAVA-005" }
-func (r *JDBCConnectionInjection) Name() string                    { return "JDBCConnectionInjection" }
-func (r *JDBCConnectionInjection) Description() string             { return "Detects JDBC connection strings built with user-controlled input, enabling connection string injection." }
+func (r *JDBCConnectionInjection) ID() string   { return "BATOU-JAVA-005" }
+func (r *JDBCConnectionInjection) Name() string { return "JDBCConnectionInjection" }
+func (r *JDBCConnectionInjection) Description() string {
+	return "Detects JDBC connection strings built with user-controlled input, enabling connection string injection."
+}
 func (r *JDBCConnectionInjection) DefaultSeverity() rules.Severity { return rules.High }
-func (r *JDBCConnectionInjection) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
+func (r *JDBCConnectionInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
 
 func (r *JDBCConnectionInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -488,10 +504,10 @@ func (r *JDBCConnectionInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reJDBCConnConcat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reJDBCConnConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "JDBC connection string built with concatenation"
-		} else if loc := reJDBCDriverManager.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reJDBCDriverManager, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reReqParam) {
 				matched = loc
 				detail = "JDBC connection with user-controlled variable"
@@ -526,17 +542,20 @@ func (r *JDBCConnectionInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RMIDeserialization struct{}
 
-func (r *RMIDeserialization) ID() string                      { return "BATOU-JAVA-006" }
-func (r *RMIDeserialization) Name() string                    { return "RMIDeserialization" }
-func (r *RMIDeserialization) Description() string             { return "Detects Java RMI usage which is vulnerable to deserialization attacks." }
+func (r *RMIDeserialization) ID() string   { return "BATOU-JAVA-006" }
+func (r *RMIDeserialization) Name() string { return "RMIDeserialization" }
+func (r *RMIDeserialization) Description() string {
+	return "Detects Java RMI usage which is vulnerable to deserialization attacks."
+}
 func (r *RMIDeserialization) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RMIDeserialization) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *RMIDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
-	hasRMI := reRMIContext.MatchString(ctx.Content)
+	hasRMI := rules.GMatchFile(reRMIContext, ctx)
 	if !hasRMI {
 		return nil
 	}
@@ -549,10 +568,10 @@ func (r *RMIDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reRMINaming.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reRMINaming, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "java.rmi.Naming bind/lookup exposes deserialization surface"
-		} else if loc := reRMILocateRegistry.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reRMILocateRegistry, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "RMI Registry exposes a deserialization attack surface"
 		}
@@ -585,15 +604,20 @@ func (r *RMIDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureSSLTrustManager struct{}
 
-func (r *InsecureSSLTrustManager) ID() string                      { return "BATOU-JAVA-007" }
-func (r *InsecureSSLTrustManager) Name() string                    { return "InsecureSSLTrustManager" }
-func (r *InsecureSSLTrustManager) Description() string             { return "Detects X509TrustManager implementations that accept all certificates, disabling SSL/TLS validation." }
+func (r *InsecureSSLTrustManager) ID() string   { return "BATOU-JAVA-007" }
+func (r *InsecureSSLTrustManager) Name() string { return "InsecureSSLTrustManager" }
+func (r *InsecureSSLTrustManager) Description() string {
+	return "Detects X509TrustManager implementations that accept all certificates, disabling SSL/TLS validation."
+}
 func (r *InsecureSSLTrustManager) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *InsecureSSLTrustManager) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
+func (r *InsecureSSLTrustManager) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
 
 func (r *InsecureSSLTrustManager) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Quick bail: only scan files with TrustManager-related code
 	if !strings.Contains(ctx.Content, "TrustManager") && !strings.Contains(ctx.Content, "checkServerTrusted") {
@@ -608,14 +632,14 @@ func (r *InsecureSSLTrustManager) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if reX509TrustManager.MatchString(line) {
+		if rules.GMatchLower(reX509TrustManager, line, lowered[i]) {
 			// Check if the implementation has empty checkServerTrusted
 			context := surroundingContext(lines, i, 20)
 			if reCheckServerTrustedEmpty.MatchString(context) || strings.Contains(context, "// trust all") || strings.Contains(context, "// accept all") {
 				matched = strings.TrimSpace(line)
 				detail = "X509TrustManager that accepts all certificates"
 			}
-		} else if reTrustAllCerts.MatchString(line) {
+		} else if rules.GMatchLower(reTrustAllCerts, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			detail = "Anonymous X509TrustManager accepting all certificates"
 		}
@@ -648,32 +672,37 @@ func (r *InsecureSSLTrustManager) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnrestrictedFileUpload struct{}
 
-func (r *UnrestrictedFileUpload) ID() string                      { return "BATOU-JAVA-008" }
-func (r *UnrestrictedFileUpload) Name() string                    { return "UnrestrictedFileUpload" }
-func (r *UnrestrictedFileUpload) Description() string             { return "Detects MultipartFile usage without file type validation, enabling arbitrary file upload." }
+func (r *UnrestrictedFileUpload) ID() string   { return "BATOU-JAVA-008" }
+func (r *UnrestrictedFileUpload) Name() string { return "UnrestrictedFileUpload" }
+func (r *UnrestrictedFileUpload) Description() string {
+	return "Detects MultipartFile usage without file type validation, enabling arbitrary file upload."
+}
 func (r *UnrestrictedFileUpload) DefaultSeverity() rules.Severity { return rules.High }
-func (r *UnrestrictedFileUpload) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
+func (r *UnrestrictedFileUpload) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
 
 func (r *UnrestrictedFileUpload) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
-	if !reMultipartFile.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reMultipartFile, ctx) {
 		return nil
 	}
 
 	// Check if file type validation exists
-	hasValidation := reFileExtCheck.MatchString(ctx.Content)
+	hasValidation := rules.GMatchFile(reFileExtCheck, ctx)
 	if hasValidation {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 
-		if reTransferTo.MatchString(line) || (reGetOriginalFilename.MatchString(line) && strings.Contains(ctx.Content, "new File")) {
+		if rules.GMatchLower(reTransferTo, line, lowered[i]) || (rules.GMatchLower(reGetOriginalFilename, line, lowered[i]) && strings.Contains(ctx.Content, "new File")) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -701,15 +730,18 @@ func (r *UnrestrictedFileUpload) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaSSTI struct{}
 
-func (r *JavaSSTI) ID() string                      { return "BATOU-JAVA-009" }
-func (r *JavaSSTI) Name() string                    { return "JavaSSTI" }
-func (r *JavaSSTI) Description() string             { return "Detects Java server-side template injection via Velocity, Freemarker, and Thymeleaf with user-controlled templates." }
+func (r *JavaSSTI) ID() string   { return "BATOU-JAVA-009" }
+func (r *JavaSSTI) Name() string { return "JavaSSTI" }
+func (r *JavaSSTI) Description() string {
+	return "Detects Java server-side template injection via Velocity, Freemarker, and Thymeleaf with user-controlled templates."
+}
 func (r *JavaSSTI) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JavaSSTI) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *JavaSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -719,17 +751,17 @@ func (r *JavaSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reVelocityEvaluate.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reVelocityEvaluate, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reSSTIUserInput) {
 				matched = loc
 				detail = "Velocity.evaluate() with user-controlled template"
 			}
-		} else if loc := reFreemarkerNewTmpl.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reFreemarkerNewTmpl, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reSSTIUserInput) {
 				matched = loc
 				detail = "Freemarker Template constructor with user-controlled input"
 			}
-		} else if loc := reThymeleafProcess.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reThymeleafProcess, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reSSTIUserInput) {
 				matched = loc
 				detail = "Thymeleaf templateEngine.process with user-controlled template name"
@@ -764,15 +796,20 @@ func (r *JavaSSTI) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ImproperCertValidation struct{}
 
-func (r *ImproperCertValidation) ID() string                      { return "BATOU-JAVA-010" }
-func (r *ImproperCertValidation) Name() string                    { return "ImproperCertValidation" }
-func (r *ImproperCertValidation) Description() string             { return "Detects disabled or permissive hostname verification in HTTPS connections." }
+func (r *ImproperCertValidation) ID() string   { return "BATOU-JAVA-010" }
+func (r *ImproperCertValidation) Name() string { return "ImproperCertValidation" }
+func (r *ImproperCertValidation) Description() string {
+	return "Detects disabled or permissive hostname verification in HTTPS connections."
+}
 func (r *ImproperCertValidation) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *ImproperCertValidation) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
+func (r *ImproperCertValidation) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
 
 func (r *ImproperCertValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -782,13 +819,13 @@ func (r *ImproperCertValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reHostnameVerifierAllowAll.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reHostnameVerifierAllowAll, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "ALLOW_ALL_HOSTNAME_VERIFIER disables hostname checking"
-		} else if loc := reHostnameVerifierNoOp.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reHostnameVerifierNoOp, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "NoopHostnameVerifier disables hostname checking"
-		} else if reHostnameVerifierImpl.MatchString(line) {
+		} else if rules.GMatchLower(reHostnameVerifierImpl, line, lowered[i]) {
 			context := surroundingContext(lines, i, 10)
 			if reHostnameVerifierReturn.MatchString(context) {
 				matched = strings.TrimSpace(line)
@@ -824,15 +861,20 @@ func (r *ImproperCertValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HardcodedJDBCCredentials struct{}
 
-func (r *HardcodedJDBCCredentials) ID() string                      { return "BATOU-JAVA-011" }
-func (r *HardcodedJDBCCredentials) Name() string                    { return "HardcodedJDBCCredentials" }
-func (r *HardcodedJDBCCredentials) Description() string             { return "Detects hardcoded database credentials in JDBC connection strings or DataSource configuration." }
+func (r *HardcodedJDBCCredentials) ID() string   { return "BATOU-JAVA-011" }
+func (r *HardcodedJDBCCredentials) Name() string { return "HardcodedJDBCCredentials" }
+func (r *HardcodedJDBCCredentials) Description() string {
+	return "Detects hardcoded database credentials in JDBC connection strings or DataSource configuration."
+}
 func (r *HardcodedJDBCCredentials) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *HardcodedJDBCCredentials) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
+func (r *HardcodedJDBCCredentials) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
 
 func (r *HardcodedJDBCCredentials) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -842,13 +884,13 @@ func (r *HardcodedJDBCCredentials) Scan(ctx *rules.ScanContext) []rules.Finding 
 		var matched string
 		var detail string
 
-		if loc := reJDBCPasswordInline.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reJDBCPasswordInline, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "JDBC connection with inline username and password"
-		} else if loc := reJDBCURLPassword.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reJDBCURLPassword, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "JDBC URL contains embedded password"
-		} else if loc := reDataSourceSetPassword.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reDataSourceSetPassword, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "DataSource password set with hardcoded string"
 		}
@@ -881,15 +923,18 @@ func (r *HardcodedJDBCCredentials) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type RegexDoS struct{}
 
-func (r *RegexDoS) ID() string                      { return "BATOU-JAVA-012" }
-func (r *RegexDoS) Name() string                    { return "RegexDoS" }
-func (r *RegexDoS) Description() string             { return "Detects Pattern.compile or String.matches with user-controlled regex input, enabling ReDoS attacks." }
+func (r *RegexDoS) ID() string   { return "BATOU-JAVA-012" }
+func (r *RegexDoS) Name() string { return "RegexDoS" }
+func (r *RegexDoS) Description() string {
+	return "Detects Pattern.compile or String.matches with user-controlled regex input, enabling ReDoS attacks."
+}
 func (r *RegexDoS) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RegexDoS) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -899,15 +944,15 @@ func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := rePatternCompileVar.FindString(line); loc != "" {
+		if loc := rules.GFindLower(rePatternCompileVar, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reReqParam) {
 				matched = loc
 				detail = "Pattern.compile with user-controlled regex"
 			}
-		} else if loc := rePatternCompileConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(rePatternCompileConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "Pattern.compile with concatenated regex"
-		} else if loc := reStringMatchesVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reStringMatchesVar, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reReqParam) {
 				matched = loc
 				detail = "String.matches with user-controlled pattern"
@@ -942,17 +987,20 @@ func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InfoExposureErrors struct{}
 
-func (r *InfoExposureErrors) ID() string                      { return "BATOU-JAVA-013" }
-func (r *InfoExposureErrors) Name() string                    { return "InfoExposureErrors" }
-func (r *InfoExposureErrors) Description() string             { return "Detects stack traces and exception details exposed to HTTP responses." }
+func (r *InfoExposureErrors) ID() string   { return "BATOU-JAVA-013" }
+func (r *InfoExposureErrors) Name() string { return "InfoExposureErrors" }
+func (r *InfoExposureErrors) Description() string {
+	return "Detects stack traces and exception details exposed to HTTP responses."
+}
 func (r *InfoExposureErrors) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InfoExposureErrors) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *InfoExposureErrors) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
-	hasResponseWriter := reResponseGetWriter.MatchString(ctx.Content)
+	hasResponseWriter := rules.GMatchFile(reResponseGetWriter, ctx)
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -963,16 +1011,16 @@ func (r *InfoExposureErrors) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var detail string
 		confidence := "medium"
 
-		if loc := rePrintStackTraceResp.FindString(line); loc != "" {
+		if loc := rules.GFindLower(rePrintStackTraceResp, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "printStackTrace() output sent to HTTP response"
 			confidence = "high"
-		} else if loc := reExceptionToResponse.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reExceptionToResponse, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "Exception details written to HTTP response"
 			confidence = "high"
-		} else if rePrintStackTrace.MatchString(line) && hasResponseWriter {
-			matched = rePrintStackTrace.FindString(line)
+		} else if rules.GMatchLower(rePrintStackTrace, line, lowered[i]) && hasResponseWriter {
+			matched = rules.GFindLower(rePrintStackTrace, line, lowered[i])
 			detail = "printStackTrace() in code that handles HTTP responses"
 		}
 
@@ -1004,22 +1052,25 @@ func (r *InfoExposureErrors) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaInsecureRandom struct{}
 
-func (r *JavaInsecureRandom) ID() string                      { return "BATOU-JAVA-014" }
-func (r *JavaInsecureRandom) Name() string                    { return "JavaInsecureRandom" }
-func (r *JavaInsecureRandom) Description() string             { return "Detects java.util.Random or ThreadLocalRandom used for security-sensitive operations." }
+func (r *JavaInsecureRandom) ID() string   { return "BATOU-JAVA-014" }
+func (r *JavaInsecureRandom) Name() string { return "JavaInsecureRandom" }
+func (r *JavaInsecureRandom) Description() string {
+	return "Detects java.util.Random or ThreadLocalRandom used for security-sensitive operations."
+}
 func (r *JavaInsecureRandom) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JavaInsecureRandom) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *JavaInsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Skip if SecureRandom is already used
-	if reJavaSecureRandom.MatchString(ctx.Content) {
+	if rules.GMatchFile(reJavaSecureRandom, ctx) {
 		return nil
 	}
 
-	hasUtilRandom := reJavaRandomImport.MatchString(ctx.Content)
+	hasUtilRandom := rules.GMatchFile(reJavaRandomImport, ctx)
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -1029,14 +1080,14 @@ func (r *JavaInsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reJavaUtilRandom.FindString(line); loc != "" {
-			if reJavaSecurityContext.MatchString(line) || reJavaSecurityContext.MatchString(surroundingContext(lines, i, 5)) {
+		if loc := rules.GFindLower(reJavaUtilRandom, line, lowered[i]); loc != "" {
+			if rules.GMatchLower(reJavaSecurityContext, line, lowered[i]) || reJavaSecurityContext.MatchString(surroundingContext(lines, i, 5)) {
 				matched = loc
 				detail = "java.util.Random used in security context"
 			}
 		} else if hasUtilRandom {
-			if loc := reThreadLocalRandom.FindString(line); loc != "" {
-				if reJavaSecurityContext.MatchString(line) || reJavaSecurityContext.MatchString(surroundingContext(lines, i, 5)) {
+			if loc := rules.GFindLower(reThreadLocalRandom, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reJavaSecurityContext, line, lowered[i]) || reJavaSecurityContext.MatchString(surroundingContext(lines, i, 5)) {
 					matched = loc
 					detail = "ThreadLocalRandom used in security context"
 				}
@@ -1071,38 +1122,41 @@ func (r *JavaInsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaInsecureCookies struct{}
 
-func (r *JavaInsecureCookies) ID() string                      { return "BATOU-JAVA-015" }
-func (r *JavaInsecureCookies) Name() string                    { return "JavaInsecureCookies" }
-func (r *JavaInsecureCookies) Description() string             { return "Detects cookies created without HttpOnly or Secure flags, especially for sensitive cookies." }
+func (r *JavaInsecureCookies) ID() string   { return "BATOU-JAVA-015" }
+func (r *JavaInsecureCookies) Name() string { return "JavaInsecureCookies" }
+func (r *JavaInsecureCookies) Description() string {
+	return "Detects cookies created without HttpOnly or Secure flags, especially for sensitive cookies."
+}
 func (r *JavaInsecureCookies) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *JavaInsecureCookies) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *JavaInsecureCookies) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
-	if !reNewCookie.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNewCookie, ctx) {
 		return nil
 	}
 
-	hasHttpOnly := reSetHttpOnly.MatchString(ctx.Content)
-	hasSecure := reSetSecure.MatchString(ctx.Content)
+	hasHttpOnly := rules.GMatchFile(reSetHttpOnly, ctx)
+	hasSecure := rules.GMatchFile(reSetSecure, ctx)
 
 	if hasHttpOnly && hasSecure {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 
-		if !reNewCookie.MatchString(line) {
+		if !rules.GMatchLower(reNewCookie, line, lowered[i]) {
 			continue
 		}
 
 		// Check if cookie name suggests sensitivity
-		isSensitive := reCookieSensitiveName.MatchString(line) || reCookieSensitiveName.MatchString(surroundingContext(lines, i, 5))
+		isSensitive := rules.GMatchLower(reCookieSensitiveName, line, lowered[i]) || reCookieSensitiveName.MatchString(surroundingContext(lines, i, 5))
 
 		var missing []string
 		if !hasHttpOnly {
@@ -1144,15 +1198,27 @@ func (r *JavaInsecureCookies) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaSSRF struct{}
 
-func (r *JavaSSRF) ID() string                      { return "BATOU-JAVA-016" }
-func (r *JavaSSRF) Name() string                    { return "JavaSSRF" }
-func (r *JavaSSRF) Description() string             { return "Detects SSRF vulnerabilities via Java URL/URI classes with user-controlled input." }
+func (r *JavaSSRF) ID() string   { return "BATOU-JAVA-016" }
+func (r *JavaSSRF) Name() string { return "JavaSSRF" }
+func (r *JavaSSRF) Description() string {
+	return "Detects SSRF vulnerabilities via Java URL/URI classes with user-controlled input."
+}
 func (r *JavaSSRF) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JavaSSRF) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *JavaSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
+
+	// File-scope hardening gate: if the file contains a host allowlist guard
+	// (`ALLOWED_HOSTS.contains(...)` / `isAllowedHost(...)` / etc.), suppress
+	// the per-line URL/URI sink findings. The developer has implemented the
+	// canonical CWE-918 mitigation. Mirrors the body-scope guard the tsflow
+	// taint engine uses for the same shape.
+	if rules.GMatchFile(reJavaSSRFHostAllowlist, ctx) {
+		return nil
+	}
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -1162,15 +1228,15 @@ func (r *JavaSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reNewURLConcat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reNewURLConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "new URL() with concatenated user input"
-		} else if loc := reNewURL.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reNewURL, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reReqParam) {
 				matched = loc
 				detail = "new URL() with user-controlled variable"
 			}
-		} else if loc := reURICreate.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reURICreate, line, lowered[i]); loc != "" {
 			if hasNearbyPattern(lines, i, reReqParam) {
 				matched = loc
 				detail = "URI.create() with user-controlled variable"
@@ -1205,32 +1271,35 @@ func (r *JavaSSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ZipSlip struct{}
 
-func (r *ZipSlip) ID() string                      { return "BATOU-JAVA-017" }
-func (r *ZipSlip) Name() string                    { return "ZipSlip" }
-func (r *ZipSlip) Description() string             { return "Detects Zip Slip vulnerability where archive entries are extracted without validating the path." }
+func (r *ZipSlip) ID() string   { return "BATOU-JAVA-017" }
+func (r *ZipSlip) Name() string { return "ZipSlip" }
+func (r *ZipSlip) Description() string {
+	return "Detects Zip Slip vulnerability where archive entries are extracted without validating the path."
+}
 func (r *ZipSlip) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ZipSlip) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
 func (r *ZipSlip) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
-	if !reZipInputStream.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reZipInputStream, ctx) {
 		return nil
 	}
 
 	// Check if path validation exists
-	hasPathValidation := rePathNormalize.MatchString(ctx.Content)
+	hasPathValidation := rules.GMatchFile(rePathNormalize, ctx)
 	if hasPathValidation {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 
-		if reZipEntryGetName.MatchString(line) && (strings.Contains(ctx.Content, "new File") || strings.Contains(ctx.Content, "Paths.get")) {
+		if rules.GMatchLower(reZipEntryGetName, line, lowered[i]) && (strings.Contains(ctx.Content, "new File") || strings.Contains(ctx.Content, "Paths.get")) {
 			// Check nearby for file creation
 			context := surroundingContext(lines, i, 10)
 			if strings.Contains(context, "new File") || strings.Contains(context, "Paths.get") || strings.Contains(context, "FileOutputStream") {
@@ -1263,9 +1332,11 @@ func (r *ZipSlip) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ThreadSafetyIssues struct{}
 
-func (r *ThreadSafetyIssues) ID() string                      { return "BATOU-JAVA-018" }
-func (r *ThreadSafetyIssues) Name() string                    { return "ThreadSafetyIssues" }
-func (r *ThreadSafetyIssues) Description() string             { return "Detects thread-unsafe SimpleDateFormat shared across threads." }
+func (r *ThreadSafetyIssues) ID() string   { return "BATOU-JAVA-018" }
+func (r *ThreadSafetyIssues) Name() string { return "ThreadSafetyIssues" }
+func (r *ThreadSafetyIssues) Description() string {
+	return "Detects thread-unsafe SimpleDateFormat shared across threads."
+}
 func (r *ThreadSafetyIssues) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ThreadSafetyIssues) Languages() []rules.Language     { return []rules.Language{rules.LangJava} }
 
@@ -1273,11 +1344,12 @@ func (r *ThreadSafetyIssues) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if thread-safe alternatives are used
-	if reDateTimeFormatter.MatchString(ctx.Content) || reThreadLocal.MatchString(ctx.Content) {
+	if rules.GMatchFile(reDateTimeFormatter, ctx) || rules.GMatchFile(reThreadLocal, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -1286,13 +1358,13 @@ func (r *ThreadSafetyIssues) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reStaticSimpleDateFormat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reStaticSimpleDateFormat, line, lowered[i]); loc != "" {
 			// Check if synchronized is used in the file
-			if !reSynchronized.MatchString(ctx.Content) {
+			if !rules.GMatchFile(reSynchronized, ctx) {
 				matched = loc
 				detail = "static SimpleDateFormat shared across threads without synchronization"
 			}
-		} else if loc := reSimpleDateFormatField.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reSimpleDateFormatField, line, lowered[i]); loc != "" {
 			// Only flag if the class appears to be a singleton or shared (has @Component, @Service, @Bean, etc.)
 			if strings.Contains(ctx.Content, "@Component") || strings.Contains(ctx.Content, "@Service") ||
 				strings.Contains(ctx.Content, "@Repository") || strings.Contains(ctx.Content, "@Controller") ||
@@ -1326,6 +1398,63 @@ func (r *ThreadSafetyIssues) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // ---------------------------------------------------------------------------
+// JAVA-031: MyBatis ${} String-Substitution SQL Injection
+// ---------------------------------------------------------------------------
+
+type MyBatisDollarInjection struct{}
+
+func (r *MyBatisDollarInjection) ID() string   { return "BATOU-JAVA-031" }
+func (r *MyBatisDollarInjection) Name() string { return "MyBatisDollarInjection" }
+func (r *MyBatisDollarInjection) Description() string {
+	return "Detects MyBatis mapper queries using ${} string substitution instead of #{} parameter binding."
+}
+func (r *MyBatisDollarInjection) DefaultSeverity() rules.Severity { return rules.Critical }
+func (r *MyBatisDollarInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
+
+func (r *MyBatisDollarInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
+	var findings []rules.Finding
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
+
+	for i, line := range lines {
+		if isComment(line) {
+			continue
+		}
+
+		// A ${} interpolation only matters inside a MyBatis mapper statement,
+		// either an annotation (@Select/@Insert/...) or an XML mapper tag.
+		// The annotation/tag can span multiple lines, so check nearby lines.
+		loc := rules.GFindLower(reMyBatisDollarSub, line, lowered[i])
+		if loc == "" {
+			continue
+		}
+		if !hasNearbyPattern(lines, i, reMyBatisAnnotation) && !hasNearbyPattern(lines, i, reMyBatisXMLTag) {
+			continue
+		}
+
+		findings = append(findings, rules.Finding{
+			RuleID:        r.ID(),
+			Severity:      r.DefaultSeverity(),
+			SeverityLabel: r.DefaultSeverity().String(),
+			Title:         "MyBatis SQL Injection: ${} string substitution in mapper query",
+			Description:   "MyBatis ${} performs raw string substitution directly into the SQL statement (unlike #{}, which uses a JDBC PreparedStatement placeholder). When the substituted value is user-controlled, this enables SQL injection.",
+			FilePath:      ctx.FilePath,
+			LineNumber:    i + 1,
+			MatchedText:   truncate(loc, 120),
+			Suggestion:    "Use #{paramName} parameter binding instead of ${paramName} for all user-controlled values. ${} is only safe for trusted, validated identifiers (e.g. an allow-listed column/table name), never for raw user input.",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+			Language:      ctx.Language,
+			Confidence:    "high",
+			Tags:          []string{"java", "mybatis", "sql", "injection"},
+		})
+	}
+	return findings
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -1348,4 +1477,5 @@ func init() {
 	rules.Register(&JavaSSRF{})
 	rules.Register(&ZipSlip{})
 	rules.Register(&ThreadSafetyIssues{})
+	rules.Register(&MyBatisDollarInjection{})
 }

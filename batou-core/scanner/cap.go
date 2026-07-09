@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/turenlabs/batou-rules/rules"
 )
@@ -10,7 +11,107 @@ import (
 const (
 	DefaultPerRuleCap = 3
 	DefaultPerFileCap = 20
+
+	// DefaultCrossFileSinkCap is the per-(leaf-sink-file, leaf-sink-line,
+	// rule_id) cap applied to BATOU-INTERPROC-* findings. The cap *tags*
+	// the (N+1)th and beyond as RolledUp=true rather than dropping them,
+	// so recall is preserved (every distinct flow stays in the JSONL
+	// stream). Downstream consumers can hide the rolled-up entries by
+	// default and surface them on demand.
+	//
+	// 10 is the working sweet spot: harness env-ON has 64 distinct
+	// cross-file findings with no group exceeding ~5, so it sees no
+	// rollups; Coder env-ON has middleware-chain groups of 50-200 hits
+	// at the same leaf sink, so most of the noise gets visibly rolled.
+	// Configurable via the --max-per-cross-file-sink scan flag (0
+	// disables).
+	DefaultCrossFileSinkCap = 10
 )
+
+// MarkCrossFileSinkRollups tags BATOU-INTERPROC-* findings with
+// RolledUp=true beyond the first `cap` per (leaf-sink-file,
+// leaf-sink-line, rule_id) group. The top of each group is selected by
+// (severity DESC, confidence_score DESC, file_path ASC, line ASC) so
+// the highest-signal representatives stay un-tagged.
+//
+// Non-INTERPROC findings are passed through untouched. The leaf sink
+// position is recovered from the finding's TaintPath; findings whose
+// path doesn't end in a TaintStepSink are also passed through (we'd
+// silently collapse otherwise unrelated entries).
+//
+// Returns the input slice with RolledUp set in-place on the relevant
+// entries plus the number of entries that were tagged. cap <= 0
+// disables the marker entirely.
+func MarkCrossFileSinkRollups(findings []rules.Finding, cap int) ([]rules.Finding, int) {
+	if cap <= 0 || len(findings) == 0 {
+		return findings, 0
+	}
+
+	type sinkKey struct {
+		file   string
+		line   int
+		ruleID string
+	}
+
+	// Group indices by leaf-sink key. Findings without a recoverable leaf
+	// sink (no TaintStepSink in the path, or not a BATOU-INTERPROC- rule)
+	// stay un-tagged.
+	groups := make(map[sinkKey][]int)
+	for i, f := range findings {
+		if !strings.HasPrefix(f.RuleID, "BATOU-INTERPROC-") {
+			continue
+		}
+		var leafFile string
+		var leafLine int
+		for j := len(f.TaintPath) - 1; j >= 0; j-- {
+			st := f.TaintPath[j]
+			if st.Kind == rules.TaintStepSink {
+				leafFile = st.File
+				leafLine = st.Line
+				break
+			}
+		}
+		if leafFile == "" {
+			continue
+		}
+		k := sinkKey{file: leafFile, line: leafLine, ruleID: f.RuleID}
+		groups[k] = append(groups[k], i)
+	}
+
+	tagged := 0
+	for _, indices := range groups {
+		if len(indices) <= cap {
+			continue
+		}
+		// Stable order: highest severity / confidence first; ties broken
+		// by file path then line. The kept-top selection matches
+		// findingPriority's intent (signal first) but uses a finding-
+		// path-stable secondary so two runs on the same data produce
+		// identical rollups.
+		sort.SliceStable(indices, func(a, b int) bool {
+			fa, fb := findings[indices[a]], findings[indices[b]]
+			if fa.Severity != fb.Severity {
+				return fa.Severity > fb.Severity
+			}
+			if fa.ConfidenceScore != fb.ConfidenceScore {
+				return fa.ConfidenceScore > fb.ConfidenceScore
+			}
+			if fa.FilePath != fb.FilePath {
+				return fa.FilePath < fb.FilePath
+			}
+			return fa.LineNumber < fb.LineNumber
+		})
+		for k, idx := range indices {
+			if k < cap {
+				continue
+			}
+			findings[idx].RolledUp = true
+			tagged++
+		}
+	}
+
+	return findings, tagged
+}
 
 // CapFindings limits the number of findings to keep output actionable.
 // It applies two caps in order:

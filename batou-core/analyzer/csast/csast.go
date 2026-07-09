@@ -14,12 +14,12 @@ func init() {
 	rules.Register(&CSharpASTAnalyzer{})
 }
 
-func (a *CSharpASTAnalyzer) ID() string                        { return "BATOU-CS-AST" }
-func (a *CSharpASTAnalyzer) Name() string                      { return "C# AST Security Analyzer" }
-func (a *CSharpASTAnalyzer) DefaultSeverity() rules.Severity   { return rules.High }
-func (a *CSharpASTAnalyzer) Languages() []rules.Language        { return []rules.Language{rules.LangCSharp} }
+func (a *CSharpASTAnalyzer) ID() string                      { return "BATOU-CS-AST" }
+func (a *CSharpASTAnalyzer) Name() string                    { return "C# AST Security Analyzer" }
+func (a *CSharpASTAnalyzer) DefaultSeverity() rules.Severity { return rules.High }
+func (a *CSharpASTAnalyzer) Languages() []rules.Language     { return []rules.Language{rules.LangCSharp} }
 func (a *CSharpASTAnalyzer) Description() string {
-	return "AST-based analysis of C# code for SQL injection, insecure deserialization, command injection, ReDoS, and raw SQL in Entity Framework."
+	return "AST-based analysis of C# code for SQL injection, insecure deserialization, command injection, ReDoS, raw SQL in Entity Framework, reflected XSS (Razor/Response.Write), and open redirect."
 }
 
 func (a *CSharpASTAnalyzer) Scan(ctx *rules.ScanContext) []rules.Finding {
@@ -57,9 +57,13 @@ func (c *csChecker) walk() {
 			c.checkSqlCommandConcat(n)
 			c.checkInsecureDeserializer(n)
 			c.checkRegexWithoutTimeout(n)
+			c.checkHtmlStringXSS(n)
 		case "invocation_expression":
 			c.checkProcessStart(n)
 			c.checkRawSQLEntityFramework(n)
+			c.checkRazorXSSInvocation(n)
+			c.checkOpenRedirect(n)
+			c.checkDeserializeInvocation(n)
 		}
 		return true
 	})
@@ -118,11 +122,11 @@ func (c *csChecker) checkInsecureDeserializer(n *ast.Node) {
 	}
 
 	insecureTypes := map[string]string{
-		"BinaryFormatter":       "BinaryFormatter is insecure and can lead to remote code execution via deserialization attacks.",
-		"ObjectStateFormatter":  "ObjectStateFormatter is insecure and vulnerable to deserialization attacks.",
-		"SoapFormatter":         "SoapFormatter is insecure and vulnerable to deserialization attacks.",
+		"BinaryFormatter":           "BinaryFormatter is insecure and can lead to remote code execution via deserialization attacks.",
+		"ObjectStateFormatter":      "ObjectStateFormatter is insecure and vulnerable to deserialization attacks.",
+		"SoapFormatter":             "SoapFormatter is insecure and vulnerable to deserialization attacks.",
 		"NetDataContractSerializer": "NetDataContractSerializer is insecure when deserializing untrusted data.",
-		"LosFormatter":          "LosFormatter is insecure and vulnerable to deserialization attacks.",
+		"LosFormatter":              "LosFormatter is insecure and vulnerable to deserialization attacks.",
 	}
 
 	if desc, ok := insecureTypes[typeName]; ok {
@@ -281,8 +285,8 @@ func (c *csChecker) checkRawSQLEntityFramework(n *ast.Node) {
 	efMethods := map[string]bool{
 		"ExecuteSqlRaw":          true,
 		"ExecuteSqlRawAsync":     true,
-		"FromSqlRaw":            true,
-		"SqlQuery":              true,
+		"FromSqlRaw":             true,
+		"SqlQuery":               true,
 		"ExecuteSqlInterpolated": false, // safe, but we check anyway if passed concat
 	}
 
@@ -320,6 +324,287 @@ func (c *csChecker) checkRawSQLEntityFramework(n *ast.Node) {
 			Tags:          []string{"sql-injection", "injection", "entity-framework"},
 		})
 	}
+}
+
+// checkRazorXSSInvocation detects reflected XSS via Razor/WebForms write sinks that
+// emit unencoded output: @Html.Raw(var) and Response.Write(var) with a non-literal
+// argument. Pure string-literal arguments are ignored as safe.
+func (c *csChecker) checkRazorXSSInvocation(n *ast.Node) {
+	fn := n.ChildByFieldName("function")
+	if fn == nil || fn.Type() != "member_access_expression" {
+		return
+	}
+	receiver, method := memberReceiverAndName(fn)
+	if method == "" {
+		return
+	}
+
+	// Set of (receiver.method) XSS write sinks.
+	isXSSSink := false
+	switch {
+	case method == "Raw" && (receiver == "Html" || strings.HasSuffix(receiver, ".Html") || receiver == "@Html"):
+		isXSSSink = true // @Html.Raw(...)
+	case method == "Write" && (receiver == "Response" || strings.HasSuffix(receiver, ".Response")):
+		isXSSSink = true // Response.Write(...)
+	case method == "WriteLine" && (receiver == "Response" || strings.HasSuffix(receiver, ".Response")):
+		isXSSSink = true // Response.WriteLine(...)
+	case method == "Write" && receiver == "context.Response.Output":
+		isXSSSink = true
+	}
+	if !isXSSSink {
+		return
+	}
+
+	argList := n.ChildByFieldName("arguments")
+	if argList == nil {
+		return
+	}
+	if !argHasNonLiteral(argList) {
+		return // only string literals -> safe
+	}
+
+	c.findings = append(c.findings, rules.Finding{
+		RuleID:        "BATOU-CS-AST-006",
+		Severity:      rules.High,
+		SeverityLabel: rules.High.String(),
+		Title:         "Reflected XSS via " + receiver + "." + method,
+		Description:   "Writing a non-constant value through " + receiver + "." + method + " emits unencoded output to the response/HTML, enabling reflected cross-site scripting (XSS) when the value is attacker-controlled.",
+		FilePath:      c.filePath,
+		LineNumber:    int(n.StartRow()) + 1,
+		MatchedText:   truncate(n.Text(), 200),
+		Suggestion:    "Encode output before writing it: use @Html.Encode(...) / HttpUtility.HtmlEncode(...), or render via Razor's default-encoded @value instead of Html.Raw / Response.Write.",
+		CWEID:         "CWE-79",
+		OWASPCategory: "A03:2021-Injection",
+		Language:      rules.LangCSharp,
+		Confidence:    "high",
+		Tags:          []string{"xss", "razor"},
+	})
+}
+
+// checkHtmlStringXSS detects new HtmlString(var) / new MvcHtmlString(var) /
+// new RawString(var) with a non-literal argument, which marks a value as
+// pre-encoded HTML and bypasses Razor auto-encoding (reflected XSS, CWE-79).
+func (c *csChecker) checkHtmlStringXSS(n *ast.Node) {
+	typeName := objectCreationType(n)
+	switch typeName {
+	case "HtmlString", "MvcHtmlString", "RawString", "HtmlText":
+	default:
+		return
+	}
+
+	argList := n.ChildByFieldName("arguments")
+	if argList == nil {
+		return
+	}
+	if !argHasNonLiteral(argList) {
+		return
+	}
+
+	c.findings = append(c.findings, rules.Finding{
+		RuleID:        "BATOU-CS-AST-007",
+		Severity:      rules.High,
+		SeverityLabel: rules.High.String(),
+		Title:         "Reflected XSS via new " + typeName,
+		Description:   "Wrapping a non-constant value in " + typeName + " marks it as trusted, pre-encoded HTML and bypasses Razor's automatic output encoding, enabling reflected XSS if the value is attacker-controlled.",
+		FilePath:      c.filePath,
+		LineNumber:    int(n.StartRow()) + 1,
+		MatchedText:   truncate(n.Text(), 200),
+		Suggestion:    "Do not wrap user-controlled data in " + typeName + ". HTML-encode it (HttpUtility.HtmlEncode) and let Razor render it through the default-encoded @value syntax.",
+		CWEID:         "CWE-79",
+		OWASPCategory: "A03:2021-Injection",
+		Language:      rules.LangCSharp,
+		Confidence:    "high",
+		Tags:          []string{"xss", "razor"},
+	})
+}
+
+// checkOpenRedirect detects Redirect(var) / RedirectPermanent(var) with a
+// non-literal target, where the redirect destination may be attacker-controlled
+// (open redirect, CWE-601). Both bare-call (Redirect(x)) and member-call
+// (Response.Redirect(x)) forms are handled.
+func (c *csChecker) checkOpenRedirect(n *ast.Node) {
+	fn := n.ChildByFieldName("function")
+	if fn == nil {
+		return
+	}
+
+	method := ""
+	switch fn.Type() {
+	case "identifier":
+		method = fn.Text() // Redirect(x) inside a controller
+	case "member_access_expression":
+		_, method = memberReceiverAndName(fn)
+	default:
+		return
+	}
+
+	switch method {
+	case "Redirect", "RedirectPermanent", "RedirectPreserveMethod", "LocalRedirect":
+	default:
+		return
+	}
+
+	argList := n.ChildByFieldName("arguments")
+	if argList == nil {
+		return
+	}
+	args := argList.NamedChildren()
+	if len(args) == 0 {
+		return
+	}
+	if !argHasNonLiteral(argList) {
+		return // constant redirect target -> safe
+	}
+
+	c.findings = append(c.findings, rules.Finding{
+		RuleID:        "BATOU-CS-AST-008",
+		Severity:      rules.Medium,
+		SeverityLabel: rules.Medium.String(),
+		Title:         "Open redirect via " + method,
+		Description:   "Passing a non-constant value to " + method + " lets an attacker control the redirect destination, enabling open-redirect / phishing attacks (CWE-601).",
+		FilePath:      c.filePath,
+		LineNumber:    int(n.StartRow()) + 1,
+		MatchedText:   truncate(n.Text(), 200),
+		Suggestion:    "Validate the redirect target against an allow-list of known-safe local paths, or use Url.IsLocalUrl(target) / LocalRedirect(target) before redirecting.",
+		CWEID:         "CWE-601",
+		OWASPCategory: "A01:2021-Broken Access Control",
+		Language:      rules.LangCSharp,
+		Confidence:    "high",
+		Tags:          []string{"open-redirect", "redirect"},
+	})
+}
+
+// checkDeserializeInvocation detects x.Deserialize(stream) where x is a known
+// insecure formatter constructed inline, e.g. new BinaryFormatter().Deserialize(s).
+// The construction node is already flagged by checkInsecureDeserializer; this
+// catches the dataflow sink (.Deserialize(...)) directly for the call site.
+func (c *csChecker) checkDeserializeInvocation(n *ast.Node) {
+	fn := n.ChildByFieldName("function")
+	if fn == nil || fn.Type() != "member_access_expression" {
+		return
+	}
+	_, method := memberReceiverAndName(fn)
+	if method != "Deserialize" && method != "UnsafeDeserialize" && method != "DeserializeMethodResponse" {
+		return
+	}
+
+	// Only flag when the receiver is (or constructs) a known-insecure formatter.
+	recvExpr := fn.ChildByFieldName("expression")
+	if recvExpr == nil {
+		return
+	}
+	insecure := false
+	switch recvExpr.Type() {
+	case "object_creation_expression":
+		switch objectCreationType(recvExpr) {
+		case "BinaryFormatter", "ObjectStateFormatter", "SoapFormatter", "NetDataContractSerializer", "LosFormatter":
+			insecure = true
+		}
+	default:
+		// Receiver text references one of the insecure formatter type names.
+		rt := recvExpr.Text()
+		for _, t := range []string{"BinaryFormatter", "ObjectStateFormatter", "SoapFormatter", "NetDataContractSerializer", "LosFormatter"} {
+			if strings.Contains(rt, t) {
+				insecure = true
+				break
+			}
+		}
+	}
+	if !insecure {
+		return
+	}
+
+	c.findings = append(c.findings, rules.Finding{
+		RuleID:        "BATOU-CS-AST-009",
+		Severity:      rules.Critical,
+		SeverityLabel: rules.Critical.String(),
+		Title:         "Insecure deserialization via " + method,
+		Description:   "Calling " + method + " on an insecure formatter (BinaryFormatter/SoapFormatter/LosFormatter/etc.) deserializes untrusted data and can lead to remote code execution.",
+		FilePath:      c.filePath,
+		LineNumber:    int(n.StartRow()) + 1,
+		MatchedText:   truncate(n.Text(), 200),
+		Suggestion:    "Replace the insecure formatter with System.Text.Json or Newtonsoft.Json (TypeNameHandling.None). Never deserialize untrusted input with BinaryFormatter.",
+		CWEID:         "CWE-502",
+		OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		Language:      rules.LangCSharp,
+		Confidence:    "high",
+		Tags:          []string{"deserialization", "rce"},
+	})
+}
+
+// memberReceiverAndName returns the receiver text and the trailing member name
+// of a member_access_expression (e.g. "Response.Write" -> "Response", "Write").
+func memberReceiverAndName(ma *ast.Node) (receiver, name string) {
+	expr := ma.ChildByFieldName("expression")
+	nm := ma.ChildByFieldName("name")
+	if expr != nil {
+		receiver = expr.Text()
+	}
+	if nm != nil {
+		name = nm.Text()
+	}
+	if name == "" {
+		// Fallback: last named child is the member name.
+		kids := ma.NamedChildren()
+		if len(kids) > 0 {
+			name = kids[len(kids)-1].Text()
+		}
+	}
+	return receiver, name
+}
+
+// objectCreationType returns the type name of an object_creation_expression
+// (the node tagged with field "type"), falling back to the first identifier/
+// qualified_name child.
+func objectCreationType(n *ast.Node) string {
+	if t := n.ChildByFieldName("type"); t != nil {
+		return t.Text()
+	}
+	for _, child := range n.NamedChildren() {
+		if child.Type() == "identifier" || child.Type() == "qualified_name" {
+			return child.Text()
+		}
+	}
+	return ""
+}
+
+// argHasNonLiteral reports whether the argument_list contains at least one
+// argument that is not a pure string/numeric/boolean literal — i.e. a variable,
+// member access, invocation, concatenation, or interpolation. Used to suppress
+// the "constant argument" safe case for XSS/redirect sinks.
+func argHasNonLiteral(argList *ast.Node) bool {
+	args := argList.NamedChildren()
+	if len(args) == 0 {
+		return false
+	}
+	for _, arg := range args {
+		// Each "argument" node wraps the actual expression; unwrap it.
+		expr := arg
+		if arg.Type() == "argument" {
+			kids := arg.NamedChildren()
+			if len(kids) > 0 {
+				expr = kids[len(kids)-1]
+			}
+		}
+		switch expr.Type() {
+		case "string_literal", "verbatim_string_literal", "raw_string_literal",
+			"integer_literal", "real_literal", "boolean_literal",
+			"character_literal", "null_literal":
+			// pure literal -> safe, keep checking other args
+			continue
+		case "interpolated_string_expression":
+			// Interpolated string with an interpolation hole is non-constant.
+			for _, ic := range expr.NamedChildren() {
+				if ic.Type() == "interpolation" {
+					return true
+				}
+			}
+			continue
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 // containsConcatOrInterpolation checks if a node contains binary_expression with +

@@ -31,6 +31,8 @@ var extToLanguage = map[string]rules.Language{
 	".cjs":        rules.LangJavaScript,
 	".ts":         rules.LangTypeScript,
 	".tsx":        rules.LangTypeScript,
+	".vue":        rules.LangJavaScript, // Vue SFCs embed JS/TS; mirrors batou-core/analyzer
+	".svelte":     rules.LangJavaScript, // Svelte components embed JS/TS
 	".mts":        rules.LangTypeScript,
 	".java":       rules.LangJava,
 	".rb":         rules.LangRuby,

@@ -2,10 +2,8 @@ package tsflow
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
-
 	// Import taint language catalogs.
 	_ "github.com/turenlabs/batou-core/taint/languages"
 )

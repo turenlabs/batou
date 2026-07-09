@@ -14,20 +14,20 @@ import (
 
 var (
 	// BATOU-MEM-007: Use after free pattern
-	reExtFreePtr       = regexp.MustCompile(`\bfree\s*\(\s*([a-zA-Z_]\w*)\s*\)`)
-	reExtDeletePtr     = regexp.MustCompile(`\bdelete\s*(?:\[\])?\s+([a-zA-Z_]\w*)`)
-	reExtPtrDeref      = regexp.MustCompile(`([a-zA-Z_]\w*)\s*->`)
+	reExtFreePtr        = regexp.MustCompile(`\bfree\s*\(\s*([a-zA-Z_]\w*)\s*\)`)
+	reExtDeletePtr      = regexp.MustCompile(`\bdelete\s*(?:\[\])?\s+([a-zA-Z_]\w*)`)
+	reExtPtrDeref       = regexp.MustCompile(`([a-zA-Z_]\w*)\s*->`)
 	reExtPtrArrayAccess = regexp.MustCompile(`([a-zA-Z_]\w*)\s*\[`)
-	reExtPtrStarDeref  = regexp.MustCompile(`\*\s*([a-zA-Z_]\w*)`)
-	reExtNullAssign    = regexp.MustCompile(`([a-zA-Z_]\w*)\s*=\s*(?:NULL|nullptr|0)\s*;`)
+	reExtPtrStarDeref   = regexp.MustCompile(`\*\s*([a-zA-Z_]\w*)`)
+	reExtNullAssign     = regexp.MustCompile(`([a-zA-Z_]\w*)\s*=\s*(?:NULL|nullptr|0)\s*;`)
 
 	// BATOU-MEM-008: Double free
 	// Uses reExtFreePtr and reExtDeletePtr above
 
 	// BATOU-MEM-009: Integer overflow in allocation size
-	reExtMallocArith  = regexp.MustCompile(`\bmalloc\s*\(\s*[^)]*[+*]\s*[^)]*\)`)
-	reExtCallocMul    = regexp.MustCompile(`\bcalloc\s*\(\s*[a-zA-Z_]\w*\s*,\s*[a-zA-Z_]\w*\s*\)`)
-	reExtReallocAdd   = regexp.MustCompile(`\brealloc\s*\(\s*[^,]+,\s*[^)]*[+*]\s*[^)]*\)`)
+	reExtMallocArith   = regexp.MustCompile(`\bmalloc\s*\(\s*[^)]*[+*]\s*[^)]*\)`)
+	reExtCallocMul     = regexp.MustCompile(`\bcalloc\s*\(\s*[a-zA-Z_]\w*\s*,\s*[a-zA-Z_]\w*\s*\)`)
+	reExtReallocAdd    = regexp.MustCompile(`\brealloc\s*\(\s*[^,]+,\s*[^)]*[+*]\s*[^)]*\)`)
 	reExtOverflowCheck = regexp.MustCompile(`(?:SIZE_MAX|UINT_MAX|INT_MAX|__builtin_mul_overflow|__builtin_add_overflow|safe_mul|safe_add|checked_mul|overflow_check)`)
 
 	// BATOU-MEM-010: Stack buffer overflow
@@ -36,8 +36,8 @@ var (
 	reExtStackSizeVar = regexp.MustCompile(`\b(?:int|unsigned|size_t|long)\s+[a-zA-Z_]\w*\s*\[\s*[a-zA-Z_]\w*\s*\]`)
 
 	// BATOU-MEM-011: Format string vulnerability
-	reExtFmtStrFunc   = regexp.MustCompile(`\b(printf|fprintf|sprintf|snprintf|syslog|err|warn|vprintf|vfprintf|vsprintf|vsnprintf)\s*\(`)
-	reExtFmtStrVar    = regexp.MustCompile(`\b(?:printf|fprintf|sprintf|snprintf|syslog|err|warn)\s*\([^"]*[a-zA-Z_]\w*\s*[,)]`)
+	reExtFmtStrFunc    = regexp.MustCompile(`\b(printf|fprintf|sprintf|snprintf|syslog|err|warn|vprintf|vfprintf|vsprintf|vsnprintf)\s*\(`)
+	reExtFmtStrVar     = regexp.MustCompile(`\b(?:printf|fprintf|sprintf|snprintf|syslog|err|warn)\s*\([^"]*[a-zA-Z_]\w*\s*[,)]`)
 	reExtFmtStrLiteral = regexp.MustCompile(`\b(?:printf|syslog|err|warn)\s*\(\s*"`)
 	// Broader literal checks for multi-arg functions: fprintf(file, ".."), snprintf(buf, sz, "..")
 	reExtFmtStrFprintfLiteral  = regexp.MustCompile(`\bfprintf\s*\(\s*\w+\s*,\s*"`)
@@ -46,13 +46,13 @@ var (
 	reExtFmtStrSyslogLiteral   = regexp.MustCompile(`\bsyslog\s*\(\s*\w+\s*,\s*"`)
 
 	// BATOU-MEM-012: Uninitialized variable use
-	reExtLocalDecl     = regexp.MustCompile(`^\s*(?:int|char|unsigned|long|short|float|double|size_t|ssize_t|off_t|pid_t|void\s*\*|[A-Z][a-zA-Z_]*\s*\*?)\s+([a-zA-Z_]\w*)\s*;`)
-	reExtPtrDecl       = regexp.MustCompile(`^\s*(?:[a-zA-Z_]\w*\s*\*)\s*([a-zA-Z_]\w*)\s*;`)
+	reExtLocalDecl = regexp.MustCompile(`^\s*(?:int|char|unsigned|long|short|float|double|size_t|ssize_t|off_t|pid_t|void\s*\*|[A-Z][a-zA-Z_]*\s*\*?)\s+([a-zA-Z_]\w*)\s*;`)
+	reExtPtrDecl   = regexp.MustCompile(`^\s*(?:[a-zA-Z_]\w*\s*\*)\s*([a-zA-Z_]\w*)\s*;`)
 
 	// BATOU-MEM-013: Off-by-one buffer error
-	reExtLoopBound    = regexp.MustCompile(`for\s*\([^;]*;\s*[a-zA-Z_]\w*\s*<=\s*(?:sizeof|strlen|len|size|count|length|n|num|max)\s*\(?\s*([a-zA-Z_]\w*)?\s*\)?\s*;`)
-	reExtArrayWrite   = regexp.MustCompile(`([a-zA-Z_]\w*)\s*\[\s*([a-zA-Z_]\w*)\s*\]\s*=`)
-	reExtFencePost    = regexp.MustCompile(`\[\s*(?:sizeof|strlen|len|size|count|length)\s*\(\s*[a-zA-Z_]\w*\s*\)\s*\]`)
+	reExtLoopBound  = regexp.MustCompile(`for\s*\([^;]*;\s*[a-zA-Z_]\w*\s*<=\s*(?:sizeof|strlen|len|size|count|length|n|num|max)\s*\(?\s*([a-zA-Z_]\w*)?\s*\)?\s*;`)
+	reExtArrayWrite = regexp.MustCompile(`([a-zA-Z_]\w*)\s*\[\s*([a-zA-Z_]\w*)\s*\]\s*=`)
+	reExtFencePost  = regexp.MustCompile(`\[\s*(?:sizeof|strlen|len|size|count|length)\s*\(\s*[a-zA-Z_]\w*\s*\)\s*\]`)
 )
 
 // ---------------------------------------------------------------------------
@@ -75,8 +75,8 @@ func init() {
 
 type UseAfterFreeExt struct{}
 
-func (r *UseAfterFreeExt) ID() string                     { return "BATOU-MEM-007" }
-func (r *UseAfterFreeExt) Name() string                   { return "UseAfterFreeExt" }
+func (r *UseAfterFreeExt) ID() string                      { return "BATOU-MEM-007" }
+func (r *UseAfterFreeExt) Name() string                    { return "UseAfterFreeExt" }
 func (r *UseAfterFreeExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *UseAfterFreeExt) Description() string {
 	return "Detects use-after-free patterns where a pointer is dereferenced after being freed without being reassigned."
@@ -87,7 +87,7 @@ func (r *UseAfterFreeExt) Languages() []rules.Language {
 
 func (r *UseAfterFreeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Track freed pointers per scope (reset on function boundaries)
 	freedPtrs := make(map[string]int)
@@ -103,38 +103,40 @@ func (r *UseAfterFreeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Detect free(ptr) or delete ptr
-		if m := reExtFreePtr.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reExtFreePtr, line); m != nil {
 			freedPtrs[m[1]] = i + 1
 			continue
 		}
-		if m := reExtDeletePtr.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reExtDeletePtr, line); m != nil {
 			freedPtrs[m[1]] = i + 1
 			continue
 		}
 
 		// Check if nullified
-		if m := reExtNullAssign.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reExtNullAssign, line); m != nil {
 			delete(freedPtrs, m[1])
 			continue
 		}
 
-		// Check for dereference of freed pointer
-		for ptrName, freeLine := range freedPtrs {
+		// Check for dereference of freed pointer. Iterate in sorted key order so
+		// the finding set is deterministic, not dependent on Go map order.
+		for _, ptrName := range sortedMapKeys(freedPtrs) {
+			freeLine := freedPtrs[ptrName]
 			if !strings.Contains(line, ptrName) {
 				continue
 			}
 			// Check for dereference patterns: ptr->, *ptr, ptr[
 			isDeref := false
-			if m := reExtPtrDeref.FindStringSubmatch(line); m != nil && m[1] == ptrName {
+			if m := rules.GFindSubmatch(reExtPtrDeref, line); m != nil && m[1] == ptrName {
 				isDeref = true
 			}
 			if !isDeref {
-				if m := reExtPtrArrayAccess.FindStringSubmatch(line); m != nil && m[1] == ptrName {
+				if m := rules.GFindSubmatch(reExtPtrArrayAccess, line); m != nil && m[1] == ptrName {
 					isDeref = true
 				}
 			}
 			if !isDeref {
-				if m := reExtPtrStarDeref.FindStringSubmatch(line); m != nil && m[1] == ptrName {
+				if m := rules.GFindSubmatch(reExtPtrStarDeref, line); m != nil && m[1] == ptrName {
 					isDeref = true
 				}
 			}
@@ -168,8 +170,8 @@ func (r *UseAfterFreeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DoubleFreeExt struct{}
 
-func (r *DoubleFreeExt) ID() string                     { return "BATOU-MEM-008" }
-func (r *DoubleFreeExt) Name() string                   { return "DoubleFreeExt" }
+func (r *DoubleFreeExt) ID() string                      { return "BATOU-MEM-008" }
+func (r *DoubleFreeExt) Name() string                    { return "DoubleFreeExt" }
 func (r *DoubleFreeExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *DoubleFreeExt) Description() string {
 	return "Detects double-free patterns where the same pointer is freed twice without being reassigned."
@@ -180,7 +182,7 @@ func (r *DoubleFreeExt) Languages() []rules.Language {
 
 func (r *DoubleFreeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	freedPtrs := make(map[string]int)
 
@@ -195,13 +197,13 @@ func (r *DoubleFreeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Detect null assignment (clears tracking)
-		if m := reExtNullAssign.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reExtNullAssign, line); m != nil {
 			delete(freedPtrs, m[1])
 			continue
 		}
 
 		// Check for free
-		if m := reExtFreePtr.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reExtFreePtr, line); m != nil {
 			ptrName := m[1]
 			if prevLine, ok := freedPtrs[ptrName]; ok {
 				findings = append(findings, rules.Finding{
@@ -226,7 +228,7 @@ func (r *DoubleFreeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Check for delete
-		if m := reExtDeletePtr.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reExtDeletePtr, line); m != nil {
 			ptrName := m[1]
 			if prevLine, ok := freedPtrs[ptrName]; ok {
 				findings = append(findings, rules.Finding{
@@ -258,8 +260,8 @@ func (r *DoubleFreeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type IntOverflowAllocExt struct{}
 
-func (r *IntOverflowAllocExt) ID() string                     { return "BATOU-MEM-009" }
-func (r *IntOverflowAllocExt) Name() string                   { return "IntOverflowAllocExt" }
+func (r *IntOverflowAllocExt) ID() string                      { return "BATOU-MEM-009" }
+func (r *IntOverflowAllocExt) Name() string                    { return "IntOverflowAllocExt" }
 func (r *IntOverflowAllocExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *IntOverflowAllocExt) Description() string {
 	return "Detects arithmetic in memory allocation size arguments that may overflow, leading to undersized allocations."
@@ -269,24 +271,24 @@ func (r *IntOverflowAllocExt) Languages() []rules.Language {
 }
 
 func (r *IntOverflowAllocExt) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if reExtOverflowCheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reExtOverflowCheck, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		var matched string
 		var detail string
-		if m := reExtMallocArith.FindString(line); m != "" {
+		if m := rules.GFind(reExtMallocArith, line); m != "" {
 			matched = m
 			detail = "malloc() with arithmetic in size argument"
-		} else if m := reExtReallocAdd.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtReallocAdd, line); m != "" {
 			matched = m
 			detail = "realloc() with arithmetic in size argument"
-		} else if m := reExtCallocMul.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtCallocMul, line); m != "" {
 			matched = m
 			detail = "calloc() with variable count and size (verify no overflow)"
 		}
@@ -318,8 +320,8 @@ func (r *IntOverflowAllocExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type StackBufferOverflow struct{}
 
-func (r *StackBufferOverflow) ID() string                     { return "BATOU-MEM-010" }
-func (r *StackBufferOverflow) Name() string                   { return "StackBufferOverflow" }
+func (r *StackBufferOverflow) ID() string                      { return "BATOU-MEM-010" }
+func (r *StackBufferOverflow) Name() string                    { return "StackBufferOverflow" }
 func (r *StackBufferOverflow) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *StackBufferOverflow) Description() string {
 	return "Detects stack buffer overflow patterns where fixed-size buffers are used with unbounded copy functions."
@@ -330,7 +332,7 @@ func (r *StackBufferOverflow) Languages() []rules.Language {
 
 func (r *StackBufferOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Track fixed-size buffers declared in the current scope
 	stackBufs := make(map[string]bool)
@@ -346,12 +348,12 @@ func (r *StackBufferOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Track fixed-size buffer declarations
-		if m := reExtFixedBuf.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reExtFixedBuf, line); m != nil {
 			stackBufs[m[1]] = true
 		}
 
 		// Variable-length arrays on the stack
-		if m := reExtStackSizeVar.FindString(line); m != "" {
+		if m := rules.GFind(reExtStackSizeVar, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -371,7 +373,7 @@ func (r *StackBufferOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Check if unsafe copy targets a known stack buffer
-		if m := reExtUnsafeCopy.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reExtUnsafeCopy, line); m != nil {
 			if stackBufs[m[1]] {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -401,8 +403,8 @@ func (r *StackBufferOverflow) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FormatStringExt struct{}
 
-func (r *FormatStringExt) ID() string                     { return "BATOU-MEM-011" }
-func (r *FormatStringExt) Name() string                   { return "FormatStringExt" }
+func (r *FormatStringExt) ID() string                      { return "BATOU-MEM-011" }
+func (r *FormatStringExt) Name() string                    { return "FormatStringExt" }
 func (r *FormatStringExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *FormatStringExt) Description() string {
 	return "Detects printf-family function calls where the format string is a variable instead of a string literal."
@@ -413,22 +415,22 @@ func (r *FormatStringExt) Languages() []rules.Language {
 
 func (r *FormatStringExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		// Skip if the format string is a literal (single-arg: printf(".."),
 		// multi-arg: fprintf(f, ".."), snprintf(b, n, ".."), sprintf(b, "..")).
-		if reExtFmtStrLiteral.MatchString(line) ||
-			reExtFmtStrFprintfLiteral.MatchString(line) ||
-			reExtFmtStrSnprintfLiteral.MatchString(line) ||
-			reExtFmtStrSprintfLiteral.MatchString(line) ||
-			reExtFmtStrSyslogLiteral.MatchString(line) {
+		if rules.GMatch(reExtFmtStrLiteral, line) ||
+			rules.GMatch(reExtFmtStrFprintfLiteral, line) ||
+			rules.GMatch(reExtFmtStrSnprintfLiteral, line) ||
+			rules.GMatch(reExtFmtStrSprintfLiteral, line) ||
+			rules.GMatch(reExtFmtStrSyslogLiteral, line) {
 			continue
 		}
-		if m := reExtFmtStrVar.FindString(line); m != "" {
-			funcMatch := reExtFmtStrFunc.FindStringSubmatch(line)
+		if m := rules.GFind(reExtFmtStrVar, line); m != "" {
+			funcMatch := rules.GFindSubmatch(reExtFmtStrFunc, line)
 			funcName := "printf-family"
 			if funcMatch != nil {
 				funcName = funcMatch[1]
@@ -460,8 +462,8 @@ func (r *FormatStringExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UninitVarUse struct{}
 
-func (r *UninitVarUse) ID() string                     { return "BATOU-MEM-012" }
-func (r *UninitVarUse) Name() string                   { return "UninitVarUse" }
+func (r *UninitVarUse) ID() string                      { return "BATOU-MEM-012" }
+func (r *UninitVarUse) Name() string                    { return "UninitVarUse" }
 func (r *UninitVarUse) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UninitVarUse) Description() string {
 	return "Detects local variables declared without initialization that may be used before being assigned."
@@ -472,7 +474,7 @@ func (r *UninitVarUse) Languages() []rules.Language {
 
 func (r *UninitVarUse) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Track uninitialized variables
 	uninitVars := make(map[string]int) // varName -> declaration line
@@ -488,17 +490,19 @@ func (r *UninitVarUse) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Detect uninitialized local variable declarations
-		if m := reExtLocalDecl.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reExtLocalDecl, line); m != nil {
 			uninitVars[m[1]] = i + 1
 			continue
 		}
-		if m := reExtPtrDecl.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatch(reExtPtrDecl, line); m != nil {
 			uninitVars[m[1]] = i + 1
 			continue
 		}
 
-		// Check if any uninitialized variable is used (assigned or dereferenced)
-		for varName := range uninitVars {
+		// Check if any uninitialized variable is used (assigned or dereferenced).
+		// Sorted key order so the flagged/deleted variable (and finding set) is
+		// deterministic, not Go map order.
+		for _, varName := range sortedMapKeys(uninitVars) {
 			if !strings.Contains(line, varName) {
 				continue
 			}
@@ -541,8 +545,8 @@ func (r *UninitVarUse) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OffByOneError struct{}
 
-func (r *OffByOneError) ID() string                     { return "BATOU-MEM-013" }
-func (r *OffByOneError) Name() string                   { return "OffByOneError" }
+func (r *OffByOneError) ID() string                      { return "BATOU-MEM-013" }
+func (r *OffByOneError) Name() string                    { return "OffByOneError" }
 func (r *OffByOneError) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OffByOneError) Description() string {
 	return "Detects off-by-one errors in loop bounds and array access patterns that can cause buffer overflow by one byte."
@@ -553,13 +557,13 @@ func (r *OffByOneError) Languages() []rules.Language {
 
 func (r *OffByOneError) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		// Pattern 1: for loop with <= instead of < (common off-by-one)
-		if m := reExtLoopBound.FindString(line); m != "" {
+		if m := rules.GFind(reExtLoopBound, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -579,9 +583,9 @@ func (r *OffByOneError) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Pattern 2: array access at buffer[sizeof(buffer)] or buffer[strlen(str)]
-		if m := reExtFencePost.FindString(line); m != "" {
+		if m := rules.GFind(reExtFencePost, line); m != "" {
 			// Check if it's a write operation
-			if reExtArrayWrite.MatchString(line) {
+			if rules.GMatch(reExtArrayWrite, line) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),

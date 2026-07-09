@@ -1,10 +1,14 @@
 import Alamofire
 import Foundation
+import Vapor
 
-// SSRF via Alamofire - user-controlled URL passed to HTTP client
+// SSRF (CWE-918): user-controlled URLs from a Vapor request flow into
+// third-party HTTP-client / image-loader sinks. Each case is a confirmed
+// source -> sink dataflow (Vapor req.query is the taint source).
 
-func fetchUserProfile(userUrl: String) {
-    // Vulnerable: user-controlled URL passed directly to AF.request
+// Vulnerable: tainted URL -> Alamofire AF.request
+func fetchUserProfile(req: Request) {
+    let userUrl = req.query["url"] ?? ""
     AF.request(userUrl).responseDecodable(of: UserProfile.self) { response in
         switch response.result {
         case .success(let profile):
@@ -15,8 +19,9 @@ func fetchUserProfile(userUrl: String) {
     }
 }
 
-func downloadUserFile(urlParam: String) {
-    // Vulnerable: user-controlled URL passed to AF.download
+// Vulnerable: tainted URL -> Alamofire AF.download
+func downloadUserFile(req: Request) {
+    let urlParam = req.query["file_url"] ?? ""
     AF.download(urlParam).responseData { response in
         if let data = response.value {
             saveFile(data)
@@ -24,56 +29,49 @@ func downloadUserFile(urlParam: String) {
     }
 }
 
-func uploadToUserServer(targetUrl: String, fileData: Data) {
-    // Vulnerable: user-controlled URL passed to AF.upload
-    AF.upload(fileData, to: targetUrl).responseString { response in
+// Vulnerable: tainted URL -> Alamofire AF.upload (URL as first arg)
+func uploadToUserServer(req: Request, fileData: Data) {
+    let targetUrl = req.query["target"] ?? ""
+    AF.upload(targetUrl, to: targetUrl).responseString { response in
         print(response.value ?? "")
     }
 }
 
-func fetchWithSession(endpoint: String) {
+// Vulnerable: tainted URL -> Alamofire Session.request
+func fetchWithSession(req: Request) {
+    let endpoint = req.query["endpoint"] ?? ""
     let session = Session.default
-    // Vulnerable: user-controlled URL passed to session.request
     session.request(endpoint).responseJSON { response in
         handleJSON(response)
     }
 }
 
-func downloadWithSession(url: String) {
+// Vulnerable: tainted URL -> Alamofire Session.download
+func downloadWithSession(req: Request) {
+    let url = req.query["src"] ?? ""
     let session = Session()
-    // Vulnerable: user-controlled URL passed to session.download
     session.download(url).responseData { response in
         handleData(response)
     }
 }
 
-func fetchViaMoya(targetId: String) {
-    let provider = MoyaProvider<MyAPI>()
-    // Vulnerable: provider.request with dynamic target
-    provider.request(.user(id: targetId)) { result in
-        switch result {
-        case .success(let response):
-            handleResponse(response.data)
-        case .failure:
-            break
-        }
-    }
-}
-
-func fetchWithAsyncHTTP(url: String) {
+// Vulnerable: tainted URL -> AsyncHTTPClient request
+func fetchWithAsyncHTTP(req: Request) {
+    let url = req.query["proxy"] ?? ""
     let httpClient = HTTPClient(eventLoopGroupProvider: .singleton)
-    // Vulnerable: user-controlled URL in AsyncHTTPClient
     httpClient.execute(request: try! HTTPClient.Request(url: url))
 }
 
-func loadImage(imageUrl: String) {
-    let url = URL(string: imageUrl)!
-    // Vulnerable: user-controlled URL in Kingfisher image loading
-    imageView.kf.setImage(with: url)
+// Vulnerable: tainted URL -> SDWebImage sd_setImage(with:)
+func loadSDImage(req: Request) {
+    let imageUrl = req.query["avatar"] ?? ""
+    imageView.sd_setImage(with: imageUrl)
 }
 
-func loadSDImage(imageUrl: String) {
-    let url = URL(string: imageUrl)!
-    // Vulnerable: user-controlled URL in SDWebImage
-    imageView.sd_setImage(with: url)
+// Vulnerable: tainted URL -> URLSession async data(from:) (SSRF)
+func proxyFetch(req: Request) async throws -> Data {
+    let raw = req.query["dest"] ?? ""
+    let targetURL = URL(string: raw)!
+    let (data, _) = try await URLSession.shared.data(from: targetURL)
+    return data
 }

@@ -36,7 +36,6 @@ var (
 
 // BATOU-CORS-007: Origin validation regex without anchoring
 var (
-	reOriginRegexNoAnchor = regexp.MustCompile(`(?i)(?:origin|allowed).*(?:\.test|\.match|RegExp|re\.compile|regexp\.MustCompile)\s*\(\s*[/'"](?:[^^]|[^$])`)
 	reOriginRegexFull     = regexp.MustCompile(`(?i)(?:origin|allowed).*(?:\.test|\.match|RegExp)\s*\(`)
 	reAnchorPresent       = regexp.MustCompile(`[\^$]`)
 )
@@ -65,16 +64,16 @@ func (r *CORSNullOrigin) Languages() []rules.Language {
 
 func (r *CORSNullOrigin) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
 		matched := ""
-		if loc := reNullOrigin.FindString(line); loc != "" {
+		if loc := rules.GFind(reNullOrigin, line); loc != "" {
 			matched = loc
-		} else if loc := reNullOriginCheck.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reNullOriginCheck, line); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -117,16 +116,16 @@ func (r *CORSMethodsTooPermissive) Languages() []rules.Language {
 
 func (r *CORSMethodsTooPermissive) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
 		matched := ""
-		if loc := reAllowMethodsAll.FindString(line); loc != "" {
+		if loc := rules.GFind(reAllowMethodsAll, line); loc != "" {
 			matched = loc
-		} else if loc := reMethodsPermissive.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reMethodsPermissive, line); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -169,16 +168,16 @@ func (r *CORSExposeHeadersLeak) Languages() []rules.Language {
 
 func (r *CORSExposeHeadersLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
 		matched := ""
-		if loc := reExposeHeaders.FindString(line); loc != "" {
+		if loc := rules.GFind(reExposeHeaders, line); loc != "" {
 			matched = loc
-		} else if loc := reExposeSensitive.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reExposeSensitive, line); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -221,13 +220,13 @@ func (r *CORSPreflightCacheTooLong) Languages() []rules.Language {
 
 func (r *CORSPreflightCacheTooLong) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
-		matches := reMaxAge.FindStringSubmatch(line)
+		matches := rules.GFindSubmatch(reMaxAge, line)
 		if len(matches) >= 2 {
 			// Parse the number and check if > 86400 (24 hours)
 			val := 0
@@ -278,14 +277,14 @@ func (r *CORSOriginRegexNoAnchor) Languages() []rules.Language {
 
 func (r *CORSOriginRegexNoAnchor) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
-		if reOriginRegexFull.MatchString(line) && !reAnchorPresent.MatchString(line) {
-			matched := reOriginRegexFull.FindString(line)
+		if rules.GMatch(reOriginRegexFull, line) && !rules.GMatch(reAnchorPresent, line) {
+			matched := rules.GFind(reOriginRegexFull, line)
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -325,16 +324,16 @@ func (r *CORSOriginContainsCheck) Languages() []rules.Language {
 
 func (r *CORSOriginContainsCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
 		matched := ""
-		if loc := reOriginContains.FindString(line); loc != "" {
+		if loc := rules.GFind(reOriginContains, line); loc != "" {
 			matched = loc
-		} else if loc := reOriginEndsWith.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reOriginEndsWith, line); loc != "" {
 			matched = loc
 		}
 		if matched != "" {

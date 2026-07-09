@@ -1,9 +1,8 @@
 package goast
 
 import (
-	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
+	"testing"
 )
 
 func scanGo(code string) []rules.Finding {
@@ -561,6 +560,84 @@ func main() {
 	}
 }
 
+// TestAST006_PartialTimeout_ReadHeaderOnly is the real-world FP regression test.
+// Grafana's pkg/server/instrumentation_service.go sets ReadHeaderTimeout (the
+// Go-documented Slowloris defense) but deliberately omits WriteTimeout and
+// IdleTimeout. The old rule demanded all three and flagged this well-defended
+// server. A request-phase timeout is present, so the CWE-400 threat is bounded
+// and the finding must NOT fire.
+func TestAST006_PartialTimeout_ReadHeaderOnly_NoFinding(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"time"
+)
+
+func newServer(router http.Handler) *http.Server {
+	return &http.Server{
+		// 5s timeout for header reads to avoid Slowloris attacks
+		ReadHeaderTimeout: 5 * time.Second,
+		Addr:              ":8080",
+		Handler:           router,
+	}
+}
+`
+	findings := scanGo(code)
+	if f := findByRule(findings, "BATOU-AST-006"); f != nil {
+		t.Errorf("FP: server with ReadHeaderTimeout (Slowloris defense) should not be flagged AST-006; got %q", f.Title)
+	}
+}
+
+// TestAST006_PartialTimeout_ReadTimeoutOnly_NoFinding mirrors Grafana's
+// pkg/api/http_server.go, which sets only ReadTimeout. A single request-phase
+// timeout is enough to bound the DoS threat the rule guards against.
+func TestAST006_PartialTimeout_ReadTimeoutOnly_NoFinding(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"time"
+)
+
+func newServer(h http.Handler) *http.Server {
+	return &http.Server{
+		Addr:        ":8080",
+		Handler:     h,
+		ReadTimeout: 10 * time.Second,
+	}
+}
+`
+	findings := scanGo(code)
+	if f := findByRule(findings, "BATOU-AST-006"); f != nil {
+		t.Errorf("FP: server with ReadTimeout should not be flagged AST-006; got %q", f.Title)
+	}
+}
+
+// TestAST006_NoTimeoutAtAll_StillFires is the true-positive guard proving the
+// rule was TIGHTENED, not disabled: a server with NO timeout field whatsoever
+// is genuinely Slowloris-exploitable and must still fire AST-006.
+func TestAST006_NoTimeoutAtAll_StillFires(t *testing.T) {
+	code := `package main
+
+import "net/http"
+
+func newServer(h http.Handler) *http.Server {
+	return &http.Server{
+		Addr:    ":8080",
+		Handler: h,
+	}
+}
+`
+	findings := scanGo(code)
+	if findByRule(findings, "BATOU-AST-006") == nil {
+		t.Error("TP lost: http.Server with no timeout fields at all must still fire AST-006")
+		for _, f := range findings {
+			t.Logf("  %s: %s (line %d)", f.RuleID, f.Title, f.LineNumber)
+		}
+	}
+}
+
 // =========================================================================
 // BATOU-AST-007: DeferInLoop
 // =========================================================================
@@ -750,6 +827,77 @@ func handler() {
 	}
 }
 
+// AST-008 regression: a sync.WaitGroup-coordinated goroutine cannot leak
+// because the parent blocks on wg.Wait() until it exits. The scanner's own
+// concurrent rule loop in scanner.scanCore uses exactly this pattern.
+func TestAST008_SafeGoroutineBoundedByWaitGroup(t *testing.T) {
+	code := `package main
+
+import "sync"
+
+func handler() {
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			doWork(n)
+		}(i)
+	}
+	wg.Wait()
+}
+`
+	findings := scanGo(code)
+	f := findByRule(findings, "BATOU-AST-008")
+	if f != nil {
+		t.Errorf("should not flag goroutine bounded by WaitGroup; got: %+v", f)
+	}
+}
+
+// AST-004 regression: the fuzzy "auth"/"crypt" substring match used to flag
+// any method name containing those substrings, including helpers like
+// c.checkDeprecatedCryptoImports(). It should only match calls qualified by
+// an imported package.
+func TestAST004_LocalMethodNamedLikeCrypto(t *testing.T) {
+	code := `package main
+
+type checker struct{}
+
+func (c *checker) checkDeprecatedCryptoImports() {}
+func (c *checker) validateAuthorization()       {}
+
+func driver() {
+	c := &checker{}
+	c.checkDeprecatedCryptoImports()
+	c.validateAuthorization()
+}
+`
+	findings := scanGo(code)
+	f := findByRule(findings, "BATOU-AST-004")
+	if f != nil {
+		t.Errorf("should not flag local-method calls whose names contain 'crypt'/'auth'; got: %+v", f)
+	}
+}
+
+// AST-004 positive: a real call through an imported bcrypt package still
+// fires the fuzzy-match. This guards against the rule fix being too
+// permissive.
+func TestAST004_StillFlagsImportedBcrypt(t *testing.T) {
+	code := `package main
+
+import "golang.org/x/crypto/bcrypt"
+
+func login(pw []byte) {
+	bcrypt.CompareHashAndPassword(nil, pw)
+}
+`
+	findings := scanGo(code)
+	f := findByRule(findings, "BATOU-AST-004")
+	if f == nil {
+		t.Error("expected BATOU-AST-004 for discarded bcrypt.CompareHashAndPassword call")
+	}
+}
+
 // FP 3: _, err := f() should NOT be flagged — error IS captured.
 func TestAST004_SafeTupleReturnBlankFirst(t *testing.T) {
 	code := `package main
@@ -908,5 +1056,326 @@ func TestEmptyFile(t *testing.T) {
 	findings := scanGo(code)
 	if len(findings) != 0 {
 		t.Errorf("expected no findings for empty file, got %d", len(findings))
+	}
+}
+
+func TestIsLikelyDDLQuery(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  bool
+	}{
+		// DDL keywords — always identifier-interpolation territory.
+		{"create_table", "CREATE TABLE foo (id INT)", true},
+		{"alter_add_column", "ALTER TABLE %s ADD COLUMN x", true},
+		{"drop_table", "DROP TABLE %s", true},
+		{"truncate", "TRUNCATE TABLE %s", true},
+		{"rename_table", "RENAME TABLE %s TO %s", true},
+		// Engine-specific admin commands (sequence / identity / privileges).
+		{"alter_sequence", "ALTER SEQUENCE `%s` RENAME TO `%s`", true},
+		{"setval", "SELECT setval('%s', COALESCE((SELECT MAX(id)+1 FROM `%s`), 1), false)", true},
+		{"identity_insert_on", "SET IDENTITY_INSERT %s ON", true},
+		{"identity_insert_off", "SET IDENTITY_INSERT %s OFF", true},
+		{"grant", "GRANT SELECT ON %s TO %s", true},
+		{"vacuum_table", "VACUUM ANALYZE %s", true},
+		{"reindex_table", "REINDEX TABLE %s", true},
+
+		// DML with identifier slot AND value placeholders → likely safe.
+		{"insert_into_with_q", "INSERT INTO %s (a,b) VALUES (?,?)", true},
+		{"update_set_with_q", "UPDATE %s SET col=? WHERE id=?", true},
+		{"select_from_with_q", "SELECT * FROM %s WHERE id=?", true},
+		{"select_from_pg_placeholder", "SELECT * FROM %s WHERE id=$1", true},
+		{"backticked_identifier", "INSERT INTO `%s` (a) VALUES (?)", true},
+		{"join_with_q", "SELECT a FROM t JOIN %s ON t.id=u.id WHERE t.id=?", true},
+
+		// DML with identifier slot but NO value placeholders — real risk.
+		{"insert_into_no_q", "INSERT INTO %s VALUES (%s)", false},
+		{"update_set_no_q", "UPDATE %s SET col=%s", false},
+		{"select_from_no_q", "SELECT * FROM %s WHERE id=%s", false},
+
+		// Plain DML, no interpolation at all.
+		{"plain_insert", "INSERT INTO users (a) VALUES (?)", false},
+
+		// Empty / non-SQL.
+		{"empty", "", false},
+		{"non_sql", "hello world", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isLikelyDDLQuery(tt.query); got != tt.want {
+				t.Errorf("isLikelyDDLQuery(%q) = %v, want %v", tt.query, got, tt.want)
+			}
+		})
+	}
+}
+
+// =========================================================================
+// BATOU-AST-009: Insecure TLS configuration (CWE-295 / CWE-327)
+// =========================================================================
+
+func TestAST009_InsecureSkipVerifyTrue(t *testing.T) {
+	code := `package main
+
+import "crypto/tls"
+
+func client() *tls.Config {
+	return &tls.Config{
+		InsecureSkipVerify: true,
+	}
+}
+`
+	f := findByRule(scanGo(code), "BATOU-AST-009")
+	if f == nil {
+		t.Fatal("expected BATOU-AST-009 for InsecureSkipVerify: true")
+	}
+	if f.CWEID != "CWE-295" {
+		t.Errorf("expected CWE-295, got %s", f.CWEID)
+	}
+}
+
+func TestAST009_MinVersionTLS10(t *testing.T) {
+	code := `package main
+
+import "crypto/tls"
+
+func cfg() *tls.Config {
+	return &tls.Config{
+		MinVersion: tls.VersionTLS10,
+	}
+}
+`
+	f := findByRule(scanGo(code), "BATOU-AST-009")
+	if f == nil {
+		t.Fatal("expected BATOU-AST-009 for MinVersion: tls.VersionTLS10")
+	}
+	if f.CWEID != "CWE-327" {
+		t.Errorf("expected CWE-327, got %s", f.CWEID)
+	}
+}
+
+func TestAST009_SkipVerifyFalse_Safe(t *testing.T) {
+	// InsecureSkipVerify: false means verification is ENABLED — not a finding.
+	code := `package main
+
+import "crypto/tls"
+
+func cfg() *tls.Config {
+	return &tls.Config{
+		InsecureSkipVerify: false,
+		MinVersion:         tls.VersionTLS13,
+	}
+}
+`
+	if f := findByRule(scanGo(code), "BATOU-AST-009"); f != nil {
+		t.Errorf("did not expect AST-009 on a hardened tls.Config, got: %s", f.Description)
+	}
+}
+
+func TestAST009_UnrelatedStructField_Safe(t *testing.T) {
+	// A field literally named InsecureSkipVerify on a DIFFERENT type must not
+	// trigger — anchored on crypto/tls.Config only.
+	code := `package main
+
+type MyOpts struct {
+	InsecureSkipVerify bool
+}
+
+func opts() MyOpts {
+	return MyOpts{InsecureSkipVerify: true}
+}
+`
+	if f := findByRule(scanGo(code), "BATOU-AST-009"); f != nil {
+		t.Errorf("did not expect AST-009 on an unrelated struct field, got: %s", f.Description)
+	}
+}
+
+// =========================================================================
+// BATOU-AST-010: SSH host key verification (CWE-322)
+// =========================================================================
+
+func TestAST010_InsecureIgnoreHostKey(t *testing.T) {
+	code := `package main
+
+import "golang.org/x/crypto/ssh"
+
+func cfg() *ssh.ClientConfig {
+	return &ssh.ClientConfig{
+		User:            "root",
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+}
+`
+	f := findByRule(scanGo(code), "BATOU-AST-010")
+	if f == nil {
+		t.Fatal("expected BATOU-AST-010 for ssh.InsecureIgnoreHostKey()")
+	}
+	if f.CWEID != "CWE-322" {
+		t.Errorf("expected CWE-322, got %s", f.CWEID)
+	}
+}
+
+func TestAST010_MissingHostKeyCallback(t *testing.T) {
+	code := `package main
+
+import "golang.org/x/crypto/ssh"
+
+func cfg() *ssh.ClientConfig {
+	return &ssh.ClientConfig{
+		User: "root",
+	}
+}
+`
+	if f := findByRule(scanGo(code), "BATOU-AST-010"); f == nil {
+		t.Fatal("expected BATOU-AST-010 for ssh.ClientConfig with no HostKeyCallback")
+	}
+}
+
+func TestAST010_FixedHostKey_Safe(t *testing.T) {
+	code := `package main
+
+import "golang.org/x/crypto/ssh"
+
+func cfg(key ssh.PublicKey) *ssh.ClientConfig {
+	return &ssh.ClientConfig{
+		User:            "root",
+		HostKeyCallback: ssh.FixedHostKey(key),
+	}
+}
+`
+	if f := findByRule(scanGo(code), "BATOU-AST-010"); f != nil {
+		t.Errorf("did not expect AST-010 when HostKeyCallback is ssh.FixedHostKey, got: %s", f.Description)
+	}
+}
+
+func TestAST010_UnrelatedHostKeyField_Safe(t *testing.T) {
+	// HostKeyCallback on an unrelated type must not trigger.
+	code := `package main
+
+type FakeConfig struct {
+	HostKeyCallback func() error
+}
+
+func cfg() FakeConfig {
+	return FakeConfig{}
+}
+`
+	if f := findByRule(scanGo(code), "BATOU-AST-010"); f != nil {
+		t.Errorf("did not expect AST-010 on an unrelated type, got: %s", f.Description)
+	}
+}
+
+// =========================================================================
+// BATOU-AST-011: Decompression bomb (CWE-409)
+// =========================================================================
+
+func TestAST011_UnboundedGzipCopy(t *testing.T) {
+	code := `package main
+
+import (
+	"compress/gzip"
+	"io"
+	"os"
+)
+
+func extract(f *os.File, out io.Writer) error {
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, gr)
+	return err
+}
+`
+	f := findByRule(scanGo(code), "BATOU-AST-011")
+	if f == nil {
+		t.Fatal("expected BATOU-AST-011 for unbounded io.Copy from gzip.Reader")
+	}
+	if f.CWEID != "CWE-409" {
+		t.Errorf("expected CWE-409, got %s", f.CWEID)
+	}
+}
+
+func TestAST011_BoundedCopyN_Safe(t *testing.T) {
+	code := `package main
+
+import (
+	"compress/gzip"
+	"io"
+	"os"
+)
+
+const maxBytes = 100 << 20
+
+func extract(f *os.File, out io.Writer) error {
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	_, err = io.CopyN(out, gr, maxBytes)
+	return err
+}
+`
+	if f := findByRule(scanGo(code), "BATOU-AST-011"); f != nil {
+		t.Errorf("did not expect AST-011 when io.CopyN bounds the copy, got: %s", f.Description)
+	}
+}
+
+func TestAST011_LimitReaderWrap_Safe(t *testing.T) {
+	code := `package main
+
+import (
+	"compress/gzip"
+	"io"
+	"os"
+)
+
+func extract(f *os.File, out io.Writer) error {
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, io.LimitReader(gr, 100<<20))
+	return err
+}
+`
+	if f := findByRule(scanGo(code), "BATOU-AST-011"); f != nil {
+		t.Errorf("did not expect AST-011 when source is wrapped in io.LimitReader, got: %s", f.Description)
+	}
+}
+
+func TestAST011_PlainFileCopy_Safe(t *testing.T) {
+	// io.Copy from a plain file (not a decompressor) is not a decompression bomb.
+	code := `package main
+
+import (
+	"io"
+	"os"
+)
+
+func cp(src *os.File, out io.Writer) error {
+	_, err := io.Copy(out, src)
+	return err
+}
+`
+	if f := findByRule(scanGo(code), "BATOU-AST-011"); f != nil {
+		t.Errorf("did not expect AST-011 for plain (non-decompressing) io.Copy, got: %s", f.Description)
+	}
+}
+
+func TestAST010_ZeroValuePlaceholder_Safe(t *testing.T) {
+	// A bare zero-value ssh.ClientConfig{} (populated later) must NOT fire —
+	// avoids FPs on partial-initialization patterns.
+	code := `package main
+
+import "golang.org/x/crypto/ssh"
+
+func cfg() *ssh.ClientConfig {
+	c := &ssh.ClientConfig{}
+	c.User = "root"
+	return c
+}
+`
+	if f := findByRule(scanGo(code), "BATOU-AST-010"); f != nil {
+		t.Errorf("did not expect AST-010 on a bare zero-value ssh.ClientConfig{}, got: %s", f.Description)
 	}
 }

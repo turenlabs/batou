@@ -145,6 +145,73 @@ func (env *TypeEnv) FieldType(baseType, field string) string {
 	return stdlibFieldTypes[key]
 }
 
+// ExprToTypeString renders an AST type expression to a string representation
+// using the default alias (last path component) for package-qualified types.
+// Returns "" for type parameters, generics, and unsupported constructs.
+//
+// TODO(typed-summaries-phase2): generics — *ast.IndexExpr / *ast.IndexListExpr
+// and type-parameter identifiers currently return "".
+func ExprToTypeString(expr ast.Expr) string {
+	return exprToTypeString(expr)
+}
+
+// CanonicalizeType rewrites aliased package references to their default alias
+// form. E.g. "*h.Request" with an alias `h -> "net/http"` becomes "*http.Request".
+// If no matching import is found, typeStr is returned unchanged.
+func (env *TypeEnv) CanonicalizeType(typeStr string) string {
+	if env == nil || typeStr == "" {
+		return typeStr
+	}
+	ptr := ""
+	rest := typeStr
+	for strings.HasPrefix(rest, "*") {
+		ptr += "*"
+		rest = rest[1:]
+	}
+	dot := strings.Index(rest, ".")
+	if dot < 0 {
+		return typeStr
+	}
+	alias := rest[:dot]
+	selector := rest[dot+1:]
+	importPath := env.importAliases[alias]
+	if importPath == "" {
+		return typeStr
+	}
+	defaultAlias := defaultAliasForPath(importPath)
+	if defaultAlias == "" {
+		return typeStr
+	}
+	return ptr + defaultAlias + "." + selector
+}
+
+// defaultAliasForPath returns the conventional Go alias for an import path.
+// It trims a trailing versioned segment like "/v2" or "/v3" so that
+// "github.com/labstack/echo/v4" → "echo".
+func defaultAliasForPath(path string) string {
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	last := parts[len(parts)-1]
+	if isVersionSegment(last) && len(parts) >= 2 {
+		last = parts[len(parts)-2]
+	}
+	return last
+}
+
+func isVersionSegment(s string) bool {
+	if len(s) < 2 || s[0] != 'v' {
+		return false
+	}
+	for _, c := range s[1:] {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // exprToTypeString renders an AST type expression to a string representation.
 func exprToTypeString(expr ast.Expr) string {
 	switch e := expr.(type) {
