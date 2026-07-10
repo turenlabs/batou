@@ -1,13 +1,12 @@
 package graph
 
 import (
+	"github.com/turenlabs/batou-core/taint"
+	"github.com/turenlabs/batou-rules/rules"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/turenlabs/batou-rules/rules"
-	"github.com/turenlabs/batou-core/taint"
 )
 
 // =========================================================================
@@ -141,9 +140,9 @@ func TestAppendUniqueCat(t *testing.T) {
 
 func TestBestSeverityFromSinks(t *testing.T) {
 	sinks := []SinkRef{
-		{SinkCategory: taint.SnkLog},         // Medium
-		{SinkCategory: taint.SnkSQLQuery},    // Critical
-		{SinkCategory: taint.SnkHTMLOutput},  // High
+		{SinkCategory: taint.SnkLog},        // Medium
+		{SinkCategory: taint.SnkSQLQuery},   // Critical
+		{SinkCategory: taint.SnkHTMLOutput}, // High
 	}
 	sev := bestSeverityFromSinks(sinks)
 	if sev != rules.Critical {
@@ -449,13 +448,13 @@ func TestLoadCallerFile_TooLarge(t *testing.T) {
 	largePath := filepath.Join(tmpDir, "large.go")
 
 	// Create a file just over the limit.
-	data := make([]byte, maxCallerFileSize+1)
+	data := make([]byte, maxCallerFileSize()+1)
 	if err := os.WriteFile(largePath, data, 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	cache := map[string]string{}
-	_, ok := loadCallerFile(largePath, cache)
+	_, ok := loadCallerFile(nil, largePath, cache)
 	if ok {
 		t.Error("expected loadCallerFile to reject file exceeding maxCallerFileSize")
 	}
@@ -463,7 +462,7 @@ func TestLoadCallerFile_TooLarge(t *testing.T) {
 
 func TestLoadCallerFile_Missing(t *testing.T) {
 	cache := map[string]string{}
-	_, ok := loadCallerFile("/nonexistent/path.go", cache)
+	_, ok := loadCallerFile(nil, "/nonexistent/path.go", cache)
 	if ok {
 		t.Error("expected loadCallerFile to return false for missing file")
 	}
@@ -473,7 +472,7 @@ func TestLoadCallerFile_Cached(t *testing.T) {
 	cache := map[string]string{
 		"/some/file.go": "cached content",
 	}
-	content, ok := loadCallerFile("/some/file.go", cache)
+	content, ok := loadCallerFile(nil, "/some/file.go", cache)
 	if !ok || content != "cached content" {
 		t.Error("expected loadCallerFile to return cached content")
 	}
@@ -1081,5 +1080,221 @@ func TestComputeTaintSig_WithSuppressedLines(t *testing.T) {
 	}
 	if len(sig.SuppressedSinks) == 0 {
 		t.Error("expected db.Query to appear in SuppressedSinks")
+	}
+}
+
+// =========================================================================
+// Cross-file structured TaintPath on interprocedural findings
+// =========================================================================
+
+// AnalyzeCallerImpact should attach a TaintPath whose first step is in the
+// caller's file (where the tainted argument lives) and whose last step is in
+// the callee's file (where the sink is), for the "caller passes tainted arg"
+// path (Path A).
+func TestAnalyzeCallerImpact_CrossFileTaintPath(t *testing.T) {
+	cg := NewCallGraph("/project", "test")
+
+	callee := &FuncNode{
+		ID:        "pkg.processName",
+		Name:      "processName",
+		FilePath:  "/app/process.go",
+		StartLine: 1,
+		EndLine:   3,
+		Language:  rules.LangGo,
+		TaintSig: TaintSignature{
+			SinkCalls: []SinkRef{{
+				SinkCategory: taint.SnkSQLQuery,
+				MethodName:   "db.Query",
+				Line:         2,
+				ArgFromParam: 0,
+			}},
+		},
+	}
+	caller := &FuncNode{
+		ID:        "pkg.handler",
+		Name:      "handler",
+		FilePath:  "/app/handler.go",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+	cg.AddNode(callee)
+	cg.AddNode(caller)
+	cg.AddEdge(caller.ID, callee.ID)
+
+	callerContent := `func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	processName(name)
+}`
+
+	findings := AnalyzeCallerImpact(cg, caller, callee, callerContent)
+	if len(findings) == 0 {
+		t.Fatal("expected an interprocedural finding")
+	}
+
+	var withPath *rules.Finding
+	for i := range findings {
+		if len(findings[i].TaintPath) > 0 {
+			withPath = &findings[i]
+			break
+		}
+	}
+	if withPath == nil {
+		t.Fatal("expected at least one finding to carry a TaintPath")
+	}
+
+	tp := withPath.TaintPath
+	if len(tp) < 3 {
+		t.Fatalf("expected >= 3 path steps (source, propagation, sink), got %d: %+v", len(tp), tp)
+	}
+	if tp[0].Kind != rules.TaintStepSource {
+		t.Errorf("first step kind = %q, want source", tp[0].Kind)
+	}
+	if tp[0].File != "/app/handler.go" {
+		t.Errorf("first step file = %q, want /app/handler.go (caller's file)", tp[0].File)
+	}
+	last := tp[len(tp)-1]
+	if last.Kind != rules.TaintStepSink {
+		t.Errorf("last step kind = %q, want sink", last.Kind)
+	}
+	if last.File != "/app/process.go" {
+		t.Errorf("last step file = %q, want /app/process.go (callee's file)", last.File)
+	}
+	if last.Line != 2 {
+		t.Errorf("last step line = %d, want 2 (sink line in callee)", last.Line)
+	}
+	// The cross-file aspect: source and sink are in different files.
+	if tp[0].File == last.File {
+		t.Errorf("expected cross-file path, both steps in %q", tp[0].File)
+	}
+}
+
+// Path B: callee returns tainted data, caller passes it to a sink — the path
+// should run callee's file (source) → caller's file (propagation + sink).
+func TestAnalyzeCallerImpact_CrossFileTaintPath_ReturnTaint(t *testing.T) {
+	cg := NewCallGraph("/project", "test")
+
+	callee := &FuncNode{
+		ID:        "pkg.getName",
+		Name:      "getName",
+		FilePath:  "/app/source.go",
+		StartLine: 10,
+		EndLine:   13,
+		Language:  rules.LangGo,
+		TaintSig: TaintSignature{
+			TaintedReturns: map[int][]taint.SourceCategory{0: {taint.SrcUserInput}},
+		},
+	}
+	caller := &FuncNode{
+		ID:        "pkg.handler",
+		Name:      "handler",
+		FilePath:  "/app/handler.go",
+		StartLine: 1,
+		EndLine:   4,
+		Language:  rules.LangGo,
+	}
+	cg.AddNode(callee)
+	cg.AddNode(caller)
+	cg.AddEdge(caller.ID, callee.ID)
+
+	callerContent := `func handler() {
+	name := getName()
+	db.Query("SELECT * FROM users WHERE n='" + name + "'")
+}`
+
+	findings := AnalyzeCallerImpact(cg, caller, callee, callerContent)
+	if len(findings) == 0 {
+		t.Fatal("expected an interprocedural finding for return-taint path")
+	}
+
+	var withPath *rules.Finding
+	for i := range findings {
+		if len(findings[i].TaintPath) > 0 {
+			withPath = &findings[i]
+			break
+		}
+	}
+	if withPath == nil {
+		t.Fatal("expected at least one finding to carry a TaintPath")
+	}
+	tp := withPath.TaintPath
+	if tp[0].Kind != rules.TaintStepSource || tp[0].File != "/app/source.go" {
+		t.Errorf("first step = %+v, want source in /app/source.go", tp[0])
+	}
+	last := tp[len(tp)-1]
+	if last.Kind != rules.TaintStepSink || last.File != "/app/handler.go" {
+		t.Errorf("last step = %+v, want sink in /app/handler.go", last)
+	}
+	if tp[0].File == last.File {
+		t.Errorf("expected cross-file path, both steps in %q", tp[0].File)
+	}
+}
+
+func TestContainsToken(t *testing.T) {
+	cases := []struct {
+		s, name string
+		want    bool
+	}{
+		// Single-char names — the regression PR-P targets. `r` and
+		// `w` must NOT match arbitrary words that happen to contain
+		// those letters; they MUST match when they appear as a real
+		// identifier reference.
+		{`log.Printf("[proxy] forwarding to %s", upstreamURL.String())`, "r", false},
+		{`log.Printf("[proxy] forwarding to %s", upstreamURL.String())`, "w", false},
+		{`return r.URL.Path`, "r", true},
+		{`w.Header().Set("X", "Y")`, "w", true},
+		{`http.Error(w, err.Error(), http.StatusBadRequest)`, "w", true},
+
+		// Multi-char names — substring matches can still mislead.
+		{`req2 := buildReq(req.URL)`, "req", true},
+		{`reqLog.Println("…")`, "req", false},
+		{`reqLog.Println("…")`, "reqLog", true},
+
+		// Empty inputs.
+		{"", "r", false},
+		{"some string", "", false},
+
+		// Identifier characters at boundaries: underscore IS a word
+		// character to `\b`, so `r_extra` and `extra_r` should NOT
+		// match "r". A dotted access like `a.r.b` should match
+		// because `.` is not a word char.
+		{`r_extra := 1`, "r", false},
+		{`extra_r := 1`, "r", false},
+		{`a.r.b := 1`, "r", true},
+	}
+	for _, tc := range cases {
+		got := containsToken(tc.s, tc.name)
+		if got != tc.want {
+			t.Errorf("containsToken(%q, %q) = %v, want %v", tc.s, tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestIsFuncDeclLine(t *testing.T) {
+	cases := []struct {
+		line string
+		want bool
+	}{
+		// Top-level functions and methods.
+		{`func Handle(w http.ResponseWriter, r *http.Request) {`, true},
+		{`func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {`, true},
+		{`func Foo() {`, true},
+		// Closures returned, assigned, or `go`-launched.
+		{`return func(w http.ResponseWriter, r *http.Request) {`, true},
+		{`f := func(x int) int {`, true},
+		{`go func(ctx context.Context) {`, true},
+		{`http.HandleFunc("/x", func(w http.ResponseWriter, r *http.Request) {`, true},
+
+		// Non-decl lines that mention "func" or "Request" but aren't a decl.
+		{`functionName := something`, false}, // "function" starts with "func" but no `func(`
+		{`r.URL.Path = "/api"`, false},
+		{`return r.FormValue("x")`, false},
+		{``, false},
+	}
+	for _, tc := range cases {
+		got := isFuncDeclLine(tc.line)
+		if got != tc.want {
+			t.Errorf("isFuncDeclLine(%q) = %v, want %v", tc.line, got, tc.want)
+		}
 	}
 }

@@ -10,11 +10,29 @@ import (
 // --- Compiled patterns ---
 
 // BATOU-TRV-001: Path Traversal
+//
+// Tightening note (2026-04-26): the previous Go patterns fired on
+// every `os.Open(var)` and every `filepath.Join(...)` call, regardless
+// of whether the input was user-controlled. In file-server backends
+// like ocis (where filepath.Join is everywhere), this produced 113
+// CRITICAL FPs on admin-config / internal paths.
+//
+// Tightened to require an HTTP-request indicator either on the same
+// line or in nearby context (request param, body field, URL path, etc.).
+// File-level HTTP-handler gate (goTrvHTTPHandler) excludes config
+// loaders, internal services, gRPC paths.
 var (
-	// Go: os.Open/ReadFile/etc with variable (not string literal)
+	// Go: os.Open/ReadFile/etc with variable that names a request source.
 	goFileOpUserInput = regexp.MustCompile(`\b(?:os\.(?:Open|OpenFile|ReadFile|Create|Remove|RemoveAll|Stat|Lstat|Mkdir|MkdirAll)|ioutil\.ReadFile)\s*\(\s*[a-zA-Z_]\w*`)
-	// Go: filepath.Join without subsequent Clean+prefix check
+	// Go: filepath.Join with a request-source argument.
 	goFilepathJoin = regexp.MustCompile(`filepath\.Join\s*\(`)
+	// Request-source indicators on the same line — narrows the scope of
+	// goFileOpUserInput / goFilepathJoin to user-controlled paths.
+	goRequestSource = regexp.MustCompile(`\b(?:r\.URL\.|r\.Form|r\.PostForm|r\.MultipartForm|request\.URL\.|request\.Form|request\.PostForm|c\.Param\s*\(|c\.Query\s*\(|c\.PostForm\s*\(|c\.FormFile\s*\(|c\.QueryParam\s*\(|gin\.|echo\.Context|fiber\.Ctx|chi\.URLParam|mux\.Vars|httprouter\.Params|FormValue\s*\(|ServeContent|ServeFile|http\.ServeFile)`)
+	// Looser indicator for "this file handles HTTP" — used as a
+	// file-level gate. Without this, internal services / config-loaders
+	// don't trigger TRV-001.
+	goTrvHTTPHandler = regexp.MustCompile(`\b(?:http\.(?:HandlerFunc|Handler|Request|ResponseWriter)\b|\bgin\.Context\b|\becho\.Context\b|\bfiber\.Ctx\b|\bchi\.Router\b|\.HandleFunc\s*\(|\.Handle\s*\(|mux\.Router\b)`)
 	// Python: open() with variable from request/user input
 	pyOpenUserInput = regexp.MustCompile(`\bopen\s*\(\s*(?:request\.(?:args|form|values|GET|POST)\s*\[|user_input|filename|file_path|path|f?name)`)
 	// Python: os.path.join with user input
@@ -44,20 +62,22 @@ var (
 
 // BATOU-TRV-002: File Inclusion
 var (
-	phpDynamicInclude    = regexp.MustCompile(`\b(?:include|require|include_once|require_once)\s*[\(]?\s*\$`)
-	pyDynamicImport      = regexp.MustCompile(`\b(?:__import__|importlib\.import_module)\s*\(\s*[a-zA-Z_]\w*`)
-	rubyDynamicLoadReq   = regexp.MustCompile(`\b(?:load|require)\s*[\(]?\s*[a-zA-Z_]\w*`)
+	phpDynamicInclude  = regexp.MustCompile(`\b(?:include|require|include_once|require_once)\s*[\(]?\s*\$`)
+	pyDynamicImport    = regexp.MustCompile(`\b(?:__import__|importlib\.import_module)\s*\(\s*[a-zA-Z_]\w*`)
+	rubyDynamicLoadReq = regexp.MustCompile(`\b(?:load|require)\s*[\(]?\s*[a-zA-Z_]\w*`)
 )
 
 // BATOU-TRV-003: Archive Extraction (Zip Slip / Tar Slip)
 var (
-	// Go: zip.OpenReader / zip.NewReader extraction without path checking
-	goZipExtract = regexp.MustCompile(`(?:zip\.(?:OpenReader|NewReader)|archive/zip)`)
-	goZipFile    = regexp.MustCompile(`\.Open\(\)`)
+	// Go: zip.OpenReader / zip.NewReader / tar.NewReader extraction.
+	// Tightened 2026-05-05: leading \b avoids matching `gzip.NewReader`
+	// (decompression, not extraction — no zip-slip risk). Dropped the
+	// bare `archive/zip` alternative which matched every import string.
+	// Trailing `\(` ensures we match calls, not just type references.
+	goZipExtract = regexp.MustCompile(`\b(?:zip\.(?:OpenReader|NewReader)|tar\.NewReader)\s*\(`)
 	// Python: extractall without members filter
 	pyExtractAll = regexp.MustCompile(`\.(?:extractall|extract)\s*\(`)
 	// Python: zipfile/tarfile import context
-	pyArchiveImport = regexp.MustCompile(`\b(?:zipfile|tarfile)\b`)
 	// JS: unzip/extract patterns
 	jsUnzipExtract = regexp.MustCompile(`\b(?:unzip|extract|decompress)\s*\(`)
 	// Go: os.Create with path from zip entry
@@ -66,9 +86,7 @@ var (
 
 // BATOU-TRV-004: Symlink Following
 var (
-	goReadlink    = regexp.MustCompile(`os\.Readlink\s*\(`)
-	goLstat       = regexp.MustCompile(`os\.Lstat\s*\(`)
-	goEvalSymlink = regexp.MustCompile(`filepath\.EvalSymlinks\s*\(`)
+	goReadlink = regexp.MustCompile(`os\.Readlink\s*\(`)
 )
 
 // BATOU-TRV-005: Template Path Injection
@@ -118,13 +136,11 @@ var (
 	// Go: zip.File.Name or header.Name used in filepath.Join/os.Create without path check
 	goZipSlipJoinCreate = regexp.MustCompile(`(?:filepath\.Join|os\.Create|os\.OpenFile|os\.MkdirAll)\s*\([^)]*(?:\.Name\b|entry\.Name|header\.Name|f\.Name|file\.Name|zipEntry|zf\.Name)`)
 	// Go: zip.File range with file operations
-	goZipSlipRange = regexp.MustCompile(`for\s+.*range\s+.*\.File\b`)
 	// Java: ZipEntry.getName() used in new File() without validation
 	javaZipSlipNewFile = regexp.MustCompile(`new\s+File\s*\([^)]*(?:\.getName\s*\(\)|entry\.getName|zipEntry\.getName)`)
 	// Java: ZipEntry.getName() used in path construction
 	javaZipSlipPath = regexp.MustCompile(`(?:Paths\.get|Path\.of|resolve)\s*\([^)]*(?:\.getName\s*\(\)|entry\.getName|zipEntry\.getName)`)
 	// Python: tarfile.extractall() without members filter
-	pyTarExtractAll = regexp.MustCompile(`tarfile\.open\b.*\.extractall\s*\(`)
 	// Python: tarfile extraction without safe filter
 	pyTarExtract = regexp.MustCompile(`\.extractall\s*\([^)]*\)`)
 	// Python: tarfile import + extractall
@@ -154,8 +170,8 @@ func init() {
 
 type PathTraversal struct{}
 
-func (r *PathTraversal) ID() string             { return "BATOU-TRV-001" }
-func (r *PathTraversal) Name() string            { return "PathTraversal" }
+func (r *PathTraversal) ID() string                      { return "BATOU-TRV-001" }
+func (r *PathTraversal) Name() string                    { return "PathTraversal" }
 func (r *PathTraversal) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PathTraversal) Languages() []rules.Language {
 	return []rules.Language{rules.LangAny}
@@ -167,8 +183,23 @@ func (r *PathTraversal) Description() string {
 
 func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
+	// File-level gate (Go): only flag in files that actually handle HTTP
+	// requests. Hoisted outside the per-line loop because this is a file-
+	// level property — the prior implementation re-ran the regex against
+	// the full file content on EVERY line of every Go file, which
+	// accounted for ~60% of total scan CPU on large Go codebases (e.g.
+	// 692s of 1168s on coder env-OFF).
+	if ctx.Language == rules.LangGo && !rules.GMatchFile(goTrvHTTPHandler, ctx) {
+		// No HTTP handler indicators in this Go file — none of the Go
+		// path-traversal patterns below are valid. Skip the per-line
+		// scan entirely; other-language branches still need it but are
+		// dispatched via ctx.Language elsewhere.
+		return findings
+	}
+
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		lineNum := i + 1
 		trimmed := strings.TrimSpace(line)
@@ -182,27 +213,28 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if loc := goFileOpUserInput.FindString(line); loc != "" {
-				// Check if the line also has filepath.Clean + strings.HasPrefix nearby
-				if !hasTraversalGuard(lines, i) {
+			if loc := rules.GFindLower(goFileOpUserInput, line, lowered[i]); loc != "" {
+				// Require a same-line or nearby request-source indicator.
+				// Without it, the variable might be config-derived.
+				if (rules.GMatchLower(goRequestSource, line, lowered[i]) || hasNearbyRequestSource(lines, i)) && !hasTraversalGuard(lines, i) {
 					matched = loc
 				}
 			}
 			if matched == "" {
-				if loc := goFilepathJoin.FindString(line); loc != "" {
-					if !hasTraversalGuard(lines, i) {
+				if loc := rules.GFindLower(goFilepathJoin, line, lowered[i]); loc != "" {
+					if (rules.GMatchLower(goRequestSource, line, lowered[i]) || hasNearbyRequestSource(lines, i)) && !hasTraversalGuard(lines, i) {
 						matched = strings.TrimSpace(line)
 					}
 				}
 			}
 		case rules.LangPython:
-			if loc := pyOpenUserInput.FindString(line); loc != "" {
+			if loc := rules.GFindLower(pyOpenUserInput, line, lowered[i]); loc != "" {
 				if !hasTraversalGuard(lines, i) && !rules.PySinkVarIsSafe(lines, i) {
 					matched = loc
 				}
 			}
 			if matched == "" {
-				if loc := pyOsPathJoin.FindString(line); loc != "" {
+				if loc := rules.GFindLower(pyOsPathJoin, line, lowered[i]); loc != "" {
 					if !hasTraversalGuard(lines, i) && !rules.PySinkVarIsSafe(lines, i) {
 						matched = loc
 					}
@@ -210,7 +242,7 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 			// open/codecs.open with f-string path: codecs.open(f'{dir}/{bar}', ...)
 			if matched == "" {
-				if loc := pyOpenFString.FindString(line); loc != "" {
+				if loc := rules.GFindLower(pyOpenFString, line, lowered[i]); loc != "" {
 					if !hasTraversalGuard(lines, i) {
 						// Check if the f-string variable is safe
 						if !rules.PySinkVarIsSafe(lines, i) {
@@ -221,7 +253,7 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 			// pathlib.Path(...) / var
 			if matched == "" {
-				if m := pyPathlibDiv.FindStringSubmatch(line); len(m) > 1 {
+				if m := rules.GFindSubmatchLower(pyPathlibDiv, line, lowered[i]); len(m) > 1 {
 					if !hasTraversalGuard(lines, i) {
 						varName := m[1]
 						if !rules.PyLastAssignmentIsSafe(lines, i, varName) {
@@ -231,39 +263,39 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := jsFileOpUserInput.FindString(line); loc != "" {
+			if loc := rules.GFindLower(jsFileOpUserInput, line, lowered[i]); loc != "" {
 				if !hasTraversalGuard(lines, i) {
 					matched = loc
 				}
 			}
 		case rules.LangPHP:
-			if loc := phpFileOpUserInput.FindString(line); loc != "" {
+			if loc := rules.GFindLower(phpFileOpUserInput, line, lowered[i]); loc != "" {
 				if !hasTraversalGuard(lines, i) {
 					matched = loc
 				}
 			}
 		case rules.LangRuby:
-			if loc := rubyFileOpUserInput.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rubyFileOpUserInput, line, lowered[i]); loc != "" {
 				if !hasTraversalGuard(lines, i) {
 					matched = loc
 				}
 			}
 			if matched == "" {
-				if loc := rubyFileInterpolation.FindString(line); loc != "" {
+				if loc := rules.GFindLower(rubyFileInterpolation, line, lowered[i]); loc != "" {
 					if !hasTraversalGuard(lines, i) {
 						matched = loc
 					}
 				}
 			}
 		case rules.LangC, rules.LangCPP:
-			if loc := cFileOpUserInput.FindString(line); loc != "" {
+			if loc := rules.GFindLower(cFileOpUserInput, line, lowered[i]); loc != "" {
 				if !hasTraversalGuard(lines, i) {
 					matched = loc
 				}
 			}
 			// C++ stream constructors: ifstream(var), ofstream(var)
 			if matched == "" && ctx.Language == rules.LangCPP {
-				if cppStreamUserInput.MatchString(line) && !cppStreamLiteral.MatchString(line) {
+				if rules.GMatchLower(cppStreamUserInput, line, lowered[i]) && !rules.GMatchLower(cppStreamLiteral, line, lowered[i]) {
 					if !hasTraversalGuard(lines, i) {
 						matched = strings.TrimSpace(line)
 					}
@@ -271,7 +303,7 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 		default:
 			// For any language, check for obvious traversal patterns
-			if loc := dotDotSlashInVar.FindString(line); loc != "" {
+			if loc := rules.GFindLower(dotDotSlashInVar, line, lowered[i]); loc != "" {
 				// Only flag if also doing file I/O
 				if strings.Contains(line, "open") || strings.Contains(line, "read") ||
 					strings.Contains(line, "write") || strings.Contains(line, "file") ||
@@ -343,7 +375,7 @@ func hasTraversalGuard(lines []string, idx int) bool {
 			return true
 		}
 		// C++ std::string::find("..") != npos
-		if strings.Contains(l, `.find("..`)  && strings.Contains(l, "npos") {
+		if strings.Contains(l, `.find("..`) && strings.Contains(l, "npos") {
 			return true
 		}
 
@@ -375,25 +407,25 @@ func hasTraversalGuard(lines []string, idx int) bool {
 			strings.Contains(l, "path.resolve") ||
 			strings.Contains(l, ".normalize()") ||
 			strings.Contains(l, ".toRealPath()") || strings.Contains(l, ".getCanonicalPath()") ||
-			strings.Contains(l, "File.realpath") ||   // Ruby
+			strings.Contains(l, "File.realpath") || // Ruby
 			strings.Contains(l, "File.expand_path") || // Ruby
-			strings.Contains(l, "realpath(") ||                  // C realpath() / PHP realpath()
-			strings.Contains(l, "filesystem::canonical") {       // C++17 std::filesystem::canonical
+			strings.Contains(l, "realpath(") || // C realpath() / PHP realpath()
+			strings.Contains(l, "filesystem::canonical") { // C++17 std::filesystem::canonical
 			hasNormalise = true
 		}
 
 		// Containment / prefix-check patterns (any language).
 		if strings.Contains(l, "strings.HasPrefix") ||
 			strings.Contains(l, "strings.Contains") ||
-			strings.Contains(l, ".startswith(") ||     // Python
-			strings.Contains(l, ".startsWith(") ||     // JS/Java
-			strings.Contains(l, ".start_with?(") ||    // Ruby
+			strings.Contains(l, ".startswith(") || // Python
+			strings.Contains(l, ".startsWith(") || // JS/Java
+			strings.Contains(l, ".start_with?(") || // Ruby
 			strings.Contains(l, "str_starts_with(") || // PHP 8+
 			(strings.Contains(l, "strpos(") && strings.Contains(l, "===")) || // PHP strpos check
-			strings.Contains(l, ".includes('..')") ||  // JS ..check
+			strings.Contains(l, ".includes('..')") || // JS ..check
 			strings.Contains(l, `".."`) && (strings.Contains(l, "Contains") || strings.Contains(l, "contains")) ||
-			strings.Contains(l, "strncmp(") ||         // C strncmp prefix check
-			strings.Contains(l, "starts_with(") ||     // C++20 std::string::starts_with
+			strings.Contains(l, "strncmp(") || // C strncmp prefix check
+			strings.Contains(l, "starts_with(") || // C++20 std::string::starts_with
 			(strings.Contains(l, "strstr(") && strings.Contains(l, `".."`)) || // C strstr(path, "..") check
 			(strings.Contains(l, ".find(") && strings.Contains(l, `".."`) && strings.Contains(l, "npos")) { // C++ .find("..") != npos
 			hasContainment = true
@@ -401,6 +433,20 @@ func hasTraversalGuard(lines []string, idx int) bool {
 	}
 
 	return hasNormalise && hasContainment
+}
+
+// hasNearbyRequestSource returns true if any line within the enclosing
+// function scope of idx contains an HTTP-request source indicator.
+// Used by TRV-001 to confirm the path argument was likely derived from
+// user input rather than admin config.
+func hasNearbyRequestSource(lines []string, idx int) bool {
+	start, end := functionScope(lines, idx)
+	for _, l := range lines[start:end] {
+		if rules.GMatch(goRequestSource, l) {
+			return true
+		}
+	}
+	return false
 }
 
 // functionScope returns the start and end indices (half-open) of the function
@@ -496,8 +542,8 @@ func isAllowlistGuard(line string) bool {
 
 type FileInclusion struct{}
 
-func (r *FileInclusion) ID() string             { return "BATOU-TRV-002" }
-func (r *FileInclusion) Name() string            { return "FileInclusion" }
+func (r *FileInclusion) ID() string                      { return "BATOU-TRV-002" }
+func (r *FileInclusion) Name() string                    { return "FileInclusion" }
 func (r *FileInclusion) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *FileInclusion) Languages() []rules.Language {
 	return []rules.Language{rules.LangPHP, rules.LangPython, rules.LangRuby}
@@ -509,7 +555,8 @@ func (r *FileInclusion) Description() string {
 
 func (r *FileInclusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -524,19 +571,19 @@ func (r *FileInclusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangPHP:
-			if loc := phpDynamicInclude.FindString(line); loc != "" {
+			if loc := rules.GFindLower(phpDynamicInclude, line, lowered[i]); loc != "" {
 				if !hasPHPIncludeGuard(lines, i) {
 					matched = loc
 					desc = "PHP include/require with dynamic variable. An attacker may control the included file path, leading to Local File Inclusion (LFI) or Remote File Inclusion (RFI)."
 				}
 			}
 		case rules.LangPython:
-			if loc := pyDynamicImport.FindString(line); loc != "" {
+			if loc := rules.GFindLower(pyDynamicImport, line, lowered[i]); loc != "" {
 				matched = loc
 				desc = "Dynamic Python import with variable input. An attacker may load arbitrary modules if the input is user-controlled."
 			}
 		case rules.LangRuby:
-			if loc := rubyDynamicLoadReq.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rubyDynamicLoadReq, line, lowered[i]); loc != "" {
 				// Avoid false positives on require with string literals
 				if !strings.Contains(line, `require "`) && !strings.Contains(line, `require '`) &&
 					!strings.Contains(line, `load "`) && !strings.Contains(line, `load '`) {
@@ -592,8 +639,8 @@ func hasPHPIncludeGuard(lines []string, idx int) bool {
 
 type ArchiveExtraction struct{}
 
-func (r *ArchiveExtraction) ID() string             { return "BATOU-TRV-003" }
-func (r *ArchiveExtraction) Name() string            { return "ArchiveExtraction" }
+func (r *ArchiveExtraction) ID() string                      { return "BATOU-TRV-003" }
+func (r *ArchiveExtraction) Name() string                    { return "ArchiveExtraction" }
 func (r *ArchiveExtraction) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ArchiveExtraction) Languages() []rules.Language {
 	return []rules.Language{rules.LangAny}
@@ -605,7 +652,8 @@ func (r *ArchiveExtraction) Description() string {
 
 func (r *ArchiveExtraction) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -621,14 +669,14 @@ func (r *ArchiveExtraction) Scan(ctx *rules.ScanContext) []rules.Finding {
 		switch ctx.Language {
 		case rules.LangGo:
 			// Check for os.Create with paths from zip/tar entries without validation
-			if loc := goCreateFromZip.FindString(line); loc != "" {
+			if loc := rules.GFindLower(goCreateFromZip, line, lowered[i]); loc != "" {
 				if !hasTraversalGuard(lines, i) {
 					matched = loc
 					confidence = "medium"
 				}
 			}
 			// Check for zip extraction patterns
-			if matched == "" && goZipExtract.MatchString(line) {
+			if matched == "" && rules.GMatchLower(goZipExtract, line, lowered[i]) {
 				// Only flag if there's no path validation in context
 				if !hasZipSlipGuard(lines) {
 					matched = strings.TrimSpace(line)
@@ -636,7 +684,7 @@ func (r *ArchiveExtraction) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangPython:
-			if loc := pyExtractAll.FindString(line); loc != "" {
+			if loc := rules.GFindLower(pyExtractAll, line, lowered[i]); loc != "" {
 				// Check if it has members= parameter (safe)
 				if !strings.Contains(line, "members=") && !strings.Contains(line, "members =") {
 					matched = strings.TrimSpace(line)
@@ -644,7 +692,7 @@ func (r *ArchiveExtraction) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := jsUnzipExtract.FindString(line); loc != "" {
+			if loc := rules.GFindLower(jsUnzipExtract, line, lowered[i]); loc != "" {
 				matched = strings.TrimSpace(line)
 				confidence = "medium"
 			}
@@ -690,8 +738,8 @@ func hasZipSlipGuard(lines []string) bool {
 
 type SymlinkFollowing struct{}
 
-func (r *SymlinkFollowing) ID() string             { return "BATOU-TRV-004" }
-func (r *SymlinkFollowing) Name() string            { return "SymlinkFollowing" }
+func (r *SymlinkFollowing) ID() string                      { return "BATOU-TRV-004" }
+func (r *SymlinkFollowing) Name() string                    { return "SymlinkFollowing" }
 func (r *SymlinkFollowing) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SymlinkFollowing) Languages() []rules.Language {
 	return []rules.Language{rules.LangGo}
@@ -703,7 +751,8 @@ func (r *SymlinkFollowing) Description() string {
 
 func (r *SymlinkFollowing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Track if Readlink is used and whether validation follows
 	for i, line := range lines {
@@ -714,7 +763,7 @@ func (r *SymlinkFollowing) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if goReadlink.MatchString(line) {
+		if rules.GMatchLower(goReadlink, line, lowered[i]) {
 			// Check if subsequent lines validate the resolved path
 			hasValidation := false
 			end := i + 10
@@ -755,8 +804,8 @@ func (r *SymlinkFollowing) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TemplatePathInjection struct{}
 
-func (r *TemplatePathInjection) ID() string             { return "BATOU-TRV-005" }
-func (r *TemplatePathInjection) Name() string            { return "TemplatePathInjection" }
+func (r *TemplatePathInjection) ID() string                      { return "BATOU-TRV-005" }
+func (r *TemplatePathInjection) Name() string                    { return "TemplatePathInjection" }
 func (r *TemplatePathInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TemplatePathInjection) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript, rules.LangPython}
@@ -768,7 +817,8 @@ func (r *TemplatePathInjection) Description() string {
 
 func (r *TemplatePathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -782,14 +832,14 @@ func (r *TemplatePathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := jsResRender.FindString(line); loc != "" {
+			if loc := rules.GFindLower(jsResRender, line, lowered[i]); loc != "" {
 				// Skip if arg is a string literal
 				if !isStringLiteralArg(line, "render") {
 					matched = loc
 				}
 			}
 		case rules.LangPython:
-			if loc := pyRenderTemplate.FindString(line); loc != "" {
+			if loc := rules.GFindLower(pyRenderTemplate, line, lowered[i]); loc != "" {
 				if !isStringLiteralArg(line, "render_template") {
 					matched = loc
 				}
@@ -798,7 +848,7 @@ func (r *TemplatePathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Fallback for generic render() across supported languages
 		if matched == "" {
-			if loc := genericRender.FindString(line); loc != "" {
+			if loc := rules.GFindLower(genericRender, line, lowered[i]); loc != "" {
 				if !isStringLiteralArg(line, "render") &&
 					(ctx.Language == rules.LangJavaScript || ctx.Language == rules.LangTypeScript || ctx.Language == rules.LangPython) {
 					matched = loc
@@ -830,8 +880,8 @@ func (r *TemplatePathInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PrototypePollution struct{}
 
-func (r *PrototypePollution) ID() string             { return "BATOU-TRV-006" }
-func (r *PrototypePollution) Name() string            { return "PrototypePollution" }
+func (r *PrototypePollution) ID() string                      { return "BATOU-TRV-006" }
+func (r *PrototypePollution) Name() string                    { return "PrototypePollution" }
 func (r *PrototypePollution) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PrototypePollution) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -843,7 +893,8 @@ func (r *PrototypePollution) Description() string {
 
 func (r *PrototypePollution) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -855,11 +906,11 @@ func (r *PrototypePollution) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if loc := jsSpreadReqBody.FindString(line); loc != "" {
+		if loc := rules.GFindLower(jsSpreadReqBody, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 		if matched == "" {
-			if loc := jsObjectAssignReqBody.FindString(line); loc != "" {
+			if loc := rules.GFindLower(jsObjectAssignReqBody, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		}
@@ -888,8 +939,8 @@ func (r *PrototypePollution) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ExpressSendFilePath struct{}
 
-func (r *ExpressSendFilePath) ID() string             { return "BATOU-TRV-007" }
-func (r *ExpressSendFilePath) Name() string            { return "ExpressSendFilePath" }
+func (r *ExpressSendFilePath) ID() string                      { return "BATOU-TRV-007" }
+func (r *ExpressSendFilePath) Name() string                    { return "ExpressSendFilePath" }
 func (r *ExpressSendFilePath) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ExpressSendFilePath) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -901,7 +952,8 @@ func (r *ExpressSendFilePath) Description() string {
 
 func (r *ExpressSendFilePath) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -913,13 +965,13 @@ func (r *ExpressSendFilePath) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if loc := jsSendFile.FindString(line); loc != "" {
+		if loc := rules.GFindLower(jsSendFile, line, lowered[i]); loc != "" {
 			if !hasTraversalGuard(lines, i) {
 				matched = loc
 			}
 		}
 		if matched == "" {
-			if loc := jsDownload.FindString(line); loc != "" {
+			if loc := rules.GFindLower(jsDownload, line, lowered[i]); loc != "" {
 				if !hasTraversalGuard(lines, i) {
 					matched = loc
 				}
@@ -950,8 +1002,8 @@ func (r *ExpressSendFilePath) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NullByteFilePath struct{}
 
-func (r *NullByteFilePath) ID() string             { return "BATOU-TRV-008" }
-func (r *NullByteFilePath) Name() string            { return "NullByteFilePath" }
+func (r *NullByteFilePath) ID() string                      { return "BATOU-TRV-008" }
+func (r *NullByteFilePath) Name() string                    { return "NullByteFilePath" }
 func (r *NullByteFilePath) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *NullByteFilePath) Languages() []rules.Language {
 	return []rules.Language{rules.LangAny}
@@ -963,7 +1015,7 @@ func (r *NullByteFilePath) Description() string {
 
 func (r *NullByteFilePath) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// First check if the file already has null byte sanitization in non-comment code
 	hasNullByteSanitizer := false
@@ -985,6 +1037,7 @@ func (r *NullByteFilePath) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return findings
 	}
 
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		lineNum := i + 1
 		trimmed := strings.TrimSpace(line)
@@ -993,7 +1046,7 @@ func (r *NullByteFilePath) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := nullByteFileOp.FindString(line); loc != "" {
+		if loc := rules.GFindLower(nullByteFileOp, line, lowered[i]); loc != "" {
 			// Only flag if user input indicators are present nearby
 			if hasUserInputIndicator(lines, i) {
 				findings = append(findings, rules.Finding{
@@ -1040,8 +1093,8 @@ func hasUserInputIndicator(lines []string, idx int) bool {
 
 type RenderOptionsInjection struct{}
 
-func (r *RenderOptionsInjection) ID() string             { return "BATOU-TRV-009" }
-func (r *RenderOptionsInjection) Name() string            { return "RenderOptionsInjection" }
+func (r *RenderOptionsInjection) ID() string                      { return "BATOU-TRV-009" }
+func (r *RenderOptionsInjection) Name() string                    { return "RenderOptionsInjection" }
 func (r *RenderOptionsInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RenderOptionsInjection) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -1053,7 +1106,7 @@ func (r *RenderOptionsInjection) Description() string {
 
 func (r *RenderOptionsInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Use a sliding window of up to 5 lines to detect patterns that span
 	// multiple lines (e.g., res.render('tpl', {\n  ...req.body\n})).
@@ -1128,8 +1181,8 @@ func isStringLiteralArg(line, funcName string) bool {
 
 type ZipSlipTraversal struct{}
 
-func (r *ZipSlipTraversal) ID() string                    { return "BATOU-TRV-010" }
-func (r *ZipSlipTraversal) Name() string                  { return "ZipSlipTraversal" }
+func (r *ZipSlipTraversal) ID() string                      { return "BATOU-TRV-010" }
+func (r *ZipSlipTraversal) Name() string                    { return "ZipSlipTraversal" }
 func (r *ZipSlipTraversal) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ZipSlipTraversal) Languages() []rules.Language {
 	return []rules.Language{rules.LangGo, rules.LangJava, rules.LangPython, rules.LangJavaScript, rules.LangTypeScript}
@@ -1141,8 +1194,14 @@ func (r *ZipSlipTraversal) Description() string {
 
 func (r *ZipSlipTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
+	// File-level Python tarfile import gate, hoisted out of the per-line
+	// loop. Same hot-path issue as PathTraversal.Scan: matching against
+	// ctx.Content N times per file when the answer is invariant.
+	pyHasTarfile := ctx.Language == rules.LangPython && rules.GMatchFile(pyTarImport, ctx)
+
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		lineNum := i + 1
 		trimmed := strings.TrimSpace(line)
@@ -1156,21 +1215,21 @@ func (r *ZipSlipTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if loc := goZipSlipJoinCreate.FindString(line); loc != "" {
+			if loc := rules.GFindLower(goZipSlipJoinCreate, line, lowered[i]); loc != "" {
 				if !hasZipSlipValidation(lines, i) {
 					matched = loc
 					confidence = "high"
 				}
 			}
 		case rules.LangJava:
-			if loc := javaZipSlipNewFile.FindString(line); loc != "" {
+			if loc := rules.GFindLower(javaZipSlipNewFile, line, lowered[i]); loc != "" {
 				if !hasZipSlipValidation(lines, i) {
 					matched = loc
 					confidence = "high"
 				}
 			}
 			if matched == "" {
-				if loc := javaZipSlipPath.FindString(line); loc != "" {
+				if loc := rules.GFindLower(javaZipSlipPath, line, lowered[i]); loc != "" {
 					if !hasZipSlipValidation(lines, i) {
 						matched = loc
 						confidence = "high"
@@ -1178,8 +1237,8 @@ func (r *ZipSlipTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangPython:
-			if pyTarImport.MatchString(ctx.Content) {
-				if loc := pyTarExtract.FindString(line); loc != "" {
+			if pyHasTarfile {
+				if loc := rules.GFindLower(pyTarExtract, line, lowered[i]); loc != "" {
 					// Safe if members= or filter= is used
 					if !strings.Contains(line, "members=") && !strings.Contains(line, "members =") &&
 						!strings.Contains(line, "filter=") && !strings.Contains(line, "filter =") {
@@ -1191,7 +1250,7 @@ func (r *ZipSlipTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 			if matched == "" {
-				if loc := pyZipSlipManual.FindString(line); loc != "" {
+				if loc := rules.GFindLower(pyZipSlipManual, line, lowered[i]); loc != "" {
 					if !hasZipSlipValidation(lines, i) {
 						matched = loc
 						confidence = "medium"
@@ -1199,14 +1258,14 @@ func (r *ZipSlipTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := jsZipSlipWrite.FindString(line); loc != "" {
+			if loc := rules.GFindLower(jsZipSlipWrite, line, lowered[i]); loc != "" {
 				if !hasZipSlipValidation(lines, i) {
 					matched = loc
 					confidence = "high"
 				}
 			}
 			if matched == "" {
-				if loc := jsZipSlipEntry.FindString(line); loc != "" {
+				if loc := rules.GFindLower(jsZipSlipEntry, line, lowered[i]); loc != "" {
 					if !hasZipSlipValidation(lines, i) {
 						matched = loc
 						confidence = "high"

@@ -13,11 +13,11 @@ import (
 
 // LUA-001: Command Injection
 var (
-	reOsExecute      = regexp.MustCompile(`os\.execute\s*\(`)
-	reIoPopen        = regexp.MustCompile(`io\.popen\s*\(`)
-	reCmdConcat      = regexp.MustCompile(`os\.execute\s*\(\s*[a-zA-Z_]\w*|os\.execute\s*\(\s*["'].*["']\s*\.\.\s*`)
-	reCmdPopConcat   = regexp.MustCompile(`io\.popen\s*\(\s*[a-zA-Z_]\w*|io\.popen\s*\(\s*["'].*["']\s*\.\.\s*`)
-	reCmdStaticStr   = regexp.MustCompile(`os\.execute\s*\(\s*["'][^"']*["']\s*\)|io\.popen\s*\(\s*["'][^"']*["']\s*\)`)
+	reOsExecute    = regexp.MustCompile(`os\.execute\s*\(`)
+	reIoPopen      = regexp.MustCompile(`io\.popen\s*\(`)
+	reCmdConcat    = regexp.MustCompile(`os\.execute\s*\(\s*[a-zA-Z_]\w*|os\.execute\s*\(\s*["'].*["']\s*\.\.\s*`)
+	reCmdPopConcat = regexp.MustCompile(`io\.popen\s*\(\s*[a-zA-Z_]\w*|io\.popen\s*\(\s*["'].*["']\s*\.\.\s*`)
+	reCmdStaticStr = regexp.MustCompile(`os\.execute\s*\(\s*["'][^"']*["']\s*\)|io\.popen\s*\(\s*["'][^"']*["']\s*\)`)
 )
 
 // LUA-002: Code Injection
@@ -25,17 +25,16 @@ var (
 	reLoadstring       = regexp.MustCompile(`loadstring\s*\(`)
 	reLoadstringStatic = regexp.MustCompile(`loadstring\s*\(\s*["'][^"']*["']\s*\)`)
 	reLoadFunc         = regexp.MustCompile(`\bload\s*\(\s*[a-zA-Z_]`)
-	reDofileVar      = regexp.MustCompile(`dofile\s*\(\s*[a-zA-Z_]`)
-	reLoadfileVar    = regexp.MustCompile(`loadfile\s*\(\s*[a-zA-Z_]`)
-	reDofileStatic   = regexp.MustCompile(`dofile\s*\(\s*["'][^"']+["']\s*\)`)
-	reLoadfileStatic = regexp.MustCompile(`loadfile\s*\(\s*["'][^"']+["']\s*\)`)
+	reDofileVar        = regexp.MustCompile(`dofile\s*\(\s*[a-zA-Z_]`)
+	reLoadfileVar      = regexp.MustCompile(`loadfile\s*\(\s*[a-zA-Z_]`)
+	reDofileStatic     = regexp.MustCompile(`dofile\s*\(\s*["'][^"']+["']\s*\)`)
+	reLoadfileStatic   = regexp.MustCompile(`loadfile\s*\(\s*["'][^"']+["']\s*\)`)
 )
 
 // LUA-003: SQL Injection
 var (
-	reSQLConcat    = regexp.MustCompile(`(?i)(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s+.*\.\.\s*[a-zA-Z_]`)
-	reSQLFormat    = regexp.MustCompile(`(?i)string\.format\s*\(\s*["'].*(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s+`)
-	reSQLQuery     = regexp.MustCompile(`:query\s*\(`)
+	reSQLConcat = regexp.MustCompile(`(?i)(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s+.*\.\.\s*[a-zA-Z_]`)
+	reSQLFormat = regexp.MustCompile(`(?i)string\.format\s*\(\s*["'].*(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s+`)
 )
 
 // LUA-004: Path Traversal
@@ -57,26 +56,25 @@ var (
 var (
 	reLoadstringNet  = regexp.MustCompile(`loadstring\s*\(.*(?:receive|socket|tcp|data|body|payload)`)
 	reSerpentLoad    = regexp.MustCompile(`serpent\.load\s*\(`)
-	reLoadNetContext  = regexp.MustCompile(`(?:receive|socket|tcp|data|body|payload|network|remote)`)
+	reLoadNetContext = regexp.MustCompile(`(?:receive|socket|tcp|data|body|payload|network|remote)`)
 )
 
 // LUA-007: Open Redirect
 var (
-	reNgxRedirect    = regexp.MustCompile(`ngx\.redirect\s*\(`)
-	reNgxRedirectVar = regexp.MustCompile(`ngx\.redirect\s*\(\s*[a-zA-Z_]\w*`)
+	reNgxRedirect       = regexp.MustCompile(`ngx\.redirect\s*\(`)
+	reNgxRedirectVar    = regexp.MustCompile(`ngx\.redirect\s*\(\s*[a-zA-Z_]\w*`)
 	reNgxRedirectConcat = regexp.MustCompile(`ngx\.redirect\s*\(\s*.*\.\.\s*`)
 )
 
 // LUA-008: Debug library in production
 var (
-	reDebugGetinfo   = regexp.MustCompile(`debug\.getinfo\s*\(`)
-	reDebugSethook   = regexp.MustCompile(`debug\.sethook\s*\(`)
-	reDebugSetmeta   = regexp.MustCompile(`debug\.setmetatable\s*\(`)
-	reDebugGetlocal  = regexp.MustCompile(`debug\.getlocal\s*\(`)
-	reDebugSetlocal  = regexp.MustCompile(`debug\.setlocal\s*\(`)
-	reDebugGetupval  = regexp.MustCompile(`debug\.getupvalue\s*\(`)
-	reDebugSetupval  = regexp.MustCompile(`debug\.setupvalue\s*\(`)
-	reDebugUpvalueid = regexp.MustCompile(`debug\.upvalueid\s*\(`)
+	reDebugGetinfo  = regexp.MustCompile(`debug\.getinfo\s*\(`)
+	reDebugSethook  = regexp.MustCompile(`debug\.sethook\s*\(`)
+	reDebugSetmeta  = regexp.MustCompile(`debug\.setmetatable\s*\(`)
+	reDebugGetlocal = regexp.MustCompile(`debug\.getlocal\s*\(`)
+	reDebugSetlocal = regexp.MustCompile(`debug\.setlocal\s*\(`)
+	reDebugGetupval = regexp.MustCompile(`debug\.getupvalue\s*\(`)
+	reDebugSetupval = regexp.MustCompile(`debug\.setupvalue\s*\(`)
 )
 
 // --- Comment detection ---
@@ -84,7 +82,7 @@ var (
 var reLuaComment = regexp.MustCompile(`^\s*--`)
 
 func isCommentLine(line string) bool {
-	return reLuaComment.MatchString(line)
+	return rules.GMatch(reLuaComment, line)
 }
 
 func truncate(s string, maxLen int) string {
@@ -127,7 +125,8 @@ func (r CommandInjection) Languages() []rules.Language {
 
 func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -135,8 +134,8 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// os.execute with variable or concat
-		if reOsExecute.MatchString(line) && !reCmdStaticStr.MatchString(line) {
-			if reCmdConcat.MatchString(line) || strings.Contains(line, "..") {
+		if rules.GMatchLower(reOsExecute, line, lowered[i]) && !rules.GMatchLower(reCmdStaticStr, line, lowered[i]) {
+			if rules.GMatchLower(reCmdConcat, line, lowered[i]) || strings.Contains(line, "..") {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      rules.Critical,
@@ -158,8 +157,8 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// io.popen with variable or concat
-		if reIoPopen.MatchString(line) && !reCmdStaticStr.MatchString(line) {
-			if reCmdPopConcat.MatchString(line) || strings.Contains(line, "..") {
+		if rules.GMatchLower(reIoPopen, line, lowered[i]) && !rules.GMatchLower(reCmdStaticStr, line, lowered[i]) {
+			if rules.GMatchLower(reCmdPopConcat, line, lowered[i]) || strings.Contains(line, "..") {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      rules.Critical,
@@ -200,7 +199,8 @@ func (r CodeInjection) Languages() []rules.Language {
 
 func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -208,9 +208,9 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// loadstring() with any argument (always dangerous with variable input)
-		if reLoadstring.MatchString(line) {
+		if rules.GMatchLower(reLoadstring, line, lowered[i]) {
 			// Check if it's a static string literal like loadstring("return 1")
-			if reLoadstringStatic.MatchString(line) {
+			if rules.GMatchLower(reLoadstringStatic, line, lowered[i]) {
 				continue
 			}
 			findings = append(findings, rules.Finding{
@@ -233,7 +233,7 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// load() with variable argument
-		if reLoadFunc.MatchString(line) {
+		if rules.GMatchLower(reLoadFunc, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -254,7 +254,7 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// dofile() with variable path
-		if reDofileVar.MatchString(line) && !reDofileStatic.MatchString(line) {
+		if rules.GMatchLower(reDofileVar, line, lowered[i]) && !rules.GMatchLower(reDofileStatic, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -275,7 +275,7 @@ func (r CodeInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// loadfile() with variable path
-		if reLoadfileVar.MatchString(line) && !reLoadfileStatic.MatchString(line) {
+		if rules.GMatchLower(reLoadfileVar, line, lowered[i]) && !rules.GMatchLower(reLoadfileStatic, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -315,7 +315,8 @@ func (r SQLInjection) Languages() []rules.Language {
 
 func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check for SQL quoting sanitizers in the file
 	hasQuoting := strings.Contains(ctx.Content, "quote_sql_str") ||
@@ -328,7 +329,7 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// SQL string with concatenation: "SELECT ... " .. variable
-		if reSQLConcat.MatchString(line) {
+		if rules.GMatchLower(reSQLConcat, line, lowered[i]) {
 			if hasQuoting {
 				continue
 			}
@@ -352,7 +353,7 @@ func (r SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// string.format with SQL keywords
-		if reSQLFormat.MatchString(line) {
+		if rules.GMatchLower(reSQLFormat, line, lowered[i]) {
 			if hasQuoting {
 				continue
 			}
@@ -395,7 +396,8 @@ func (r PathTraversal) Languages() []rules.Language {
 
 func (r PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check for path sanitization patterns
 	hasSanitization := strings.Contains(ctx.Content, "gsub") && strings.Contains(ctx.Content, "%.%.") ||
@@ -409,7 +411,7 @@ func (r PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// io.open with variable (not static string)
-		if (reIoOpenVar.MatchString(line) || reIoOpenConcat.MatchString(line)) && !reIoOpenStatic.MatchString(line) {
+		if (rules.GMatchLower(reIoOpenVar, line, lowered[i]) || rules.GMatchLower(reIoOpenConcat, line, lowered[i])) && !rules.GMatchLower(reIoOpenStatic, line, lowered[i]) {
 			if hasSanitization {
 				continue
 			}
@@ -454,7 +456,7 @@ func (r XSSOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only check files that have OpenResty output functions
-	if !reNgxSay.MatchString(ctx.Content) && !reNgxPrint.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNgxSay, ctx) && !rules.GMatchFile(reNgxPrint, ctx) {
 		return nil
 	}
 
@@ -473,14 +475,15 @@ func (r XSSOutput) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
 		// ngx.say/ngx.print with concatenation or variable
-		if reNgxSayConcat.MatchString(line) || reNgxSayVar.MatchString(line) {
+		if rules.GMatchLower(reNgxSayConcat, line, lowered[i]) || rules.GMatchLower(reNgxSayVar, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -520,7 +523,8 @@ func (r InsecureDeserialization) Languages() []rules.Language {
 
 func (r InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -528,7 +532,7 @@ func (r InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// loadstring with network/data context
-		if reLoadstringNet.MatchString(line) {
+		if rules.GMatchLower(reLoadstringNet, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -549,7 +553,7 @@ func (r InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// loadstring in file with network context (cross-line check)
-		if reLoadstring.MatchString(line) && reLoadNetContext.MatchString(ctx.Content) {
+		if rules.GMatchLower(reLoadstring, line, lowered[i]) && rules.GMatchFile(reLoadNetContext, ctx) {
 			// Already handled by LUA-002 for general loadstring; check for
 			// deserialization patterns specifically near network code
 			start := i - 10
@@ -589,7 +593,7 @@ func (r InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// serpent.load from potentially untrusted source
-		if reSerpentLoad.MatchString(line) {
+		if rules.GMatchLower(reSerpentLoad, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -630,7 +634,7 @@ func (r OpenRedirect) Languages() []rules.Language {
 func (r OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
-	if !reNgxRedirect.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNgxRedirect, ctx) {
 		return nil
 	}
 
@@ -638,13 +642,14 @@ func (r OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if reNgxRedirectVar.MatchString(line) || reNgxRedirectConcat.MatchString(line) {
+		if rules.GMatchLower(reNgxRedirectVar, line, lowered[i]) || rules.GMatchLower(reNgxRedirectConcat, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -684,7 +689,8 @@ func (r DebugLibrary) Languages() []rules.Language {
 
 func (r DebugLibrary) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type pattern struct {
 		re    *regexp.Regexp
@@ -744,7 +750,7 @@ func (r DebugLibrary) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		for _, p := range patterns {
-			if p.re.MatchString(line) {
+			if rules.GMatchLower(p.re, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      p.sev,

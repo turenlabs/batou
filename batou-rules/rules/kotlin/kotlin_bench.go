@@ -18,7 +18,6 @@ var (
 	// executeQuery("...${var}...") or executeQuery("...$var...")
 	reExecuteQueryTemplate = regexp.MustCompile(`(?:executeQuery|executeUpdate|execute)\s*\(\s*"[^"]*\$`)
 	// createStatement().executeQuery with string template/concat nearby
-	reCreateStatement = regexp.MustCompile(`createStatement\s*\(\s*\)\s*\.`)
 	// String concatenation into SQL variable: val query = "SELECT..." + var
 	reSQLStringConcat = regexp.MustCompile(`(?i)(?:val|var)\s+\w+\s*=\s*"(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)[^"]*"\s*\+`)
 	// String template with SQL: val query = "SELECT ... $var" or "... ${var}"
@@ -62,10 +61,9 @@ var (
 // KT-028: Path traversal via File operations
 var (
 	// File(userVar) or File("/path/" + var) or File("/path/$var")
-	reFileWithVar     = regexp.MustCompile(`File\s*\(\s*[a-zA-Z_]\w*\s*[!)\]]`)
-	reFileWithConcat  = regexp.MustCompile(`File\s*\(\s*"[^"]*"\s*\+`)
-	reFileWithInterp  = regexp.MustCompile(`File\s*\(\s*"[^"]*\$`)
-	reFileWithBaseVar = regexp.MustCompile(`File\s*\(\s*[a-zA-Z_]\w*\s*,`)
+	reFileWithVar    = regexp.MustCompile(`File\s*\(\s*[a-zA-Z_]\w*\s*[!)\]]`)
+	reFileWithConcat = regexp.MustCompile(`File\s*\(\s*"[^"]*"\s*\+`)
+	reFileWithInterp = regexp.MustCompile(`File\s*\(\s*"[^"]*\$`)
 	// FileInputStream with variable
 	reFileInputStreamVar = regexp.MustCompile(`FileInputStream\s*\(\s*[a-zA-Z_]\w*`)
 	// Paths.get with variable
@@ -108,11 +106,15 @@ func init() {
 
 type KotlinJDBCSQLInjection struct{}
 
-func (r *KotlinJDBCSQLInjection) ID() string                      { return "BATOU-KT-025" }
-func (r *KotlinJDBCSQLInjection) Name() string                    { return "KotlinJDBCSQLInjection" }
-func (r *KotlinJDBCSQLInjection) Description() string             { return "Detects JDBC SQL injection via executeQuery/createStatement with string concatenation or template interpolation." }
+func (r *KotlinJDBCSQLInjection) ID() string   { return "BATOU-KT-025" }
+func (r *KotlinJDBCSQLInjection) Name() string { return "KotlinJDBCSQLInjection" }
+func (r *KotlinJDBCSQLInjection) Description() string {
+	return "Detects JDBC SQL injection via executeQuery/createStatement with string concatenation or template interpolation."
+}
 func (r *KotlinJDBCSQLInjection) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *KotlinJDBCSQLInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *KotlinJDBCSQLInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *KotlinJDBCSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Quick bail: no SQL-related functions
@@ -123,12 +125,13 @@ func (r *KotlinJDBCSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Must have user input somewhere
-	if !reKotlinUserInput.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reKotlinUserInput, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -157,17 +160,17 @@ func (r *KotlinJDBCSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 
 		// Check for executeQuery with string template
-		if reExecuteQueryTemplate.MatchString(line) {
-			matched = reExecuteQueryTemplate.FindString(line)
+		if rules.GMatchLower(reExecuteQueryTemplate, line, lowered[i]) {
+			matched = rules.GFindLower(reExecuteQueryTemplate, line, lowered[i])
 			desc = "executeQuery() with Kotlin string template interpolation"
-		} else if reExecuteQueryConcat.MatchString(line) {
-			matched = reExecuteQueryConcat.FindString(line)
+		} else if rules.GMatchLower(reExecuteQueryConcat, line, lowered[i]) {
+			matched = rules.GFindLower(reExecuteQueryConcat, line, lowered[i])
 			desc = "executeQuery() with string concatenation"
-		} else if reSQLStringConcat.MatchString(line) {
-			matched = reSQLStringConcat.FindString(line)
+		} else if rules.GMatchLower(reSQLStringConcat, line, lowered[i]) {
+			matched = rules.GFindLower(reSQLStringConcat, line, lowered[i])
 			desc = "SQL query built via string concatenation"
-		} else if reSQLStringTemplate.MatchString(line) {
-			matched = reSQLStringTemplate.FindString(line)
+		} else if rules.GMatchLower(reSQLStringTemplate, line, lowered[i]) {
+			matched = rules.GFindLower(reSQLStringTemplate, line, lowered[i])
 			desc = "SQL query built via string template interpolation"
 		}
 
@@ -199,11 +202,15 @@ func (r *KotlinJDBCSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KotlinXSSHTMLResponse struct{}
 
-func (r *KotlinXSSHTMLResponse) ID() string                      { return "BATOU-KT-026" }
-func (r *KotlinXSSHTMLResponse) Name() string                    { return "KotlinXSSHTMLResponse" }
-func (r *KotlinXSSHTMLResponse) Description() string             { return "Detects XSS via Ktor respondText with HTML content type containing unescaped user input." }
+func (r *KotlinXSSHTMLResponse) ID() string   { return "BATOU-KT-026" }
+func (r *KotlinXSSHTMLResponse) Name() string { return "KotlinXSSHTMLResponse" }
+func (r *KotlinXSSHTMLResponse) Description() string {
+	return "Detects XSS via Ktor respondText with HTML content type containing unescaped user input."
+}
 func (r *KotlinXSSHTMLResponse) DefaultSeverity() rules.Severity { return rules.High }
-func (r *KotlinXSSHTMLResponse) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *KotlinXSSHTMLResponse) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *KotlinXSSHTMLResponse) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Quick bail: needs HTML response and user input
@@ -212,15 +219,16 @@ func (r *KotlinXSSHTMLResponse) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !hasRespondText && !hasReturnHTML {
 		return nil
 	}
-	if !reKotlinUserInput.MatchString(ctx.Content) && !reServletInput.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reKotlinUserInput, ctx) && !rules.GMatchFile(reServletInput, ctx) {
 		return nil
 	}
 
 	// Check for HTML escaping in the file
-	hasEscaping := reHTMLEscape.MatchString(ctx.Content)
+	hasEscaping := rules.GMatchFile(reHTMLEscape, ctx)
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -228,8 +236,8 @@ func (r *KotlinXSSHTMLResponse) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		isRespondText := reRespondTextHTML.MatchString(line)
-		isReturnHTML := reReturnHTML.MatchString(line)
+		isRespondText := rules.GMatchLower(reRespondTextHTML, line, lowered[i])
+		isReturnHTML := rules.GMatchLower(reReturnHTML, line, lowered[i])
 
 		if !isRespondText && !isReturnHTML {
 			continue
@@ -239,16 +247,16 @@ func (r *KotlinXSSHTMLResponse) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		if isRespondText {
 			// Skip if content type is plain text or JSON
-			if reContentTypeSafe.MatchString(line) || reContentTypeSafe.MatchString(context) {
-				if !reContentTypeHTML.MatchString(line) && !reContentTypeHTML.MatchString(context) {
+			if rules.GMatchLower(reContentTypeSafe, line, lowered[i]) || reContentTypeSafe.MatchString(context) {
+				if !rules.GMatchLower(reContentTypeHTML, line, lowered[i]) && !reContentTypeHTML.MatchString(context) {
 					continue
 				}
 			}
 
 			// Must have HTML content type on the same line or nearby
-			hasHTMLType := reContentTypeHTML.MatchString(line) || reContentTypeHTML.MatchString(context)
+			hasHTMLType := rules.GMatchLower(reContentTypeHTML, line, lowered[i]) || reContentTypeHTML.MatchString(context)
 			// Or the response contains HTML tags with variables
-			hasHTMLVars := reHTMLWithVar.MatchString(line) || reHTMLWithVar.MatchString(context)
+			hasHTMLVars := rules.GMatchLower(reHTMLWithVar, line, lowered[i]) || reHTMLWithVar.MatchString(context)
 
 			if !hasHTMLType && !hasHTMLVars {
 				continue
@@ -312,11 +320,15 @@ func hasVariableInterp(s string) bool {
 
 type KotlinCommandInjection struct{}
 
-func (r *KotlinCommandInjection) ID() string                      { return "BATOU-KT-027" }
-func (r *KotlinCommandInjection) Name() string                    { return "KotlinCommandInjection" }
-func (r *KotlinCommandInjection) Description() string             { return "Detects command injection via Runtime.exec() or ProcessBuilder with user-controlled input." }
+func (r *KotlinCommandInjection) ID() string   { return "BATOU-KT-027" }
+func (r *KotlinCommandInjection) Name() string { return "KotlinCommandInjection" }
+func (r *KotlinCommandInjection) Description() string {
+	return "Detects command injection via Runtime.exec() or ProcessBuilder with user-controlled input."
+}
 func (r *KotlinCommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *KotlinCommandInjection) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
+func (r *KotlinCommandInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangKotlin}
+}
 
 func (r *KotlinCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Quick bail: needs exec or ProcessBuilder
@@ -327,12 +339,13 @@ func (r *KotlinCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Must have user input
-	if !reKotlinUserInput.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reKotlinUserInput, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -346,11 +359,11 @@ func (r *KotlinCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 
 		// Runtime.exec with string interpolation or concatenation
-		if reRuntimeExecSimple.MatchString(line) {
-			if reExecWithInterp.MatchString(line) {
+		if rules.GMatchLower(reRuntimeExecSimple, line, lowered[i]) {
+			if rules.GMatchLower(reExecWithInterp, line, lowered[i]) {
 				matched = strings.TrimSpace(line)
 				desc = "Runtime.exec() with string template interpolation"
-			} else if reExecWithConcat.MatchString(line) {
+			} else if rules.GMatchLower(reExecWithConcat, line, lowered[i]) {
 				matched = strings.TrimSpace(line)
 				desc = "Runtime.exec() with string concatenation"
 			} else if strings.Contains(line, "arrayOf") && hasVariableInArgs(line) {
@@ -361,13 +374,13 @@ func (r *KotlinCommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// ProcessBuilder with /bin/sh -c and interpolation
 		if matched == "" && hasPB {
-			if rePBShellExec.MatchString(line) && hasVariableInterp(line) {
+			if rules.GMatchLower(rePBShellExec, line, lowered[i]) && hasVariableInterp(line) {
 				matched = strings.TrimSpace(line)
 				desc = "ProcessBuilder with shell execution and user-controlled input"
-			} else if rePBShellExec.MatchString(line) && hasVariableInterp(context) {
+			} else if rules.GMatchLower(rePBShellExec, line, lowered[i]) && hasVariableInterp(context) {
 				matched = strings.TrimSpace(line)
 				desc = "ProcessBuilder with shell execution and user-controlled input"
-			} else if rePBWithInterp.MatchString(line) {
+			} else if rules.GMatchLower(rePBWithInterp, line, lowered[i]) {
 				matched = strings.TrimSpace(line)
 				desc = "ProcessBuilder with string template interpolation in arguments"
 			}
@@ -441,9 +454,11 @@ func hasVariableInArgs(s string) bool {
 
 type KotlinPathTraversal struct{}
 
-func (r *KotlinPathTraversal) ID() string                      { return "BATOU-KT-028" }
-func (r *KotlinPathTraversal) Name() string                    { return "KotlinPathTraversal" }
-func (r *KotlinPathTraversal) Description() string             { return "Detects path traversal via File(), FileInputStream, or Paths.get() with user-controlled input." }
+func (r *KotlinPathTraversal) ID() string   { return "BATOU-KT-028" }
+func (r *KotlinPathTraversal) Name() string { return "KotlinPathTraversal" }
+func (r *KotlinPathTraversal) Description() string {
+	return "Detects path traversal via File(), FileInputStream, or Paths.get() with user-controlled input."
+}
 func (r *KotlinPathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *KotlinPathTraversal) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
 
@@ -455,12 +470,13 @@ func (r *KotlinPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Must have user input
-	if !reKotlinUserInput.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reKotlinUserInput, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -474,22 +490,22 @@ func (r *KotlinPathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 
 		// File(variable) - direct variable
-		if reFileWithVar.MatchString(line) {
+		if rules.GMatchLower(reFileWithVar, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			desc = "File() constructor with user-controlled path"
-		} else if reFileWithConcat.MatchString(line) {
+		} else if rules.GMatchLower(reFileWithConcat, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			desc = "File() constructor with string concatenation in path"
-		} else if reFileWithInterp.MatchString(line) {
+		} else if rules.GMatchLower(reFileWithInterp, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			desc = "File() constructor with string template in path"
-		} else if reFileInputStreamVar.MatchString(line) {
+		} else if rules.GMatchLower(reFileInputStreamVar, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			desc = "FileInputStream with user-controlled path"
-		} else if rePathsGetVar.MatchString(line) && strings.Contains(context, "readAllBytes") {
+		} else if rules.GMatchLower(rePathsGetVar, line, lowered[i]) && strings.Contains(context, "readAllBytes") {
 			matched = strings.TrimSpace(line)
 			desc = "Paths.get() with user-controlled path component"
-		} else if reFilesRead.MatchString(line) {
+		} else if rules.GMatchLower(reFilesRead, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			desc = "Files.readAllBytes() with user-controlled path"
 		}
@@ -595,9 +611,11 @@ func isHardcodedFilePath(line string) bool {
 
 type KotlinOpenRedirect struct{}
 
-func (r *KotlinOpenRedirect) ID() string                      { return "BATOU-KT-029" }
-func (r *KotlinOpenRedirect) Name() string                    { return "KotlinOpenRedirect" }
-func (r *KotlinOpenRedirect) Description() string             { return "Detects open redirect via Ktor respondRedirect or servlet sendRedirect with user-controlled URL." }
+func (r *KotlinOpenRedirect) ID() string   { return "BATOU-KT-029" }
+func (r *KotlinOpenRedirect) Name() string { return "KotlinOpenRedirect" }
+func (r *KotlinOpenRedirect) Description() string {
+	return "Detects open redirect via Ktor respondRedirect or servlet sendRedirect with user-controlled URL."
+}
 func (r *KotlinOpenRedirect) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *KotlinOpenRedirect) Languages() []rules.Language     { return []rules.Language{rules.LangKotlin} }
 
@@ -608,12 +626,13 @@ func (r *KotlinOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Must have user input
-	if !reKotlinUserInput.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reKotlinUserInput, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -622,9 +641,9 @@ func (r *KotlinOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched bool
-		if reRespondRedirect.MatchString(line) {
+		if rules.GMatchLower(reRespondRedirect, line, lowered[i]) {
 			matched = true
-		} else if reSendRedirect.MatchString(line) {
+		} else if rules.GMatchLower(reSendRedirect, line, lowered[i]) {
 			matched = true
 		}
 
@@ -633,7 +652,7 @@ func (r *KotlinOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Skip hardcoded redirects: respondRedirect("/dashboard")
-		if reRedirectHardcoded.MatchString(line) {
+		if rules.GMatchLower(reRedirectHardcoded, line, lowered[i]) {
 			continue
 		}
 

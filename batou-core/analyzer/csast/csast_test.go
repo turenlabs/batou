@@ -1,11 +1,10 @@
 package csast
 
 import (
-	"strings"
-	"testing"
-
 	"github.com/turenlabs/batou-core/ast"
 	"github.com/turenlabs/batou-rules/rules"
+	"strings"
+	"testing"
 )
 
 func scanCS(t *testing.T, code string) []rules.Finding {
@@ -221,6 +220,128 @@ class Foo {
 			t.Error("unexpected EF SQL injection finding for literal query")
 		}
 	}
+}
+
+func TestResponseWriteXSS(t *testing.T) {
+	code := `
+class C {
+    void M() {
+        Response.Write(Request.QueryString["x"]);
+    }
+}
+`
+	findings := scanCS(t, code)
+	if !hasRuleCWE(findings, "BATOU-CS-AST-006", "CWE-79") {
+		t.Error("expected reflected XSS finding for Response.Write")
+	}
+}
+
+func TestHtmlRawXSS(t *testing.T) {
+	code := `
+class C {
+    string M(string userInput) {
+        return Html.Raw(userInput);
+    }
+}
+`
+	findings := scanCS(t, code)
+	if !hasRuleCWE(findings, "BATOU-CS-AST-006", "CWE-79") {
+		t.Error("expected reflected XSS finding for Html.Raw")
+	}
+}
+
+func TestHtmlRawLiteralSafe(t *testing.T) {
+	code := `
+class C {
+    string M() {
+        return Html.Raw("<b>static</b>");
+    }
+}
+`
+	findings := scanCS(t, code)
+	if hasRuleCWE(findings, "BATOU-CS-AST-006", "CWE-79") {
+		t.Error("unexpected XSS finding for Html.Raw with string literal")
+	}
+}
+
+func TestHtmlStringXSS(t *testing.T) {
+	code := `
+class C {
+    object M(string userInput) {
+        return new HtmlString(userInput);
+    }
+}
+`
+	findings := scanCS(t, code)
+	if !hasRuleCWE(findings, "BATOU-CS-AST-007", "CWE-79") {
+		t.Error("expected reflected XSS finding for new HtmlString(var)")
+	}
+}
+
+func TestOpenRedirect(t *testing.T) {
+	code := `
+class C {
+    object M(string url) {
+        return Redirect(url);
+    }
+}
+`
+	findings := scanCS(t, code)
+	if !hasRuleCWE(findings, "BATOU-CS-AST-008", "CWE-601") {
+		t.Error("expected open redirect finding for Redirect(var)")
+	}
+}
+
+func TestRedirectLiteralSafe(t *testing.T) {
+	code := `
+class C {
+    object M() {
+        return Redirect("/home");
+    }
+}
+`
+	findings := scanCS(t, code)
+	if hasRuleCWE(findings, "BATOU-CS-AST-008", "CWE-601") {
+		t.Error("unexpected open redirect finding for Redirect with literal path")
+	}
+}
+
+func TestResponseRedirect(t *testing.T) {
+	code := `
+class C {
+    void M(string url) {
+        Response.Redirect(url);
+    }
+}
+`
+	findings := scanCS(t, code)
+	if !hasRuleCWE(findings, "BATOU-CS-AST-008", "CWE-601") {
+		t.Error("expected open redirect finding for Response.Redirect(var)")
+	}
+}
+
+func TestBinaryFormatterDeserializeInvocation(t *testing.T) {
+	code := `
+class C {
+    object M(System.IO.Stream stream) {
+        return new BinaryFormatter().Deserialize(stream);
+    }
+}
+`
+	findings := scanCS(t, code)
+	// The chained .Deserialize call site is flagged (CWE-502).
+	if !hasRuleCWE(findings, "BATOU-CS-AST-009", "CWE-502") {
+		t.Error("expected insecure deserialization finding for BinaryFormatter().Deserialize")
+	}
+}
+
+func hasRuleCWE(findings []rules.Finding, ruleID, cwe string) bool {
+	for _, f := range findings {
+		if f.RuleID == ruleID && f.CWEID == cwe {
+			return true
+		}
+	}
+	return false
 }
 
 func TestNilTree(t *testing.T) {

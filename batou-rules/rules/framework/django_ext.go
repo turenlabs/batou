@@ -60,14 +60,15 @@ func (r *DjangoMarkSafeExt) Languages() []rules.Language {
 
 func (r *DjangoMarkSafeExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") {
 			continue
 		}
-		if m := reDjangoExtMarkSafe.FindString(line); m != "" {
+		if m := rules.GFindLower(reDjangoExtMarkSafe, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -111,14 +112,15 @@ func (r *DjangoCsrfCookieSecure) Languages() []rules.Language {
 
 func (r *DjangoCsrfCookieSecure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") {
 			continue
 		}
-		if reDjangoExtCsrfCookieSecureFalse.MatchString(line) {
+		if rules.GMatchLower(reDjangoExtCsrfCookieSecureFalse, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -162,7 +164,8 @@ func (r *DjangoRawQueryExt) Languages() []rules.Language {
 
 func (r *DjangoRawQueryExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -171,9 +174,9 @@ func (r *DjangoRawQueryExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reDjangoExtRawQuery.FindString(line); m != "" {
+		if m := rules.GFindLower(reDjangoExtRawQuery, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reDjangoExtRawConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reDjangoExtRawConcat, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -220,14 +223,15 @@ func (r *DjangoPickleSerializer) Languages() []rules.Language {
 
 func (r *DjangoPickleSerializer) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") {
 			continue
 		}
-		if reDjangoExtPickleSerializer.MatchString(line) {
+		if rules.GMatchLower(reDjangoExtPickleSerializer, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -271,14 +275,15 @@ func (r *DjangoSSLRedirectExt) Languages() []rules.Language {
 
 func (r *DjangoSSLRedirectExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") {
 			continue
 		}
-		if reDjangoExtSSLRedirectFalse.MatchString(line) {
+		if rules.GMatchLower(reDjangoExtSSLRedirectFalse, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -322,14 +327,15 @@ func (r *DjangoDefaultAdmin) Languages() []rules.Language {
 
 func (r *DjangoDefaultAdmin) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") {
 			continue
 		}
-		if reDjangoExtDefaultAdmin.MatchString(line) && reDjangoExtAdminSiteUrls.MatchString(line) {
+		if rules.GMatchLower(reDjangoExtDefaultAdmin, line, lowered[i]) && rules.GMatchLower(reDjangoExtAdminSiteUrls, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

@@ -1,0 +1,10 @@
+use actix_web::{web, HttpResponse};
+use std::collections::HashMap;
+
+// Vulnerable: SSRF via reqwest Client get
+async fn handler(query: web::Query<HashMap<String, String>>) -> HttpResponse {
+    let param = query.get("target").unwrap_or(&String::new()).clone();
+    let client = reqwest::Client::new();
+    let resp = client.get(&param).send().await.unwrap();
+    HttpResponse::Ok().body(resp.text().await.unwrap_or_default())
+}

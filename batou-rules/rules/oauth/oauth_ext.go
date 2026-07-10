@@ -56,7 +56,7 @@ func (r *OAuthTokenQueryString) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
@@ -66,11 +66,11 @@ func (r *OAuthTokenQueryString) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		confidence := "high"
 
-		if m := reOAuthTokenInURL.FindString(line); m != "" {
+		if m := rules.GFind(reOAuthTokenInURL, line); m != "" {
 			matched = m
-		} else if m := reOAuthTokenURLBuild.FindString(line); m != "" {
+		} else if m := rules.GFind(reOAuthTokenURLBuild, line); m != "" {
 			matched = m
-		} else if m := reOAuthTokenQueryString.FindString(line); m != "" {
+		} else if m := rules.GFind(reOAuthTokenQueryString, line); m != "" {
 			// Lower confidence for bare ?access_token= without URL context
 			lower := strings.ToLower(line)
 			if strings.Contains(lower, "url") || strings.Contains(lower, "href") ||
@@ -123,7 +123,7 @@ func (r *OAuthRefreshTokenExposed) Languages() []rules.Language {
 
 func (r *OAuthRefreshTokenExposed) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -134,16 +134,16 @@ func (r *OAuthRefreshTokenExposed) Scan(ctx *rules.ScanContext) []rules.Finding 
 		var matched string
 		var detail string
 
-		if m := reRefreshTokenClientStore.FindString(line); m != "" {
+		if m := rules.GFind(reRefreshTokenClientStore, line); m != "" {
 			matched = m
 			detail = "Refresh token stored in localStorage/sessionStorage. Any JavaScript running on the page (including XSS payloads) can read it. Refresh tokens grant long-lived access and should never be client-side accessible."
-		} else if m := reRefreshTokenClientSet.FindString(line); m != "" {
+		} else if m := rules.GFind(reRefreshTokenClientSet, line); m != "" {
 			matched = m
 			detail = "Refresh token stored in localStorage/sessionStorage via bracket notation. This exposes the long-lived token to JavaScript-based attacks."
-		} else if m := reRefreshTokenLogged.FindString(line); m != "" {
+		} else if m := rules.GFind(reRefreshTokenLogged, line); m != "" {
 			matched = m
 			detail = "Refresh token logged to console. Console output may be captured by browser extensions, monitoring tools, or shared debug sessions, exposing the token."
-		} else if m := reRefreshTokenCookie.FindString(line); m != "" {
+		} else if m := rules.GFind(reRefreshTokenCookie, line); m != "" {
 			matched = m
 			detail = "Refresh token set in a cookie via document.cookie or without HttpOnly flag. Client-accessible cookies are vulnerable to XSS-based theft."
 		}

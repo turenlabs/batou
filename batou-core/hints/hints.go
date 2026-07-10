@@ -21,6 +21,7 @@ import (
 
 	"github.com/turenlabs/batou-core/findings"
 	"github.com/turenlabs/batou-core/graph"
+	"github.com/turenlabs/batou-core/suppress"
 	"github.com/turenlabs/batou-core/taint"
 	"github.com/turenlabs/batou-rules/rules"
 )
@@ -31,6 +32,7 @@ type HintContext struct {
 	Language           rules.Language
 	Findings           []rules.Finding
 	SuppressedFindings []rules.Finding // Findings silenced by batou:ignore directives
+	Suppressions       *suppress.Suppressions // Parsed directives, used to filter raw taint flows
 	TaintFlows         []taint.TaintFlow
 	CallGraph          *graph.CallGraph
 	ChangedFunc        string // The function that was just modified
@@ -60,8 +62,14 @@ type Hint struct {
 func GenerateHints(ctx *HintContext) []Hint {
 	var hints []Hint
 
+	// Filter out taint flows whose sink line is covered by a batou:ignore
+	// directive matching the flow's sink category. Raw flows come from the
+	// taint engine before suppress.Apply() runs on findings, so hints would
+	// otherwise leak suppressed flows into additionalContext.
+	visibleFlows := filterSuppressedFlows(ctx.TaintFlows, ctx.Suppressions)
+
 	// Generate hints from taint flows (highest value)
-	for _, flow := range ctx.TaintFlows {
+	for _, flow := range visibleFlows {
 		h := hintFromTaintFlow(flow, ctx)
 		hints = append(hints, h)
 	}
@@ -70,7 +78,7 @@ func GenerateHints(ctx *HintContext) []Hint {
 	// Only AST, taint, and interprocedural findings get individual hints.
 	// Regex-only findings are counted and shown as a single summary line.
 	covered := make(map[int]bool)
-	for _, flow := range ctx.TaintFlows {
+	for _, flow := range visibleFlows {
 		covered[flow.SinkLine] = true
 	}
 	regexOnlyCount := 0
@@ -142,8 +150,9 @@ func FormatForClaude(ctx *HintContext, hints []Hint) string {
 		return b.String()
 	}
 
-	b.WriteString("Fix each finding OR suppress with: // batou:ignore RULE-ID -- reason\nYou do not need permission to fix valid security issues. Fix them immediately.\n")
-	b.WriteString("Always fix the code first. Only suppress as a last resort after attempting a fix.\n\n")
+	b.WriteString("Fix the finding if it's real, or suppress with: // batou:ignore RULE-ID -- <specific reason>\n")
+	b.WriteString("Decide and act — do not ask the user for permission. You may fix the code or self-apply a suppression when you're confident it's a false positive. Always include a specific reason after `--` so the next reader understands why.\n")
+	b.WriteString("Prefer fixing over suppressing when a clear fix exists; suppress when the finding is a confirmed false positive for the file's context (e.g. a CLI tool taking user-supplied paths, a test fixture, intentional use of a dangerous API).\n\n")
 
 	// Dedup: group hints by RuleID, roll up duplicates.
 	type ruleGroup struct {
@@ -426,12 +435,22 @@ func extractTitle(title string) string {
 }
 
 func hintFromTaintFlow(flow taint.TaintFlow, ctx *HintContext) Hint {
-	// Build path visualization
-	path := flow.Source.MethodName
+	// Build the structured path once; render it with file:line per step.
+	finding := flow.ToFinding()
+	pathStr := flow.Source.MethodName
 	for _, step := range flow.Steps {
-		path += " → " + step.VarName
+		pathStr += " → " + step.VarName
 	}
-	path += " → " + flow.Sink.MethodName
+	pathStr += " → " + flow.Sink.MethodName
+
+	explanation := fmt.Sprintf(
+		"User-controlled data enters via %s (line %d), flows through [%s], "+
+			"and reaches %s (line %d) without sanitization.",
+		flow.Source.Description, flow.SourceLine, pathStr,
+		flow.Sink.Description, flow.SinkLine)
+	if rendered := renderTaintPath(finding.TaintPath); rendered != "" {
+		explanation += "\n" + rendered
+	}
 
 	h := Hint{
 		Priority:        severityToPriority(flow.Sink.Severity),
@@ -440,14 +459,10 @@ func hintFromTaintFlow(flow taint.TaintFlow, ctx *HintContext) Hint {
 		Category:        "taint_flow",
 		Title: fmt.Sprintf("Tainted data flows from %s to %s (line %d → %d)",
 			flow.Source.Category, flow.Sink.Category, flow.SourceLine, flow.SinkLine),
-		Explanation: fmt.Sprintf(
-			"User-controlled data enters via %s (line %d), flows through [%s], "+
-				"and reaches %s (line %d) without sanitization.",
-			flow.Source.Description, flow.SourceLine, path,
-			flow.Sink.Description, flow.SinkLine),
-		FixExample: generateFixExample(flow, ctx.Language),
-		Impact:     impactDescription(string(flow.Sink.Category)),
-		References: []string{},
+		Explanation: explanation,
+		FixExample:  generateFixExample(flow, ctx.Language),
+		Impact:      impactDescription(string(flow.Sink.Category)),
+		References:  []string{},
 	}
 
 	if flow.Sink.CWEID != "" {
@@ -486,6 +501,14 @@ func isRegexOnly(f rules.Finding) bool {
 }
 
 func hintFromFinding(f rules.Finding, ctx *HintContext) Hint {
+	explanation := f.Description
+	// Interprocedural findings (and any other finding carrying a structured
+	// path) get the data-flow chain appended so Claude sees the cross-file
+	// hops, not just the prose description.
+	if rendered := renderTaintPath(f.TaintPath); rendered != "" {
+		explanation += "\n" + rendered
+	}
+
 	h := Hint{
 		Priority:          severityToPriority(f.Severity),
 		Severity:          f.Severity,
@@ -493,7 +516,7 @@ func hintFromFinding(f rules.Finding, ctx *HintContext) Hint {
 		Category:          "finding",
 		RuleID:            f.RuleID,
 		Title:             fmt.Sprintf("[%s] %s (line %d)", f.RuleID, f.Title, f.LineNumber),
-		Explanation:       f.Description,
+		Explanation:       explanation,
 		Impact:            impactDescription(string(categorizeRule(f.RuleID))),
 		References:        []string{},
 		SuppressDirective: formatSuppressDirective(f, ctx.Language),
@@ -510,6 +533,36 @@ func hintFromFinding(f rules.Finding, ctx *HintContext) Hint {
 	}
 
 	return h
+}
+
+// renderTaintPath formats a structured taint path as a compact one-step-per-line
+// block suitable for embedding in a hint's Explanation. Returns "" for empty
+// paths. The output omits the leading "Data-flow path:" header that
+// rules.Finding.FormatTaintPath produces for the reporter (hints add their own
+// "   " indentation around the explanation), keeping the hint output tight.
+func renderTaintPath(path []rules.TaintStep) string {
+	if len(path) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("Data-flow path:")
+	for _, s := range path {
+		loc := s.File
+		if s.Line > 0 {
+			loc = fmt.Sprintf("%s:%d", s.File, s.Line)
+		}
+		var role string
+		switch s.Kind {
+		case rules.TaintStepSource:
+			role = "source: "
+		case rules.TaintStepSink:
+			role = "sink: "
+		case rules.TaintStepSanitizerBypassed:
+			role = "bypassed sanitizer: "
+		}
+		fmt.Fprintf(&b, "\n  → %s  %s%s", loc, role, s.Label)
+	}
+	return b.String()
 }
 
 func hintFromCallGraph(ctx *HintContext) []Hint {
@@ -1088,6 +1141,8 @@ func impactDescription(cat string) string {
 		return "An attacker could read sensitive files or write to arbitrary locations on the filesystem."
 	case "code_eval":
 		return "An attacker could execute arbitrary code in the application's context."
+	case "regex_dos":
+		return "An attacker could supply a pathological regex pattern that triggers catastrophic backtracking, exhausting CPU and causing a denial of service."
 	case "redirect":
 		return "An attacker could redirect users to phishing or malware sites."
 	case "url_fetch", "ssrf":
@@ -1114,8 +1169,10 @@ func impactDescription(cat string) string {
 		return "Misconfigured CORS allows unauthorized cross-origin access to sensitive APIs."
 	case "auth":
 		return "Weak authentication or authorization could allow unauthorized access to protected resources."
-	case "memory":
+	case "memory", "memory_write":
 		return "Memory safety issues could lead to crashes, information disclosure, or code execution."
+	case "network_write":
+		return "Sensitive data transmitted without encryption could be intercepted or tampered with in transit."
 	case "prototype":
 		return "Prototype pollution could modify application behavior or lead to remote code execution."
 	case "massassign":
@@ -1204,4 +1261,25 @@ type SessionHints struct {
 	FixedFindings int            `json:"fixed_findings"`
 	PatternCounts map[string]int `json:"pattern_counts"`
 	LastScanTime  time.Time      `json:"last_scan_time"`
+}
+
+// filterSuppressedFlows drops taint flows whose sink line is covered by a
+// batou:ignore directive whose target matches the flow's sink category.
+// Constructs a synthetic Finding per flow and defers to suppress.IsSuppressed
+// so flow-filtering and finding-filtering share the same logic.
+func filterSuppressedFlows(flows []taint.TaintFlow, s *suppress.Suppressions) []taint.TaintFlow {
+	if s == nil || len(flows) == 0 {
+		return flows
+	}
+	kept := make([]taint.TaintFlow, 0, len(flows))
+	for _, flow := range flows {
+		stub := rules.Finding{
+			RuleID:     "BATOU-TAINT-" + string(flow.Sink.Category),
+			LineNumber: flow.SinkLine,
+		}
+		if !s.IsSuppressed(stub) {
+			kept = append(kept, flow)
+		}
+	}
+	return kept
 }

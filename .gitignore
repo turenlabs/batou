@@ -15,6 +15,7 @@ coverage.html
 
 # Benchmarks (private)
 bench/
+!testdata/bench/
 
 # IDE
 .idea/
@@ -29,5 +30,22 @@ Thumbs.db
 # Test binaries
 *.test
 
+# External benchmark clones
+testdata/external/
+
+# OWASP bench results
+testdata/owasp-bench/*/results.json
+
 # Generated rule files
 *_gen.go
+
+# Local MCP server config
+.mcp.json
+
+# stray build artifact (build to bin/batou via make)
+batou-core/batou
+
+# Claude Code working directory: ignore agent worktrees, caches, and scratch
+# artifacts (reports, ad-hoc workflow scripts), but keep committed skills.
+/.claude/*
+!/.claude/skills/

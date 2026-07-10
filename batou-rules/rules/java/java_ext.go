@@ -13,44 +13,40 @@ import (
 
 // JAVA-019: Spring SpEL expression with user input (broader pattern)
 var (
-	reSpELValueAnnotVar    = regexp.MustCompile(`@Value\s*\(\s*"#\{[^}]*\+`)
-	reSpELEvalContext      = regexp.MustCompile(`StandardEvaluationContext\s*\(\s*\)`)
-	reSpELParseReq         = regexp.MustCompile(`\.parseExpression\s*\(\s*(?:request\.|param|input|body|query|header)`)
+	reSpELEvalContext = regexp.MustCompile(`StandardEvaluationContext\s*\(\s*\)`)
+	reSpELParseReq    = regexp.MustCompile(`\.parseExpression\s*\(\s*(?:request\.|param|input|body|query|header)`)
 )
 
 // JAVA-020: JNDI lookup with user-controlled name (Log4Shell-style)
 var (
-	reLog4jLookup        = regexp.MustCompile(`\$\{jndi:`)
-	reLoggerUserInput    = regexp.MustCompile(`(?:logger|log|LOG)\s*\.(?:info|warn|error|debug|trace|fatal)\s*\(\s*(?:request\.|param|input|user|header|cookie)`)
-	reLoggerConcat       = regexp.MustCompile(`(?:logger|log|LOG)\s*\.(?:info|warn|error|debug|trace|fatal)\s*\(\s*"[^"]*"\s*\+\s*(?:request\.|param|input|user|header|cookie)`)
+	reLoggerUserInput = regexp.MustCompile(`(?:logger|log|LOG)\s*\.(?:info|warn|error|debug|trace|fatal)\s*\(\s*(?:request\.|param|input|user|header|cookie)`)
+	reLoggerConcat    = regexp.MustCompile(`(?:logger|log|LOG)\s*\.(?:info|warn|error|debug|trace|fatal)\s*\(\s*"[^"]*"\s*\+\s*(?:request\.|param|input|user|header|cookie)`)
 )
 
 // JAVA-021: Java unsafe reflection
 var (
 	reClassForNameVar    = regexp.MustCompile(`Class\.forName\s*\(\s*(?:request\.|param|input|user|className|name|clazz|type)`)
 	reClassForNameConcat = regexp.MustCompile(`Class\.forName\s*\(\s*"[^"]*"\s*\+`)
-	reNewInstanceReflect = regexp.MustCompile(`\.newInstance\s*\(\s*\)`)
 )
 
 // JAVA-022: Java RMI without SSL/authentication
 var (
-	reRMIExportNoSSL     = regexp.MustCompile(`UnicastRemoteObject\.export(?:Object)?\s*\(\s*\w+\s*,\s*\d+\s*\)`)
-	reRMISocketFactory   = regexp.MustCompile(`(?:SslRMIClientSocketFactory|SslRMIServerSocketFactory)`)
-	reRMIRegistryCreate  = regexp.MustCompile(`LocateRegistry\.createRegistry\s*\(\s*\d+\s*\)`)
+	reRMIExportNoSSL    = regexp.MustCompile(`UnicastRemoteObject\.export(?:Object)?\s*\(\s*\w+\s*,\s*\d+\s*\)`)
+	reRMISocketFactory  = regexp.MustCompile(`(?:SslRMIClientSocketFactory|SslRMIServerSocketFactory)`)
+	reRMIRegistryCreate = regexp.MustCompile(`LocateRegistry\.createRegistry\s*\(\s*\d+\s*\)`)
 )
 
 // JAVA-023: Struts OGNL injection
 var (
-	reOGNLGetValue       = regexp.MustCompile(`Ognl\.getValue\s*\(\s*[a-zA-Z_]\w*`)
-	reOGNLSetValue       = regexp.MustCompile(`Ognl\.setValue\s*\(\s*[a-zA-Z_]\w*`)
-	reOGNLParseExpr      = regexp.MustCompile(`Ognl\.parseExpression\s*\(\s*[a-zA-Z_]\w*`)
-	reStrutsAction       = regexp.MustCompile(`(?:ActionSupport|StrutsAction|ActionMapping)`)
+	reOGNLGetValue  = regexp.MustCompile(`Ognl\.getValue\s*\(\s*[a-zA-Z_]\w*`)
+	reOGNLSetValue  = regexp.MustCompile(`Ognl\.setValue\s*\(\s*[a-zA-Z_]\w*`)
+	reOGNLParseExpr = regexp.MustCompile(`Ognl\.parseExpression\s*\(\s*[a-zA-Z_]\w*`)
 )
 
 // JAVA-024: JDBC connection without SSL
 var (
-	reJDBCURLNoSSL       = regexp.MustCompile(`"jdbc:(?:mysql|postgresql|mariadb)://[^"]*"`)
-	reJDBCSSLParam       = regexp.MustCompile(`(?:useSSL=true|sslMode=|ssl=true|sslmode=require|requireSSL=true)`)
+	reJDBCURLNoSSL = regexp.MustCompile(`"jdbc:(?:mysql|postgresql|mariadb)://[^"]*"`)
+	reJDBCSSLParam = regexp.MustCompile(`(?:useSSL=true|sslMode=|ssl=true|sslmode=require|requireSSL=true)`)
 )
 
 // JAVA-025: Java trust all certificates (TrustManager override) - broader
@@ -62,17 +58,17 @@ var (
 
 // JAVA-026: Java hostname verifier disabled (broader detection)
 var (
-	reSetDefaultHV       = regexp.MustCompile(`HttpsURLConnection\.setDefaultHostnameVerifier\s*\(`)
-	reHVLambdaTrue       = regexp.MustCompile(`\(\s*\w+\s*,\s*\w+\s*\)\s*->\s*true`)
-	reHVAlwaysTrueAnon   = regexp.MustCompile(`new\s+HostnameVerifier\s*\(\s*\)\s*\{[^}]*return\s+true`)
+	reSetDefaultHV     = regexp.MustCompile(`HttpsURLConnection\.setDefaultHostnameVerifier\s*\(`)
+	reHVLambdaTrue     = regexp.MustCompile(`\(\s*\w+\s*,\s*\w+\s*\)\s*->\s*true`)
+	reHVAlwaysTrueAnon = regexp.MustCompile(`new\s+HostnameVerifier\s*\(\s*\)\s*\{[^}]*return\s+true`)
 )
 
 // JAVA-027: Spring mass binding without @InitBinder
 var (
-	reModelAttribute     = regexp.MustCompile(`@ModelAttribute\s`)
-	reInitBinder         = regexp.MustCompile(`@InitBinder`)
-	reWebDataBinder      = regexp.MustCompile(`WebDataBinder`)
-	reRequestMapping     = regexp.MustCompile(`@(?:RequestMapping|GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping)`)
+	reModelAttribute = regexp.MustCompile(`@ModelAttribute\s`)
+	reInitBinder     = regexp.MustCompile(`@InitBinder`)
+	reWebDataBinder  = regexp.MustCompile(`WebDataBinder`)
+	reRequestMapping = regexp.MustCompile(`@(?:RequestMapping|GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping)`)
 )
 
 // JAVA-028: Java File.createTempFile with predictable name
@@ -83,17 +79,15 @@ var (
 
 // JAVA-029: Java SecureRandom seed from non-random source
 var (
-	reSecureRandomSeed     = regexp.MustCompile(`SecureRandom\s*\(\s*\)`)
-	reSetSeedManual        = regexp.MustCompile(`\.setSeed\s*\(\s*(?:System\.currentTimeMillis|System\.nanoTime|\d+L?\s*\)|"[^"]*"\.getBytes)`)
-	reSecureRandomGetInst  = regexp.MustCompile(`SecureRandom\.getInstance\s*\(`)
+	reSetSeedManual = regexp.MustCompile(`\.setSeed\s*\(\s*(?:System\.currentTimeMillis|System\.nanoTime|\d+L?\s*\)|"[^"]*"\.getBytes)`)
 )
 
 // JAVA-030: Java XXE via TransformerFactory
 var (
-	reTransformerFactory   = regexp.MustCompile(`TransformerFactory\.newInstance\s*\(\s*\)`)
-	reSAXTransform         = regexp.MustCompile(`SAXTransformerFactory\.newInstance\s*\(\s*\)`)
-	reSetFeatureXXE        = regexp.MustCompile(`\.setFeature\s*\(\s*(?:XMLConstants\.FEATURE_SECURE_PROCESSING|"http://javax\.xml\.XMLConstants)`)
-	reSetAttrAccessExt     = regexp.MustCompile(`\.setAttribute\s*\(\s*XMLConstants\.ACCESS_EXTERNAL`)
+	reTransformerFactory = regexp.MustCompile(`TransformerFactory\.newInstance\s*\(\s*\)`)
+	reSAXTransform       = regexp.MustCompile(`SAXTransformerFactory\.newInstance\s*\(\s*\)`)
+	reSetFeatureXXE      = regexp.MustCompile(`\.setFeature\s*\(\s*(?:XMLConstants\.FEATURE_SECURE_PROCESSING|"http://javax\.xml\.XMLConstants)`)
+	reSetAttrAccessExt   = regexp.MustCompile(`\.setAttribute\s*\(\s*XMLConstants\.ACCESS_EXTERNAL`)
 )
 
 func init() {
@@ -130,17 +124,18 @@ func (r *SpringSpELUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "SpEL") && !strings.Contains(ctx.Content, "parseExpression") && !strings.Contains(ctx.Content, "EvaluationContext") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
 		var detail string
-		if m := reSpELParseReq.FindString(line); m != "" {
+		if m := rules.GFindLower(reSpELParseReq, line, lowered[i]); m != "" {
 			matched = m
 			detail = "SpEL parseExpression with user-controlled input"
-		} else if reSpELEvalContext.MatchString(line) {
+		} else if rules.GMatchLower(reSpELEvalContext, line, lowered[i]) {
 			if hasNearbyPattern(lines, i, reSpELRequestParam) {
 				matched = strings.TrimSpace(line)
 				detail = "StandardEvaluationContext used with user input (full type access)"
@@ -185,17 +180,18 @@ func (r *JNDILog4Shell) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "log") && !strings.Contains(ctx.Content, "LOG") && !strings.Contains(ctx.Content, "logger") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
 		var detail string
-		if m := reLoggerConcat.FindString(line); m != "" {
+		if m := rules.GFindLower(reLoggerConcat, line, lowered[i]); m != "" {
 			matched = m
 			detail = "Logger concatenating user input (Log4Shell vector)"
-		} else if m := reLoggerUserInput.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reLoggerUserInput, line, lowered[i]); m != "" {
 			matched = m
 			detail = "Logger called with user-controlled variable"
 		}
@@ -238,15 +234,16 @@ func (r *JavaUnsafeReflection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "Class.forName") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reClassForNameVar.FindString(line); m != "" {
+		if m := rules.GFindLower(reClassForNameVar, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reClassForNameConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reClassForNameConcat, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -288,20 +285,21 @@ func (r *RMIWithoutSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "RMI") && !strings.Contains(ctx.Content, "UnicastRemoteObject") && !strings.Contains(ctx.Content, "LocateRegistry") {
 		return nil
 	}
-	if reRMISocketFactory.MatchString(ctx.Content) {
+	if rules.GMatchFile(reRMISocketFactory, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
 		var detail string
-		if m := reRMIExportNoSSL.FindString(line); m != "" {
+		if m := rules.GFindLower(reRMIExportNoSSL, line, lowered[i]); m != "" {
 			matched = m
 			detail = "RMI object exported without SSL socket factory"
-		} else if m := reRMIRegistryCreate.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRMIRegistryCreate, line, lowered[i]); m != "" {
 			matched = m
 			detail = "RMI Registry created without SSL (plaintext)"
 		}
@@ -344,17 +342,18 @@ func (r *StrutsOGNLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "Ognl") && !strings.Contains(ctx.Content, "ognl") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reOGNLGetValue.FindString(line); m != "" {
+		if m := rules.GFindLower(reOGNLGetValue, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reOGNLSetValue.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reOGNLSetValue, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reOGNLParseExpr.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reOGNLParseExpr, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -393,12 +392,13 @@ func (r *JDBCWithoutSSL) Languages() []rules.Language { return []rules.Language{
 
 func (r *JDBCWithoutSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if m := reJDBCURLNoSSL.FindString(line); m != "" {
+		if m := rules.GFindLower(reJDBCURLNoSSL, line, lowered[i]); m != "" {
 			if !reJDBCSSLParam.MatchString(m) {
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
@@ -439,20 +439,21 @@ func (r *JavaTrustAllCerts) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "TrustManager") && !strings.Contains(ctx.Content, "checkClientTrusted") && !strings.Contains(ctx.Content, "getAcceptedIssuers") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
 		var detail string
-		if reCheckClientTrustedEmpty.MatchString(line) {
+		if rules.GMatchLower(reCheckClientTrustedEmpty, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			detail = "Empty checkClientTrusted (accepts all client certificates)"
-		} else if reGetAcceptedIssuersNull.MatchString(line) {
+		} else if rules.GMatchLower(reGetAcceptedIssuersNull, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			detail = "getAcceptedIssuers returns null/empty (no trusted CAs)"
-		} else if reTrustAllComment.MatchString(line) && strings.Contains(ctx.Content, "TrustManager") {
+		} else if rules.GMatchLower(reTrustAllComment, line, lowered[i]) && strings.Contains(ctx.Content, "TrustManager") {
 			if strings.Contains(line, "class") || strings.Contains(line, "new") {
 				matched = strings.TrimSpace(line)
 				detail = "Trust-all TrustManager implementation"
@@ -497,17 +498,18 @@ func (r *JavaHVDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "HostnameVerifier") && !strings.Contains(ctx.Content, "setDefaultHostnameVerifier") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
 		var detail string
-		if reSetDefaultHV.MatchString(line) && reHVLambdaTrue.MatchString(line) {
+		if rules.GMatchLower(reSetDefaultHV, line, lowered[i]) && rules.GMatchLower(reHVLambdaTrue, line, lowered[i]) {
 			matched = strings.TrimSpace(line)
 			detail = "setDefaultHostnameVerifier with lambda always returning true"
-		} else if reSetDefaultHV.MatchString(line) {
+		} else if rules.GMatchLower(reSetDefaultHV, line, lowered[i]) {
 			ctx2 := surroundingContext(lines, i, 10)
 			if reHVAlwaysTrueAnon.MatchString(ctx2) {
 				matched = strings.TrimSpace(line)
@@ -550,21 +552,22 @@ func (r *SpringMassBinding) Languages() []rules.Language { return []rules.Langua
 
 func (r *SpringMassBinding) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if !reModelAttribute.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reModelAttribute, ctx) {
 		return nil
 	}
-	if reInitBinder.MatchString(ctx.Content) || reWebDataBinder.MatchString(ctx.Content) {
+	if rules.GMatchFile(reInitBinder, ctx) || rules.GMatchFile(reWebDataBinder, ctx) {
 		return nil
 	}
-	if !reRequestMapping.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reRequestMapping, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reModelAttribute.MatchString(line) {
+		if rules.GMatchLower(reModelAttribute, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "Spring mass assignment: @ModelAttribute without @InitBinder",
@@ -597,22 +600,25 @@ func (r *JavaTempFilePredictable) DefaultSeverity() rules.Severity { return rule
 func (r *JavaTempFilePredictable) Description() string {
 	return "Detects File.createTempFile with only two arguments (uses default temp directory with predictable path)."
 }
-func (r *JavaTempFilePredictable) Languages() []rules.Language { return []rules.Language{rules.LangJava} }
+func (r *JavaTempFilePredictable) Languages() []rules.Language {
+	return []rules.Language{rules.LangJava}
+}
 
 func (r *JavaTempFilePredictable) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	if !strings.Contains(ctx.Content, "createTempFile") {
 		return nil
 	}
-	if reTempFileSecure.MatchString(ctx.Content) {
+	if rules.GMatchFile(reTempFileSecure, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if m := reTempFilePredictable.FindString(line); m != "" {
+		if m := rules.GFindLower(reTempFilePredictable, line, lowered[i]); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "Predictable temp file: File.createTempFile in shared temp directory",
@@ -651,12 +657,13 @@ func (r *JavaSecureRandomSeed) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "SecureRandom") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if m := reSetSeedManual.FindString(line); m != "" {
+		if m := rules.GFindLower(reSetSeedManual, line, lowered[i]); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "SecureRandom seeded with predictable value",
@@ -695,18 +702,19 @@ func (r *JavaXXETransformer) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "TransformerFactory") {
 		return nil
 	}
-	if reSetFeatureXXE.MatchString(ctx.Content) && reSetAttrAccessExt.MatchString(ctx.Content) {
+	if rules.GMatchFile(reSetFeatureXXE, ctx) && rules.GMatchFile(reSetAttrAccessExt, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reTransformerFactory.FindString(line); m != "" {
+		if m := rules.GFindLower(reTransformerFactory, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSAXTransform.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSAXTransform, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {

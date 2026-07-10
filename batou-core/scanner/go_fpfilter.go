@@ -63,8 +63,19 @@ var goScFmtIntVerb = regexp.MustCompile(`%d|%v`)
 var goScParamQuery = regexp.MustCompile(`\?\s*[,)]`)
 
 // XSS safety
-var goScHTMLEscape = regexp.MustCompile(`html\.EscapeString\s*\(`)
-var goScHTMLTemplate = regexp.MustCompile(`(?:html/template|template\.HTML)`)
+//
+// Genuine output-escaping sanitizers only. html.EscapeString /
+// template.HTMLEscapeString / template.JSEscapeString actually neutralize a
+// tainted value. We deliberately do NOT treat the presence of an
+// `html/template` import or a `template.HTML(...)` call as a safety signal:
+// `template.HTML`/`template.JS`/`template.CSS`/`template.HTMLAttr` are the
+// escaping-BYPASS conversions — they are the XSS sink, not protection — and a
+// bare `html/template` import does not sanitize a raw `w.Write`/`fmt.Fprintf`
+// write or an explicit-bypass conversion. The genuine auto-escaping path
+// (`tmpl.Execute(w, data)` on an html/template) is already suppressed soundly
+// at the astflow layer by isHTMLTemplateExecute, so this window does not need
+// to (and must not) re-approve it via an import-presence heuristic.
+var goScHTMLEscape = regexp.MustCompile(`(?:html\.EscapeString|template\.(?:HTMLEscapeString|JSEscapeString))\s*\(`)
 var goScStrconvFormat = regexp.MustCompile(`strconv\.(?:Itoa|FormatInt|FormatFloat)\s*\(`)
 var goScFmtSprintf = regexp.MustCompile(`fmt\.Sprintf\s*\(`)
 
@@ -142,7 +153,7 @@ func goScanHasXSSGuard(lines []string, sinkLine int) bool {
 	hasFmtInt := false
 	for i := max(0, sinkLine-15); i <= sinkLine && i < len(lines); i++ {
 		line := lines[i]
-		if goScHTMLEscape.MatchString(line) || goScHTMLTemplate.MatchString(line) {
+		if goScHTMLEscape.MatchString(line) {
 			return true
 		}
 		if goScStrconvAtoi.MatchString(line) || goScStrconvFormat.MatchString(line) {

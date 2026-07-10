@@ -68,16 +68,17 @@ func (r *RailsHTMLSafe) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if !reRailsHTMLSafe.MatchString(line) {
+		if !rules.GMatchLower(reRailsHTMLSafe, line, lowered[i]) {
 			continue
 		}
 		// Skip string literal without interpolation .html_safe (safe pattern like "<br>".html_safe)
-		if reRailsHTMLSafeLiteral.MatchString(line) {
+		if rules.GMatchLower(reRailsHTMLSafeLiteral, line, lowered[i]) {
 			continue
 		}
 		findings = append(findings, rules.Finding{
@@ -121,13 +122,14 @@ func (r *RailsRenderInline) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched bool
-		if reRailsRenderInline.MatchString(line) || reRailsRenderInlineInterp.MatchString(line) {
+		if rules.GMatchLower(reRailsRenderInline, line, lowered[i]) || rules.GMatchLower(reRailsRenderInlineInterp, line, lowered[i]) {
 			matched = true
 		}
 		if matched {
@@ -173,17 +175,18 @@ func (r *RailsConstantize) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if !reRailsConstantize.MatchString(line) {
+		if !rules.GMatchLower(reRailsConstantize, line, lowered[i]) {
 			continue
 		}
 		confidence := "medium"
 		severity := rules.High
-		if reRailsConstantizeParams.MatchString(line) ||
+		if rules.GMatchLower(reRailsConstantizeParams, line, lowered[i]) ||
 			strings.Contains(line, "params") ||
 			strings.Contains(line, "input") ||
 			strings.Contains(line, "user") {
@@ -231,12 +234,13 @@ func (r *RailsPermitBang) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reRailsPermitBang.MatchString(line) {
+		if rules.GMatchLower(reRailsPermitBang, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -279,7 +283,8 @@ func (r *RailsMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type check struct {
 		re         *regexp.Regexp
@@ -325,7 +330,7 @@ func (r *RailsMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, c := range checks {
-			if c.re.MatchString(line) {
+			if rules.GMatchLower(c.re, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -369,7 +374,8 @@ func (r *RailsSQLParams) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type check struct {
 		re         *regexp.Regexp
@@ -410,7 +416,7 @@ func (r *RailsSQLParams) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, c := range checks {
-			if c.re.MatchString(line) {
+			if rules.GMatchLower(c.re, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),

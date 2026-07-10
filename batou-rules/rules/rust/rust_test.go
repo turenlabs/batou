@@ -252,3 +252,90 @@ func TestFixture_Safe(t *testing.T) {
 	testutil.MustNotFindRule(t, result, "BATOU-RS-002")
 	testutil.MustNotFindRule(t, result, "BATOU-RS-003")
 }
+
+// --- RS-019: Hard-coded cryptographic key (CWE-798) ---
+
+func TestRS019_HardcodedAESKey(t *testing.T) {
+	content := `use aes_gcm::{Aes256Gcm, KeyInit};
+fn make_cipher() -> Aes256Gcm {
+    Aes256Gcm::new_from_slice(b"0123456789abcdef0123456789abcdef").unwrap()
+}`
+	result := testutil.ScanContent(t, "/app/crypto.rs", content)
+	testutil.MustFindRule(t, result, "BATOU-RS-019")
+}
+
+func TestRS019_HardcodedChaChaKey(t *testing.T) {
+	content := `use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
+fn make_cipher() {
+    let cipher = ChaCha20Poly1305::new_from_slice(&[0x00, 0x01, 0x02, 0x03]).unwrap();
+}`
+	result := testutil.ScanContent(t, "/app/crypto.rs", content)
+	testutil.MustFindRule(t, result, "BATOU-RS-019")
+}
+
+func TestRS019_Safe_CSPRNGKey(t *testing.T) {
+	content := `use aes_gcm::{Aes256Gcm, KeyInit, aead::OsRng};
+fn make_cipher() -> Aes256Gcm {
+    let key = Aes256Gcm::generate_key(&mut OsRng);
+    Aes256Gcm::new(&key)
+}`
+	result := testutil.ScanContent(t, "/app/crypto.rs", content)
+	testutil.MustNotFindRule(t, result, "BATOU-RS-019")
+}
+
+func TestRS019_Safe_EnvKey(t *testing.T) {
+	content := `use aes_gcm::{Aes256Gcm, KeyInit};
+fn make_cipher() -> Aes256Gcm {
+    let raw = std::env::var("AES_KEY").unwrap();
+    Aes256Gcm::new_from_slice(raw.as_bytes()).unwrap()
+}`
+	result := testutil.ScanContent(t, "/app/crypto.rs", content)
+	testutil.MustNotFindRule(t, result, "BATOU-RS-019")
+}
+
+// --- RS-020: Session/auth cookie without Secure flag (CWE-614) ---
+
+func TestRS020_SessionCookieNoSecure(t *testing.T) {
+	content := `use actix_web::cookie::Cookie;
+fn set_session(token: &str) -> Cookie {
+    Cookie::build("session_id", token)
+        .http_only(true)
+        .finish()
+}`
+	result := testutil.ScanContent(t, "/app/auth.rs", content)
+	testutil.MustFindRule(t, result, "BATOU-RS-020")
+}
+
+func TestRS020_Safe_SecureSet(t *testing.T) {
+	content := `use actix_web::cookie::Cookie;
+fn set_session(token: &str) -> Cookie {
+    Cookie::build("session_id", token)
+        .secure(true)
+        .http_only(true)
+        .finish()
+}`
+	result := testutil.ScanContent(t, "/app/auth.rs", content)
+	testutil.MustNotFindRule(t, result, "BATOU-RS-020")
+}
+
+func TestRS020_Safe_NonAuthCookie(t *testing.T) {
+	content := `use actix_web::cookie::Cookie;
+fn set_pref(theme: &str) -> Cookie {
+    Cookie::build("theme", theme)
+        .http_only(true)
+        .finish()
+}`
+	result := testutil.ScanContent(t, "/app/prefs.rs", content)
+	testutil.MustNotFindRule(t, result, "BATOU-RS-020")
+}
+
+func TestRS020_Safe_ExplicitSecureFalseDev(t *testing.T) {
+	content := `use actix_web::cookie::Cookie;
+fn set_session(token: &str) -> Cookie {
+    Cookie::build("auth_token", token)
+        .secure(false)
+        .finish()
+}`
+	result := testutil.ScanContent(t, "/app/auth.rs", content)
+	testutil.MustNotFindRule(t, result, "BATOU-RS-020")
+}

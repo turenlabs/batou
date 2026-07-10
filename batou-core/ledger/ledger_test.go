@@ -2,15 +2,14 @@ package ledger_test
 
 import (
 	"encoding/json"
+	"github.com/turenlabs/batou-core/ledger"
+	"github.com/turenlabs/batou-core/reporter"
+	"github.com/turenlabs/batou-rules/rules"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/turenlabs/batou-core/ledger"
-	"github.com/turenlabs/batou-core/reporter"
-	"github.com/turenlabs/batou-rules/rules"
 )
 
 // guardedReadFile wraps os.ReadFile with filepath.Clean + strings.HasPrefix
@@ -224,5 +223,86 @@ func TestRecordNoFindingsIsNotBlocked(t *testing.T) {
 	}
 	if entry.FindingCount != 0 {
 		t.Errorf("FindingCount = %d, want 0", entry.FindingCount)
+	}
+}
+
+// Suppressed findings must carry their batou:ignore `-- reason` text into the
+// ledger entry (index-aligned with SuppressedRules) so the audit trail keeps
+// the developer's justification, not just the rule that was silenced.
+func TestRecordSuppressedReasons(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	result := &reporter.ScanResult{
+		FilePath:        "/app/handler.py",
+		Language:        rules.LangPython,
+		Event:           "PostToolUse",
+		SuppressedCount: 2,
+		SuppressedFindings: []rules.Finding{
+			{RuleID: "BATOU-INJ-001", SuppressReason: "known FP because X"},
+			{RuleID: "BATOU-XSS-002"}, // reasonless directive
+		},
+	}
+
+	if err := ledger.Record("s-reasons", result); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	dateStr := time.Now().UTC().Format("2006-01-02")
+	ledgerFile := filepath.Clean(filepath.Join(tmpDir, ".batou", "ledger", "batou-"+dateStr+".jsonl"))
+	if !strings.HasPrefix(ledgerFile, filepath.Clean(tmpDir)) {
+		t.Fatal("unexpected path")
+	}
+	data, err := guardedReadFile(tmpDir, ledgerFile)
+	if err != nil {
+		t.Fatalf("read ledger: %v", err)
+	}
+
+	var entry ledger.Entry
+	if err := json.Unmarshal([]byte(strings.TrimSpace(string(data))), &entry); err != nil {
+		t.Fatalf("parse ledger: %v", err)
+	}
+
+	wantRules := []string{"BATOU-INJ-001", "BATOU-XSS-002"}
+	wantReasons := []string{"known FP because X", ""}
+	if len(entry.SuppressedRules) != len(wantRules) || len(entry.SuppressedReasons) != len(wantReasons) {
+		t.Fatalf("SuppressedRules=%v SuppressedReasons=%v, want %v / %v",
+			entry.SuppressedRules, entry.SuppressedReasons, wantRules, wantReasons)
+	}
+	for i := range wantRules {
+		if entry.SuppressedRules[i] != wantRules[i] || entry.SuppressedReasons[i] != wantReasons[i] {
+			t.Errorf("index %d: got (%q, %q), want (%q, %q)",
+				i, entry.SuppressedRules[i], entry.SuppressedReasons[i], wantRules[i], wantReasons[i])
+		}
+	}
+}
+
+// When no suppressed finding stated a reason, the suppressed_reasons field is
+// omitted entirely (no ["",""] noise in the audit log).
+func TestRecordSuppressedReasonsOmittedWhenAllEmpty(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	result := &reporter.ScanResult{
+		FilePath: "/app/handler.py",
+		Language: rules.LangPython,
+		Event:    "PostToolUse",
+		SuppressedFindings: []rules.Finding{
+			{RuleID: "BATOU-INJ-001"},
+		},
+	}
+
+	if err := ledger.Record("s-noreasons", result); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	dateStr := time.Now().UTC().Format("2006-01-02")
+	ledgerFile := filepath.Clean(filepath.Join(tmpDir, ".batou", "ledger", "batou-"+dateStr+".jsonl"))
+	data, err := guardedReadFile(tmpDir, ledgerFile)
+	if err != nil {
+		t.Fatalf("read ledger: %v", err)
+	}
+	if strings.Contains(string(data), `"suppressed_reasons"`) {
+		t.Errorf("expected suppressed_reasons to be omitted when all reasons are empty; got %s", data)
 	}
 }

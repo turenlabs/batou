@@ -17,10 +17,10 @@ var (
 	reExtRateLimit  = regexp.MustCompile(`(?i)(?:rate[_-]?limit|throttle|limiter|RateLimit|slowDown|express-rate-limit|express-brute|ratelimit|Throttle)`)
 
 	// BATOU-AUTH-009: Password comparison using ==
-	reExtPasswordEqGo   = regexp.MustCompile(`(?i)(?:password|passwd|pass|pwd)\s*==\s*(?:[a-zA-Z_]\w*|"[^"]+"|'[^']+')`)
-	reExtPasswordEqJS   = regexp.MustCompile(`(?i)(?:password|passwd|pass|pwd)\s*===?\s*(?:[a-zA-Z_]\w*|"[^"]+"|'[^']+')`)
-	reExtPasswordEqPy   = regexp.MustCompile(`(?i)(?:password|passwd|pass|pwd)\s*==\s*(?:[a-zA-Z_]\w*|"[^"]+"|'[^']+')`)
-	reExtSafeCompare    = regexp.MustCompile(`(?i)(?:bcrypt|argon2|scrypt|pbkdf2|hmac|constant_time|compare_digest|timing_safe|timingSafeEqual|subtle\.ConstantTimeCompare|crypto\.timingSafeEqual|secrets\.compare_digest)`)
+	reExtPasswordEqGo = regexp.MustCompile(`(?i)(?:password|passwd|pass|pwd)\s*==\s*(?:[a-zA-Z_]\w*|"[^"]+"|'[^']+')`)
+	reExtPasswordEqJS = regexp.MustCompile(`(?i)(?:password|passwd|pass|pwd)\s*===?\s*(?:[a-zA-Z_]\w*|"[^"]+"|'[^']+')`)
+	reExtPasswordEqPy = regexp.MustCompile(`(?i)(?:password|passwd|pass|pwd)\s*==\s*(?:[a-zA-Z_]\w*|"[^"]+"|'[^']+')`)
+	reExtSafeCompare  = regexp.MustCompile(`(?i)(?:bcrypt|argon2|scrypt|pbkdf2|hmac|constant_time|compare_digest|timing_safe|timingSafeEqual|subtle\.ConstantTimeCompare|crypto\.timingSafeEqual|secrets\.compare_digest)`)
 
 	// BATOU-AUTH-010: Hardcoded admin/default credentials
 	reExtHardcodedAdmin = regexp.MustCompile(`(?i)(?:admin|administrator|root|superuser|default)\s*[:=]\s*["'](?:admin|password|123456|root|default|changeme|admin123|pass|passwd|test|secret)["']`)
@@ -34,21 +34,30 @@ var (
 	reExtAuthBypass = regexp.MustCompile(`(?i)(?:is[_-]?admin|isAdmin|is[_-]?authenticated|is_superuser|role|user_?role|admin)\s*[:=]\s*(?:req\.(?:body|query|params)|request\.(?:POST|GET|data|json|form)|params\[|\$_(?:GET|POST|REQUEST))`)
 
 	// BATOU-AUTH-013: Broken function-level access control
-	reExtAdminEndpoint       = regexp.MustCompile(`(?i)(?:\.(?:get|post|put|delete|patch|all))\s*\(\s*["']/(?:admin|internal|management|supervisor|moderator|api/admin)`)
-	reExtAccessControlCheck  = regexp.MustCompile(`(?i)(?:isAdmin|is_admin|requireAdmin|require_admin|authorize|@admin_required|@staff_member_required|@permission_required|hasRole|has_role|checkPermission)`)
+	reExtAdminEndpoint      = regexp.MustCompile(`(?i)(?:\.(?:get|post|put|delete|patch|all))\s*\(\s*["']/(?:admin|internal|management|supervisor|moderator|api/admin)`)
+	reExtAccessControlCheck = regexp.MustCompile(`(?i)(?:isAdmin|is_admin|requireAdmin|require_admin|authorize|@admin_required|@staff_member_required|@permission_required|hasRole|has_role|checkPermission)`)
 
 	// BATOU-AUTH-014: Insecure password reset
-	reExtPasswordReset      = regexp.MustCompile(`(?i)(?:reset[_-]?(?:password|token|code)|forgot[_-]?password|password[_-]?reset)`)
-	reExtPredictableToken   = regexp.MustCompile(`(?i)(?:uuid\.uuid1|Math\.random|rand\(\)|time\.Now|Date\.now|random\.randint|srand|mt_rand|uniqid)\s*\(`)
-	reExtSecureToken        = regexp.MustCompile(`(?i)(?:crypto\.random|secrets\.token|uuid\.uuid4|uuid\.v4|RandomBytes|SecureRandom|crypto\.getRandomValues|os\.urandom|RandRead)`)
+	reExtPasswordReset    = regexp.MustCompile(`(?i)(?:reset[_-]?(?:password|token|code)|forgot[_-]?password|password[_-]?reset)`)
+	reExtPredictableToken = regexp.MustCompile(`(?i)(?:uuid\.uuid1|Math\.random|rand\(\)|time\.Now|Date\.now|random\.randint|srand|mt_rand|uniqid)\s*\(`)
+	reExtSecureToken      = regexp.MustCompile(`(?i)(?:crypto\.random|secrets\.token|uuid\.uuid4|uuid\.v4|RandomBytes|SecureRandom|crypto\.getRandomValues|os\.urandom|RandRead)`)
 
 	// BATOU-AUTH-015: Missing MFA check
 	reExtMFACheck    = regexp.MustCompile(`(?i)(?:mfa|2fa|two[_-]?factor|totp|otp|multi[_-]?factor|second[_-]?factor)`)
 	reExtSensitiveOp = regexp.MustCompile(`(?i)(?:transfer|withdraw|payment|wire|change[_-]?password|change[_-]?email|delete[_-]?account|export[_-]?data)`)
+	// HTTP route shape — required to be present on the function-decl line
+	// to avoid firing on every internal Go function, CLI command, migration,
+	// or test that mentions a sensitive keyword. Matches:
+	//   - a quoted leading-slash path: "/transfer" or '/api/withdraw'
+	//   - Spring annotations: @PostMapping, @PutMapping, @DeleteMapping
+	//   - Flask/FastAPI decorators: @app.route, @router.post
+	//   - Express/Gin/Chi handlers: app.post(, router.put(, r.Delete(
+	//   - net/http: HandleFunc, mux.Methods
+	reExtHTTPRouteShape = regexp.MustCompile(`(?:["']/(?:\w[\w/-]*)?["']|@(?:Post|Put|Delete|Patch|Get|Request)Mapping|@(?:app\.route|router\.(?:post|put|delete|patch|get)|route)|(?:app|router|r|mux)\.(?:[Pp]ost|[Pp]ut|[Dd]elete|[Pp]atch|[Hh]andle|[Mm]ethods)\s*\()`)
 
 	// BATOU-AUTH-016: Username enumeration via different error messages
-	reExtUserNotFound    = regexp.MustCompile(`(?i)["'](?:user\s+not\s+found|username\s+does\s+not\s+exist|no\s+(?:such\s+)?user|account\s+not\s+found|invalid\s+username|email\s+not\s+found|unknown\s+user|user\s+does\s+not\s+exist)["']`)
-	reExtWrongPassword   = regexp.MustCompile(`(?i)["'](?:wrong\s+password|incorrect\s+password|invalid\s+password|password\s+(?:is\s+)?incorrect|bad\s+password)["']`)
+	reExtUserNotFound  = regexp.MustCompile(`(?i)["'](?:user\s+not\s+found|username\s+does\s+not\s+exist|no\s+(?:such\s+)?user|account\s+not\s+found|invalid\s+username|email\s+not\s+found|unknown\s+user|user\s+does\s+not\s+exist)["']`)
+	reExtWrongPassword = regexp.MustCompile(`(?i)["'](?:wrong\s+password|incorrect\s+password|invalid\s+password|password\s+(?:is\s+)?incorrect|bad\s+password)["']`)
 
 	// BATOU-AUTH-017: Weak password policy
 	reExtWeakPolicyNoUpper = regexp.MustCompile(`(?i)(?:min_?length|minLen|minimum.?length|PASSWORD_MIN)\s*[:=]\s*([0-9]+)`)
@@ -78,8 +87,8 @@ func init() {
 
 type MissingRateLimit struct{}
 
-func (r *MissingRateLimit) ID() string                     { return "BATOU-AUTH-008" }
-func (r *MissingRateLimit) Name() string                   { return "MissingRateLimit" }
+func (r *MissingRateLimit) ID() string                      { return "BATOU-AUTH-008" }
+func (r *MissingRateLimit) Name() string                    { return "MissingRateLimit" }
 func (r *MissingRateLimit) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingRateLimit) Description() string {
 	return "Detects login/authentication endpoints without rate limiting middleware, enabling brute-force attacks."
@@ -89,18 +98,19 @@ func (r *MissingRateLimit) Languages() []rules.Language {
 }
 
 func (r *MissingRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
-	hasRateLimit := reExtRateLimit.MatchString(ctx.Content)
+	hasRateLimit := rules.GMatchFile(reExtRateLimit, ctx)
 	if hasRateLimit {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if m := reExtLoginRoute.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtLoginRoute, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -132,8 +142,8 @@ func (r *MissingRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TimingAttackComparison struct{}
 
-func (r *TimingAttackComparison) ID() string                     { return "BATOU-AUTH-009" }
-func (r *TimingAttackComparison) Name() string                   { return "TimingAttackComparison" }
+func (r *TimingAttackComparison) ID() string                      { return "BATOU-AUTH-009" }
+func (r *TimingAttackComparison) Name() string                    { return "TimingAttackComparison" }
 func (r *TimingAttackComparison) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TimingAttackComparison) Description() string {
 	return "Detects password/secret comparison using == operator instead of constant-time comparison, enabling timing side-channel attacks."
@@ -144,11 +154,12 @@ func (r *TimingAttackComparison) Languages() []rules.Language {
 
 func (r *TimingAttackComparison) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Skip if file already uses safe comparison functions
-	if reExtSafeCompare.MatchString(ctx.Content) {
+	if rules.GMatchFile(reExtSafeCompare, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
@@ -157,11 +168,11 @@ func (r *TimingAttackComparison) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		switch ctx.Language {
 		case rules.LangGo, rules.LangJava:
-			matched = reExtPasswordEqGo.FindString(line)
+			matched = rules.GFindLower(reExtPasswordEqGo, line, lowered[i])
 		case rules.LangJavaScript, rules.LangTypeScript:
-			matched = reExtPasswordEqJS.FindString(line)
+			matched = rules.GFindLower(reExtPasswordEqJS, line, lowered[i])
 		case rules.LangPython:
-			matched = reExtPasswordEqPy.FindString(line)
+			matched = rules.GFindLower(reExtPasswordEqPy, line, lowered[i])
 		}
 		if matched != "" {
 			if len(matched) > 120 {
@@ -194,8 +205,8 @@ func (r *TimingAttackComparison) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HardcodedAdminCreds struct{}
 
-func (r *HardcodedAdminCreds) ID() string                     { return "BATOU-AUTH-010" }
-func (r *HardcodedAdminCreds) Name() string                   { return "HardcodedAdminCreds" }
+func (r *HardcodedAdminCreds) ID() string                      { return "BATOU-AUTH-010" }
+func (r *HardcodedAdminCreds) Name() string                    { return "HardcodedAdminCreds" }
 func (r *HardcodedAdminCreds) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *HardcodedAdminCreds) Description() string {
 	return "Detects hardcoded admin or default credentials in source code."
@@ -206,16 +217,17 @@ func (r *HardcodedAdminCreds) Languages() []rules.Language {
 
 func (r *HardcodedAdminCreds) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
 		var matched string
-		if m := reExtHardcodedAdmin.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtHardcodedAdmin, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reExtDefaultCreds.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reExtDefaultCreds, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -249,8 +261,8 @@ func (r *HardcodedAdminCreds) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingCSRF struct{}
 
-func (r *MissingCSRF) ID() string                     { return "BATOU-AUTH-011" }
-func (r *MissingCSRF) Name() string                   { return "MissingCSRF" }
+func (r *MissingCSRF) ID() string                      { return "BATOU-AUTH-011" }
+func (r *MissingCSRF) Name() string                    { return "MissingCSRF" }
 func (r *MissingCSRF) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MissingCSRF) Description() string {
 	return "Detects state-changing endpoints without CSRF token validation."
@@ -262,22 +274,23 @@ func (r *MissingCSRF) Languages() []rules.Language {
 func (r *MissingCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// JWT Bearer token auth is transmitted via Authorization header, not
 	// cookies, so it is inherently immune to CSRF.
-	if reJWTBearerAuth.MatchString(ctx.Content) {
+	if rules.GMatchFile(reJWTBearerAuth, ctx) {
 		return nil
 	}
 
-	hasCSRF := reExtCSRFToken.MatchString(ctx.Content)
+	hasCSRF := rules.GMatchFile(reExtCSRFToken, ctx)
 	if hasCSRF {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if m := reExtStateChanging.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtStateChanging, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -309,8 +322,8 @@ func (r *MissingCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AuthBypassParam struct{}
 
-func (r *AuthBypassParam) ID() string                     { return "BATOU-AUTH-012" }
-func (r *AuthBypassParam) Name() string                   { return "AuthBypassParam" }
+func (r *AuthBypassParam) ID() string                      { return "BATOU-AUTH-012" }
+func (r *AuthBypassParam) Name() string                    { return "AuthBypassParam" }
 func (r *AuthBypassParam) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AuthBypassParam) Description() string {
 	return "Detects authentication/authorization decisions based on user-controllable request parameters."
@@ -321,13 +334,14 @@ func (r *AuthBypassParam) Languages() []rules.Language {
 
 func (r *AuthBypassParam) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if m := reExtAuthBypass.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtAuthBypass, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -359,8 +373,8 @@ func (r *AuthBypassParam) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type BrokenAccessControl struct{}
 
-func (r *BrokenAccessControl) ID() string                     { return "BATOU-AUTH-013" }
-func (r *BrokenAccessControl) Name() string                   { return "BrokenAccessControl" }
+func (r *BrokenAccessControl) ID() string                      { return "BATOU-AUTH-013" }
+func (r *BrokenAccessControl) Name() string                    { return "BrokenAccessControl" }
 func (r *BrokenAccessControl) DefaultSeverity() rules.Severity { return rules.High }
 func (r *BrokenAccessControl) Description() string {
 	return "Detects admin/privileged endpoints without access control checks."
@@ -370,18 +384,19 @@ func (r *BrokenAccessControl) Languages() []rules.Language {
 }
 
 func (r *BrokenAccessControl) Scan(ctx *rules.ScanContext) []rules.Finding {
-	hasAccessControl := reExtAccessControlCheck.MatchString(ctx.Content)
+	hasAccessControl := rules.GMatchFile(reExtAccessControlCheck, ctx)
 	if hasAccessControl {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if m := reExtAdminEndpoint.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtAdminEndpoint, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -413,8 +428,8 @@ func (r *BrokenAccessControl) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecurePasswordReset struct{}
 
-func (r *InsecurePasswordReset) ID() string                     { return "BATOU-AUTH-014" }
-func (r *InsecurePasswordReset) Name() string                   { return "InsecurePasswordReset" }
+func (r *InsecurePasswordReset) ID() string                      { return "BATOU-AUTH-014" }
+func (r *InsecurePasswordReset) Name() string                    { return "InsecurePasswordReset" }
 func (r *InsecurePasswordReset) DefaultSeverity() rules.Severity { return rules.High }
 func (r *InsecurePasswordReset) Description() string {
 	return "Detects password reset functionality using predictable token generation (Math.random, time-based, sequential)."
@@ -424,21 +439,22 @@ func (r *InsecurePasswordReset) Languages() []rules.Language {
 }
 
 func (r *InsecurePasswordReset) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reExtPasswordReset.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reExtPasswordReset, ctx) {
 		return nil
 	}
 	// Skip if secure token generation is present
-	if reExtSecureToken.MatchString(ctx.Content) {
+	if rules.GMatchFile(reExtSecureToken, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if m := reExtPredictableToken.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtPredictableToken, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -470,8 +486,8 @@ func (r *InsecurePasswordReset) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingMFA struct{}
 
-func (r *MissingMFA) ID() string                     { return "BATOU-AUTH-015" }
-func (r *MissingMFA) Name() string                   { return "MissingMFA" }
+func (r *MissingMFA) ID() string                      { return "BATOU-AUTH-015" }
+func (r *MissingMFA) Name() string                    { return "MissingMFA" }
 func (r *MissingMFA) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingMFA) Description() string {
 	return "Detects sensitive operations (transfers, password changes) without multi-factor authentication verification."
@@ -481,19 +497,23 @@ func (r *MissingMFA) Languages() []rules.Language {
 }
 
 func (r *MissingMFA) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if reExtMFACheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reExtMFACheck, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if m := reExtSensitiveOp.FindString(line); m != "" {
-			// Only flag route definitions, not variable names
-			if strings.Contains(line, "(") && (strings.Contains(line, "/") || strings.Contains(line, "def ") || strings.Contains(line, "func ")) {
+		if m := rules.GFindLower(reExtSensitiveOp, line, lowered[i]); m != "" {
+			// Require an HTTP-route shape on the same line (or a window
+			// around it). This avoids firing on every Go function, CLI
+			// command, migration, test, or struct method that happens to
+			// mention a sensitive keyword.
+			if rules.GMatchLower(reExtHTTPRouteShape, line, lowered[i]) || hasNearbyHTTPRouteShape(lines, i, 3) {
 				matched := m
 				_ = matched // used below in Finding
 				findings = append(findings, rules.Finding{
@@ -518,14 +538,35 @@ func (r *MissingMFA) Scan(ctx *rules.ScanContext) []rules.Finding {
 	return findings
 }
 
+// hasNearbyHTTPRouteShape returns true when an HTTP route shape (annotation,
+// decorator, or handler-registration call) appears within `window` lines
+// before or after lineIdx. This catches Spring/Flask/FastAPI patterns
+// where the decorator/annotation is on a line above the function.
+func hasNearbyHTTPRouteShape(lines []string, lineIdx, window int) bool {
+	start := lineIdx - window
+	if start < 0 {
+		start = 0
+	}
+	end := lineIdx + window
+	if end >= len(lines) {
+		end = len(lines) - 1
+	}
+	for i := start; i <= end; i++ {
+		if reExtHTTPRouteShape.MatchString(lines[i]) {
+			return true
+		}
+	}
+	return false
+}
+
 // ========================================================================
 // BATOU-AUTH-016: Username Enumeration via Different Error Messages
 // ========================================================================
 
 type UsernameEnumeration struct{}
 
-func (r *UsernameEnumeration) ID() string                     { return "BATOU-AUTH-016" }
-func (r *UsernameEnumeration) Name() string                   { return "UsernameEnumeration" }
+func (r *UsernameEnumeration) ID() string                      { return "BATOU-AUTH-016" }
+func (r *UsernameEnumeration) Name() string                    { return "UsernameEnumeration" }
 func (r *UsernameEnumeration) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UsernameEnumeration) Description() string {
 	return "Detects different error messages for invalid username vs invalid password, enabling username enumeration."
@@ -535,19 +576,20 @@ func (r *UsernameEnumeration) Languages() []rules.Language {
 }
 
 func (r *UsernameEnumeration) Scan(ctx *rules.ScanContext) []rules.Finding {
-	hasUserNotFound := reExtUserNotFound.MatchString(ctx.Content)
-	hasWrongPassword := reExtWrongPassword.MatchString(ctx.Content)
+	hasUserNotFound := rules.GMatchFile(reExtUserNotFound, ctx)
+	hasWrongPassword := rules.GMatchFile(reExtWrongPassword, ctx)
 	if !hasUserNotFound || !hasWrongPassword {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if m := reExtUserNotFound.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtUserNotFound, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -580,8 +622,8 @@ func (r *UsernameEnumeration) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WeakPasswordPolicyExt struct{}
 
-func (r *WeakPasswordPolicyExt) ID() string                     { return "BATOU-AUTH-017" }
-func (r *WeakPasswordPolicyExt) Name() string                   { return "WeakPasswordPolicyExt" }
+func (r *WeakPasswordPolicyExt) ID() string                      { return "BATOU-AUTH-017" }
+func (r *WeakPasswordPolicyExt) Name() string                    { return "WeakPasswordPolicyExt" }
 func (r *WeakPasswordPolicyExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *WeakPasswordPolicyExt) Description() string {
 	return "Detects password policies that only check length without requiring character complexity."
@@ -592,21 +634,22 @@ func (r *WeakPasswordPolicyExt) Languages() []rules.Language {
 
 func (r *WeakPasswordPolicyExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Check if the file has password length checks but no complexity requirements
-	hasLengthCheck := reExtWeakPolicyNoUpper.MatchString(ctx.Content)
-	hasComplexity := reExtComplexityCheck.MatchString(ctx.Content)
+	hasLengthCheck := rules.GMatchFile(reExtWeakPolicyNoUpper, ctx)
+	hasComplexity := rules.GMatchFile(reExtComplexityCheck, ctx)
 
 	if !hasLengthCheck || hasComplexity {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if m := reExtWeakPolicyNoUpper.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatchLower(reExtWeakPolicyNoUpper, line, lowered[i]); m != nil {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

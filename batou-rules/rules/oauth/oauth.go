@@ -13,10 +13,8 @@ import (
 
 // BATOU-OAUTH-001: OAuth state parameter missing (CSRF)
 var (
-	reOAuthAuthURL        = regexp.MustCompile(`(?i)(?:authorize_url|authorization_url|auth_url|authorizationEndpoint|authorize_endpoint|/authorize\?|/oauth/authorize)`)
-	reOAuthStateParam     = regexp.MustCompile(`(?i)(?:state\s*[=:&]|[&?]state=|\bstate\b\s*[:=]\s*[^,\s])`)
-	reOAuthNoState        = regexp.MustCompile(`(?i)(?:authorize_url|authorization_url|auth_url|/authorize\?)[^;]*(?:\?|&)(?:client_id|response_type|redirect_uri)`)
-	reOAuthStateVerify    = regexp.MustCompile(`(?i)(?:verify_state|validate_state|check_state|state\s*(?:===?|!==?|==|!=)\s*(?:session|stored|expected|saved)|session\s*\[\s*["']state["']\s*\])`)
+	reOAuthStateParam = regexp.MustCompile(`(?i)(?:state\s*[=:&]|[&?]state=|\bstate\b\s*[:=]\s*[^,\s])`)
+	reOAuthNoState    = regexp.MustCompile(`(?i)(?:authorize_url|authorization_url|auth_url|/authorize\?)[^;]*(?:\?|&)(?:client_id|response_type|redirect_uri)`)
 )
 
 // BATOU-OAUTH-002: OAuth implicit grant flow (deprecated)
@@ -44,8 +42,15 @@ var (
 
 // BATOU-OAUTH-005: PKCE not used
 var (
-	reOAuthCodeGrant     = regexp.MustCompile(`(?i)(?:response_type\s*[=:]\s*["']code["']|grant_type\s*[=:]\s*["']authorization_code["']|AuthorizationCode)`)
-	reOAuthPKCE          = regexp.MustCompile(`(?i)(?:code_challenge|code_verifier|PKCE|S256|pkce|proof.?key)`)
+	reOAuthCodeGrant = regexp.MustCompile(`(?i)(?:response_type\s*[=:]\s*["']code["']|grant_type\s*[=:]\s*["']authorization_code["']|AuthorizationCode)`)
+	reOAuthPKCE      = regexp.MustCompile(`(?i)(?:code_challenge|code_verifier|PKCE|S256|pkce|proof.?key)`)
+	// OAuth/OIDC client libraries that perform PKCE automatically for the
+	// authorization-code flow. When one is imported, `response_type: 'code'`
+	// without an explicit `code_challenge` is NOT a missing-PKCE bug —
+	// owncloud/web's oidc-client-ts usage produced ~6 FPs here.
+	reOAuthPKCELib = regexp.MustCompile(`(?i)(?:oidc-client-ts|\boidc-client\b|openid-client|@panva/oauth4webapi|\boauth4webapi\b|react-oidc-context|angular-oauth2-oidc|@badgateway/oauth2-client|\bAppAuth\b|\bappauth\b|react-native-app-auth|@openid/appauth)`)
+	// Other explicit PKCE-handling signals anywhere in the file.
+	reOAuthPKCEHint = regexp.MustCompile(`(?i)(?:usePkce|use_pkce|with_?pkce|enablePkce|pkce\s*[:=]\s*(?:true|['"][^'"]*['"])|responseMode|response_mode)`)
 )
 
 // BATOU-OAUTH-006: OAuth client secret exposed in frontend
@@ -68,10 +73,21 @@ var (
 )
 
 // BATOU-OAUTH-009: OpenID Connect nonce not validated
+//
+// Tightening note (2026-04-25): the previous reOIDCAuthRequest alternation
+// `(?:openid|id_token|...)` matched any literal `OpenId` or `id_token`
+// reference — type names like `OpenIdConfig`, config keys like
+// `openId: {...}`, framework registration like `useOpenId()`. Frontend
+// codebases like owncloud/web that consume an OIDC client library
+// produced 10 FPs without doing any authorization-request construction.
+//
+// Tightened to require actual flow-construction shape: a `response_type`
+// containing `id_token`, a `scope` containing `openid`, or an OIDC
+// authorize endpoint URL. Bare keyword mentions no longer trigger.
 var (
-	reOIDCAuthRequest   = regexp.MustCompile(`(?i)(?:openid|id_token|response_type\s*[=:]\s*["'][^"']*id_token)`)
-	reOIDCNonce         = regexp.MustCompile(`(?i)(?:nonce\s*[=:&]|[&?]nonce=|\bnonce\b\s*[:=]\s*[^,\s])`)
-	reOIDCNonceVerify   = regexp.MustCompile(`(?i)(?:verify_nonce|validate_nonce|check_nonce|nonce\s*(?:===?|!==?|==|!=)\s*(?:session|stored|expected|saved)|claims\s*\[\s*["']nonce["']\s*\])`)
+	reOIDCAuthRequest = regexp.MustCompile(`(?i)(?:response_type\s*[=:]\s*["'][^"']*id_token|scope\s*[=:]\s*["'][^"']*\bopenid\b|/authorize\?[^"'\s]*\bopenid\b|/oauth2?/authorize\b|\.authorize\s*\([^)]*\bopenid\b)`)
+	reOIDCNonce       = regexp.MustCompile(`(?i)(?:nonce\s*[=:&]|[&?]nonce=|\bnonce\b\s*[:=]\s*[^,\s])`)
+	reOIDCNonceVerify = regexp.MustCompile(`(?i)(?:verify_nonce|validate_nonce|check_nonce|nonce\s*(?:===?|!==?|==|!=)\s*(?:session|stored|expected|saved)|claims\s*\[\s*["']nonce["']\s*\])`)
 )
 
 // ---------------------------------------------------------------------------
@@ -103,7 +119,7 @@ func hasNearbyPattern(lines []string, idx, before, after int, re *regexp.Regexp)
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if re.MatchString(l) {
+		if rules.GMatch(re, l) {
 			return true
 		}
 	}
@@ -121,8 +137,8 @@ func fileContains(content string, re *regexp.Regexp) bool {
 
 type OAuthNoState struct{}
 
-func (r *OAuthNoState) ID() string                     { return "BATOU-OAUTH-001" }
-func (r *OAuthNoState) Name() string                   { return "OAuthNoState" }
+func (r *OAuthNoState) ID() string                      { return "BATOU-OAUTH-001" }
+func (r *OAuthNoState) Name() string                    { return "OAuthNoState" }
 func (r *OAuthNoState) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OAuthNoState) Description() string {
 	return "Detects OAuth authorization requests missing the state parameter, making the flow vulnerable to CSRF attacks."
@@ -133,15 +149,15 @@ func (r *OAuthNoState) Languages() []rules.Language {
 
 func (r *OAuthNoState) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reOAuthNoState.FindString(line); m != "" {
+		if m := rules.GFind(reOAuthNoState, line); m != "" {
 			// Check if state parameter is included
-			if reOAuthStateParam.MatchString(line) {
+			if rules.GMatch(reOAuthStateParam, line) {
 				continue
 			}
 			if hasNearbyPattern(lines, i, 5, 5, reOAuthStateParam) {
@@ -174,8 +190,8 @@ func (r *OAuthNoState) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OAuthImplicitGrant struct{}
 
-func (r *OAuthImplicitGrant) ID() string                     { return "BATOU-OAUTH-002" }
-func (r *OAuthImplicitGrant) Name() string                   { return "OAuthImplicitGrant" }
+func (r *OAuthImplicitGrant) ID() string                      { return "BATOU-OAUTH-002" }
+func (r *OAuthImplicitGrant) Name() string                    { return "OAuthImplicitGrant" }
 func (r *OAuthImplicitGrant) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OAuthImplicitGrant) Description() string {
 	return "Detects use of the OAuth 2.0 implicit grant flow (response_type=token), which is deprecated due to token exposure in URL fragments and browser history."
@@ -186,14 +202,14 @@ func (r *OAuthImplicitGrant) Languages() []rules.Language {
 
 func (r *OAuthImplicitGrant) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reOAuthImplicitGrant, reOAuthImplicitFlow} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -223,8 +239,8 @@ func (r *OAuthImplicitGrant) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OAuthOpenRedirect struct{}
 
-func (r *OAuthOpenRedirect) ID() string                     { return "BATOU-OAUTH-003" }
-func (r *OAuthOpenRedirect) Name() string                   { return "OAuthOpenRedirect" }
+func (r *OAuthOpenRedirect) ID() string                      { return "BATOU-OAUTH-003" }
+func (r *OAuthOpenRedirect) Name() string                    { return "OAuthOpenRedirect" }
 func (r *OAuthOpenRedirect) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OAuthOpenRedirect) Description() string {
 	return "Detects OAuth redirect_uri constructed from user input without validation, enabling authorization code/token theft via open redirect."
@@ -235,14 +251,14 @@ func (r *OAuthOpenRedirect) Languages() []rules.Language {
 
 func (r *OAuthOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reOAuthRedirectOpen, reOAuthRedirectConcat} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				if hasNearbyPattern(lines, i, 10, 10, reOAuthRedirectValidate) {
 					continue
 				}
@@ -275,8 +291,8 @@ func (r *OAuthOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OAuthTokenFragment struct{}
 
-func (r *OAuthTokenFragment) ID() string                     { return "BATOU-OAUTH-004" }
-func (r *OAuthTokenFragment) Name() string                   { return "OAuthTokenFragment" }
+func (r *OAuthTokenFragment) ID() string                      { return "BATOU-OAUTH-004" }
+func (r *OAuthTokenFragment) Name() string                    { return "OAuthTokenFragment" }
 func (r *OAuthTokenFragment) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OAuthTokenFragment) Description() string {
 	return "Detects code that extracts OAuth tokens from URL fragments (hash), indicating use of the insecure implicit flow or improper token handling."
@@ -287,13 +303,13 @@ func (r *OAuthTokenFragment) Languages() []rules.Language {
 
 func (r *OAuthTokenFragment) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// If the file uses hash routing patterns (SPA routers) and has no
 	// credential-like patterns, this is a hash router — not OAuth token
 	// extraction. Suppress to avoid false positives.
-	hasRouting := reHashRouting.MatchString(ctx.Content)
-	hasCredential := reHashCredential.MatchString(ctx.Content)
+	hasRouting := rules.GMatchFile(reHashRouting, ctx)
+	hasCredential := rules.GMatchFile(reHashCredential, ctx)
 	if hasRouting && !hasCredential {
 		return nil
 	}
@@ -304,9 +320,9 @@ func (r *OAuthTokenFragment) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reOAuthTokenFragment, reOAuthTokenFromHash} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				// Per-line check: skip lines that look like route handling.
-				if reHashRouting.MatchString(line) && !reHashCredential.MatchString(line) {
+				if rules.GMatch(reHashRouting, line) && !rules.GMatch(reHashCredential, line) {
 					continue
 				}
 				findings = append(findings, rules.Finding{
@@ -338,8 +354,8 @@ func (r *OAuthTokenFragment) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OAuthNoPKCE struct{}
 
-func (r *OAuthNoPKCE) ID() string                     { return "BATOU-OAUTH-005" }
-func (r *OAuthNoPKCE) Name() string                   { return "OAuthNoPKCE" }
+func (r *OAuthNoPKCE) ID() string                      { return "BATOU-OAUTH-005" }
+func (r *OAuthNoPKCE) Name() string                    { return "OAuthNoPKCE" }
 func (r *OAuthNoPKCE) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OAuthNoPKCE) Description() string {
 	return "Detects OAuth authorization code flow without PKCE (Proof Key for Code Exchange), which is required for public clients and recommended for all clients."
@@ -350,15 +366,19 @@ func (r *OAuthNoPKCE) Languages() []rules.Language {
 
 func (r *OAuthNoPKCE) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reOAuthCodeGrant.FindString(line); m != "" {
-			// Check if PKCE is used in the file
-			if fileContains(ctx.Content, reOAuthPKCE) {
+		if m := rules.GFind(reOAuthCodeGrant, line); m != "" {
+			// Check if PKCE is used in the file (explicit), or a known
+			// PKCE-handling OAuth/OIDC client library is in use, or another
+			// PKCE-related config signal is present.
+			if fileContains(ctx.Content, reOAuthPKCE) ||
+				fileContains(ctx.Content, reOAuthPKCELib) ||
+				fileContains(ctx.Content, reOAuthPKCEHint) {
 				continue
 			}
 			findings = append(findings, rules.Finding{
@@ -388,8 +408,8 @@ func (r *OAuthNoPKCE) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OAuthClientSecretFE struct{}
 
-func (r *OAuthClientSecretFE) ID() string                     { return "BATOU-OAUTH-006" }
-func (r *OAuthClientSecretFE) Name() string                   { return "OAuthClientSecretFE" }
+func (r *OAuthClientSecretFE) ID() string                      { return "BATOU-OAUTH-006" }
+func (r *OAuthClientSecretFE) Name() string                    { return "OAuthClientSecretFE" }
 func (r *OAuthClientSecretFE) DefaultSeverity() rules.Severity { return rules.High }
 func (r *OAuthClientSecretFE) Description() string {
 	return "Detects OAuth client_secret hardcoded in frontend JavaScript/TypeScript code, where it is exposed to all users."
@@ -400,13 +420,13 @@ func (r *OAuthClientSecretFE) Languages() []rules.Language {
 
 func (r *OAuthClientSecretFE) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reOAuthClientSecretFE.FindString(line); m != "" {
+		if m := rules.GFind(reOAuthClientSecretFE, line); m != "" {
 			// Check if this looks like frontend code
 			if fileContains(ctx.Content, reFrontendContext) || strings.HasSuffix(ctx.FilePath, ".jsx") || strings.HasSuffix(ctx.FilePath, ".tsx") || strings.Contains(ctx.FilePath, "public/") || strings.Contains(ctx.FilePath, "static/") || strings.Contains(ctx.FilePath, "src/") {
 				findings = append(findings, rules.Finding{
@@ -437,8 +457,8 @@ func (r *OAuthClientSecretFE) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OAuthScopeNotValidated struct{}
 
-func (r *OAuthScopeNotValidated) ID() string                     { return "BATOU-OAUTH-007" }
-func (r *OAuthScopeNotValidated) Name() string                   { return "OAuthScopeNotValidated" }
+func (r *OAuthScopeNotValidated) ID() string                      { return "BATOU-OAUTH-007" }
+func (r *OAuthScopeNotValidated) Name() string                    { return "OAuthScopeNotValidated" }
 func (r *OAuthScopeNotValidated) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OAuthScopeNotValidated) Description() string {
 	return "Detects OAuth scope values taken directly from user input without server-side validation, allowing scope escalation."
@@ -449,14 +469,14 @@ func (r *OAuthScopeNotValidated) Languages() []rules.Language {
 
 func (r *OAuthScopeNotValidated) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reOAuthScopeFromUser, reOAuthScopeConcat} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				if hasNearbyPattern(lines, i, 10, 10, reOAuthScopeValidate) {
 					continue
 				}
@@ -489,8 +509,8 @@ func (r *OAuthScopeNotValidated) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OAuthTokenLocalStorage struct{}
 
-func (r *OAuthTokenLocalStorage) ID() string                     { return "BATOU-OAUTH-008" }
-func (r *OAuthTokenLocalStorage) Name() string                   { return "OAuthTokenLocalStorage" }
+func (r *OAuthTokenLocalStorage) ID() string                      { return "BATOU-OAUTH-008" }
+func (r *OAuthTokenLocalStorage) Name() string                    { return "OAuthTokenLocalStorage" }
 func (r *OAuthTokenLocalStorage) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OAuthTokenLocalStorage) Description() string {
 	return "Detects OAuth tokens stored in localStorage, which is accessible to any JavaScript on the page including XSS payloads."
@@ -501,14 +521,14 @@ func (r *OAuthTokenLocalStorage) Languages() []rules.Language {
 
 func (r *OAuthTokenLocalStorage) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reOAuthTokenLocalStorage, reOAuthTokenLSDirect} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -538,8 +558,8 @@ func (r *OAuthTokenLocalStorage) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type OIDCNoNonce struct{}
 
-func (r *OIDCNoNonce) ID() string                     { return "BATOU-OAUTH-009" }
-func (r *OIDCNoNonce) Name() string                   { return "OIDCNoNonce" }
+func (r *OIDCNoNonce) ID() string                      { return "BATOU-OAUTH-009" }
+func (r *OIDCNoNonce) Name() string                    { return "OIDCNoNonce" }
 func (r *OIDCNoNonce) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *OIDCNoNonce) Description() string {
 	return "Detects OpenID Connect flows that do not include or validate the nonce parameter, making them vulnerable to token replay attacks."
@@ -550,13 +570,13 @@ func (r *OIDCNoNonce) Languages() []rules.Language {
 
 func (r *OIDCNoNonce) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reOIDCAuthRequest.FindString(line); m != "" {
+		if m := rules.GFind(reOIDCAuthRequest, line); m != "" {
 			// Check if nonce is included in the request
 			if fileContains(ctx.Content, reOIDCNonce) {
 				// Also check if nonce is verified

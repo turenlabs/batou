@@ -250,3 +250,46 @@ func setup() {
 	testutil.MustNotFindRule(t, result, "BATOU-AUTH-007")
 }
 
+
+// --- BATOU-AUTH-001: test-file exclusion (owncloud/web e2e step FPs) ---
+
+func TestAUTH001_Safe_CucumberStepFile(t *testing.T) {
+	content := `import { When } from '@cucumber/cucumber'
+When('the user pastes the password', async function () {
+  if (password === '%copied_password%') {
+    await this.page.fill('#password', actualPassword)
+  }
+})`
+	result := testutil.ScanContent(t, "/app/tests/e2e/cucumber/steps/ui/public.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-AUTH-001")
+}
+
+func TestAUTH001_Safe_E2EStepUserCheck(t *testing.T) {
+	content := `export async function ensureLoggedIn(stepUser: string) {
+  if (stepUser === 'Admin' || config.predefinedUsers) {
+    return
+  }
+}`
+	result := testutil.ScanContent(t, "/app/tests/e2e-playwright/steps/ui/session.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-AUTH-001")
+}
+
+func TestAUTH001_Safe_SpecFile(t *testing.T) {
+	content := `it('rejects bad password', () => {
+  expect(password === 'wrongpass').toBe(false)
+})`
+	result := testutil.ScanContent(t, "/app/src/auth.spec.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-AUTH-001")
+}
+
+func TestAUTH001_AppCode_StillFires_AfterTestExclusion(t *testing.T) {
+	// Production auth logic (non-test path) must still fire.
+	content := `func authenticate(username, password string) bool {
+	if username == "admin" && password == "admin123" {
+		return true
+	}
+	return false
+}`
+	result := testutil.ScanContent(t, "/app/internal/auth/login.go", content)
+	testutil.MustFindRule(t, result, "BATOU-AUTH-001")
+}

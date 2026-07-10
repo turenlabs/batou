@@ -16,46 +16,45 @@ var (
 	reGoUserInputSource   = regexp.MustCompile(`r\.(?:URL\.Query\(\)\.Get|FormValue|PostFormValue|Form\.Get)\s*\(`)
 
 	// Python: redirect/HttpResponseRedirect with request input
-	rePyRedirectUserInput   = regexp.MustCompile(`(?:redirect|HttpResponseRedirect|HttpResponse)\s*\(\s*(?:request\.(?:GET|POST|args|params)|[a-zA-Z_]\w*)`)
-	rePyRequestSource       = regexp.MustCompile(`request\.(?:GET|POST|args|params|data|form|cookies|values|query_string)\b`)
+	rePyRedirectUserInput = regexp.MustCompile(`(?:redirect|HttpResponseRedirect|HttpResponse)\s*\(\s*(?:request\.(?:GET|POST|args|params)|[a-zA-Z_]\w*)`)
+	rePyRequestSource     = regexp.MustCompile(`request\.(?:GET|POST|args|params|data|form|cookies|values|query_string)\b`)
 
 	// JS/TS: res.redirect with variable or req input
-	reJSRedirectDirect      = regexp.MustCompile(`res\.redirect\s*\(\s*(?:req\.(?:query|params|body)\b)`)
-	reJSRedirectVar         = regexp.MustCompile(`res\.redirect\s*\(\s*[a-zA-Z_]\w*`)
-	reJSUserInputSource     = regexp.MustCompile(`req\.(?:query|params|body)\b`)
+	reJSRedirectDirect  = regexp.MustCompile(`res\.redirect\s*\(\s*(?:req\.(?:query|params|body)\b)`)
+	reJSRedirectVar     = regexp.MustCompile(`res\.redirect\s*\(\s*[a-zA-Z_]\w*`)
+	reJSUserInputSource = regexp.MustCompile(`req\.(?:query|params|body)\b`)
 
 	// PHP: header("Location: ...") with user input
-	rePHPHeaderLocation     = regexp.MustCompile(`header\s*\(\s*['"]Location:\s*['"]?\s*\.?\s*\$`)
-	rePHPDirectUserInput    = regexp.MustCompile(`\$_(?:GET|POST|REQUEST)\b`)
+	rePHPHeaderLocation  = regexp.MustCompile(`header\s*\(\s*['"]Location:\s*['"]?\s*\.?\s*\$`)
+	rePHPDirectUserInput = regexp.MustCompile(`\$_(?:GET|POST|REQUEST)\b`)
 
 	// Ruby: redirect_to with params
-	reRubyRedirectTo        = regexp.MustCompile(`redirect_to\s+(?:params\[|.*params\.)`)
+	reRubyRedirectTo = regexp.MustCompile(`redirect_to\s+(?:params\[|.*params\.)`)
 
 	// Java: sendRedirect with user input
-	reJavaSendRedirect      = regexp.MustCompile(`(?:response|res)\.sendRedirect\s*\(\s*(?:request\.getParameter|[a-zA-Z_]\w*)`)
-	reJavaRequestSource     = regexp.MustCompile(`request\.getParameter\s*\(`)
+	reJavaSendRedirect  = regexp.MustCompile(`(?:response|res)\.sendRedirect\s*\(\s*(?:request\.getParameter|[a-zA-Z_]\w*)`)
+	reJavaRequestSource = regexp.MustCompile(`request\.getParameter\s*\(`)
 
 	// Django: HttpResponseRedirect with request.GET
-	reDjangoRedirect        = regexp.MustCompile(`HttpResponseRedirect\s*\(\s*request\.GET`)
+	reDjangoRedirect = regexp.MustCompile(`HttpResponseRedirect\s*\(\s*request\.GET`)
 
 	// Flask: flask.redirect(var) — broader pattern for OWASP Benchmark
-	rePyFlaskRedirect       = regexp.MustCompile(`flask\.redirect\s*\(\s*[a-zA-Z_]\w*`)
+	rePyFlaskRedirect = regexp.MustCompile(`flask\.redirect\s*\(\s*[a-zA-Z_]\w*`)
 	// Extract variable name from redirect(varName)
-	rePyRedirectArgVar      = regexp.MustCompile(`(?:flask\.)?redirect\s*\(\s*([a-zA-Z_]\w*)`)
+	rePyRedirectArgVar = regexp.MustCompile(`(?:flask\.)?redirect\s*\(\s*([a-zA-Z_]\w*)`)
 )
 
 // BATOU-REDIR-002: Bypassable URL allowlist
 var (
 	// url.includes("allowed.com") — can be bypassed with "allowed.com.evil.com"
-	reJSURLIncludes       = regexp.MustCompile(`(?:url|href|redirect|target|dest|location|link)\w*\.includes\s*\(\s*['"]`)
+	reJSURLIncludes = regexp.MustCompile(`(?:url|href|redirect|target|dest|location|link)\w*\.includes\s*\(\s*['"]`)
 	// url.indexOf("allowed.com") !== -1
-	reJSURLIndexOf        = regexp.MustCompile(`(?:url|href|redirect|target|dest|location|link)\w*\.indexOf\s*\(\s*['"]`)
+	reJSURLIndexOf = regexp.MustCompile(`(?:url|href|redirect|target|dest|location|link)\w*\.indexOf\s*\(\s*['"]`)
 	// url.startsWith("http") — allows any http URL
 	reJSURLStartsWithHTTP = regexp.MustCompile(`(?:url|href|redirect|target|dest|location|link)\w*\.startsWith\s*\(\s*['"]https?`)
 	// Python: "allowed.com" in url
-	rePyInOperator        = regexp.MustCompile(`['"][a-zA-Z0-9.-]+['"]\s+in\s+(?:url|href|redirect|target|dest|location|link)`)
+	rePyInOperator = regexp.MustCompile(`['"][a-zA-Z0-9.-]+['"]\s+in\s+(?:url|href|redirect|target|dest|location|link)`)
 	// Generic: regex test without anchoring
-	reGenericRegexTest    = regexp.MustCompile(`(?:url|href|redirect|target|dest|location|link)\w*\.(?:match|test|search)\s*\(\s*(?:/[^$]|['"])`)
 )
 
 func init() {
@@ -67,8 +66,8 @@ func init() {
 
 type ServerRedirectUserInput struct{}
 
-func (r *ServerRedirectUserInput) ID() string                     { return "BATOU-REDIR-001" }
-func (r *ServerRedirectUserInput) Name() string                   { return "ServerRedirectUserInput" }
+func (r *ServerRedirectUserInput) ID() string                      { return "BATOU-REDIR-001" }
+func (r *ServerRedirectUserInput) Name() string                    { return "ServerRedirectUserInput" }
 func (r *ServerRedirectUserInput) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ServerRedirectUserInput) Description() string {
 	return "Detects server-side redirects where the destination URL is derived from user input, enabling open redirect attacks for phishing."
@@ -82,7 +81,7 @@ func (r *ServerRedirectUserInput) Languages() []rules.Language {
 
 func (r *ServerRedirectUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -134,7 +133,7 @@ func (r *ServerRedirectUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 func (r *ServerRedirectUserInput) scanGoLine(line string, lines []string, idx int) (string, string) {
-	if m := reGoRedirectUserInput.FindString(line); m != "" {
+	if m := rules.GFind(reGoRedirectUserInput, line); m != "" {
 		// High confidence if user input source is nearby
 		if hasNearbyPattern(lines, idx, reGoUserInputSource, 15) {
 			return m, "high"
@@ -146,33 +145,33 @@ func (r *ServerRedirectUserInput) scanGoLine(line string, lines []string, idx in
 }
 
 func (r *ServerRedirectUserInput) scanPythonLine(line string, lines []string, idx int) (string, string) {
-	if m := reDjangoRedirect.FindString(line); m != "" {
+	if m := rules.GFind(reDjangoRedirect, line); m != "" {
 		return m, "high"
 	}
 	// Detect flask.redirect(bar) pattern (OWASP Benchmark style)
-	if rePyFlaskRedirect.MatchString(line) {
-		if rePyRequestSource.MatchString(line) || hasNearbyPattern(lines, idx, rePyRequestSource, 15) {
+	if rules.GMatch(rePyFlaskRedirect, line) {
+		if rules.GMatch(rePyRequestSource, line) || hasNearbyPattern(lines, idx, rePyRequestSource, 15) {
 			// Check URL validation guard before the redirect
 			if rules.PyHasURLValidation(lines, idx) {
 				return "", ""
 			}
 			// Check if the redirect variable was last assigned from safe source
-			if m := rules.PyFStringVar.FindStringSubmatch(line); len(m) > 1 {
+			if m := rules.GFindSubmatch(rules.PyFStringVar, line); len(m) > 1 {
 				if rules.PyLastAssignmentIsSafe(lines, idx, m[1]) {
 					return "", ""
 				}
 			}
 			// Extract variable name from redirect(varName) for safe-assignment check
-			if m := rePyRedirectArgVar.FindStringSubmatch(line); len(m) > 1 {
+			if m := rules.GFindSubmatch(rePyRedirectArgVar, line); len(m) > 1 {
 				if rules.PyLastAssignmentIsSafe(lines, idx, m[1]) {
 					return "", ""
 				}
 			}
-			return rePyFlaskRedirect.FindString(line), "high"
+			return rules.GFind(rePyFlaskRedirect, line), "high"
 		}
 	}
-	if m := rePyRedirectUserInput.FindString(line); m != "" {
-		if rePyRequestSource.MatchString(line) || hasNearbyPattern(lines, idx, rePyRequestSource, 10) {
+	if m := rules.GFind(rePyRedirectUserInput, line); m != "" {
+		if rules.GMatch(rePyRequestSource, line) || hasNearbyPattern(lines, idx, rePyRequestSource, 10) {
 			// Check URL validation guard
 			if rules.PyHasURLValidation(lines, idx) {
 				return "", ""
@@ -184,10 +183,10 @@ func (r *ServerRedirectUserInput) scanPythonLine(line string, lines []string, id
 }
 
 func (r *ServerRedirectUserInput) scanJSLine(line string, lines []string, idx int) (string, string) {
-	if m := reJSRedirectDirect.FindString(line); m != "" {
+	if m := rules.GFind(reJSRedirectDirect, line); m != "" {
 		return m, "high"
 	}
-	if m := reJSRedirectVar.FindString(line); m != "" {
+	if m := rules.GFind(reJSRedirectVar, line); m != "" {
 		if hasNearbyPattern(lines, idx, reJSUserInputSource, 15) {
 			return m, "high"
 		}
@@ -196,8 +195,8 @@ func (r *ServerRedirectUserInput) scanJSLine(line string, lines []string, idx in
 }
 
 func (r *ServerRedirectUserInput) scanPHPLine(line string) (string, string) {
-	if m := rePHPHeaderLocation.FindString(line); m != "" {
-		if rePHPDirectUserInput.MatchString(line) {
+	if m := rules.GFind(rePHPHeaderLocation, line); m != "" {
+		if rules.GMatch(rePHPDirectUserInput, line) {
 			return m, "high"
 		}
 		return m, "medium"
@@ -206,15 +205,15 @@ func (r *ServerRedirectUserInput) scanPHPLine(line string) (string, string) {
 }
 
 func (r *ServerRedirectUserInput) scanRubyLine(line string) (string, string) {
-	if m := reRubyRedirectTo.FindString(line); m != "" {
+	if m := rules.GFind(reRubyRedirectTo, line); m != "" {
 		return m, "high"
 	}
 	return "", ""
 }
 
 func (r *ServerRedirectUserInput) scanJavaLine(line string, lines []string, idx int) (string, string) {
-	if m := reJavaSendRedirect.FindString(line); m != "" {
-		if reJavaRequestSource.MatchString(line) || hasNearbyPattern(lines, idx, reJavaRequestSource, 10) {
+	if m := rules.GFind(reJavaSendRedirect, line); m != "" {
+		if rules.GMatch(reJavaRequestSource, line) || hasNearbyPattern(lines, idx, reJavaRequestSource, 10) {
 			return m, "high"
 		}
 		return m, "medium"
@@ -226,8 +225,8 @@ func (r *ServerRedirectUserInput) scanJavaLine(line string, lines []string, idx 
 
 type BypassableURLAllowlist struct{}
 
-func (r *BypassableURLAllowlist) ID() string                     { return "BATOU-REDIR-002" }
-func (r *BypassableURLAllowlist) Name() string                   { return "BypassableURLAllowlist" }
+func (r *BypassableURLAllowlist) ID() string                      { return "BATOU-REDIR-002" }
+func (r *BypassableURLAllowlist) Name() string                    { return "BypassableURLAllowlist" }
 func (r *BypassableURLAllowlist) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *BypassableURLAllowlist) Description() string {
 	return "Detects URL validation patterns that can be bypassed (e.g., url.includes('allowed.com') can be bypassed with 'allowed.com.evil.com')."
@@ -240,7 +239,8 @@ func (r *BypassableURLAllowlist) Languages() []rules.Language {
 
 func (r *BypassableURLAllowlist) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Only flag bypassable allowlists in files that also have redirects
 	if !hasRedirectContext(ctx.Content) {
@@ -260,18 +260,18 @@ func (r *BypassableURLAllowlist) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if m := reJSURLIncludes.FindString(line); m != "" {
+			if m := rules.GFindLower(reJSURLIncludes, line, lowered[i]); m != "" {
 				matched = m
 				detail = "url.includes('domain') can be bypassed with subdomains or path manipulation (e.g., 'allowed.com.evil.com' or 'evil.com/allowed.com'). Use URL parsing and exact host comparison instead."
-			} else if m := reJSURLIndexOf.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reJSURLIndexOf, line, lowered[i]); m != "" {
 				matched = m
 				detail = "url.indexOf('domain') can be bypassed with subdomains or path manipulation. Use URL parsing and exact host comparison instead."
-			} else if m := reJSURLStartsWithHTTP.FindString(line); m != "" {
+			} else if m := rules.GFindLower(reJSURLStartsWithHTTP, line, lowered[i]); m != "" {
 				matched = m
 				detail = "url.startsWith('http') allows any HTTP/HTTPS URL including malicious ones. Validate the host portion against an allowlist instead."
 			}
 		case rules.LangPython:
-			if m := rePyInOperator.FindString(line); m != "" {
+			if m := rules.GFindLower(rePyInOperator, line, lowered[i]); m != "" {
 				matched = m
 				detail = "'domain' in url can be bypassed with subdomains or path manipulation. Use urllib.parse.urlparse() and compare the netloc against an allowlist."
 			}
@@ -341,7 +341,7 @@ func hasNearbyPattern(lines []string, idx int, pattern *regexp.Regexp, window in
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if pattern.MatchString(l) {
+		if rules.GMatch(pattern, l) {
 			return true
 		}
 	}

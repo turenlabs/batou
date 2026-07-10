@@ -14,7 +14,6 @@ import (
 // BATOU-CS-001: SQL Injection (SqlCommand/SqlConnection with string concat/interpolation)
 var (
 	// SqlCommand with string concatenation
-	reSQLCommandConcat = regexp.MustCompile(`(?i)new\s+SqlCommand\s*\(\s*(?:["'][^"']*["']\s*\+|\$"[^"]*\{|[a-zA-Z_]\w*\s*[,)])`)
 	// CommandText assignment with concatenation or interpolation
 	reCommandTextConcat = regexp.MustCompile(`(?i)\.CommandText\s*=\s*(?:["'][^"']*["']\s*\+|\$"|[a-zA-Z_]\w*\s*;)`)
 	// String concat with SQL keywords (C# specific patterns)
@@ -66,7 +65,7 @@ var (
 
 // BATOU-CS-006: LDAP injection
 var (
-	reLDAPFilterConcat     = regexp.MustCompile(`(?i)(?:DirectorySearcher|searcher)\s*(?:\(\s*|\.Filter\s*=\s*)(?:["'][^"']*["']\s*\+|\$"|[a-zA-Z_]\w*\s*[;)])`)
+	reLDAPFilterConcat      = regexp.MustCompile(`(?i)(?:DirectorySearcher|searcher)\s*(?:\(\s*|\.Filter\s*=\s*)(?:["'][^"']*["']\s*\+|\$"|[a-zA-Z_]\w*\s*[;)])`)
 	reLDAPNewSearcherConcat = regexp.MustCompile(`(?i)new\s+DirectorySearcher\s*\(\s*(?:["'][^"']*["']\s*\+|\$")`)
 )
 
@@ -85,10 +84,10 @@ var (
 
 // BATOU-CS-010: CORS misconfiguration
 var (
-	reAllowAnyOrigin    = regexp.MustCompile(`\.AllowAnyOrigin\s*\(`)
-	reAllowCredentials  = regexp.MustCompile(`\.AllowCredentials\s*\(`)
-	reWithOriginsStar   = regexp.MustCompile(`\.WithOrigins\s*\(\s*["']\*["']\s*\)`)
-	reCORSPolicyStar    = regexp.MustCompile(`(?i)policy\.WithOrigins\s*\(\s*["']\*["']\s*\)`)
+	reAllowAnyOrigin   = regexp.MustCompile(`\.AllowAnyOrigin\s*\(`)
+	reAllowCredentials = regexp.MustCompile(`\.AllowCredentials\s*\(`)
+	reWithOriginsStar  = regexp.MustCompile(`\.WithOrigins\s*\(\s*["']\*["']\s*\)`)
+	reCORSPolicyStar   = regexp.MustCompile(`(?i)policy\.WithOrigins\s*\(\s*["']\*["']\s*\)`)
 )
 
 // BATOU-CS-011: Blazor JS interop injection
@@ -106,10 +105,8 @@ var (
 
 // BATOU-CS-013: Regex DoS (new Regex with user input without timeout)
 var (
-	reNewRegex        = regexp.MustCompile(`new\s+Regex\s*\(`)
-	reRegexTimeout    = regexp.MustCompile(`(?:RegexOptions\s*\.\s*None|TimeSpan|matchTimeout|RegexOptions\.[^)]*,\s*TimeSpan)`)
-	reRegexIsMatch    = regexp.MustCompile(`Regex\.(?:IsMatch|Match|Matches|Replace|Split)\s*\(`)
-	reRegexStaticSafe = regexp.MustCompile(`Regex\.(?:IsMatch|Match|Matches|Replace|Split)\s*\([^,)]*,[^,)]*,\s*RegexOptions`)
+	reNewRegex     = regexp.MustCompile(`new\s+Regex\s*\(`)
+	reRegexTimeout = regexp.MustCompile(`(?:RegexOptions\s*\.\s*None|TimeSpan|matchTimeout|RegexOptions\.[^)]*,\s*TimeSpan)`)
 )
 
 // BATOU-CS-014: Insecure random (System.Random for security)
@@ -122,8 +119,7 @@ var (
 
 // BATOU-CS-015: ViewData/ViewBag XSS
 var (
-	reViewDataAssign = regexp.MustCompile(`(?:ViewData|ViewBag)\s*\[?\s*["']?\w*["']?\]?\s*=`)
-	reHtmlRaw        = regexp.MustCompile(`@?Html\.Raw\s*\(`)
+	reHtmlRaw = regexp.MustCompile(`@?Html\.Raw\s*\(`)
 )
 
 // BATOU-CS-016: Open redirect
@@ -140,37 +136,37 @@ var (
 
 // BATOU-CS-018: Insecure XML (XmlDocument without XmlResolver=null)
 var (
-	reXmlDocument    = regexp.MustCompile(`new\s+XmlDocument\s*\(`)
-	reXmlReaderLoad  = regexp.MustCompile(`\.(?:LoadXml|Load)\s*\(`)
+	reXmlDocument     = regexp.MustCompile(`new\s+XmlDocument\s*\(`)
+	reXmlReaderLoad   = regexp.MustCompile(`\.(?:LoadXml|Load)\s*\(`)
 	reXmlResolverNull = regexp.MustCompile(`XmlResolver\s*=\s*null`)
-	reXmlDtdProc     = regexp.MustCompile(`DtdProcessing\s*=\s*DtdProcessing\.Prohibit`)
+	reXmlDtdProc      = regexp.MustCompile(`DtdProcessing\s*=\s*DtdProcessing\.Prohibit`)
 )
 
 // BATOU-CS-019: Expression injection (dynamic LINQ with user input)
 var (
-	reDynamicLinq = regexp.MustCompile(`\.(?:Where|OrderBy|Select|GroupBy)\s*\(\s*(?:[a-zA-Z_]\w*\s*\+|\$"|[a-zA-Z_]\w*\s*\))\s*`)
+	reDynamicLinq    = regexp.MustCompile(`\.(?:Where|OrderBy|Select|GroupBy)\s*\(\s*(?:[a-zA-Z_]\w*\s*\+|\$"|[a-zA-Z_]\w*\s*\))\s*`)
 	reDynamicLinqLib = regexp.MustCompile(`(?:System\.Linq\.Dynamic|DynamicQueryable)`)
 )
 
 // BATOU-CS-020: Missing [ValidateAntiForgeryToken] on POST endpoints
 var (
-	reHttpPostAttr         = regexp.MustCompile(`\[\s*Http(?:Post|Put|Delete|Patch)\s*\]`)
-	reAntiForgeryToken     = regexp.MustCompile(`\[\s*ValidateAntiForgeryToken\s*\]`)
-	reAutoAntiForgery      = regexp.MustCompile(`(?:AutoValidateAntiforgeryToken|IgnoreAntiforgeryToken|\[ApiController\])`)
+	reHttpPostAttr     = regexp.MustCompile(`\[\s*Http(?:Post|Put|Delete|Patch)\s*\]`)
+	reAntiForgeryToken = regexp.MustCompile(`\[\s*ValidateAntiForgeryToken\s*\]`)
+	reAutoAntiForgery  = regexp.MustCompile(`(?:AutoValidateAntiforgeryToken|IgnoreAntiforgeryToken|\[ApiController\])`)
 )
 
 // BATOU-CS-021: Hardcoded secrets (API keys, tokens in code)
 var (
-	reHardcodedSecret = regexp.MustCompile(`(?i)(?:apiKey|api_key|secret|secretKey|secret_key|accessKey|access_key|privateKey|private_key|clientSecret|client_secret)\s*=\s*["'][a-zA-Z0-9+/=_\-]{16,}["']`)
+	reHardcodedSecret      = regexp.MustCompile(`(?i)(?:apiKey|api_key|secret|secretKey|secret_key|accessKey|access_key|privateKey|private_key|clientSecret|client_secret)\s*=\s*["'][a-zA-Z0-9+/=_\-]{16,}["']`)
 	reHardcodedSecretConst = regexp.MustCompile(`(?i)(?:const|static\s+readonly)\s+string\s+\w*(?:Key|Secret|Token|Password)\w*\s*=\s*["'][^"']{8,}["']`)
 )
 
 // BATOU-CS-022: Unsafe reflection (Type.GetType/Activator.CreateInstance with user input)
 var (
-	reTypeGetType          = regexp.MustCompile(`Type\.GetType\s*\(\s*[a-zA-Z_]\w*`)
-	reActivatorCreate      = regexp.MustCompile(`Activator\.CreateInstance\s*\(\s*(?:Type\.GetType|[a-zA-Z_]\w*Type|[a-zA-Z_]\w*\))`)
-	reAssemblyLoad         = regexp.MustCompile(`Assembly\.(?:Load|LoadFrom|LoadFile)\s*\(\s*[a-zA-Z_]\w*`)
-	reReflectionSafe       = regexp.MustCompile(`(?i)(?:typeof\s*\(|nameof\s*\(|allowedTypes|typeWhitelist|validTypes)`)
+	reTypeGetType     = regexp.MustCompile(`Type\.GetType\s*\(\s*[a-zA-Z_]\w*`)
+	reActivatorCreate = regexp.MustCompile(`Activator\.CreateInstance\s*\(\s*(?:Type\.GetType|[a-zA-Z_]\w*Type|[a-zA-Z_]\w*\))`)
+	reAssemblyLoad    = regexp.MustCompile(`Assembly\.(?:Load|LoadFrom|LoadFile)\s*\(\s*[a-zA-Z_]\w*`)
+	reReflectionSafe  = regexp.MustCompile(`(?i)(?:typeof\s*\(|nameof\s*\(|allowedTypes|typeWhitelist|validTypes)`)
 )
 
 // ---------------------------------------------------------------------------
@@ -180,7 +176,7 @@ var (
 var reLineComment = regexp.MustCompile(`^\s*(?://|/\*|\*)`)
 
 func isCommentLine(line string) bool {
-	return reLineComment.MatchString(line)
+	return rules.GMatch(reLineComment, line)
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +201,12 @@ func hasNearbySafe(lines []string, idx int, pat *regexp.Regexp) bool {
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if pat.MatchString(l) {
+		// Fold-aware per-line pre-gate: skip the (?i) regex on window lines that
+		// provably cannot match (no required literal present). GMatch never
+		// returns false for a line the regex would actually match, so this is a
+		// finding-identical drop-in — the negative "nearby safe" guard fires on
+		// exactly the same lines, never adding or dropping a finding.
+		if rules.GMatch(pat, l) {
 			return true
 		}
 	}
@@ -230,7 +231,8 @@ func (r *SQLInjection) Languages() []rules.Language {
 
 func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Skip if file uses parameterized queries extensively
 	for i, line := range lines {
@@ -245,19 +247,19 @@ func (r *SQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := reSQLInterpolation.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reSQLInterpolation, line, lowered[i]); loc != "" {
 			matched = loc
 			confidence = "high"
-		} else if loc := reSQLStringConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reSQLStringConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			confidence = "high"
-		} else if loc := reFromSqlRawVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reFromSqlRawVar, line, lowered[i]); loc != "" {
 			matched = loc
 			confidence = "high"
-		} else if loc := reExecuteSqlRawVar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reExecuteSqlRawVar, line, lowered[i]); loc != "" {
 			matched = loc
 			confidence = "high"
-		} else if loc := reCommandTextConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reCommandTextConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			confidence = "medium"
 		}
@@ -302,7 +304,8 @@ func (r *InsecureDeserialization) Languages() []rules.Language {
 
 func (r *InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -313,16 +316,16 @@ func (r *InsecureDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var detail string
 		sev := r.DefaultSeverity()
 
-		if m := reInsecureDeserialize.FindString(line); m != "" {
+		if m := rules.GFindLower(reInsecureDeserialize, line, lowered[i]); m != "" {
 			matched = m
 			detail = "BinaryFormatter/SoapFormatter/NetDataContractSerializer/LosFormatter/ObjectStateFormatter deserialization is inherently insecure and allows arbitrary code execution. Microsoft recommends not using these serializers with untrusted data."
-		} else if m := reInsecureDeserializer.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reInsecureDeserializer, line, lowered[i]); m != "" {
 			matched = m
 			detail = "Instantiation of an insecure deserializer (BinaryFormatter, SoapFormatter, etc.). These serializers can execute arbitrary code during deserialization of untrusted data."
-		} else if m := reJavaScriptSerializerUnsafe.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reJavaScriptSerializerUnsafe, line, lowered[i]); m != "" {
 			matched = m
 			detail = "JavaScriptSerializer with SimpleTypeResolver allows type-discriminated deserialization, enabling remote code execution via crafted JSON payloads."
-		} else if m := reTypeNameHandlingUnsafe.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reTypeNameHandlingUnsafe, line, lowered[i]); m != "" {
 			matched = m
 			detail = "JSON.NET TypeNameHandling set to All/Auto/Objects/Arrays allows type-discriminated deserialization, enabling remote code execution via crafted JSON payloads."
 			sev = rules.High
@@ -368,7 +371,8 @@ func (r *CommandInjection) Languages() []rules.Language {
 
 func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -380,21 +384,21 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		confidence := "high"
 
 		// Skip safe Process.Start with hardcoded string
-		if reProcessSafe.MatchString(line) {
+		if rules.GMatchLower(reProcessSafe, line, lowered[i]) {
 			continue
 		}
 
-		if m := reProcessStartWithArgs.FindString(line); m != "" {
+		if m := rules.GFindLower(reProcessStartWithArgs, line, lowered[i]); m != "" {
 			matched = m
 			detail = "Process.Start with a variable argument may allow command injection if the argument is user-controlled."
-		} else if m := reProcessStart.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reProcessStart, line, lowered[i]); m != "" {
 			matched = m
 			detail = "Process.Start with dynamic argument may allow command injection if the argument is user-controlled."
-		} else if m := reProcessStartInfo.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reProcessStartInfo, line, lowered[i]); m != "" {
 			matched = m
 			detail = "ProcessStartInfo FileName or Arguments set with dynamic value may allow command injection."
 			confidence = "medium"
-		} else if m := reNewProcessStartInfo.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reNewProcessStartInfo, line, lowered[i]); m != "" {
 			matched = m
 			detail = "ProcessStartInfo constructed with dynamic arguments may allow command injection."
 		}
@@ -439,7 +443,8 @@ func (r *PathTraversal) Languages() []rules.Language {
 
 func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if file has user input sources
 	hasUserInput := strings.Contains(ctx.Content, "Request.") ||
@@ -466,21 +471,21 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Skip lines with Path.GetFileName (safe pattern)
-		if rePathSafe.MatchString(line) {
+		if rules.GMatchLower(rePathSafe, line, lowered[i]) {
 			continue
 		}
 
 		var matched string
 		var detail string
 
-		if m := rePathCombine.FindString(line); m != "" {
+		if m := rules.GFindLower(rePathCombine, line, lowered[i]); m != "" {
 			// Path.Combine is vulnerable to traversal if user input contains absolute path
 			if hasNearbySafe(lines, i, rePathSafe) {
 				continue
 			}
 			matched = m
 			detail = "Path.Combine with user-controlled input is vulnerable to path traversal. If the second argument is an absolute path (e.g., starts with / or C:\\), it ignores the base path entirely."
-		} else if m := reFileOpsUserInput.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reFileOpsUserInput, line, lowered[i]); m != "" {
 			// Check if there's path sanitization nearby
 			if hasNearbySafe(lines, i, rePathSafe) {
 				continue
@@ -529,7 +534,8 @@ func (r *LDAPInjection) Languages() []rules.Language {
 
 func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -538,9 +544,9 @@ func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reLDAPFilterConcat.FindString(line); m != "" {
+		if m := rules.GFindLower(reLDAPFilterConcat, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reLDAPNewSearcherConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reLDAPNewSearcherConcat, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -584,14 +590,15 @@ func (r *HardcodedConnectionString) Languages() []rules.Language {
 
 func (r *HardcodedConnectionString) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if m := reHardcodedConnString.FindString(line); m != "" {
+		if m := rules.GFindLower(reHardcodedConnString, line, lowered[i]); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -631,14 +638,15 @@ func (r *InsecureCookie) Languages() []rules.Language {
 
 func (r *InsecureCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if !reCookieNoSecure.MatchString(line) {
+		if !rules.GMatchLower(reCookieNoSecure, line, lowered[i]) {
 			continue
 		}
 
@@ -707,18 +715,19 @@ func (r *CORSMisconfiguration) Languages() []rules.Language {
 
 func (r *CORSMisconfiguration) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
-	hasAnyOrigin := reAllowAnyOrigin.MatchString(ctx.Content)
-	hasCreds := reAllowCredentials.MatchString(ctx.Content)
-	hasWildcardOrigins := reWithOriginsStar.MatchString(ctx.Content) || reCORSPolicyStar.MatchString(ctx.Content)
+	hasAnyOrigin := rules.GMatchFile(reAllowAnyOrigin, ctx)
+	hasCreds := rules.GMatchFile(reAllowCredentials, ctx)
+	hasWildcardOrigins := rules.GMatchFile(reWithOriginsStar, ctx) || rules.GMatchFile(reCORSPolicyStar, ctx)
 
 	if hasAnyOrigin && hasCreds {
 		for i, line := range lines {
 			if isCommentLine(line) {
 				continue
 			}
-			if reAllowAnyOrigin.MatchString(line) {
+			if rules.GMatchLower(reAllowAnyOrigin, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      rules.High,
@@ -743,7 +752,7 @@ func (r *CORSMisconfiguration) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if isCommentLine(line) {
 				continue
 			}
-			if reAllowAnyOrigin.MatchString(line) || reWithOriginsStar.MatchString(line) || reCORSPolicyStar.MatchString(line) {
+			if rules.GMatchLower(reAllowAnyOrigin, line, lowered[i]) || rules.GMatchLower(reWithOriginsStar, line, lowered[i]) || rules.GMatchLower(reCORSPolicyStar, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -786,7 +795,8 @@ func (r *BlazorJSInteropInjection) Languages() []rules.Language {
 
 func (r *BlazorJSInteropInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -796,10 +806,10 @@ func (r *BlazorJSInteropInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 		var matched string
 		var detail string
 
-		if m := reJSRuntimeInvoke.FindString(line); m != "" {
+		if m := rules.GFindLower(reJSRuntimeInvoke, line, lowered[i]); m != "" {
 			matched = m
 			detail = "JSRuntime.InvokeAsync with 'eval' as the function name executes arbitrary JavaScript. If user input reaches the eval argument, this enables XSS."
-		} else if m := reJSRuntimeInterp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reJSRuntimeInterp, line, lowered[i]); m != "" {
 			matched = m
 			detail = "JSRuntime.InvokeAsync/InvokeVoidAsync with string interpolation in the function identifier may allow JavaScript injection if user input is interpolated into the function name."
 		}
@@ -844,7 +854,8 @@ func (r *MassAssignment) Languages() []rules.Language {
 
 func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check for TryUpdateModelAsync without field restrictions
 	for i, line := range lines {
@@ -852,7 +863,7 @@ func (r *MassAssignment) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reTryUpdateModel.MatchString(line) && !reUpdateModelFields.MatchString(line) {
+		if rules.GMatchLower(reTryUpdateModel, line, lowered[i]) && !rules.GMatchLower(reUpdateModelFields, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -893,14 +904,15 @@ func (r *RegexDoS) Languages() []rules.Language {
 
 func (r *RegexDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if m := reNewRegex.FindString(line); m != "" {
+		if m := rules.GFindLower(reNewRegex, line, lowered[i]); m != "" {
 			// Check if timeout is specified nearby
 			context := strings.Join(getSurrounding(lines, i, 3), "\n")
 			if reRegexTimeout.MatchString(context) {
@@ -947,16 +959,17 @@ func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if file uses secure random
-	if reSecureRandomSafe.MatchString(ctx.Content) {
+	if rules.GMatchFile(reSecureRandomSafe, ctx) {
 		return nil
 	}
 
 	// Only flag in security contexts
-	if !reSecurityContext.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reSecurityContext, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -964,9 +977,9 @@ func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reSystemRandom.FindString(line); m != "" {
+		if m := rules.GFindLower(reSystemRandom, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reRandomNext.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRandomNext, line, lowered[i]); m != "" {
 			// Check if this line or nearby lines involve security
 			context := strings.Join(getSurrounding(lines, i, 5), "\n")
 			if reSecurityContext.MatchString(context) {
@@ -1014,14 +1027,15 @@ func (r *ViewDataXSS) Languages() []rules.Language {
 
 func (r *ViewDataXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if m := reHtmlRaw.FindString(line); m != "" {
+		if m := rules.GFindLower(reHtmlRaw, line, lowered[i]); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -1061,14 +1075,15 @@ func (r *OpenRedirect) Languages() []rules.Language {
 
 func (r *OpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if m := reRedirectUserInput.FindString(line); m != "" {
+		if m := rules.GFindLower(reRedirectUserInput, line, lowered[i]); m != "" {
 			// Skip if safe redirect pattern nearby
 			if hasNearbySafe(lines, i, reRedirectSafe) {
 				continue
@@ -1129,14 +1144,15 @@ func (r *SSRFHttpClient) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if m := reHttpClientRequest.FindString(line); m != "" {
+		if m := rules.GFindLower(reHttpClientRequest, line, lowered[i]); m != "" {
 			if hasNearbySafe(lines, i, reHttpClientSafe) {
 				continue
 			}
@@ -1179,14 +1195,15 @@ func (r *InsecureXML) Languages() []rules.Language {
 
 func (r *InsecureXML) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if reXmlDocument.MatchString(line) {
+		if rules.GMatchLower(reXmlDocument, line, lowered[i]) {
 			// Check if XmlResolver is set to null or DtdProcessing is prohibited nearby
 			context := strings.Join(getSurrounding(lines, i, 10), "\n")
 			if reXmlResolverNull.MatchString(context) || reXmlDtdProc.MatchString(context) {
@@ -1237,18 +1254,19 @@ func (r *ExpressionInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only flag if Dynamic LINQ is in use
-	if !reDynamicLinqLib.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reDynamicLinqLib, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if m := reDynamicLinq.FindString(line); m != "" {
+		if m := rules.GFindLower(reDynamicLinq, line, lowered[i]); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -1290,18 +1308,19 @@ func (r *MissingAntiForgeryToken) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if auto-validation is enabled at class level
-	if reAutoAntiForgery.MatchString(ctx.Content) {
+	if rules.GMatchFile(reAutoAntiForgery, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if reHttpPostAttr.MatchString(line) {
+		if rules.GMatchLower(reHttpPostAttr, line, lowered[i]) {
 			// Check surrounding lines for ValidateAntiForgeryToken
 			context := strings.Join(getSurrounding(lines, i, 3), "\n")
 			if reAntiForgeryToken.MatchString(context) {
@@ -1346,7 +1365,8 @@ func (r *HardcodedSecret) Languages() []rules.Language {
 
 func (r *HardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -1355,9 +1375,9 @@ func (r *HardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reHardcodedSecret.FindString(line); m != "" {
+		if m := rules.GFindLower(reHardcodedSecret, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reHardcodedSecretConst.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reHardcodedSecretConst, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -1419,7 +1439,8 @@ func (r *UnsafeReflection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -1434,13 +1455,13 @@ func (r *UnsafeReflection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if m := reTypeGetType.FindString(line); m != "" {
+		if m := rules.GFindLower(reTypeGetType, line, lowered[i]); m != "" {
 			matched = m
 			detail = "Type.GetType() with a user-controlled type name allows instantiation of arbitrary types. An attacker can load dangerous types to achieve remote code execution or bypass security controls."
-		} else if m := reActivatorCreate.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reActivatorCreate, line, lowered[i]); m != "" {
 			matched = m
 			detail = "Activator.CreateInstance() with a user-controlled type allows arbitrary object creation. Combined with Type.GetType(), this enables loading and instantiating any type in the runtime."
-		} else if m := reAssemblyLoad.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reAssemblyLoad, line, lowered[i]); m != "" {
 			matched = m
 			detail = "Assembly.Load/LoadFrom/LoadFile with a user-controlled path allows loading arbitrary .NET assemblies, enabling remote code execution."
 		}

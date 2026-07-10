@@ -184,3 +184,50 @@ def handle_error(e):
 	testutil.MustNotFindRule(t, result, "BATOU-MISC-002")
 }
 
+// --- BATOU-MISC-007: Admin interface exposed without IP restriction ---
+
+func TestMISC007_TP_ExpressAdminRoute(t *testing.T) {
+	content := `app.get('/admin', (req, res) => { res.render('admin/dashboard'); });
+app.use('/admin/users', usersRouter);
+`
+	result := testutil.ScanContent(t, "/app/routes.js", content)
+	testutil.MustFindRule(t, result, "BATOU-MISC-007")
+}
+
+func TestMISC007_TP_AdminPanelMount(t *testing.T) {
+	content := `const adminPanel = require('./adminPanel');
+app.use(adminPanel);
+`
+	result := testutil.ScanContent(t, "/app/server.js", content)
+	testutil.MustFindRule(t, result, "BATOU-MISC-007")
+}
+
+func TestMISC007_Safe_AdminRouteWithAuthCheck(t *testing.T) {
+	content := `app.get('/admin', requireAdmin, (req, res) => { res.render('admin'); });
+`
+	result := testutil.ScanContent(t, "/app/routes.js", content)
+	testutil.MustNotFindRule(t, result, "BATOU-MISC-007")
+}
+
+func TestMISC007_Safe_AdminRouteWithIPRestriction(t *testing.T) {
+	content := `app.use('/admin', ipFilter(allowedIps), adminRouter);
+`
+	result := testutil.ScanContent(t, "/app/routes.js", content)
+	testutil.MustNotFindRule(t, result, "BATOU-MISC-007")
+}
+
+// owncloud/web FP regression: bare 'admin' string literals — role
+// identifiers, i18n keys, CSS classes, test fixtures — are not HTTP
+// route definitions. The tightened reAdminRoute requires a URL-path
+// shape (leading slash) or an admin_panel/dashboard/interface token.
+func TestMISC007_FP_BareAdminStrings(t *testing.T) {
+	content := `export const ROLES = ['admin', 'editor', 'guest'];
+const headerClass = 'admin-bar';
+i18n.t('admin');
+const user = { name: 'admin', email: 'a@x.test' };
+if (currentUser.role === userRole) { /* ... */ }
+`
+	result := testutil.ScanContent(t, "/app/constants.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-MISC-007")
+}
+

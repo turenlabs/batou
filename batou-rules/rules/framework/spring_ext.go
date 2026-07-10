@@ -14,19 +14,16 @@ import (
 var (
 	// BATOU-FW-SPRING-011: Actuator endpoints exposed without auth (config-level)
 	reSpringExtActuatorExpose = regexp.MustCompile(`management\.endpoints\.web\.exposure\.include\s*[=:]\s*\*`)
-	reSpringExtActuatorBase   = regexp.MustCompile(`management\.endpoint\.\w+\.enabled\s*[=:]\s*true`)
 
 	// BATOU-FW-SPRING-012: Spring Data REST without authorization
-	reSpringExtDataRest       = regexp.MustCompile(`@RepositoryRestResource`)
-	reSpringExtDataRestExport = regexp.MustCompile(`exported\s*=\s*true`)
+	reSpringExtDataRest = regexp.MustCompile(`@RepositoryRestResource`)
 
 	// BATOU-FW-SPRING-013: Spring Security CSRF disabled (lambda DSL, newer style)
 	reSpringExtCsrfDisable    = regexp.MustCompile(`\.csrf\s*\(\s*(?:csrf\s*->|AbstractHttpConfigurer::)\s*(?:csrf\.)?disable`)
 	reSpringExtCsrfCustomizer = regexp.MustCompile(`\.csrf\s*\(\s*CsrfConfigurer::disable\s*\)`)
 
 	// BATOU-FW-SPRING-014: DevTools in production
-	reSpringExtDevToolsDep  = regexp.MustCompile(`spring-boot-devtools`)
-	reSpringExtDevToolsConf = regexp.MustCompile(`spring\.devtools\.`)
+	reSpringExtDevToolsDep = regexp.MustCompile(`spring-boot-devtools`)
 
 	// BATOU-FW-SPRING-015: @ResponseBody with unescaped user data
 	reSpringExtResponseBody    = regexp.MustCompile(`@ResponseBody`)
@@ -34,16 +31,15 @@ var (
 	reSpringExtProducesHTML    = regexp.MustCompile(`produces\s*=\s*(?:"text/html"|MediaType\.TEXT_HTML)`)
 
 	// BATOU-FW-SPRING-016: Profile-specific secrets in application.yml
-	reSpringExtSecretInYml   = regexp.MustCompile(`(?i)(?:password|secret|api[_-]?key|token|credential)\s*:\s*["']?[A-Za-z0-9+/=@#$%^&*]{8,}`)
-	reSpringExtYmlProfile    = regexp.MustCompile(`(?i)spring\.profiles\.active|---`)
+	reSpringExtSecretInYml = regexp.MustCompile(`(?i)(?:password|secret|api[_-]?key|token|credential)\s*:\s*["']?[A-Za-z0-9+/=@#$%^&*]{8,}`)
 
 	// BATOU-FW-SPRING-017: OAuth2 redirect_uri not restricted
 	reSpringExtOAuth2Redirect = regexp.MustCompile(`redirect[_-]?uri\s*[=:]\s*(?:["']\*["']|.*\.\*)`)
 	reSpringExtOAuth2Any      = regexp.MustCompile(`\.redirectUriTemplate\s*\(\s*["']\{`)
 
 	// BATOU-FW-SPRING-018: Method security not enabled
-	reSpringExtEnableMethodSec  = regexp.MustCompile(`@EnableGlobalMethodSecurity|@EnableMethodSecurity`)
-	reSpringExtPreAuthorize     = regexp.MustCompile(`@PreAuthorize|@Secured|@RolesAllowed`)
+	reSpringExtEnableMethodSec = regexp.MustCompile(`@EnableGlobalMethodSecurity|@EnableMethodSecurity`)
+	reSpringExtPreAuthorize    = regexp.MustCompile(`@PreAuthorize|@Secured|@RolesAllowed`)
 )
 
 func init() {
@@ -75,14 +71,15 @@ func (r *SpringActuatorNoAuth) Languages() []rules.Language {
 
 func (r *SpringActuatorNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "#") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reSpringExtActuatorExpose.FindString(line); m != "" {
+		if m := rules.GFindLower(reSpringExtActuatorExpose, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -125,7 +122,7 @@ func (r *SpringDataRESTNoAuth) Languages() []rules.Language {
 }
 
 func (r *SpringDataRESTNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reSpringExtDataRest.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reSpringExtDataRest, ctx) {
 		return nil
 	}
 	// Skip if file has security annotations
@@ -135,14 +132,15 @@ func (r *SpringDataRESTNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reSpringExtDataRest.MatchString(line) {
+		if rules.GMatchLower(reSpringExtDataRest, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -186,7 +184,8 @@ func (r *SpringCSRFDisabledExt) Languages() []rules.Language {
 
 func (r *SpringCSRFDisabledExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -195,9 +194,9 @@ func (r *SpringCSRFDisabledExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reSpringExtCsrfDisable.FindString(line); m != "" {
+		if m := rules.GFindLower(reSpringExtCsrfDisable, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSpringExtCsrfCustomizer.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSpringExtCsrfCustomizer, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -250,14 +249,15 @@ func (r *SpringDevToolsProd) Languages() []rules.Language {
 
 func (r *SpringDevToolsProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "#") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") || strings.HasPrefix(t, "<!--") {
 			continue
 		}
-		if reSpringExtDevToolsDep.MatchString(line) {
+		if rules.GMatchLower(reSpringExtDevToolsDep, line, lowered[i]) {
 			// Skip if scope is limited to development
 			if strings.Contains(line, "<scope>") || strings.Contains(line, "developmentOnly") || strings.Contains(line, "compileOnly") {
 				continue
@@ -304,24 +304,25 @@ func (r *SpringResponseBodyXSS) Languages() []rules.Language {
 }
 
 func (r *SpringResponseBodyXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
-	hasResponseBody := reSpringExtResponseBody.MatchString(ctx.Content) || strings.Contains(ctx.Content, "@RestController")
+	hasResponseBody := rules.GMatchFile(reSpringExtResponseBody, ctx) || strings.Contains(ctx.Content, "@RestController")
 	if !hasResponseBody {
 		return nil
 	}
-	hasHTMLProduces := reSpringExtProducesHTML.MatchString(ctx.Content)
+	hasHTMLProduces := rules.GMatchFile(reSpringExtProducesHTML, ctx)
 	if !hasHTMLProduces {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reSpringExtReturnUserInput.FindString(line); m != "" {
+		if m := rules.GFindLower(reSpringExtReturnUserInput, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -374,14 +375,15 @@ func (r *SpringYmlSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") || strings.HasPrefix(t, "//") {
 			continue
 		}
-		if m := reSpringExtSecretInYml.FindString(line); m != "" {
+		if m := rules.GFindLower(reSpringExtSecretInYml, line, lowered[i]); m != "" {
 			// Skip if it references environment variables
 			if strings.Contains(line, "${") || strings.Contains(line, "ENC(") {
 				continue
@@ -429,7 +431,8 @@ func (r *SpringOAuth2Redirect) Languages() []rules.Language {
 
 func (r *SpringOAuth2Redirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -438,9 +441,9 @@ func (r *SpringOAuth2Redirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reSpringExtOAuth2Redirect.FindString(line); m != "" {
+		if m := rules.GFindLower(reSpringExtOAuth2Redirect, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSpringExtOAuth2Any.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSpringExtOAuth2Any, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -487,22 +490,23 @@ func (r *SpringMethodSecMissing) Languages() []rules.Language {
 
 func (r *SpringMethodSecMissing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Only flag if method security annotations are present but not enabled
-	if !reSpringExtPreAuthorize.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reSpringExtPreAuthorize, ctx) {
 		return nil
 	}
-	if reSpringExtEnableMethodSec.MatchString(ctx.Content) {
+	if rules.GMatchFile(reSpringExtEnableMethodSec, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reSpringExtPreAuthorize.MatchString(line) {
+		if rules.GMatchLower(reSpringExtPreAuthorize, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

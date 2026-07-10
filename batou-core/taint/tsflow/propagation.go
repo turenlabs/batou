@@ -1,6 +1,12 @@
 package tsflow
 
-import "github.com/turenlabs/batou-core/ast"
+import (
+	"strconv"
+	"strings"
+
+	"github.com/turenlabs/batou-core/ast"
+	"github.com/turenlabs/batou-rules/rules"
+)
 
 // nodeIsTainted checks whether a tree-sitter node references any tainted variable.
 // Walks into identifiers, attribute accesses, binary expressions, call arguments,
@@ -12,10 +18,17 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 
 	nodeType := n.Type()
 
-	// Identifier — direct variable lookup
+	// Identifier — direct variable lookup. If the bare identifier itself
+	// is not tracked, fall back to shallow field-sensitive lookup: any
+	// `<name>.<field>` entry in the taint map taints a bare-object read at
+	// a sink, since the sink may internally read any field. This is a
+	// conservative over-approximation that mirrors astflow's exprIsTainted.
 	if nodeType == cfg.identType {
 		name := n.Text()
 		if ts := tm.get(name); ts != nil && ts.source != nil {
+			return ts, true
+		}
+		if ts := tm.anyFieldTainted(name); ts != nil {
 			return ts, true
 		}
 		return nil, false
@@ -27,21 +40,58 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 		if ts := tm.get(name); ts != nil && ts.source != nil {
 			return ts, true
 		}
+		if ts := tm.anyFieldTainted(name); ts != nil {
+			return ts, true
+		}
 		return nil, false
 	}
 
-	// Attribute/member access — check the base object
+	// Ruby instance/class/global variables. Tree-sitter exposes `@q`,
+	// `@@cache`, and `$g` as distinct node types (instance_variable,
+	// class_variable, global_variable) whose Text() is the full sigil'd
+	// name — exactly the key extractAssignLHS seeds. A read of `@q` at a
+	// sink (`system(@q)`) resolves the taint assigned to `@q = params[:q]`.
+	// Gated to Ruby so no other language's node handling changes.
+	if cfg != nil && cfg.language == rules.LangRuby &&
+		(nodeType == "instance_variable" || nodeType == "class_variable" || nodeType == "global_variable") {
+		name := n.Text()
+		if ts := tm.get(name); ts != nil && ts.source != nil {
+			return ts, true
+		}
+		if ts := tm.anyFieldTainted(name); ts != nil {
+			return ts, true
+		}
+		return nil, false
+	}
+
+	// Attribute/member access. Bounded multi-level field-sensitive read order:
+	//   1. Walk bounded dotted PREFIXES of the path
+	//      (req.body.user.id → req.body.user → req.body → req) and taint if any
+	//      prefix is a tracked tainted access path. This matches the exact path
+	//      (`req.body.user.id`) AND taints sub-paths of a tainted path
+	//      (`req.body.user` taints `req.body.user.id`), while a SIBLING field
+	//      whose prefix was never tainted (`req.body.other` when only
+	//      `req.body.user` is tainted) stays clean — the multi-level precision
+	//      gain. Read keys are bounded to maxAccessPathDepth so a deep read
+	//      matches a collapsed seeded prefix.
+	//   2. Fall back to the grammar-extracted immediate receiver's bare taint
+	//      (`tm.get(recv)`). This is the long-standing whole-object fallback:
+	//      `msg` in C `msg->payload` (where `msg` is a tainted bare variable),
+	//      `b` in `b = req.body; sink(b.x)`. It is path-grammar-agnostic, so it
+	//      also covers `->`-style accesses that the dotted prefix walk does not
+	//      split. Because processAttr now seeds the precise maximal path rather
+	//      than the bare source receiver, this no longer over-taints siblings
+	//      (`tm.get("req.body")` is nil when only `req.body.a` was seeded).
 	if cfg.attrTypes[nodeType] {
+		fullText := n.Text()
+		if ts := tm.prefixTainted(boundAccessPath(fullText)); ts != nil {
+			return ts, true
+		}
 		recv := cfg.extractAttrReceiver(n)
 		if recv != "" {
 			if ts := tm.get(recv); ts != nil && ts.source != nil {
 				return ts, true
 			}
-		}
-		// Also check the full expression text as a variable (e.g., "request.args" stored as-is)
-		fullText := n.Text()
-		if ts := tm.get(fullText); ts != nil && ts.source != nil {
-			return ts, true
 		}
 		return nil, false
 	}
@@ -100,6 +150,39 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 		return nil, false
 	}
 
+	// Bash variable expansion (Shell only): `$var` is a simple_expansion node and
+	// `${var}` is an expansion node; both contain a `variable_name` child whose
+	// text is the bare name (e.g. "url", "1", "HOME"). Resolve it against the
+	// taint map so a `"$url"` argument at a sink picks up the taint assigned to
+	// `url`. `concatenation` (e.g. /tmp/$name) wraps multiple words/expansions.
+	// Gated to Shell so the other languages' taint behaviour is byte-identical.
+	if cfg != nil && cfg.language == rules.LangShell {
+		if nodeType == "simple_expansion" || nodeType == "expansion" {
+			for i := 0; i < n.ChildCount(); i++ {
+				c := n.Child(i)
+				if c.Type() == "variable_name" {
+					name := c.Text()
+					if ts := tm.get(name); ts != nil && ts.source != nil {
+						return ts, true
+					}
+					if ts := tm.anyFieldTainted(name); ts != nil {
+						return ts, true
+					}
+				}
+			}
+			return nil, false
+		}
+		if nodeType == "concatenation" {
+			for i := 0; i < n.ChildCount(); i++ {
+				c := n.Child(i)
+				if ts, ok := nodeIsTainted(c, tm, cfg); ok {
+					return ts, true
+				}
+			}
+			return nil, false
+		}
+	}
+
 	// Template string / f-string / interpolated string containers — walk all
 	// children looking for interpolation nodes or embedded variables.
 	// Handles:
@@ -111,7 +194,15 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 	//   Perl:   interpolated_string_literal ("...$var...")
 	if nodeType == "template_string" || nodeType == "string" ||
 		nodeType == "string_literal" || nodeType == "interpolated_string_expression" ||
-		nodeType == "interpolated_string_literal" {
+		nodeType == "interpolated_string_literal" ||
+		// Ruby: backtick `cmd #{x}` and %x{cmd #{x}} both parse as a `subshell`
+		// node holding string_content/interpolation children — same shape as a
+		// string, walked here so an embedded tainted interpolation is seen.
+		nodeType == "subshell" ||
+		// Swift: "...\(expr)..." is a line_string_literal whose interpolation
+		// children are `interpolated_expression` nodes (already handled above).
+		// Multi-line `"""..."""` is multi_line_string_literal.
+		nodeType == "line_string_literal" || nodeType == "multi_line_string_literal" {
 		for i := 0; i < n.ChildCount(); i++ {
 			c := n.Child(i)
 			if ts, ok := nodeIsTainted(c, tm, cfg); ok {
@@ -135,6 +226,26 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 
 	// Call expression — check receiver and arguments
 	if cfg.callTypes[nodeType] {
+		// Ruby attribute READ (`obj.cmd`). Tree-sitter models a bare
+		// attribute getter as a `call` node with a receiver and a method
+		// name but NO argument list. The matching attribute SETTER
+		// (`obj.cmd = ...`) seeds a shallow field key "obj.cmd" via
+		// extractAssignLHS, so consult prefixTainted for that exact path
+		// here. Only fires when the receiver is a plain identifier and
+		// there is no argument list, so real method calls (`obj.run(x)`)
+		// fall through to the generic receiver/args checks below. Gated to
+		// Ruby so other languages' `call` handling is byte-identical, and
+		// purely additive: a non-seeded `obj.cmd` returns nil and proceeds.
+		if cfg.language == rules.LangRuby && n.ChildByFieldName("arguments") == nil {
+			if recv := n.ChildByFieldName("receiver"); recv != nil && recv.Type() == "identifier" {
+				if m := n.ChildByFieldName("method"); m != nil {
+					fullText := recv.Text() + "." + m.Text()
+					if ts := tm.prefixTainted(boundAccessPath(fullText)); ts != nil {
+						return ts, true
+					}
+				}
+			}
+		}
 		// Check if receiver is tainted (e.g., taintedObj.method())
 		receiver := cfg.extractCallReceiver(n)
 		if receiver != "" {
@@ -171,8 +282,12 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 	}
 
 	// Subscript / index expression — check full text first (per-key taint),
-	// then fall back to checking the base object.
-	if nodeType == "subscript" || nodeType == "subscript_expression" || nodeType == "element_reference" {
+	// then per-index list taint, then fall back to checking the base object.
+	// element_access_expression is C#'s indexer node (Request.Form["x"], arr[i]);
+	// no other grammar produces it, so adding it here only affects C# parses and
+	// gives indexing-through-a-tainted-collection the same propagation other
+	// languages already get from subscript.
+	if nodeType == "subscript" || nodeType == "subscript_expression" || nodeType == "element_reference" || nodeType == "element_access_expression" {
 		// Per-key lookup: d['keyB'] stored as full text in taint map.
 		fullText := n.Text()
 		if ts := tm.get(fullText); ts != nil && ts.source != nil {
@@ -182,8 +297,44 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 		if obj == nil {
 			obj = n.ChildByFieldName("value")
 		}
+		if obj == nil {
+			obj = n.ChildByFieldName("expression") // C# element_access_expression
+		}
 		if obj == nil && n.ChildCount() > 0 {
 			obj = n.Child(0)
+		}
+		// Per-index list taint: lst[N] with N an integer literal — consult
+		// the per-index map populated by .append() / .pop() / etc. so that a
+		// list whose tainted element was shifted out by pop(0) reads as
+		// untainted at the now-safe index.
+		if obj != nil {
+			recv := obj.Text()
+			if _, ok := tm.lists[recv]; ok {
+				// Extract the subscript expression. Tree-sitter exposes it
+				// as field "subscript" (Python) or as the second named child.
+				idxNode := n.ChildByFieldName("subscript")
+				if idxNode == nil {
+					named := n.NamedChildren()
+					if len(named) >= 2 {
+						idxNode = named[1]
+					}
+				}
+				if idxNode != nil {
+					idxText := strings.TrimSpace(idxNode.Text())
+					if idx, err := strconv.Atoi(idxText); err == nil {
+						elemTs := tm.listGet(recv, idx)
+						if elemTs != nil && elemTs.source != nil {
+							return elemTs, true
+						}
+						// Integer-literal index that resolved to a non-tainted
+						// slot (or out-of-range): treat the subscript as
+						// untainted regardless of the receiver's whole-list
+						// taint flag. This is what makes the OWASP list-shuffle
+						// `bar = lst[1]` after pop(0) read as safe.
+						return nil, false
+					}
+				}
+			}
 		}
 		return nodeIsTainted(obj, tm, cfg)
 	}
@@ -208,6 +359,20 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 			if c.IsNamed() {
 				return nodeIsTainted(c, tm, cfg)
 			}
+		}
+		return nil, false
+	}
+
+	// Python walrus `x := expr` (named_expression): the whole expression
+	// evaluates to its assigned value, so it carries that value's taint. This
+	// covers the value appearing directly at a sink, e.g.
+	// `os.system(cmd := input())`. The "value" field holds the assigned
+	// expression. (The target `x` is separately seeded by processAssignInterproc
+	// via assignTypes.) The node type is Python-unique, so no language gate is
+	// needed.
+	if nodeType == "named_expression" {
+		if val := n.ChildByFieldName("value"); val != nil {
+			return nodeIsTainted(val, tm, cfg)
 		}
 		return nil, false
 	}
@@ -237,6 +402,17 @@ func nodeIsTainted(n *ast.Node, tm *taintMap, cfg *langConfig) (*taintState, boo
 		cond := n.ChildByFieldName("condition")
 		cons := n.ChildByFieldName("consequence")
 		alt := n.ChildByFieldName("alternative")
+
+		// Python's conditional_expression (`cons if cond else alt`) has no field
+		// names — fall back to positional named children in source order.
+		if cond == nil && cons == nil && alt == nil {
+			named := n.NamedChildren()
+			if len(named) >= 3 {
+				cons = named[0]
+				cond = named[1]
+				alt = named[2]
+			}
+		}
 
 		if cond != nil {
 			if val, ok := evalConstExpr(cond, tm); ok {
@@ -345,7 +521,7 @@ func propagationConfidence(n *ast.Node) float64 {
 		return 0.95 // string concatenation
 	case "call", "call_expression", "method_invocation", "function_call_expression", "member_call_expression":
 		return 0.85 // unknown function call
-	case "subscript", "subscript_expression", "element_reference":
+	case "subscript", "subscript_expression", "element_reference", "element_access_expression":
 		return 0.9 // indexing
 	case "template_string", "interpolation", "template_substitution",
 		"interpolated_string_expression", "interpolated_string_literal",
@@ -358,4 +534,3 @@ func propagationConfidence(n *ast.Node) float64 {
 		return 1.0
 	}
 }
-

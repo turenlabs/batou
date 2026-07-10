@@ -28,13 +28,21 @@ var (
 	jinja2EnvAutoescapeFalse = regexp.MustCompile(`Environment\s*\([^)]*autoescape\s*=\s*(?:False|0)`)
 	jinja2EnvNoAutoescape    = regexp.MustCompile(`Environment\s*\(`)
 	jinja2AutoescapeTrue     = regexp.MustCompile(`autoescape\s*=\s*(?:True|select_autoescape|1)`)
+	// A bare `autoescape=False` kwarg reaches the raw jinja2.Environment(...)
+	// constructor above only in the classic case. Framework setup helpers pass
+	// the same kwarg without ever naming Environment — aiohttp_jinja2.setup(app,
+	// loader=PackageLoader(...), autoescape=False), Starlette/Flask wrappers,
+	// etc. Match the bare kwarg, but require a jinja2/templating indicator in
+	// the immediate window so this stays precise (a stray autoescape=False in
+	// unrelated config is not flagged).
+	jinja2BareAutoescapeFalse = regexp.MustCompile(`\bautoescape\s*=\s*(?:False|0)\b`)
+	jinja2TemplatingIndicator = regexp.MustCompile(`(?i)\b(?:aiohttp_jinja2|jinja2|PackageLoader|FileSystemLoader|ChoiceLoader|DictLoader|ModuleLoader|FunctionLoader|Jinja2Templates|select_autoescape)\b`)
 )
 
 // PY-004: yaml.load without SafeLoader
 var (
 	yamlUnsafeLoad = regexp.MustCompile(`yaml\.(?:load|unsafe_load)\s*\(`)
 	yamlSafeLoader = regexp.MustCompile(`Loader\s*=\s*(?:yaml\.)?(?:SafeLoader|CSafeLoader|FullLoader|CFullLoader)`)
-	yamlSafeLoad   = regexp.MustCompile(`yaml\.safe_load\s*\(`)
 )
 
 // PY-005: tempfile.mktemp (race condition)
@@ -51,7 +59,6 @@ var (
 // PY-007: pickle/dill/cloudpickle/shelve deserialization (more specific patterns)
 var (
 	pickleLoadUserInput = regexp.MustCompile(`(?:pickle|cPickle|dill|cloudpickle|shelve|marshal)\.(?:load|loads)\s*\(`)
-	pickleFromRequest   = regexp.MustCompile(`(?:request\.|flask\.|bottle\.)`)
 )
 
 // PY-008: hmac.compare_digest missing (timing attack)
@@ -63,11 +70,11 @@ var (
 
 // PY-009: Django raw SQL / extra / RawSQL
 var (
-	djangoRawSQL      = regexp.MustCompile(`\.raw\s*\(\s*(?:f["']|["'][^"']*["']\s*%\s*[(\w]|["'][^"']*["']\s*\.format\s*\()`)
-	djangoExtra       = regexp.MustCompile(`\.extra\s*\(\s*(?:where|select|tables)\s*=`)
-	djangoRawSQLExpr  = regexp.MustCompile(`RawSQL\s*\(\s*(?:f["']|["'][^"']*["']\s*%\s*[(\w]|["'][^"']*["']\s*\.format\s*\()`)
-	djangoConnection  = regexp.MustCompile(`connection\.cursor\s*\(\s*\)`)
-	djangoCursorExec  = regexp.MustCompile(`cursor\.execute\s*\(\s*(?:f["']|["'][^"']*["']\s*%\s*[(\w]|["'][^"']*["']\s*\.format\s*\(|[a-zA-Z_]\w*\s*(?:\+|%))`)
+	djangoRawSQL     = regexp.MustCompile(`\.raw\s*\(\s*(?:f["']|["'][^"']*["']\s*%\s*[(\w]|["'][^"']*["']\s*\.format\s*\()`)
+	djangoExtra      = regexp.MustCompile(`\.extra\s*\(\s*(?:where|select|tables)\s*=`)
+	djangoRawSQLExpr = regexp.MustCompile(`RawSQL\s*\(\s*(?:f["']|["'][^"']*["']\s*%\s*[(\w]|["'][^"']*["']\s*\.format\s*\()`)
+	djangoConnection = regexp.MustCompile(`connection\.cursor\s*\(\s*\)`)
+	djangoCursorExec = regexp.MustCompile(`cursor\.execute\s*\(\s*(?:f["']|["'][^"']*["']\s*%\s*[(\w]|["'][^"']*["']\s*\.format\s*\(|[a-zA-Z_]\w*\s*(?:\+|%))`)
 )
 
 // PY-010: Flask secret_key hardcoded (more specific patterns)
@@ -78,12 +85,12 @@ var (
 
 // PY-011: requests/urllib3 TLS verification disabled
 var (
-	requestsVerifyFalse   = regexp.MustCompile(`requests\.(?:get|post|put|delete|patch|head|options|request)\s*\([^)]*verify\s*=\s*False`)
+	requestsVerifyFalse    = regexp.MustCompile(`requests\.(?:get|post|put|delete|patch|head|options|request)\s*\([^)]*verify\s*=\s*False`)
 	urllib3DisableWarnings = regexp.MustCompile(`urllib3\.disable_warnings\s*\(`)
 	urllib3NoVerify        = regexp.MustCompile(`HTTPSConnectionPool\s*\([^)]*cert_reqs\s*=\s*["']CERT_NONE["']`)
-	sslNoVerify           = regexp.MustCompile(`ssl\._create_unverified_context`)
-	httpxVerifyFalse      = regexp.MustCompile(`httpx\.(?:Client|AsyncClient)\s*\([^)]*verify\s*=\s*False`)
-	aiohttpNoVerify       = regexp.MustCompile(`(?:ssl\s*=\s*False|connector\s*=\s*aiohttp\.TCPConnector\s*\([^)]*ssl\s*=\s*False)`)
+	sslNoVerify            = regexp.MustCompile(`ssl\._create_unverified_context`)
+	httpxVerifyFalse       = regexp.MustCompile(`httpx\.(?:Client|AsyncClient)\s*\([^)]*verify\s*=\s*False`)
+	aiohttpNoVerify        = regexp.MustCompile(`(?:ssl\s*=\s*False|connector\s*=\s*aiohttp\.TCPConnector\s*\([^)]*ssl\s*=\s*False)`)
 )
 
 // PY-012: ReDoS via re.compile with user input
@@ -97,7 +104,6 @@ var (
 	tarExtractAll     = regexp.MustCompile(`\.extractall\s*\(`)
 	tarExtractFilter  = regexp.MustCompile(`filter\s*=`)
 	tarExtractMembers = regexp.MustCompile(`members\s*=`)
-	zipExtractAll     = regexp.MustCompile(`ZipFile\s*\([^)]*\)\s*\.extractall`)
 )
 
 // PY-014: f-string in logging (injection + performance)
@@ -109,16 +115,15 @@ var (
 
 // PY-015: jwt.decode without verification
 var (
-	jwtDecodeNoVerify  = regexp.MustCompile(`jwt\.decode\s*\([^)]*(?:verify\s*=\s*False|options\s*=\s*\{[^}]*"verify_signature"\s*:\s*False)`)
-	jwtDecodeAlgNone   = regexp.MustCompile(`jwt\.decode\s*\([^)]*algorithms\s*=\s*\[?\s*["']none["']`)
+	jwtDecodeNoVerify = regexp.MustCompile(`jwt\.decode\s*\([^)]*(?:verify\s*=\s*False|options\s*=\s*\{[^}]*"verify_signature"\s*:\s*False)`)
+	jwtDecodeAlgNone  = regexp.MustCompile(`jwt\.decode\s*\([^)]*algorithms\s*=\s*\[?\s*["']none["']`)
 )
 
 // PY-016: Werkzeug/Flask debugger in production
 var (
-	werkzeugDebugger   = regexp.MustCompile(`(?:run_simple|serve)\s*\([^)]*use_debugger\s*=\s*True`)
-	werkzeugDebuggerPW = regexp.MustCompile(`debugger_pin\s*=`)
-	flaskDebugRun      = regexp.MustCompile(`app\.run\s*\([^)]*debug\s*=\s*True`)
-	debugToolbar       = regexp.MustCompile(`DebugToolbarExtension\s*\(`)
+	werkzeugDebugger = regexp.MustCompile(`(?:run_simple|serve)\s*\([^)]*use_debugger\s*=\s*True`)
+	flaskDebugRun    = regexp.MustCompile(`app\.run\s*\([^)]*debug\s*=\s*True`)
+	debugToolbar     = regexp.MustCompile(`DebugToolbarExtension\s*\(`)
 )
 
 // PY-017: FastAPI missing input validation
@@ -129,7 +134,7 @@ var (
 
 // PY-018: asyncio subprocess with shell=True
 var (
-	asyncioShellTrue = regexp.MustCompile(`(?:asyncio\.create_subprocess_shell|await\s+asyncio\.create_subprocess_shell)\s*\(`)
+	asyncioShellTrue   = regexp.MustCompile(`(?:asyncio\.create_subprocess_shell|await\s+asyncio\.create_subprocess_shell)\s*\(`)
 	asyncioShellConcat = regexp.MustCompile(`create_subprocess_shell\s*\(\s*(?:f["']|["'][^"']*"\s*\+|[a-zA-Z_]\w*\s*\+)`)
 )
 
@@ -158,15 +163,20 @@ func init() {
 
 type SubprocessShellInjection struct{}
 
-func (r *SubprocessShellInjection) ID() string                      { return "BATOU-PY-001" }
-func (r *SubprocessShellInjection) Name() string                    { return "SubprocessShellInjection" }
-func (r *SubprocessShellInjection) Description() string             { return "Detects subprocess calls with shell=True and user-controlled input, or string formatting in shell commands." }
+func (r *SubprocessShellInjection) ID() string   { return "BATOU-PY-001" }
+func (r *SubprocessShellInjection) Name() string { return "SubprocessShellInjection" }
+func (r *SubprocessShellInjection) Description() string {
+	return "Detects subprocess calls with shell=True and user-controlled input, or string formatting in shell commands."
+}
 func (r *SubprocessShellInjection) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *SubprocessShellInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
+func (r *SubprocessShellInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *SubprocessShellInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -177,19 +187,19 @@ func (r *SubprocessShellInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 		var matched string
 		var desc string
 
-		if loc := subprocessShellTrue.FindString(line); loc != "" {
+		if loc := rules.GFindLower(subprocessShellTrue, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "subprocess with shell=True"
-		} else if loc := subprocessFString.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(subprocessFString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "subprocess with f-string command"
-		} else if loc := subprocessFormat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(subprocessFormat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "subprocess with .format() command"
-		} else if loc := subprocessPercent.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(subprocessPercent, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "subprocess with %-formatted command"
-		} else if loc := subprocessConcat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(subprocessConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "subprocess with concatenated command"
 		}
@@ -226,9 +236,11 @@ func (r *SubprocessShellInjection) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type PathTraversal struct{}
 
-func (r *PathTraversal) ID() string                      { return "BATOU-PY-002" }
-func (r *PathTraversal) Name() string                    { return "PathTraversal" }
-func (r *PathTraversal) Description() string             { return "Detects os.path.join with user-controlled input that may allow directory traversal." }
+func (r *PathTraversal) ID() string   { return "BATOU-PY-002" }
+func (r *PathTraversal) Name() string { return "PathTraversal" }
+func (r *PathTraversal) Description() string {
+	return "Detects os.path.join with user-controlled input that may allow directory traversal."
+}
 func (r *PathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PathTraversal) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
 
@@ -241,7 +253,8 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -249,7 +262,7 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if osPathJoinInput.MatchString(line) {
+		if rules.GMatchLower(osPathJoinInput, line, lowered[i]) {
 			// Check if line references user-controlled variables
 			context := surroundingContext(lines, i, 3)
 			if containsUserVariable(context) {
@@ -280,15 +293,20 @@ func (r *PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type Jinja2AutoescapeDisabled struct{}
 
-func (r *Jinja2AutoescapeDisabled) ID() string                      { return "BATOU-PY-003" }
-func (r *Jinja2AutoescapeDisabled) Name() string                    { return "Jinja2AutoescapeDisabled" }
-func (r *Jinja2AutoescapeDisabled) Description() string             { return "Detects Jinja2 Environment created with autoescape disabled, enabling XSS." }
+func (r *Jinja2AutoescapeDisabled) ID() string   { return "BATOU-PY-003" }
+func (r *Jinja2AutoescapeDisabled) Name() string { return "Jinja2AutoescapeDisabled" }
+func (r *Jinja2AutoescapeDisabled) Description() string {
+	return "Detects Jinja2 Environment created with autoescape disabled, enabling XSS."
+}
 func (r *Jinja2AutoescapeDisabled) DefaultSeverity() rules.Severity { return rules.High }
-func (r *Jinja2AutoescapeDisabled) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
+func (r *Jinja2AutoescapeDisabled) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *Jinja2AutoescapeDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -297,7 +315,7 @@ func (r *Jinja2AutoescapeDisabled) Scan(ctx *rules.ScanContext) []rules.Finding 
 		}
 
 		// Explicit autoescape=False
-		if loc := jinja2EnvAutoescapeFalse.FindString(line); loc != "" {
+		if loc := rules.GFindLower(jinja2EnvAutoescapeFalse, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -317,8 +335,35 @@ func (r *Jinja2AutoescapeDisabled) Scan(ctx *rules.ScanContext) []rules.Finding 
 			continue
 		}
 
+		// Framework setup helper with autoescape disabled (no raw
+		// Environment(...) constructor on the line). Precise: only when a
+		// jinja2/templating indicator sits in the immediate window.
+		if rules.GMatchLower(jinja2BareAutoescapeFalse, line, lowered[i]) &&
+			!jinja2AutoescapeTrue.MatchString(line) {
+			context := surroundingContext(lines, i, 3)
+			if jinja2TemplatingIndicator.MatchString(context) {
+				findings = append(findings, rules.Finding{
+					RuleID:        r.ID(),
+					Severity:      r.DefaultSeverity(),
+					SeverityLabel: r.DefaultSeverity().String(),
+					Title:         "Jinja2 templating configured with autoescape disabled",
+					Description:   "A Jinja2 templating environment is set up with autoescape=False (via a framework setup helper such as aiohttp_jinja2.setup). Template variables are rendered without HTML escaping, exposing the application to cross-site scripting (XSS) if any user input is rendered.",
+					FilePath:      ctx.FilePath,
+					LineNumber:    i + 1,
+					MatchedText:   truncate(trimmed, 120),
+					Suggestion:    "Enable autoescaping: pass autoescape=True or autoescape=select_autoescape(['html', 'xml']) to the templating setup.",
+					CWEID:         "CWE-79",
+					OWASPCategory: "A03:2021-Injection",
+					Language:      ctx.Language,
+					Confidence:    "medium",
+					Tags:          []string{"python", "jinja2", "xss", "autoescape"},
+				})
+				continue
+			}
+		}
+
 		// Environment without autoescape (default is False in Jinja2)
-		if jinja2EnvNoAutoescape.MatchString(line) && strings.Contains(line, "jinja2") {
+		if rules.GMatchLower(jinja2EnvNoAutoescape, line, lowered[i]) && strings.Contains(line, "jinja2") {
 			context := surroundingContext(lines, i, 2)
 			if !jinja2AutoescapeTrue.MatchString(context) {
 				findings = append(findings, rules.Finding{
@@ -348,15 +393,18 @@ func (r *Jinja2AutoescapeDisabled) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type UnsafeYAMLLoad struct{}
 
-func (r *UnsafeYAMLLoad) ID() string                      { return "BATOU-PY-004" }
-func (r *UnsafeYAMLLoad) Name() string                    { return "UnsafeYAMLLoad" }
-func (r *UnsafeYAMLLoad) Description() string             { return "Detects yaml.load() without SafeLoader, enabling arbitrary code execution." }
+func (r *UnsafeYAMLLoad) ID() string   { return "BATOU-PY-004" }
+func (r *UnsafeYAMLLoad) Name() string { return "UnsafeYAMLLoad" }
+func (r *UnsafeYAMLLoad) Description() string {
+	return "Detects yaml.load() without SafeLoader, enabling arbitrary code execution."
+}
 func (r *UnsafeYAMLLoad) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *UnsafeYAMLLoad) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
 
 func (r *UnsafeYAMLLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -364,7 +412,7 @@ func (r *UnsafeYAMLLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := yamlUnsafeLoad.FindString(line); loc != "" {
+		if loc := rules.GFindLower(yamlUnsafeLoad, line, lowered[i]); loc != "" {
 			// Check if SafeLoader is specified on this line or the next
 			context := surroundingContext(lines, i, 1)
 			if yamlSafeLoader.MatchString(context) {
@@ -408,15 +456,18 @@ func (r *UnsafeYAMLLoad) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TempfileMktemp struct{}
 
-func (r *TempfileMktemp) ID() string                      { return "BATOU-PY-005" }
-func (r *TempfileMktemp) Name() string                    { return "TempfileMktemp" }
-func (r *TempfileMktemp) Description() string             { return "Detects use of deprecated tempfile.mktemp() which has a TOCTOU race condition." }
+func (r *TempfileMktemp) ID() string   { return "BATOU-PY-005" }
+func (r *TempfileMktemp) Name() string { return "TempfileMktemp" }
+func (r *TempfileMktemp) Description() string {
+	return "Detects use of deprecated tempfile.mktemp() which has a TOCTOU race condition."
+}
 func (r *TempfileMktemp) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *TempfileMktemp) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
 
 func (r *TempfileMktemp) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -424,7 +475,7 @@ func (r *TempfileMktemp) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := tempfileMktemp.FindString(line); loc != "" {
+		if loc := rules.GFindLower(tempfileMktemp, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -451,15 +502,18 @@ func (r *TempfileMktemp) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AssertSecurity struct{}
 
-func (r *AssertSecurity) ID() string                      { return "BATOU-PY-006" }
-func (r *AssertSecurity) Name() string                    { return "AssertSecurity" }
-func (r *AssertSecurity) Description() string             { return "Detects use of Python assert statements for security checks, which are removed with -O flag." }
+func (r *AssertSecurity) ID() string   { return "BATOU-PY-006" }
+func (r *AssertSecurity) Name() string { return "AssertSecurity" }
+func (r *AssertSecurity) Description() string {
+	return "Detects use of Python assert statements for security checks, which are removed with -O flag."
+}
 func (r *AssertSecurity) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AssertSecurity) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
 
 func (r *AssertSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -468,9 +522,9 @@ func (r *AssertSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if loc := assertSecurity.FindString(line); loc != "" {
+		if loc := rules.GFindLower(assertSecurity, line, lowered[i]); loc != "" {
 			matched = loc
-		} else if loc := assertCompare.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(assertCompare, line, lowered[i]); loc != "" {
 			matched = loc
 		}
 
@@ -501,11 +555,15 @@ func (r *AssertSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeDeserialization struct{}
 
-func (r *UnsafeDeserialization) ID() string                      { return "BATOU-PY-007" }
-func (r *UnsafeDeserialization) Name() string                    { return "UnsafeDeserialization" }
-func (r *UnsafeDeserialization) Description() string             { return "Detects pickle/dill/cloudpickle/shelve/marshal deserialization with user-controlled data." }
+func (r *UnsafeDeserialization) ID() string   { return "BATOU-PY-007" }
+func (r *UnsafeDeserialization) Name() string { return "UnsafeDeserialization" }
+func (r *UnsafeDeserialization) Description() string {
+	return "Detects pickle/dill/cloudpickle/shelve/marshal deserialization with user-controlled data."
+}
 func (r *UnsafeDeserialization) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *UnsafeDeserialization) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
+func (r *UnsafeDeserialization) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
@@ -523,7 +581,8 @@ func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -531,7 +590,7 @@ func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := pickleLoadUserInput.FindString(line); loc != "" {
+		if loc := rules.GFindLower(pickleLoadUserInput, line, lowered[i]); loc != "" {
 			// Python FP suppression: check if the sink variable was
 			// last assigned a safe value.
 			if rules.PySinkVarIsSafe(lines, i) {
@@ -574,9 +633,11 @@ func (r *UnsafeDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TimingAttack struct{}
 
-func (r *TimingAttack) ID() string                      { return "BATOU-PY-008" }
-func (r *TimingAttack) Name() string                    { return "TimingAttack" }
-func (r *TimingAttack) Description() string             { return "Detects direct comparison of secrets/tokens instead of constant-time comparison." }
+func (r *TimingAttack) ID() string   { return "BATOU-PY-008" }
+func (r *TimingAttack) Name() string { return "TimingAttack" }
+func (r *TimingAttack) Description() string {
+	return "Detects direct comparison of secrets/tokens instead of constant-time comparison."
+}
 func (r *TimingAttack) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *TimingAttack) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
 
@@ -584,11 +645,12 @@ func (r *TimingAttack) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// If file already uses hmac.compare_digest, skip (developer is aware)
-	if hmacCompareDigest.MatchString(ctx.Content) || secretsCompare.MatchString(ctx.Content) {
+	if rules.GMatchFile(hmacCompareDigest, ctx) || rules.GMatchFile(secretsCompare, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -596,7 +658,7 @@ func (r *TimingAttack) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := directTokenCompare.FindString(line); loc != "" {
+		if loc := rules.GFindLower(directTokenCompare, line, lowered[i]); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -623,15 +685,18 @@ func (r *TimingAttack) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DjangoRawSQL struct{}
 
-func (r *DjangoRawSQL) ID() string                      { return "BATOU-PY-009" }
-func (r *DjangoRawSQL) Name() string                    { return "DjangoRawSQL" }
-func (r *DjangoRawSQL) Description() string             { return "Detects Django .raw(), .extra(), RawSQL() with string interpolation enabling SQL injection." }
+func (r *DjangoRawSQL) ID() string   { return "BATOU-PY-009" }
+func (r *DjangoRawSQL) Name() string { return "DjangoRawSQL" }
+func (r *DjangoRawSQL) Description() string {
+	return "Detects Django .raw(), .extra(), RawSQL() with string interpolation enabling SQL injection."
+}
 func (r *DjangoRawSQL) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *DjangoRawSQL) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
 
 func (r *DjangoRawSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -642,17 +707,17 @@ func (r *DjangoRawSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := djangoRawSQL.FindString(line); loc != "" {
+		if loc := rules.GFindLower(djangoRawSQL, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Django .raw() with string interpolation"
-		} else if loc := djangoExtra.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(djangoExtra, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Django .extra() (deprecated and unsafe)"
-		} else if loc := djangoRawSQLExpr.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(djangoRawSQLExpr, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Django RawSQL() expression with string interpolation"
-		} else if djangoCursorExec.MatchString(line) && djangoConnection.MatchString(ctx.Content) {
-			matched = djangoCursorExec.FindString(line)
+		} else if rules.GMatchLower(djangoCursorExec, line, lowered[i]) && rules.GMatchFile(djangoConnection, ctx) {
+			matched = rules.GFindLower(djangoCursorExec, line, lowered[i])
 			desc = "Django cursor.execute() with string interpolation"
 		}
 
@@ -683,15 +748,20 @@ func (r *DjangoRawSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FlaskHardcodedSecret struct{}
 
-func (r *FlaskHardcodedSecret) ID() string                      { return "BATOU-PY-010" }
-func (r *FlaskHardcodedSecret) Name() string                    { return "FlaskHardcodedSecret" }
-func (r *FlaskHardcodedSecret) Description() string             { return "Detects Flask/Django SECRET_KEY hardcoded as a string literal instead of loaded from environment." }
+func (r *FlaskHardcodedSecret) ID() string   { return "BATOU-PY-010" }
+func (r *FlaskHardcodedSecret) Name() string { return "FlaskHardcodedSecret" }
+func (r *FlaskHardcodedSecret) Description() string {
+	return "Detects Flask/Django SECRET_KEY hardcoded as a string literal instead of loaded from environment."
+}
 func (r *FlaskHardcodedSecret) DefaultSeverity() rules.Severity { return rules.High }
-func (r *FlaskHardcodedSecret) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
+func (r *FlaskHardcodedSecret) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *FlaskHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -699,9 +769,9 @@ func (r *FlaskHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := flaskSecretHardcoded.FindString(line); loc != "" {
+		if loc := rules.GFindLower(flaskSecretHardcoded, line, lowered[i]); loc != "" {
 			// Skip if it's clearly an env-based approach
-			if flaskSecretEnv.MatchString(line) {
+			if rules.GMatchLower(flaskSecretEnv, line, lowered[i]) {
 				continue
 			}
 			// Placeholder values still flagged (they shouldn't be in production)
@@ -731,15 +801,20 @@ func (r *FlaskHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TLSVerificationDisabled struct{}
 
-func (r *TLSVerificationDisabled) ID() string                      { return "BATOU-PY-011" }
-func (r *TLSVerificationDisabled) Name() string                    { return "TLSVerificationDisabled" }
-func (r *TLSVerificationDisabled) Description() string             { return "Detects disabled TLS certificate verification in requests, httpx, aiohttp, and urllib3." }
+func (r *TLSVerificationDisabled) ID() string   { return "BATOU-PY-011" }
+func (r *TLSVerificationDisabled) Name() string { return "TLSVerificationDisabled" }
+func (r *TLSVerificationDisabled) Description() string {
+	return "Detects disabled TLS certificate verification in requests, httpx, aiohttp, and urllib3."
+}
 func (r *TLSVerificationDisabled) DefaultSeverity() rules.Severity { return rules.High }
-func (r *TLSVerificationDisabled) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
+func (r *TLSVerificationDisabled) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *TLSVerificationDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -750,22 +825,22 @@ func (r *TLSVerificationDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := requestsVerifyFalse.FindString(line); loc != "" {
+		if loc := rules.GFindLower(requestsVerifyFalse, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "requests library with verify=False"
-		} else if loc := urllib3DisableWarnings.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(urllib3DisableWarnings, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "urllib3 InsecureRequestWarning suppressed"
-		} else if loc := urllib3NoVerify.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(urllib3NoVerify, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "urllib3 with CERT_NONE"
-		} else if loc := sslNoVerify.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(sslNoVerify, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "ssl._create_unverified_context()"
-		} else if loc := httpxVerifyFalse.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(httpxVerifyFalse, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "httpx client with verify=False"
-		} else if loc := aiohttpNoVerify.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(aiohttpNoVerify, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "aiohttp with SSL verification disabled"
 		}
@@ -797,9 +872,11 @@ func (r *TLSVerificationDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ReDoS struct{}
 
-func (r *ReDoS) ID() string                      { return "BATOU-PY-012" }
-func (r *ReDoS) Name() string                    { return "ReDoS" }
-func (r *ReDoS) Description() string             { return "Detects re.compile/match/search with user-controlled patterns enabling Regular Expression Denial of Service." }
+func (r *ReDoS) ID() string   { return "BATOU-PY-012" }
+func (r *ReDoS) Name() string { return "ReDoS" }
+func (r *ReDoS) Description() string {
+	return "Detects re.compile/match/search with user-controlled patterns enabling Regular Expression Denial of Service."
+}
 func (r *ReDoS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ReDoS) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
 
@@ -811,7 +888,8 @@ func (r *ReDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -819,9 +897,9 @@ func (r *ReDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reCompileUserInput.MatchString(line) {
+		if rules.GMatchLower(reCompileUserInput, line, lowered[i]) {
 			// Skip if the regex pattern argument is a string literal (hardcoded)
-			if reRegexStringLiteralArg.MatchString(line) {
+			if rules.GMatchLower(reRegexStringLiteralArg, line, lowered[i]) {
 				continue
 			}
 			// Check if user-controlled variable is passed as the pattern
@@ -854,15 +932,20 @@ func (r *ReDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeArchiveExtraction struct{}
 
-func (r *UnsafeArchiveExtraction) ID() string                      { return "BATOU-PY-013" }
-func (r *UnsafeArchiveExtraction) Name() string                    { return "UnsafeArchiveExtraction" }
-func (r *UnsafeArchiveExtraction) Description() string             { return "Detects tarfile/zipfile extractall() without path validation (CVE-2007-4559)." }
+func (r *UnsafeArchiveExtraction) ID() string   { return "BATOU-PY-013" }
+func (r *UnsafeArchiveExtraction) Name() string { return "UnsafeArchiveExtraction" }
+func (r *UnsafeArchiveExtraction) Description() string {
+	return "Detects tarfile/zipfile extractall() without path validation (CVE-2007-4559)."
+}
 func (r *UnsafeArchiveExtraction) DefaultSeverity() rules.Severity { return rules.High }
-func (r *UnsafeArchiveExtraction) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
+func (r *UnsafeArchiveExtraction) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *UnsafeArchiveExtraction) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -870,7 +953,7 @@ func (r *UnsafeArchiveExtraction) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if tarExtractAll.MatchString(line) {
+		if rules.GMatchLower(tarExtractAll, line, lowered[i]) {
 			context := surroundingContext(lines, i, 3)
 			// Skip if filter= or members= is used (Python 3.12+ or manual filtering)
 			if tarExtractFilter.MatchString(context) || tarExtractMembers.MatchString(context) {
@@ -908,15 +991,18 @@ func (r *UnsafeArchiveExtraction) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LoggingInjection struct{}
 
-func (r *LoggingInjection) ID() string                      { return "BATOU-PY-014" }
-func (r *LoggingInjection) Name() string                    { return "LoggingInjection" }
-func (r *LoggingInjection) Description() string             { return "Detects f-string/.format()/% formatting in logging calls instead of lazy % formatting." }
+func (r *LoggingInjection) ID() string   { return "BATOU-PY-014" }
+func (r *LoggingInjection) Name() string { return "LoggingInjection" }
+func (r *LoggingInjection) Description() string {
+	return "Detects f-string/.format()/% formatting in logging calls instead of lazy % formatting."
+}
 func (r *LoggingInjection) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *LoggingInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
 
 func (r *LoggingInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -927,13 +1013,13 @@ func (r *LoggingInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := loggingFString.FindString(line); loc != "" {
+		if loc := rules.GFindLower(loggingFString, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "f-string in logging call"
-		} else if loc := loggingFormat.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(loggingFormat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = ".format() in logging call"
-		} else if loc := loggingPercent.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(loggingPercent, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "%-formatting in logging call"
 		}
@@ -965,15 +1051,18 @@ func (r *LoggingInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JWTNoVerification struct{}
 
-func (r *JWTNoVerification) ID() string                      { return "BATOU-PY-015" }
-func (r *JWTNoVerification) Name() string                    { return "JWTNoVerification" }
-func (r *JWTNoVerification) Description() string             { return "Detects PyJWT jwt.decode() with signature verification disabled or algorithm=none." }
+func (r *JWTNoVerification) ID() string   { return "BATOU-PY-015" }
+func (r *JWTNoVerification) Name() string { return "JWTNoVerification" }
+func (r *JWTNoVerification) Description() string {
+	return "Detects PyJWT jwt.decode() with signature verification disabled or algorithm=none."
+}
 func (r *JWTNoVerification) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JWTNoVerification) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
 
 func (r *JWTNoVerification) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -984,10 +1073,10 @@ func (r *JWTNoVerification) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if loc := jwtDecodeNoVerify.FindString(line); loc != "" {
+		if loc := rules.GFindLower(jwtDecodeNoVerify, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "jwt.decode() with signature verification disabled"
-		} else if loc := jwtDecodeAlgNone.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(jwtDecodeAlgNone, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "jwt.decode() with algorithm='none' (no signature)"
 		}
@@ -1019,15 +1108,20 @@ func (r *JWTNoVerification) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DebuggerInProduction struct{}
 
-func (r *DebuggerInProduction) ID() string                      { return "BATOU-PY-016" }
-func (r *DebuggerInProduction) Name() string                    { return "DebuggerInProduction" }
-func (r *DebuggerInProduction) Description() string             { return "Detects Werkzeug debugger, Flask debug mode, and debug toolbar enabled in application code." }
+func (r *DebuggerInProduction) ID() string   { return "BATOU-PY-016" }
+func (r *DebuggerInProduction) Name() string { return "DebuggerInProduction" }
+func (r *DebuggerInProduction) Description() string {
+	return "Detects Werkzeug debugger, Flask debug mode, and debug toolbar enabled in application code."
+}
 func (r *DebuggerInProduction) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *DebuggerInProduction) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
+func (r *DebuggerInProduction) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *DebuggerInProduction) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -1039,15 +1133,15 @@ func (r *DebuggerInProduction) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 		severity := r.DefaultSeverity()
 
-		if loc := werkzeugDebugger.FindString(line); loc != "" {
+		if loc := rules.GFindLower(werkzeugDebugger, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Werkzeug debugger enabled (use_debugger=True)"
 			severity = rules.Critical
-		} else if loc := flaskDebugRun.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(flaskDebugRun, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Flask app.run(debug=True)"
 			severity = rules.High
-		} else if loc := debugToolbar.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(debugToolbar, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "Flask-DebugToolbar enabled"
 			severity = rules.Medium
@@ -1080,11 +1174,15 @@ func (r *DebuggerInProduction) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FastAPIMissingValidation struct{}
 
-func (r *FastAPIMissingValidation) ID() string                      { return "BATOU-PY-017" }
-func (r *FastAPIMissingValidation) Name() string                    { return "FastAPIMissingValidation" }
-func (r *FastAPIMissingValidation) Description() string             { return "Detects FastAPI endpoints accepting raw user input without Pydantic validation or Query/Path constraints." }
+func (r *FastAPIMissingValidation) ID() string   { return "BATOU-PY-017" }
+func (r *FastAPIMissingValidation) Name() string { return "FastAPIMissingValidation" }
+func (r *FastAPIMissingValidation) Description() string {
+	return "Detects FastAPI endpoints accepting raw user input without Pydantic validation or Query/Path constraints."
+}
 func (r *FastAPIMissingValidation) DefaultSeverity() rules.Severity { return rules.Medium }
-func (r *FastAPIMissingValidation) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
+func (r *FastAPIMissingValidation) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *FastAPIMissingValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
@@ -1094,7 +1192,8 @@ func (r *FastAPIMissingValidation) Scan(ctx *rules.ScanContext) []rules.Finding 
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -1105,10 +1204,10 @@ func (r *FastAPIMissingValidation) Scan(ctx *rules.ScanContext) []rules.Finding 
 		var matched string
 		var desc string
 
-		if loc := fastapiQueryParam.FindString(line); loc != "" {
+		if loc := rules.GFindLower(fastapiQueryParam, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "FastAPI Query/Header/Cookie/Path parameter without validation constraints"
-		} else if loc := fastapiRawBody.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(fastapiRawBody, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "FastAPI endpoint reads raw request body without Pydantic model validation"
 		}
@@ -1140,15 +1239,20 @@ func (r *FastAPIMissingValidation) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type AsyncioShellInjection struct{}
 
-func (r *AsyncioShellInjection) ID() string                      { return "BATOU-PY-018" }
-func (r *AsyncioShellInjection) Name() string                    { return "AsyncioShellInjection" }
-func (r *AsyncioShellInjection) Description() string             { return "Detects asyncio.create_subprocess_shell with potentially user-controlled commands." }
+func (r *AsyncioShellInjection) ID() string   { return "BATOU-PY-018" }
+func (r *AsyncioShellInjection) Name() string { return "AsyncioShellInjection" }
+func (r *AsyncioShellInjection) Description() string {
+	return "Detects asyncio.create_subprocess_shell with potentially user-controlled commands."
+}
 func (r *AsyncioShellInjection) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *AsyncioShellInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPython} }
+func (r *AsyncioShellInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *AsyncioShellInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -1160,11 +1264,11 @@ func (r *AsyncioShellInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 		confidence := "medium"
 
-		if loc := asyncioShellConcat.FindString(line); loc != "" {
+		if loc := rules.GFindLower(asyncioShellConcat, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "asyncio.create_subprocess_shell with dynamic command"
 			confidence = "high"
-		} else if loc := asyncioShellTrue.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(asyncioShellTrue, line, lowered[i]); loc != "" {
 			matched = loc
 			desc = "asyncio.create_subprocess_shell always invokes the shell"
 		}

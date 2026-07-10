@@ -1,9 +1,8 @@
 package suppress
 
 import (
-	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
+	"testing"
 )
 
 // =========================================================================
@@ -855,5 +854,186 @@ func TestSuppress_MultipleTargets(t *testing.T) {
 	}
 	if !s.IsSuppressed(xssF) {
 		t.Error("xss should be suppressed by multi-target directive")
+	}
+}
+
+// =========================================================================
+// ParseWithLineMap — mirroring to original line coordinates
+//
+// Regression: a Python file where joinPythonContinuations collapses a
+// multi-line argparse.ArgumentParser(...) call (original lines 2–4) into a
+// single preprocessed line. A `# batou:ignore` comment above a taint sink
+// further down the file would otherwise miss the sink entirely, because:
+//   - suppress.Parse sees the directive at preprocessed line N.
+//   - The taint engine reports the sink at original line N+2 (the collapse
+//     shifted things by 2).
+//   - lineTargets[N+2] is empty, lookup fails, finding is not suppressed.
+// ParseWithLineMap mirrors each preprocessed entry across every original line
+// in the group, so lookups in either coordinate system succeed.
+// =========================================================================
+
+func TestParseWithLineMap_MirrorsToOriginalAfterCollapse(t *testing.T) {
+	// Shape: orig lines 1..3 collapse into preprocessed line 1 (argparse-like
+	// multi-line ctor). Directive at orig line 4 = preprocessed line 2.
+	// Sink at orig line 5 = preprocessed line 3.
+	preToOrig := []int{1, 4, 5, 6}
+	totalOrigLines := 6
+	// Parse runs on preprocessed content, which has 4 physical lines after
+	// collapse.
+	preprocessed := "p1 joined\n# batou:ignore file_read\nsink()\nafter"
+
+	s := ParseWithLineMap(preprocessed, preToOrig, totalOrigLines)
+
+	// Finding reported in ORIGINAL coords (e.g. from the taint engine).
+	taintFinding := rules.Finding{RuleID: "BATOU-TAINT-file_read", LineNumber: 5}
+	if !s.IsSuppressed(taintFinding) {
+		t.Errorf("taint finding at original line 5 should be suppressed via mirroring; lineTargets=%v", s.lineTargets)
+	}
+
+	// Finding reported in PREPROCESSED coords (e.g. from a regex rule) still
+	// resolves directly.
+	regexFinding := rules.Finding{RuleID: "BATOU-TAINT-file_read", LineNumber: 3}
+	if !s.IsSuppressed(regexFinding) {
+		t.Error("regex-style finding at preprocessed line 3 should still be suppressed (backwards compat)")
+	}
+
+	// A finding BEYOND the mirror range should not be suppressed.
+	unrelated := rules.Finding{RuleID: "BATOU-TAINT-file_read", LineNumber: 6}
+	if s.IsSuppressed(unrelated) {
+		t.Error("finding on line 6 (outside directive scope) should not be suppressed")
+	}
+}
+
+func TestParseWithLineMap_ExpandsGroupAcrossCollapse(t *testing.T) {
+	// Directive above a collapsed group: orig lines 2..4 collapse into
+	// preprocessed line 2. A directive at orig line 1 should suppress
+	// findings anywhere in the collapsed group (orig lines 2, 3, or 4).
+	preToOrig := []int{1, 2, 5}
+	totalOrigLines := 5
+	preprocessed := "# batou:ignore injection\nsink(joined,content)\nafter"
+
+	s := ParseWithLineMap(preprocessed, preToOrig, totalOrigLines)
+
+	// Any original line within the collapsed group should be suppressed.
+	for _, ln := range []int{2, 3, 4} {
+		f := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: ln}
+		if !s.IsSuppressed(f) {
+			t.Errorf("line %d (inside collapsed group) should be suppressed; lineTargets=%v", ln, s.lineTargets)
+		}
+	}
+
+	// Line 5 (next group) should NOT be suppressed.
+	f5 := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 5}
+	if s.IsSuppressed(f5) {
+		t.Error("line 5 (outside directive scope) should not be suppressed")
+	}
+}
+
+func TestParseWithLineMap_NilMapIsIdentity(t *testing.T) {
+	// Passing nil preToOrig should behave identically to Parse.
+	code := "# batou:ignore injection\ndb.Query(sql)"
+	s := ParseWithLineMap(code, nil, 0)
+	ref := Parse(code)
+
+	if len(s.lineTargets) != len(ref.lineTargets) {
+		t.Errorf("expected identical lineTargets; got %v vs %v", s.lineTargets, ref.lineTargets)
+	}
+	for ln, targets := range ref.lineTargets {
+		if got := s.lineTargets[ln]; len(got) != len(targets) {
+			t.Errorf("line %d mismatch: got %v, want %v", ln, got, targets)
+		}
+	}
+}
+
+// =========================================================================
+// Trailing (inline) directive scope
+//
+// Regression: a directive that trails a code line should only suppress that
+// one line. The old implementation always extended to the next code line,
+// which silently suppressed unrelated findings below.
+// =========================================================================
+
+func TestTrailingDirective_DoesNotLeakToNextLine(t *testing.T) {
+	content := "risky_call()  // batou:ignore injection\nanother_call()"
+	s := Parse(content)
+
+	// The directive line itself is suppressed.
+	onLine1 := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 1}
+	if !s.IsSuppressed(onLine1) {
+		t.Error("directive line (trailing form) should be suppressed")
+	}
+
+	// The NEXT line must NOT be suppressed — it's unrelated code.
+	onLine2 := rules.Finding{RuleID: "BATOU-INJ-002", LineNumber: 2}
+	if s.IsSuppressed(onLine2) {
+		t.Error("line 2 should NOT be suppressed by a trailing directive on line 1")
+	}
+}
+
+func TestPureCommentDirective_ExtendsToNextCodeLine(t *testing.T) {
+	// Guardrail: pure-comment form must still extend to the next code line.
+	content := "// batou:ignore injection\nrisky_call()"
+	s := Parse(content)
+
+	onLine2 := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 2}
+	if !s.IsSuppressed(onLine2) {
+		t.Error("pure-comment directive must still suppress next code line (regression)")
+	}
+}
+
+func TestParseWithLineMap_LastPreprocessedLineExtendsToEOF(t *testing.T) {
+	// The last preprocessed line represents a collapsed group that runs to
+	// the end of the file (unclosed paren / trailing backslash). The mirror
+	// must extend to totalOrigLines, not just preToOrig[-1].
+	preToOrig := []int{1, 3}
+	totalOrigLines := 5
+	preprocessed := "before\n# batou:ignore injection trailing"
+
+	s := ParseWithLineMap(preprocessed, preToOrig, totalOrigLines)
+
+	// The directive is on preprocessed line 2 which maps to orig lines 3..5.
+	// Every original line in that range should carry the directive's targets
+	// (so a finding on any of them is suppressed).
+	for _, ln := range []int{3, 4, 5} {
+		f := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: ln}
+		if !s.IsSuppressed(f) {
+			t.Errorf("line %d (end-of-file group) should be suppressed; lineTargets=%v", ln, s.lineTargets)
+		}
+	}
+}
+
+// =========================================================================
+// ReasonForFinding — exported reason lookup for the audit trail
+// =========================================================================
+
+// ReasonForFinding must return the directive's `-- reason` text for a finding
+// the directive suppresses, so the scanner can stamp Finding.SuppressReason
+// and the findings store / ledger persist the developer's justification.
+func TestReasonForFinding_ReturnsDirectiveReason(t *testing.T) {
+	s := Parse("# batou:ignore BATOU-INJ-001 -- known FP because X\ncursor.execute(sql)")
+	f := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 2}
+	reason, ok := s.ReasonForFinding(f)
+	if !ok {
+		t.Fatal("expected ok=true for a finding covered by the directive")
+	}
+	if reason != "known FP because X" {
+		t.Errorf("reason = %q, want %q", reason, "known FP because X")
+	}
+}
+
+// A reasonless directive still covers the finding (ok=true) but yields an
+// empty reason; an uncovered finding yields ok=false.
+func TestReasonForFinding_ReasonlessAndUncovered(t *testing.T) {
+	s := Parse("# batou:ignore BATOU-INJ-001\ncursor.execute(sql)")
+
+	covered := rules.Finding{RuleID: "BATOU-INJ-001", LineNumber: 2}
+	reason, ok := s.ReasonForFinding(covered)
+	if !ok || reason != "" {
+		t.Errorf("reasonless directive: got (%q, %v), want (\"\", true)", reason, ok)
+	}
+
+	uncovered := rules.Finding{RuleID: "BATOU-XSS-001", LineNumber: 2}
+	if reason, ok := s.ReasonForFinding(uncovered); ok {
+		t.Errorf("non-matching rule: got (%q, %v), want ok=false", reason, ok)
 	}
 }

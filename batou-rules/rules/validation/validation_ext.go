@@ -25,17 +25,25 @@ var (
 
 // BATOU-VAL-008: Integer overflow from unchecked conversion
 var (
-	reStrToIntGo     = regexp.MustCompile(`strconv\.(?:Atoi|ParseInt|ParseUint)\s*\(`)
-	reStrToIntPy     = regexp.MustCompile(`\bint\s*\(\s*(?:request\.|input\(|sys\.argv|os\.environ)`)
-	reStrToIntJS     = regexp.MustCompile(`(?:parseInt|Number)\s*\(\s*(?:req\.|request\.|params|query|body|process\.argv)`)
-	reStrToIntJava   = regexp.MustCompile(`(?:Integer\.parseInt|Long\.parseLong|Short\.parseShort)\s*\(\s*(?:request\.getParameter|args\[)`)
-	reOverflowCheck  = regexp.MustCompile(`(?i)(?:overflow|MaxInt|MinInt|MAX_VALUE|MIN_VALUE|max_value|min_value|Number\.MAX_SAFE_INTEGER|Number\.isSafeInteger|Number\.isFinite|Number\.isNaN|Number\.isInteger|isFinite|isNaN|math\.MaxInt|math\.MinInt|int32|int16|bounds|range\s*check|>\s*0|<\s*\d|>=\s*\d|<=\s*\d)`)
+	// Tightened 2026-05-05: require user-input argument shape so this
+	// doesn't fire on internal int parsing (config values, migration row
+	// counts, schema versions). Mirrors how the Python/JS variants below
+	// gate on request./params./process.argv. On gitea pre-fix, this
+	// pattern matched 116 lines of which all were internal-string parsing.
+	reStrToIntGo = regexp.MustCompile(`strconv\.(?:Atoi|ParseInt|ParseUint)\s*\(\s*(?:r\.URL\.Query|r\.Form|r\.PostForm|r\.Header\.Get|req\.URL\.Query|req\.Form|req\.Header\.Get|c\.Param|c\.Query|c\.PostForm|c\.GetHeader|c\.FormValue|ctx\.Param|ctx\.Query|ctx\.PostForm|os\.Args|os\.Getenv\b)`)
+	reStrToIntPy = regexp.MustCompile(`\bint\s*\(\s*(?:request\.|input\(|sys\.argv|os\.environ)`)
+	// Tightened 2026-04-25: required `params|query|body` to be followed
+	// by `.` or `[` so identifiers like `queryItemAsString` no longer
+	// match the request-source alternation.
+	reStrToIntJS    = regexp.MustCompile(`(?:parseInt|Number)\s*\(\s*(?:req\.|request\.|(?:params|query|body)[.\[]|process\.argv)`)
+	reStrToIntJava  = regexp.MustCompile(`(?:Integer\.parseInt|Long\.parseLong|Short\.parseShort)\s*\(\s*(?:request\.getParameter|args\[)`)
+	reOverflowCheck = regexp.MustCompile(`(?i)(?:overflow|MaxInt|MinInt|MAX_VALUE|MIN_VALUE|max_value|min_value|Number\.MAX_SAFE_INTEGER|Number\.isSafeInteger|Number\.isFinite|Number\.isNaN|Number\.isInteger|isFinite|isNaN|math\.MaxInt|math\.MinInt|int32|int16|bounds|range\s*check|>\s*0|<\s*\d|>=\s*\d|<=\s*\d)`)
 )
 
 // BATOU-VAL-009: Email validation using regex only
 var (
-	reEmailRegex      = regexp.MustCompile(`(?i)(?:email|e_mail|mail).*(?:regex|regexp|pattern|match|test|re\.compile|MustCompile|Pattern\.compile)\s*[\(\[]?\s*['"\x60/]`)
-	reEmailRegexAlt   = regexp.MustCompile(`(?i)(?:regex|regexp|pattern|re\.compile|MustCompile|Pattern\.compile)\s*[\(\[]?\s*['"\x60/][^'"]*@[^'"]*['"\x60/]`)
+	reEmailRegex       = regexp.MustCompile(`(?i)(?:email|e_mail|mail).*(?:regex|regexp|pattern|match|test|re\.compile|MustCompile|Pattern\.compile)\s*[\(\[]?\s*['"\x60/]`)
+	reEmailRegexAlt    = regexp.MustCompile(`(?i)(?:regex|regexp|pattern|re\.compile|MustCompile|Pattern\.compile)\s*[\(\[]?\s*['"\x60/][^'"]*@[^'"]*['"\x60/]`)
 	reDomainValidation = regexp.MustCompile(`(?i)(?:dns\.lookup|dns\.resolve|checkdnsrr|getmxrr|MX\s*record|validate.*domain|domain.*valid|socket\.getaddrinfo|nslookup|dig\s+)`)
 )
 
@@ -48,7 +56,6 @@ var (
 // BATOU-VAL-011: Trusting client-side validation only
 var (
 	reClientSideOnly = regexp.MustCompile(`(?i)(?:<!--\s*|//\s*|/\*\s*)(?:client.?side|front.?end|browser)\s+(?:only|validation)`)
-	reFormPattern    = regexp.MustCompile(`(?i)(?:pattern\s*=\s*['"][^'"]+['"]|required\s*[=>]|minlength\s*=|maxlength\s*=|type\s*=\s*['"]email['"])`)
 	reNoServerVal    = regexp.MustCompile(`(?i)//\s*(?:no\s+)?(?:server|backend)\s*(?:side)?\s*validation\s*(?:needed|required|necessary)?`)
 )
 
@@ -71,8 +78,8 @@ var (
 
 type MissingInputLengthValidation struct{}
 
-func (r *MissingInputLengthValidation) ID() string                     { return "BATOU-VAL-006" }
-func (r *MissingInputLengthValidation) Name() string                   { return "MissingInputLengthValidation" }
+func (r *MissingInputLengthValidation) ID() string                      { return "BATOU-VAL-006" }
+func (r *MissingInputLengthValidation) Name() string                    { return "MissingInputLengthValidation" }
 func (r *MissingInputLengthValidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingInputLengthValidation) Description() string {
 	return "Detects user input accepted without length or size validation, allowing unlimited data that can cause denial of service or buffer issues."
@@ -83,10 +90,10 @@ func (r *MissingInputLengthValidation) Languages() []rules.Language {
 
 func (r *MissingInputLengthValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// File-level check: if there are limit checks anywhere, skip
-	if reLimitPresent.MatchString(ctx.Content) {
+	if rules.GMatchFile(reLimitPresent, ctx) {
 		return nil
 	}
 
@@ -94,7 +101,7 @@ func (r *MissingInputLengthValidation) Scan(ctx *rules.ScanContext) []rules.Find
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reAcceptBodyNoLimit.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reAcceptBodyNoLimit, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -127,8 +134,8 @@ func (r *MissingInputLengthValidation) Scan(ctx *rules.ScanContext) []rules.Find
 
 type ReDoSPattern struct{}
 
-func (r *ReDoSPattern) ID() string                     { return "BATOU-VAL-007" }
-func (r *ReDoSPattern) Name() string                   { return "ReDoSPattern" }
+func (r *ReDoSPattern) ID() string                      { return "BATOU-VAL-007" }
+func (r *ReDoSPattern) Name() string                    { return "ReDoSPattern" }
 func (r *ReDoSPattern) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ReDoSPattern) Description() string {
 	return "Detects regular expressions with patterns susceptible to catastrophic backtracking (ReDoS), which can cause denial of service when processing crafted input."
@@ -138,17 +145,24 @@ func (r *ReDoSPattern) Languages() []rules.Language {
 }
 
 func (r *ReDoSPattern) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Skip test files — the `/[^/\n]+/` regex-literal pattern matches PGP
+	// keys, JWT samples, and other slash-rich test fixtures. None of those
+	// are real ReDoS patterns; they're test data.
+	if isValidationTestFile(ctx.FilePath) {
+		return nil
+	}
+
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if !reRedosPattern.MatchString(line) {
+		if !rules.GMatch(reRedosPattern, line) {
 			continue
 		}
-		if reNestedQuant.MatchString(line) {
+		if rules.GMatch(reNestedQuant, line) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -180,8 +194,8 @@ func (r *ReDoSPattern) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type IntegerOverflowConversion struct{}
 
-func (r *IntegerOverflowConversion) ID() string                     { return "BATOU-VAL-008" }
-func (r *IntegerOverflowConversion) Name() string                   { return "IntegerOverflowConversion" }
+func (r *IntegerOverflowConversion) ID() string                      { return "BATOU-VAL-008" }
+func (r *IntegerOverflowConversion) Name() string                    { return "IntegerOverflowConversion" }
 func (r *IntegerOverflowConversion) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *IntegerOverflowConversion) Description() string {
 	return "Detects string-to-integer conversions of user input without overflow or range checking, which can lead to integer overflow vulnerabilities."
@@ -192,7 +206,7 @@ func (r *IntegerOverflowConversion) Languages() []rules.Language {
 
 func (r *IntegerOverflowConversion) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	var patterns []*regexp.Regexp
 	switch ctx.Language {
@@ -213,7 +227,7 @@ func (r *IntegerOverflowConversion) Scan(ctx *rules.ScanContext) []rules.Finding
 			continue
 		}
 		for _, pat := range patterns {
-			if loc := pat.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(pat, line); loc != nil {
 				if scopeHasPattern(lines, i, reOverflowCheck, 10) {
 					continue
 				}
@@ -250,8 +264,8 @@ func (r *IntegerOverflowConversion) Scan(ctx *rules.ScanContext) []rules.Finding
 
 type EmailRegexOnlyValidation struct{}
 
-func (r *EmailRegexOnlyValidation) ID() string                     { return "BATOU-VAL-009" }
-func (r *EmailRegexOnlyValidation) Name() string                   { return "EmailRegexOnlyValidation" }
+func (r *EmailRegexOnlyValidation) ID() string                      { return "BATOU-VAL-009" }
+func (r *EmailRegexOnlyValidation) Name() string                    { return "EmailRegexOnlyValidation" }
 func (r *EmailRegexOnlyValidation) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *EmailRegexOnlyValidation) Description() string {
 	return "Detects email validation that relies solely on regex pattern matching without DNS/MX record verification, which allows fake domains."
@@ -262,9 +276,9 @@ func (r *EmailRegexOnlyValidation) Languages() []rules.Language {
 
 func (r *EmailRegexOnlyValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
-	if reDomainValidation.MatchString(ctx.Content) {
+	if rules.GMatchFile(reDomainValidation, ctx) {
 		return nil
 	}
 
@@ -273,9 +287,9 @@ func (r *EmailRegexOnlyValidation) Scan(ctx *rules.ScanContext) []rules.Finding 
 			continue
 		}
 		matched := ""
-		if loc := reEmailRegex.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reEmailRegex, line); loc != nil {
 			matched = line[loc[0]:loc[1]]
-		} else if loc := reEmailRegexAlt.FindStringIndex(line); loc != nil {
+		} else if loc := rules.GFindIndex(reEmailRegexAlt, line); loc != nil {
 			matched = line[loc[0]:loc[1]]
 		}
 		if matched != "" {
@@ -309,8 +323,8 @@ func (r *EmailRegexOnlyValidation) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type MissingNullCheck struct{}
 
-func (r *MissingNullCheck) ID() string                     { return "BATOU-VAL-010" }
-func (r *MissingNullCheck) Name() string                   { return "MissingNullCheck" }
+func (r *MissingNullCheck) ID() string                      { return "BATOU-VAL-010" }
+func (r *MissingNullCheck) Name() string                    { return "MissingNullCheck" }
 func (r *MissingNullCheck) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingNullCheck) Description() string {
 	return "Detects deep property access on request objects without null/undefined checks, which can cause runtime crashes."
@@ -321,15 +335,15 @@ func (r *MissingNullCheck) Languages() []rules.Language {
 
 func (r *MissingNullCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reOptionalChainMissing.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reOptionalChainMissing, line); loc != nil {
 			// Skip if optional chaining or null check is present nearby
-			if strings.Contains(line, "?.") || reNullCheckPresent.MatchString(line) {
+			if strings.Contains(line, "?.") || rules.GMatch(reNullCheckPresent, line) {
 				continue
 			}
 			if scopeHasPattern(lines, i, reNullCheckPresent, 5) {
@@ -366,8 +380,8 @@ func (r *MissingNullCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ClientSideValidationOnly struct{}
 
-func (r *ClientSideValidationOnly) ID() string                     { return "BATOU-VAL-011" }
-func (r *ClientSideValidationOnly) Name() string                   { return "ClientSideValidationOnly" }
+func (r *ClientSideValidationOnly) ID() string                      { return "BATOU-VAL-011" }
+func (r *ClientSideValidationOnly) Name() string                    { return "ClientSideValidationOnly" }
 func (r *ClientSideValidationOnly) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ClientSideValidationOnly) Description() string {
 	return "Detects code comments or patterns indicating reliance on client-side validation only, without server-side validation."
@@ -378,13 +392,13 @@ func (r *ClientSideValidationOnly) Languages() []rules.Language {
 
 func (r *ClientSideValidationOnly) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		matched := ""
-		if loc := reClientSideOnly.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reClientSideOnly, line); loc != nil {
 			matched = line[loc[0]:loc[1]]
-		} else if loc := reNoServerVal.FindStringIndex(line); loc != nil {
+		} else if loc := rules.GFindIndex(reNoServerVal, line); loc != nil {
 			matched = line[loc[0]:loc[1]]
 		}
 		if matched != "" {
@@ -418,8 +432,8 @@ func (r *ClientSideValidationOnly) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type TypeConfusionJSON struct{}
 
-func (r *TypeConfusionJSON) ID() string                     { return "BATOU-VAL-012" }
-func (r *TypeConfusionJSON) Name() string                   { return "TypeConfusionJSON" }
+func (r *TypeConfusionJSON) ID() string                      { return "BATOU-VAL-012" }
+func (r *TypeConfusionJSON) Name() string                    { return "TypeConfusionJSON" }
 func (r *TypeConfusionJSON) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *TypeConfusionJSON) Description() string {
 	return "Detects JSON.parse of user input used directly without type validation, which can lead to type confusion vulnerabilities."
@@ -430,16 +444,16 @@ func (r *TypeConfusionJSON) Languages() []rules.Language {
 
 func (r *TypeConfusionJSON) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		matched := ""
-		if loc := reJSONParseDirect.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reJSONParseDirect, line); loc != nil {
 			matched = line[loc[0]:loc[1]]
-		} else if loc := reJSONParseAccess.FindStringIndex(line); loc != nil {
+		} else if loc := rules.GFindIndex(reJSONParseAccess, line); loc != nil {
 			matched = line[loc[0]:loc[1]]
 		}
 		if matched != "" {
@@ -476,8 +490,8 @@ func (r *TypeConfusionJSON) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingArrayBoundsCheck struct{}
 
-func (r *MissingArrayBoundsCheck) ID() string                     { return "BATOU-VAL-013" }
-func (r *MissingArrayBoundsCheck) Name() string                   { return "MissingArrayBoundsCheck" }
+func (r *MissingArrayBoundsCheck) ID() string                      { return "BATOU-VAL-013" }
+func (r *MissingArrayBoundsCheck) Name() string                    { return "MissingArrayBoundsCheck" }
 func (r *MissingArrayBoundsCheck) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingArrayBoundsCheck) Description() string {
 	return "Detects array indexing with variable indices without bounds checking, which can cause out-of-bounds access."
@@ -488,13 +502,13 @@ func (r *MissingArrayBoundsCheck) Languages() []rules.Language {
 
 func (r *MissingArrayBoundsCheck) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reArrayIndexVar.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reArrayIndexVar, line); loc != nil {
 			if scopeHasPattern(lines, i, reBoundsCheck, 5) {
 				continue
 			}
@@ -536,4 +550,24 @@ func init() {
 	rules.Register(&ClientSideValidationOnly{})
 	rules.Register(&TypeConfusionJSON{})
 	// rules.Register(&MissingArrayBoundsCheck{}) // Removed: noise
+}
+
+// isValidationTestFile returns true if the path looks like a test fixture
+// or test file. Used to suppress VAL-007 (ReDoS) which fires on PGP keys
+// and other slash-rich test data via the `/[^/\n]+/` regex-literal pattern.
+func isValidationTestFile(path string) bool {
+	if path == "" {
+		return false
+	}
+	low := strings.ToLower(path)
+	return strings.HasSuffix(low, "_test.go") ||
+		strings.HasSuffix(low, ".test.ts") ||
+		strings.HasSuffix(low, ".test.js") ||
+		strings.HasSuffix(low, ".spec.ts") ||
+		strings.HasSuffix(low, ".spec.js") ||
+		strings.Contains(low, "/tests/") ||
+		strings.Contains(low, "/test/") ||
+		strings.Contains(low, "/__tests__/") ||
+		strings.Contains(low, "_test.py") ||
+		strings.Contains(low, "test_")
 }

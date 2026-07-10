@@ -13,62 +13,58 @@ import (
 
 // CS-023: SQL injection via string interpolation in EF Core
 var (
-	reEFFromSqlInterp   = regexp.MustCompile(`\.FromSqlRaw\s*\(\s*\$"`)
-	reEFExecuteInterp   = regexp.MustCompile(`\.ExecuteSqlRaw\s*\(\s*\$"`)
-	reEFSqlQueryInterp  = regexp.MustCompile(`\.SqlQuery\s*<[^>]+>\s*\(\s*\$"`)
-	reEFRawSqlConcat    = regexp.MustCompile(`\.(?:FromSqlRaw|ExecuteSqlRaw|SqlQuery)\s*\(\s*"[^"]*"\s*\+`)
+	reEFFromSqlInterp  = regexp.MustCompile(`\.FromSqlRaw\s*\(\s*\$"`)
+	reEFExecuteInterp  = regexp.MustCompile(`\.ExecuteSqlRaw\s*\(\s*\$"`)
+	reEFSqlQueryInterp = regexp.MustCompile(`\.SqlQuery\s*<[^>]+>\s*\(\s*\$"`)
+	reEFRawSqlConcat   = regexp.MustCompile(`\.(?:FromSqlRaw|ExecuteSqlRaw|SqlQuery)\s*\(\s*"[^"]*"\s*\+`)
 )
 
 // CS-024: XML serialization without type restriction
 var (
-	reXmlSerializerType  = regexp.MustCompile(`new\s+XmlSerializer\s*\(\s*(?:Type\.GetType|typeof)\s*\(\s*[a-zA-Z_]\w*`)
-	reBinaryFormatter    = regexp.MustCompile(`new\s+BinaryFormatter\s*\(\s*\)`)
-	reSoapFormatter      = regexp.MustCompile(`new\s+SoapFormatter\s*\(\s*\)`)
-	reDeserializeCall    = regexp.MustCompile(`\.Deserialize\s*\(`)
+	reXmlSerializerType = regexp.MustCompile(`new\s+XmlSerializer\s*\(\s*(?:Type\.GetType|typeof)\s*\(\s*[a-zA-Z_]\w*`)
+	reBinaryFormatter   = regexp.MustCompile(`new\s+BinaryFormatter\s*\(\s*\)`)
+	reSoapFormatter     = regexp.MustCompile(`new\s+SoapFormatter\s*\(\s*\)`)
 )
 
 // CS-025: LDAP injection via DirectorySearcher
 var (
-	reDirectorySearcher      = regexp.MustCompile(`new\s+DirectorySearcher\s*\(`)
-	reSearchFilterConcat     = regexp.MustCompile(`\.Filter\s*=\s*(?:\$"|"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+)`)
-	reSearchFilterInterp     = regexp.MustCompile(`\.Filter\s*=\s*\$"[^"]*\{`)
-	reLdapSearchConcat       = regexp.MustCompile(`(?i)DirectorySearcher\s*\(\s*(?:\$"|"[^"]*"\s*\+)`)
+	reDirectorySearcher  = regexp.MustCompile(`new\s+DirectorySearcher\s*\(`)
+	reSearchFilterConcat = regexp.MustCompile(`\.Filter\s*=\s*(?:\$"|"[^"]*"\s*\+|[a-zA-Z_]\w*\s*\+)`)
+	reSearchFilterInterp = regexp.MustCompile(`\.Filter\s*=\s*\$"[^"]*\{`)
+	reLdapSearchConcat   = regexp.MustCompile(`(?i)DirectorySearcher\s*\(\s*(?:\$"|"[^"]*"\s*\+)`)
 )
 
 // CS-026: Server.MapPath with user input
 var (
-	reServerMapPath      = regexp.MustCompile(`Server\.MapPath\s*\(\s*(?:Request|[a-zA-Z_]\w*\s*\+|\$")`)
+	reServerMapPath       = regexp.MustCompile(`Server\.MapPath\s*\(\s*(?:Request|[a-zA-Z_]\w*\s*\+|\$")`)
 	reHostEnvironmentPath = regexp.MustCompile(`\.ContentRootPath\s*\+\s*(?:Request|[a-zA-Z_]\w*)`)
-	rePathCombineUser    = regexp.MustCompile(`Path\.Combine\s*\([^,]*,\s*(?:Request|Input|model\.\w+)`)
+	rePathCombineUser     = regexp.MustCompile(`Path\.Combine\s*\([^,]*,\s*(?:Request|Input|model\.\w+)`)
 )
 
 // CS-027: Response.Write with user input (XSS)
 var (
-	reResponseWrite     = regexp.MustCompile(`Response\.Write\s*\(\s*(?:Request|Input|model\.\w+|ViewBag\.\w+|ViewData\[)`)
+	reResponseWrite       = regexp.MustCompile(`Response\.Write\s*\(\s*(?:Request|Input|model\.\w+|ViewBag\.\w+|ViewData\[)`)
 	reResponseWriteInterp = regexp.MustCompile(`Response\.Write\s*\(\s*\$"[^"]*\{(?:Request|Input|model\.\w+)`)
-	reHtmlRawUser       = regexp.MustCompile(`Html\.Raw\s*\(\s*(?:Model\.\w+|ViewBag\.\w+|ViewData\[)`)
+	reHtmlRawUser         = regexp.MustCompile(`Html\.Raw\s*\(\s*(?:Model\.\w+|ViewBag\.\w+|ViewData\[)`)
 )
 
 // CS-028: Regex without timeout (ReDoS)
 var (
 	reNewRegexNoTimeout = regexp.MustCompile(`new\s+Regex\s*\(\s*(?:[a-zA-Z_]\w*|"[^"]*")\s*\)`)
 	reNewRegexOptions   = regexp.MustCompile(`new\s+Regex\s*\(\s*(?:[a-zA-Z_]\w*|"[^"]*")\s*,\s*RegexOptions\.\w+\s*\)`)
-	reRegexMatch        = regexp.MustCompile(`Regex\.(?:Match|IsMatch|Replace|Matches)\s*\(`)
 	reRegexTimeoutExt   = regexp.MustCompile(`TimeSpan|matchTimeout|MatchTimeout`)
 )
 
 // CS-029: TypeNameHandling.All in JSON deserialization
 var (
-	reTypeNameAll     = regexp.MustCompile(`TypeNameHandling\s*=\s*TypeNameHandling\.(?:All|Auto|Objects|Arrays)`)
-	reJsonDeserialize = regexp.MustCompile(`JsonConvert\.DeserializeObject|JsonSerializer\.Deserialize`)
+	reTypeNameAll      = regexp.MustCompile(`TypeNameHandling\s*=\s*TypeNameHandling\.(?:All|Auto|Objects|Arrays)`)
 	reSerializerBinder = regexp.MustCompile(`SerializationBinder|ISerializationBinder`)
 )
 
 // CS-030: ViewBag/ViewData used in raw HTML
 var (
-	reViewBagInRazor    = regexp.MustCompile(`@Html\.Raw\s*\(\s*(?:ViewBag\.\w+|ViewData\[)`)
-	reViewBagUnescaped  = regexp.MustCompile(`@ViewBag\.\w+`)
-	reRazorHTMLContext  = regexp.MustCompile(`<\w+[^>]*@ViewBag\.\w+`)
+	reViewBagInRazor   = regexp.MustCompile(`@Html\.Raw\s*\(\s*(?:ViewBag\.\w+|ViewData\[)`)
+	reRazorHTMLContext = regexp.MustCompile(`<\w+[^>]*@ViewBag\.\w+`)
 )
 
 func init() {
@@ -88,15 +84,18 @@ func init() {
 
 type CSharpEFSqlInterp struct{}
 
-func (r *CSharpEFSqlInterp) ID() string                      { return "BATOU-CS-023" }
-func (r *CSharpEFSqlInterp) Name() string                    { return "CSharpEFSqlInterp" }
-func (r *CSharpEFSqlInterp) Description() string             { return "Detects C# SQL injection via string interpolation ($\"\") or concatenation in EF Core FromSqlRaw/ExecuteSqlRaw." }
+func (r *CSharpEFSqlInterp) ID() string   { return "BATOU-CS-023" }
+func (r *CSharpEFSqlInterp) Name() string { return "CSharpEFSqlInterp" }
+func (r *CSharpEFSqlInterp) Description() string {
+	return "Detects C# SQL injection via string interpolation ($\"\") or concatenation in EF Core FromSqlRaw/ExecuteSqlRaw."
+}
 func (r *CSharpEFSqlInterp) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CSharpEFSqlInterp) Languages() []rules.Language     { return []rules.Language{rules.LangCSharp} }
 
 func (r *CSharpEFSqlInterp) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -105,16 +104,16 @@ func (r *CSharpEFSqlInterp) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reEFFromSqlInterp.FindString(line); m != "" {
+		if m := rules.GFindLower(reEFFromSqlInterp, line, lowered[i]); m != "" {
 			matched = m
 			desc = "FromSqlRaw() with string interpolation ($\"\"). Interpolated values bypass parameterization."
-		} else if m := reEFExecuteInterp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reEFExecuteInterp, line, lowered[i]); m != "" {
 			matched = m
 			desc = "ExecuteSqlRaw() with string interpolation ($\"\"). Interpolated values bypass parameterization."
-		} else if m := reEFSqlQueryInterp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reEFSqlQueryInterp, line, lowered[i]); m != "" {
 			matched = m
 			desc = "SqlQuery() with string interpolation ($\"\"). User input is embedded directly in the SQL string."
-		} else if m := reEFRawSqlConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reEFRawSqlConcat, line, lowered[i]); m != "" {
 			matched = m
 			desc = "FromSqlRaw/ExecuteSqlRaw with string concatenation. Concatenated values bypass parameterization."
 		}
@@ -150,15 +149,18 @@ func (r *CSharpEFSqlInterp) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CSharpXmlDeser struct{}
 
-func (r *CSharpXmlDeser) ID() string                      { return "BATOU-CS-024" }
-func (r *CSharpXmlDeser) Name() string                    { return "CSharpXmlDeser" }
-func (r *CSharpXmlDeser) Description() string             { return "Detects C# BinaryFormatter and SoapFormatter deserialization which allow arbitrary type instantiation and code execution." }
+func (r *CSharpXmlDeser) ID() string   { return "BATOU-CS-024" }
+func (r *CSharpXmlDeser) Name() string { return "CSharpXmlDeser" }
+func (r *CSharpXmlDeser) Description() string {
+	return "Detects C# BinaryFormatter and SoapFormatter deserialization which allow arbitrary type instantiation and code execution."
+}
 func (r *CSharpXmlDeser) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CSharpXmlDeser) Languages() []rules.Language     { return []rules.Language{rules.LangCSharp} }
 
 func (r *CSharpXmlDeser) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -168,15 +170,15 @@ func (r *CSharpXmlDeser) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var desc string
 		sev := r.DefaultSeverity()
 
-		if m := reBinaryFormatter.FindString(line); m != "" {
+		if m := rules.GFindLower(reBinaryFormatter, line, lowered[i]); m != "" {
 			matched = m
 			desc = "BinaryFormatter is inherently insecure and can execute arbitrary code during deserialization. Microsoft has deprecated it and recommends against its use."
 			sev = rules.Critical
-		} else if m := reSoapFormatter.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSoapFormatter, line, lowered[i]); m != "" {
 			matched = m
 			desc = "SoapFormatter is inherently insecure like BinaryFormatter and allows arbitrary type instantiation during deserialization."
 			sev = rules.Critical
-		} else if m := reXmlSerializerType.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reXmlSerializerType, line, lowered[i]); m != "" {
 			matched = m
 			desc = "XmlSerializer constructed with a variable type. If the type comes from user input, an attacker can deserialize arbitrary types."
 		}
@@ -212,19 +214,22 @@ func (r *CSharpXmlDeser) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CSharpLDAPInjection struct{}
 
-func (r *CSharpLDAPInjection) ID() string                      { return "BATOU-CS-025" }
-func (r *CSharpLDAPInjection) Name() string                    { return "CSharpLDAPInjection" }
-func (r *CSharpLDAPInjection) Description() string             { return "Detects C# LDAP injection via DirectorySearcher.Filter with string concatenation or interpolation." }
+func (r *CSharpLDAPInjection) ID() string   { return "BATOU-CS-025" }
+func (r *CSharpLDAPInjection) Name() string { return "CSharpLDAPInjection" }
+func (r *CSharpLDAPInjection) Description() string {
+	return "Detects C# LDAP injection via DirectorySearcher.Filter with string concatenation or interpolation."
+}
 func (r *CSharpLDAPInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CSharpLDAPInjection) Languages() []rules.Language     { return []rules.Language{rules.LangCSharp} }
 
 func (r *CSharpLDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reDirectorySearcher.MatchString(ctx.Content) && !strings.Contains(ctx.Content, "DirectorySearcher") {
+	if !rules.GMatchFile(reDirectorySearcher, ctx) && !strings.Contains(ctx.Content, "DirectorySearcher") {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -232,11 +237,11 @@ func (r *CSharpLDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reSearchFilterInterp.FindString(line); m != "" {
+		if m := rules.GFindLower(reSearchFilterInterp, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSearchFilterConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSearchFilterConcat, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reLdapSearchConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reLdapSearchConcat, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -271,15 +276,18 @@ func (r *CSharpLDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CSharpServerMapPath struct{}
 
-func (r *CSharpServerMapPath) ID() string                      { return "BATOU-CS-026" }
-func (r *CSharpServerMapPath) Name() string                    { return "CSharpServerMapPath" }
-func (r *CSharpServerMapPath) Description() string             { return "Detects C# Server.MapPath, Path.Combine, or ContentRootPath with user-controlled input, enabling path traversal." }
+func (r *CSharpServerMapPath) ID() string   { return "BATOU-CS-026" }
+func (r *CSharpServerMapPath) Name() string { return "CSharpServerMapPath" }
+func (r *CSharpServerMapPath) Description() string {
+	return "Detects C# Server.MapPath, Path.Combine, or ContentRootPath with user-controlled input, enabling path traversal."
+}
 func (r *CSharpServerMapPath) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CSharpServerMapPath) Languages() []rules.Language     { return []rules.Language{rules.LangCSharp} }
 
 func (r *CSharpServerMapPath) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -288,13 +296,13 @@ func (r *CSharpServerMapPath) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reServerMapPath.FindString(line); m != "" {
+		if m := rules.GFindLower(reServerMapPath, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Server.MapPath() maps a virtual path to a physical path. With user input, an attacker can use ../ traversal to access files outside the web root."
-		} else if m := reHostEnvironmentPath.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reHostEnvironmentPath, line, lowered[i]); m != "" {
 			matched = m
 			desc = "ContentRootPath concatenated with user input allows path traversal via ../ sequences to access arbitrary files on the server."
-		} else if m := rePathCombineUser.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePathCombineUser, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Path.Combine with user input can be exploited: an absolute path in the user input replaces the base path entirely, or ../ sequences traverse directories."
 		}
@@ -330,15 +338,20 @@ func (r *CSharpServerMapPath) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CSharpResponseWriteXSS struct{}
 
-func (r *CSharpResponseWriteXSS) ID() string                      { return "BATOU-CS-027" }
-func (r *CSharpResponseWriteXSS) Name() string                    { return "CSharpResponseWriteXSS" }
-func (r *CSharpResponseWriteXSS) Description() string             { return "Detects C# Response.Write or Html.Raw with user input or model data, enabling cross-site scripting (XSS)." }
+func (r *CSharpResponseWriteXSS) ID() string   { return "BATOU-CS-027" }
+func (r *CSharpResponseWriteXSS) Name() string { return "CSharpResponseWriteXSS" }
+func (r *CSharpResponseWriteXSS) Description() string {
+	return "Detects C# Response.Write or Html.Raw with user input or model data, enabling cross-site scripting (XSS)."
+}
 func (r *CSharpResponseWriteXSS) DefaultSeverity() rules.Severity { return rules.High }
-func (r *CSharpResponseWriteXSS) Languages() []rules.Language     { return []rules.Language{rules.LangCSharp} }
+func (r *CSharpResponseWriteXSS) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
 
 func (r *CSharpResponseWriteXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -347,13 +360,13 @@ func (r *CSharpResponseWriteXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reResponseWrite.FindString(line); m != "" {
+		if m := rules.GFindLower(reResponseWrite, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Response.Write() outputs content directly to the HTTP response without encoding. User input embedded this way enables cross-site scripting attacks."
-		} else if m := reResponseWriteInterp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reResponseWriteInterp, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Response.Write() with interpolated user input outputs unencoded content, enabling XSS."
-		} else if m := reHtmlRawUser.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reHtmlRawUser, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Html.Raw() renders content without HTML encoding. Model data or ViewBag values rendered this way can contain malicious scripts if the data originates from user input."
 		}
@@ -389,20 +402,25 @@ func (r *CSharpResponseWriteXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CSharpRegexNoTimeout struct{}
 
-func (r *CSharpRegexNoTimeout) ID() string                      { return "BATOU-CS-028" }
-func (r *CSharpRegexNoTimeout) Name() string                    { return "CSharpRegexNoTimeout" }
-func (r *CSharpRegexNoTimeout) Description() string             { return "Detects C# Regex usage without a timeout, which can lead to ReDoS (regular expression denial of service)." }
+func (r *CSharpRegexNoTimeout) ID() string   { return "BATOU-CS-028" }
+func (r *CSharpRegexNoTimeout) Name() string { return "CSharpRegexNoTimeout" }
+func (r *CSharpRegexNoTimeout) Description() string {
+	return "Detects C# Regex usage without a timeout, which can lead to ReDoS (regular expression denial of service)."
+}
 func (r *CSharpRegexNoTimeout) DefaultSeverity() rules.Severity { return rules.Medium }
-func (r *CSharpRegexNoTimeout) Languages() []rules.Language     { return []rules.Language{rules.LangCSharp} }
+func (r *CSharpRegexNoTimeout) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
 
 func (r *CSharpRegexNoTimeout) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// If a timeout is configured globally or in the file, skip
-	if reRegexTimeoutExt.MatchString(ctx.Content) {
+	if rules.GMatchFile(reRegexTimeoutExt, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -410,9 +428,9 @@ func (r *CSharpRegexNoTimeout) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reNewRegexNoTimeout.FindString(line); m != "" {
+		if m := rules.GFindLower(reNewRegexNoTimeout, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reNewRegexOptions.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reNewRegexOptions, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -447,30 +465,35 @@ func (r *CSharpRegexNoTimeout) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CSharpTypeNameHandling struct{}
 
-func (r *CSharpTypeNameHandling) ID() string                      { return "BATOU-CS-029" }
-func (r *CSharpTypeNameHandling) Name() string                    { return "CSharpTypeNameHandling" }
-func (r *CSharpTypeNameHandling) Description() string             { return "Detects C# Newtonsoft.Json TypeNameHandling set to All/Auto/Objects/Arrays without a SerializationBinder, enabling deserialization attacks." }
+func (r *CSharpTypeNameHandling) ID() string   { return "BATOU-CS-029" }
+func (r *CSharpTypeNameHandling) Name() string { return "CSharpTypeNameHandling" }
+func (r *CSharpTypeNameHandling) Description() string {
+	return "Detects C# Newtonsoft.Json TypeNameHandling set to All/Auto/Objects/Arrays without a SerializationBinder, enabling deserialization attacks."
+}
 func (r *CSharpTypeNameHandling) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *CSharpTypeNameHandling) Languages() []rules.Language     { return []rules.Language{rules.LangCSharp} }
+func (r *CSharpTypeNameHandling) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
 
 func (r *CSharpTypeNameHandling) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reTypeNameAll.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reTypeNameAll, ctx) {
 		return nil
 	}
 
 	// If a custom SerializationBinder is configured, the risk is mitigated
-	if reSerializerBinder.MatchString(ctx.Content) {
+	if rules.GMatchFile(reSerializerBinder, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if m := reTypeNameAll.FindString(line); m != "" {
+		if m := rules.GFindLower(reTypeNameAll, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -502,15 +525,20 @@ func (r *CSharpTypeNameHandling) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CSharpViewBagRawHTML struct{}
 
-func (r *CSharpViewBagRawHTML) ID() string                      { return "BATOU-CS-030" }
-func (r *CSharpViewBagRawHTML) Name() string                    { return "CSharpViewBagRawHTML" }
-func (r *CSharpViewBagRawHTML) Description() string             { return "Detects C# ViewBag/ViewData rendered via Html.Raw or in HTML attribute contexts without encoding." }
+func (r *CSharpViewBagRawHTML) ID() string   { return "BATOU-CS-030" }
+func (r *CSharpViewBagRawHTML) Name() string { return "CSharpViewBagRawHTML" }
+func (r *CSharpViewBagRawHTML) Description() string {
+	return "Detects C# ViewBag/ViewData rendered via Html.Raw or in HTML attribute contexts without encoding."
+}
 func (r *CSharpViewBagRawHTML) DefaultSeverity() rules.Severity { return rules.High }
-func (r *CSharpViewBagRawHTML) Languages() []rules.Language     { return []rules.Language{rules.LangCSharp} }
+func (r *CSharpViewBagRawHTML) Languages() []rules.Language {
+	return []rules.Language{rules.LangCSharp}
+}
 
 func (r *CSharpViewBagRawHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
@@ -519,10 +547,10 @@ func (r *CSharpViewBagRawHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reViewBagInRazor.FindString(line); m != "" {
+		if m := rules.GFindLower(reViewBagInRazor, line, lowered[i]); m != "" {
 			matched = m
 			desc = "@Html.Raw() is used with ViewBag or ViewData values. Html.Raw bypasses Razor's auto-encoding, and if the ViewBag value contains user-controlled data, it enables XSS."
-		} else if m := reRazorHTMLContext.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRazorHTMLContext, line, lowered[i]); m != "" {
 			matched = m
 			desc = "ViewBag value is used directly inside an HTML tag attribute. While Razor auto-encodes in text contexts, certain attribute contexts (event handlers, href, src) can still be exploited for XSS."
 		}

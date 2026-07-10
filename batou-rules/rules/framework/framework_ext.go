@@ -20,15 +20,14 @@ var (
 
 // BATOU-FW-NEXTJS-009: Next.js getServerSideProps SQL injection via query params
 var (
-	reNextGSSPFunction  = regexp.MustCompile(`(?:export\s+(?:async\s+)?function|const)\s+getServerSideProps`)
-	reNextContextQuery  = regexp.MustCompile(`context\.(?:query|params)`)
-	reNextContextDestr  = regexp.MustCompile(`(?:query|params)\s*\}\s*=\s*context`)
-	reNextDBCall        = regexp.MustCompile(`(?i)(?:\.query\s*\(|\.execute\s*\(|\.findOne\s*\(|\.find\s*\(|\.where\s*\(|\.raw\s*\(|prisma\.|sequelize\.|knex\s*\(|db\.)`)
-	reNextParamQuery    = regexp.MustCompile(`(?i)(?:\.query\s*\(|\.execute\s*\(|\.raw\s*\(|\.findOne\s*\(|\.find\s*\().*(?:context\.query|context\.params|\$\{)`)
-	reNextSQLConcat     = regexp.MustCompile("(?:SELECT|INSERT|UPDATE|DELETE|WHERE)\\b[^`]*\\$\\{")
-	reNextParamSQL      = regexp.MustCompile(`(?i)(?:\.query|\.execute|\.raw)\s*\(\s*` + "`" + `[^` + "`" + `]*\$\{`)
+	reNextGSSPFunction   = regexp.MustCompile(`(?:export\s+(?:async\s+)?function|const)\s+getServerSideProps`)
+	reNextContextQuery   = regexp.MustCompile(`context\.(?:query|params)`)
+	reNextContextDestr   = regexp.MustCompile(`(?:query|params)\s*\}\s*=\s*context`)
+	reNextDBCall         = regexp.MustCompile(`(?i)(?:\.query\s*\(|\.execute\s*\(|\.findOne\s*\(|\.find\s*\(|\.where\s*\(|\.raw\s*\(|prisma\.|sequelize\.|knex\s*\(|db\.)`)
+	reNextParamQuery     = regexp.MustCompile(`(?i)(?:\.query\s*\(|\.execute\s*\(|\.raw\s*\(|\.findOne\s*\(|\.find\s*\().*(?:context\.query|context\.params|\$\{)`)
+	reNextParamSQL       = regexp.MustCompile(`(?i)(?:\.query|\.execute|\.raw)\s*\(\s*` + "`" + `[^` + "`" + `]*\$\{`)
 	reNextParamSQLConcat = regexp.MustCompile(`(?i)(?:\.query|\.execute|\.raw)\s*\([^)]*\+`)
-	reNextParamSafe     = regexp.MustCompile(`(?i)(?:parameterized|prepared|sanitize|escape|parseInt|Number\(|validate|zod|yup|joi)`)
+	reNextParamSafe      = regexp.MustCompile(`(?i)(?:parameterized|prepared|sanitize|escape|parseInt|Number\(|validate|zod|yup|joi)`)
 )
 
 // BATOU-FW-FASTAPI-011: FastAPI endpoint with unvalidated path/query params
@@ -42,7 +41,6 @@ var (
 var (
 	reGinRawSprintf = regexp.MustCompile(`db\.(?:Raw|Exec)\s*\(\s*fmt\.Sprintf\s*\(`)
 	reGinRawConcat  = regexp.MustCompile(`db\.(?:Raw|Exec)\s*\(\s*(?:[a-zA-Z_]\w*|"[^"]*")\s*\+`)
-	reGinRawFmtVar  = regexp.MustCompile(`db\.(?:Raw|Exec)\s*\(\s*fmt\.Sprintf`)
 )
 
 func init() {
@@ -70,7 +68,8 @@ func (r *ExpressOpenRedirect) Languages() []rules.Language {
 
 func (r *ExpressOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -79,9 +78,9 @@ func (r *ExpressOpenRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reExpressRedirectDirect.FindString(line); m != "" {
+		if m := rules.GFindLower(reExpressRedirectDirect, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reExpressRedirectVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reExpressRedirectVar, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -151,28 +150,29 @@ func (r *NextJSGSSPInjection) Languages() []rules.Language {
 
 func (r *NextJSGSSPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Must have getServerSideProps
-	if !reNextGSSPFunction.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNextGSSPFunction, ctx) {
 		return nil
 	}
 
 	// Must reference context.query or destructure query from context
-	hasQueryAccess := reNextContextQuery.MatchString(ctx.Content) || reNextContextDestr.MatchString(ctx.Content)
+	hasQueryAccess := rules.GMatchFile(reNextContextQuery, ctx) || rules.GMatchFile(reNextContextDestr, ctx)
 	if !hasQueryAccess {
 		return nil
 	}
 
 	// Must have database calls
-	if !reNextDBCall.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNextDBCall, ctx) {
 		return nil
 	}
 
 	// If parameterized queries or validation is present, skip
-	if reNextParamSafe.MatchString(ctx.Content) {
+	if rules.GMatchFile(reNextParamSafe, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inGSSP := false
 	braceDepth := 0
@@ -183,7 +183,7 @@ func (r *NextJSGSSPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reNextGSSPFunction.MatchString(line) {
+		if rules.GMatchLower(reNextGSSPFunction, line, lowered[i]) {
 			inGSSP = true
 			braceDepth = strings.Count(line, "{") - strings.Count(line, "}")
 			continue
@@ -193,7 +193,7 @@ func (r *NextJSGSSPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 
 			// Look for SQL/DB calls with query params
-			if reNextParamSQL.MatchString(line) || reNextParamSQLConcat.MatchString(line) || reNextParamQuery.MatchString(line) {
+			if rules.GMatchLower(reNextParamSQL, line, lowered[i]) || rules.GMatchLower(reNextParamSQLConcat, line, lowered[i]) || rules.GMatchLower(reNextParamQuery, line, lowered[i]) {
 				matched := strings.TrimSpace(line)
 				if len(matched) > 120 {
 					matched = matched[:120] + "..."
@@ -241,19 +241,23 @@ func (r *FastAPIUnvalidatedParam) Languages() []rules.Language {
 }
 
 func (r *FastAPIUnvalidatedParam) Scan(ctx *rules.ScanContext) []rules.Finding {
+	if !isFastAPIFile(ctx.Content) {
+		return nil
+	}
 	var findings []rules.Finding
 
 	// Must have FastAPI route decorators
-	if !reFastapiRouteDecorator.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reFastapiRouteDecorator, ctx) {
 		return nil
 	}
 
 	// If the file already uses validators, it's likely well-structured
-	if reFastapiValidatedParam.MatchString(ctx.Content) {
+	if rules.GMatchFile(reFastapiValidatedParam, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -261,7 +265,7 @@ func (r *FastAPIUnvalidatedParam) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if !reFastapiRouteDecorator.MatchString(line) {
+		if !rules.GMatchLower(reFastapiRouteDecorator, line, lowered[i]) {
 			continue
 		}
 
@@ -321,7 +325,8 @@ func (r *GinRawSQLFormat) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -330,9 +335,9 @@ func (r *GinRawSQLFormat) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reGinRawSprintf.FindString(line); m != "" {
+		if m := rules.GFindLower(reGinRawSprintf, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reGinRawConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reGinRawConcat, line, lowered[i]); m != "" {
 			matched = m
 		}
 

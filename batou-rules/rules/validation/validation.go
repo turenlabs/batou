@@ -32,8 +32,13 @@ var (
 	// Ruby: params[] access
 	reRubyParams = regexp.MustCompile(`params\s*\[`)
 
-	// Validation/sanitization indicators (if present nearby, suppress finding)
-	reValidationPresent = regexp.MustCompile(`(?i)\b(?:validate|sanitize|clean|escape|parseInt|parseFloat|Number\(|int\(|float\(|isinstance|strconv\.|regexp\.|@Valid|@Pattern|Joi\.|zod\.|\.parse\(|\.safeParse\(|yup\.|validator\.|express-validator|filter_var|intval|is_numeric|\.to_i\b|Integer\.parseInt|Long\.parseLong|\.matches\(|pydantic|wtforms|marshmallow|binding\.Bind|ValidationPipe)\b`)
+	// Validation/sanitization indicators (if present nearby, suppress finding).
+	// Trailing \b is intentionally absent so camelCase suffixes match —
+	// `sanitizeLogInput`, `sanitizeInput`, `escapeHtml`, `cleanUrl`, etc.
+	// would otherwise be ignored. Without that change, Java safe fixtures
+	// like LogSafe.java (sanitizeLogInput) and XssEscaped.java (escapeHtml)
+	// fire on VAL-001 even though they're explicitly demonstrating sanitization.
+	reValidationPresent = regexp.MustCompile(`(?i)\b(?:validate|sanitize|clean|escape|parseInt|parseFloat|Number\(|int\(|float\(|isinstance|strconv\.|regexp\.|@Valid|@Pattern|Joi\.|zod\.|\.parse\(|\.safeParse\(|yup\.|validator\.|express-validator|filter_var|intval|is_numeric|\.to_i\b|Integer\.parseInt|Long\.parseLong|\.matches\(|pydantic|wtforms|marshmallow|binding\.Bind|ValidationPipe)`)
 
 	// Parameterized SQL — only match when actual placeholders are present in
 	// a query string (not just the DB function name, which could still use
@@ -136,12 +141,20 @@ var (
 )
 
 // BATOU-VAL-002: Missing type coercion / bounds checking
+//
+// Tightening note (2026-04-25): the previous reParseIntNoCheck and
+// reArrayUserIndex matched any identifier starting with `params`,
+// `query`, or `body` — `parseInt(queryItemAsString)`,
+// `arr[paramsList]` etc. — producing 11 FPs in owncloud/web.
+// Tightened so each request-source token must be followed by a
+// property accessor (`.x` or `[...]`), confirming it's a request
+// property access not a same-prefix local variable.
 var (
 	// parseInt without isNaN check (JS)
-	reParseIntNoCheck = regexp.MustCompile(`parseInt\s*\(\s*(?:req\.|request\.|params|query|body)\w*`)
+	reParseIntNoCheck = regexp.MustCompile(`parseInt\s*\(\s*(?:req\.|request\.|(?:params|query|body)[.\[])\w*`)
 
 	// Array indexing with user input
-	reArrayUserIndex = regexp.MustCompile(`\[\s*(?:req\.|request\.|params|query|body)\w*\s*(?:\.\s*\w+\s*)?\]`)
+	reArrayUserIndex = regexp.MustCompile(`\[\s*(?:req\.|request\.|(?:params|query|body)[.\[])\w*\s*(?:\.\s*\w+\s*)?\]`)
 
 	// NaN check indicators
 	reNaNCheck = regexp.MustCompile(`(?i)\b(?:isNaN|Number\.isNaN|Number\.isFinite|isFinite|Number\.isInteger|!==?\s*NaN)\b`)
@@ -183,7 +196,7 @@ var (
 var reLineComment = regexp.MustCompile(`^\s*(?://|#|--|;|%|/\*)`)
 
 func isCommentLine(line string) bool {
-	return reLineComment.MatchString(line)
+	return rules.GMatch(reLineComment, line)
 }
 
 // truncate ensures matched text doesn't exceed maxLen characters.
@@ -221,8 +234,8 @@ func scopeHasPattern(lines []string, lineIdx int, re *regexp.Regexp, window int)
 
 type DirectParamUsage struct{}
 
-func (r DirectParamUsage) ID() string              { return "BATOU-VAL-001" }
-func (r DirectParamUsage) Name() string            { return "Direct Request Parameter Usage" }
+func (r DirectParamUsage) ID() string                      { return "BATOU-VAL-001" }
+func (r DirectParamUsage) Name() string                    { return "Direct Request Parameter Usage" }
 func (r DirectParamUsage) DefaultSeverity() rules.Severity { return rules.High }
 func (r DirectParamUsage) Description() string {
 	return "Detects request parameters used directly in operations without any validation or sanitization call nearby."
@@ -234,54 +247,76 @@ func (r DirectParamUsage) Languages() []rules.Language {
 	}
 }
 
-// paramUsageSuppressed checks whether the parameter access at lineIdx is
-// used in a safe context by scanning surrounding lines for evidence of
-// validation, parameterized queries, ORM usage, path safety, HTML escaping,
-// URL validation, or equality/allowlist checks.
-func paramUsageSuppressed(lines []string, lineIdx int) bool {
+// suppressMemo lazily memoizes per-(pattern, line) MatchString results so that
+// the overlapping +/-20-line windows scanned by DirectParamUsage.Scan never
+// re-run the same (regex, line) match twice. suppressed(lineIdx) replaces the
+// former paramUsageSuppressed helper and returns a byte-for-byte identical
+// result: the same 7 patterns (reValidationPresent, reParameterizedSQL,
+// reORMUsage, rePathSafety, reHTMLSafe, reURLSafe, reEqualityCheck) in the same
+// fixed order, the same window=20, and the same OR-of-windows semantics
+// (true if ANY pattern matches ANY line in its window via re.MatchString).
+type suppressMemo struct {
+	lines []string
+	pats  []*regexp.Regexp // the 7 patterns, fixed order
+	cache [][]int8         // cache[p][i]: -1 unknown, 0 false, 1 true
+}
+
+func newSuppressMemo(lines []string) *suppressMemo {
+	pats := []*regexp.Regexp{
+		reValidationPresent, reParameterizedSQL, reORMUsage, rePathSafety,
+		reHTMLSafe, reURLSafe, reEqualityCheck,
+	}
+	cache := make([][]int8, len(pats))
+	for p := range cache {
+		cache[p] = make([]int8, len(lines))
+		for i := range cache[p] {
+			cache[p][i] = -1
+		}
+	}
+	return &suppressMemo{lines: lines, pats: pats, cache: cache}
+}
+
+func (m *suppressMemo) match(p, i int) bool {
+	if m.cache[p][i] == -1 {
+		if m.pats[p].MatchString(m.lines[i]) {
+			m.cache[p][i] = 1
+		} else {
+			m.cache[p][i] = 0
+		}
+	}
+	return m.cache[p][i] == 1
+}
+
+func (m *suppressMemo) windowHas(lineIdx, p, window int) bool {
+	start := lineIdx - window
+	if start < 0 {
+		start = 0
+	}
+	end := lineIdx + window
+	if end > len(m.lines) {
+		end = len(m.lines)
+	}
+	for i := start; i < end; i++ {
+		if m.match(p, i) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *suppressMemo) suppressed(lineIdx int) bool {
 	const window = 20
-
-	// Layer 1: Original validation/sanitization keywords
-	if scopeHasPattern(lines, lineIdx, reValidationPresent, window) {
-		return true
+	for p := 0; p < 7; p++ {
+		if m.windowHas(lineIdx, p, window) {
+			return true
+		}
 	}
-
-	// Layer 2: Parameterized SQL (the param is bound safely via placeholders)
-	if scopeHasPattern(lines, lineIdx, reParameterizedSQL, window) {
-		return true
-	}
-
-	// Layer 3: ORM / query builder (input goes through safe abstraction)
-	if scopeHasPattern(lines, lineIdx, reORMUsage, window) {
-		return true
-	}
-
-	// Layer 4: Path-safety functions (traversal already handled)
-	if scopeHasPattern(lines, lineIdx, rePathSafety, window) {
-		return true
-	}
-
-	// Layer 5: HTML-safe output (XSS already handled or JSON-only)
-	if scopeHasPattern(lines, lineIdx, reHTMLSafe, window) {
-		return true
-	}
-
-	// Layer 6: URL-safety (SSRF/redirect already handled)
-	if scopeHasPattern(lines, lineIdx, reURLSafe, window) {
-		return true
-	}
-
-	// Layer 7: Equality / switch / comparison checks
-	if scopeHasPattern(lines, lineIdx, reEqualityCheck, window) {
-		return true
-	}
-
 	return false
 }
 
 func (r DirectParamUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -321,14 +356,22 @@ func (r DirectParamUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
+	// memo lazily caches per-(pattern, line) MatchString results across the
+	// overlapping suppression windows; built once on the first matching line.
+	// memo.suppressed(i) is identical to paramUsageSuppressed(lines, i).
+	var memo *suppressMemo
+
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				// Check if validation/sanitization exists nearby
-				if paramUsageSuppressed(lines, i) {
+				if memo == nil {
+					memo = newSuppressMemo(lines)
+				}
+				if memo.suppressed(i) {
 					continue
 				}
 
@@ -362,8 +405,8 @@ func (r DirectParamUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingTypeCoercion struct{}
 
-func (r MissingTypeCoercion) ID() string              { return "BATOU-VAL-002" }
-func (r MissingTypeCoercion) Name() string            { return "Missing Type Coercion" }
+func (r MissingTypeCoercion) ID() string                      { return "BATOU-VAL-002" }
+func (r MissingTypeCoercion) Name() string                    { return "Missing Type Coercion" }
 func (r MissingTypeCoercion) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r MissingTypeCoercion) Description() string {
 	return "Detects user input used where a specific type is expected without proper parsing or bounds checking."
@@ -377,7 +420,7 @@ func (r MissingTypeCoercion) Languages() []rules.Language {
 
 func (r MissingTypeCoercion) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -386,7 +429,7 @@ func (r MissingTypeCoercion) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// parseInt/parseFloat without isNaN check (JS/TS)
 		if ctx.Language == rules.LangJavaScript || ctx.Language == rules.LangTypeScript {
-			if loc := reParseIntNoCheck.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(reParseIntNoCheck, line); loc != nil {
 				// Check if NaN check exists nearby
 				if !scopeHasPattern(lines, i, reNaNCheck, 5) {
 					matched := truncate(line[loc[0]:loc[1]], 120)
@@ -411,7 +454,7 @@ func (r MissingTypeCoercion) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Array indexing with user input (any language)
-		if loc := reArrayUserIndex.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reArrayUserIndex, line); loc != nil {
 			matched := truncate(line[loc[0]:loc[1]], 120)
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
@@ -440,8 +483,8 @@ func (r MissingTypeCoercion) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingLengthValidation struct{}
 
-func (r MissingLengthValidation) ID() string              { return "BATOU-VAL-003" }
-func (r MissingLengthValidation) Name() string            { return "Missing Length Validation" }
+func (r MissingLengthValidation) ID() string                      { return "BATOU-VAL-003" }
+func (r MissingLengthValidation) Name() string                    { return "Missing Length Validation" }
 func (r MissingLengthValidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r MissingLengthValidation) Description() string {
 	return "Detects user input used in database or storage operations without length or size validation, which can lead to DoS or storage abuse."
@@ -455,7 +498,7 @@ func (r MissingLengthValidation) Languages() []rules.Language {
 
 func (r MissingLengthValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Check for file upload without size limit
 	for i, line := range lines {
@@ -463,7 +506,7 @@ func (r MissingLengthValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := reFileUploadNoLimit.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reFileUploadNoLimit, line); loc != nil {
 			// Check if size limit exists nearby
 			if !scopeHasPattern(lines, i, reFileSizeLimit, 8) {
 				matched := truncate(line[loc[0]:loc[1]], 120)
@@ -492,10 +535,10 @@ func (r MissingLengthValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 		hasDBOp := false
 		hasBody := false
 		for _, line := range lines {
-			if reDBOp.MatchString(line) {
+			if rules.GMatch(reDBOp, line) {
 				hasDBOp = true
 			}
-			if reBodyInDB.MatchString(line) {
+			if rules.GMatch(reBodyInDB, line) {
 				hasBody = true
 			}
 			if hasDBOp && hasBody {
@@ -507,7 +550,7 @@ func (r MissingLengthValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 			// Check if there's any length validation in the file
 			hasLengthCheck := false
 			for _, line := range lines {
-				if reLengthCheck.MatchString(line) {
+				if rules.GMatch(reLengthCheck, line) {
 					hasLengthCheck = true
 					break
 				}
@@ -515,7 +558,7 @@ func (r MissingLengthValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if !hasLengthCheck {
 				// Find the first DB operation line to report
 				for i, line := range lines {
-					if reDBOp.MatchString(line) {
+					if rules.GMatch(reDBOp, line) {
 						matched := truncate(strings.TrimSpace(line), 120)
 						findings = append(findings, rules.Finding{
 							RuleID:        r.ID(),
@@ -549,8 +592,8 @@ func (r MissingLengthValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingAllowlistValidation struct{}
 
-func (r MissingAllowlistValidation) ID() string              { return "BATOU-VAL-004" }
-func (r MissingAllowlistValidation) Name() string            { return "Missing Allowlist Validation" }
+func (r MissingAllowlistValidation) ID() string                      { return "BATOU-VAL-004" }
+func (r MissingAllowlistValidation) Name() string                    { return "Missing Allowlist Validation" }
 func (r MissingAllowlistValidation) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r MissingAllowlistValidation) Description() string {
 	return "Detects user input used as object keys or in dynamic property access without allowlist validation, which can lead to prototype pollution or unauthorized access."
@@ -564,7 +607,7 @@ func (r MissingAllowlistValidation) Languages() []rules.Language {
 
 func (r MissingAllowlistValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
@@ -577,7 +620,7 @@ func (r MissingAllowlistValidation) Scan(ctx *rules.ScanContext) []rules.Finding
 
 		switch ctx.Language {
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := reDynPropAccess.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(reDynPropAccess, line); loc != nil {
 				if !scopeHasPattern(lines, i, reAllowlistCheck, 10) {
 					matched = truncate(line[loc[0]:loc[1]], 120)
 					desc = "Dynamic property access with user input without allowlist"
@@ -585,7 +628,7 @@ func (r MissingAllowlistValidation) Scan(ctx *rules.ScanContext) []rules.Finding
 				}
 			}
 		case rules.LangPython:
-			if loc := reDynAttrAccess.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(reDynAttrAccess, line); loc != nil {
 				if !scopeHasPattern(lines, i, reAllowlistCheck, 10) {
 					matched = truncate(line[loc[0]:loc[1]], 120)
 					desc = "Dynamic attribute access with user input without allowlist"
@@ -593,7 +636,7 @@ func (r MissingAllowlistValidation) Scan(ctx *rules.ScanContext) []rules.Finding
 				}
 			}
 		case rules.LangGo:
-			if loc := reDynMapAccessGo.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(reDynMapAccessGo, line); loc != nil {
 				if !scopeHasPattern(lines, i, reAllowlistCheck, 10) {
 					matched = truncate(line[loc[0]:loc[1]], 120)
 					desc = "Dynamic map access with user input without allowlist"
@@ -631,26 +674,26 @@ func (r MissingAllowlistValidation) Scan(ctx *rules.ScanContext) []rules.Finding
 // File upload handler patterns
 var (
 	// Go: multipart form handling
-	reGoMultipartForm  = regexp.MustCompile(`\.(?:FormFile|MultipartForm|ParseMultipartForm)\s*\(`)
-	reGoContentType    = regexp.MustCompile(`(?i)(?:content[_-]?type|mime|DetectContentType|http\.DetectContentType)`)
-	reGoFileExt        = regexp.MustCompile(`(?:filepath\.Ext|path\.Ext|strings\.HasSuffix)\s*\(`)
+	reGoMultipartForm = regexp.MustCompile(`\.(?:FormFile|MultipartForm|ParseMultipartForm)\s*\(`)
+	reGoContentType   = regexp.MustCompile(`(?i)(?:content[_-]?type|mime|DetectContentType|http\.DetectContentType)`)
+	reGoFileExt       = regexp.MustCompile(`(?:filepath\.Ext|path\.Ext|strings\.HasSuffix)\s*\(`)
 
 	// Python: file upload patterns
-	rePyFileUpload     = regexp.MustCompile(`(?:request\.(?:files|FILES)|FileField|ImageField|UploadedFile)\b`)
-	rePyContentCheck   = regexp.MustCompile(`(?i)(?:content[_-]?type|mimetype|allowed_extensions|ALLOWED_EXTENSIONS|magic\.from_buffer|imghdr|filetype)`)
+	rePyFileUpload   = regexp.MustCompile(`(?:request\.(?:files|FILES)|FileField|ImageField|UploadedFile)\b`)
+	rePyContentCheck = regexp.MustCompile(`(?i)(?:content[_-]?type|mimetype|allowed_extensions|ALLOWED_EXTENSIONS|magic\.from_buffer|imghdr|filetype)`)
 
 	// JS/TS: multer / express-fileupload / formidable
-	reJSFileUpload     = regexp.MustCompile(`(?:multer|fileUpload|formidable|busboy|multiparty)\s*\(`)
-	reJSFileFilter     = regexp.MustCompile(`(?i)(?:fileFilter|mimetype|content[_-]?type|allowedTypes|allowedMimes)`)
-	reJSMimeType       = regexp.MustCompile(`(?i)(?:\.mimetype|\.type)\s*(?:===?|!==?|\.includes|\.match|\.test)`)
+	reJSFileUpload = regexp.MustCompile(`(?:multer|fileUpload|formidable|busboy|multiparty)\s*\(`)
+	reJSFileFilter = regexp.MustCompile(`(?i)(?:fileFilter|mimetype|content[_-]?type|allowedTypes|allowedMimes)`)
+	reJSMimeType   = regexp.MustCompile(`(?i)(?:\.mimetype|\.type)\s*(?:===?|!==?|\.includes|\.match|\.test)`)
 
 	// Java: multipart upload
 	reJavaMultipart    = regexp.MustCompile(`(?:MultipartFile|@RequestParam.*MultipartFile|Part\s+\w+\s*=|getPart\s*\()`)
 	reJavaContentCheck = regexp.MustCompile(`(?i)(?:getContentType|content[_-]?type|MediaType|MimeType)`)
 
 	// PHP: file upload
-	rePHPFileUpload    = regexp.MustCompile(`\$_FILES\s*\[`)
-	rePHPTypeCheck     = regexp.MustCompile(`(?i)(?:mime_content_type|finfo_file|getimagesize|exif_imagetype|pathinfo.*PATHINFO_EXTENSION)`)
+	rePHPFileUpload = regexp.MustCompile(`\$_FILES\s*\[`)
+	rePHPTypeCheck  = regexp.MustCompile(`(?i)(?:mime_content_type|finfo_file|getimagesize|exif_imagetype|pathinfo.*PATHINFO_EXTENSION)`)
 
 	// Ruby: file upload
 	reRubyFileUpload   = regexp.MustCompile(`(?:params\[.*\]\.tempfile|uploaded_file|ActionDispatch::Http::UploadedFile|attach\s*\()`)
@@ -662,8 +705,8 @@ var (
 
 type FileUploadHardening struct{}
 
-func (r FileUploadHardening) ID() string              { return "BATOU-VAL-005" }
-func (r FileUploadHardening) Name() string            { return "File Upload Hardening" }
+func (r FileUploadHardening) ID() string                      { return "BATOU-VAL-005" }
+func (r FileUploadHardening) Name() string                    { return "File Upload Hardening" }
 func (r FileUploadHardening) DefaultSeverity() rules.Severity { return rules.High }
 func (r FileUploadHardening) Description() string {
 	return "Detects file upload handlers missing content-type validation, size limits, or storing files in web-accessible directories."
@@ -677,7 +720,7 @@ func (r FileUploadHardening) Languages() []rules.Language {
 
 func (r FileUploadHardening) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Determine language-specific upload and validation patterns
 	var uploadRE *regexp.Regexp
@@ -712,7 +755,7 @@ func (r FileUploadHardening) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := uploadRE.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(uploadRE, line); loc != nil {
 			// Check if content-type validation exists nearby
 			hasContentCheck := scopeHasPattern(lines, i, contentCheckRE, 30)
 
@@ -748,9 +791,9 @@ func (r FileUploadHardening) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Check for storing uploads in web-accessible directories
-		if loc := reWebAccessibleDir.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reWebAccessibleDir, line); loc != nil {
 			// Only flag if there's also an upload handler in the file
-			if uploadRE.MatchString(ctx.Content) {
+			if rules.GMatchFile(uploadRE, ctx) {
 				matched := truncate(line[loc[0]:loc[1]], 120)
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),

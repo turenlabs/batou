@@ -2,10 +2,8 @@ package taint_test
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-core/taint"
 	"github.com/turenlabs/batou-rules/rules"
-
 	_ "github.com/turenlabs/batou-core/taint/languages"
 )
 

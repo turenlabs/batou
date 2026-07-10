@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/testutil"
 )

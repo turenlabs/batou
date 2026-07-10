@@ -3,7 +3,6 @@ package taintrule
 import (
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
 	"github.com/turenlabs/batou-core/testutil"

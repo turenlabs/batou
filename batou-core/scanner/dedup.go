@@ -7,7 +7,8 @@ import (
 )
 
 // Priority tiers for finding classification. Higher values win during
-// deduplication when two findings share the same (LineNumber, CWE) key.
+// deduplication when two findings share the same (FilePath, LineNumber, CWE)
+// key.
 const (
 	tierRegex           = 10
 	tierInterprocedural = 20
@@ -15,8 +16,18 @@ const (
 	tierTaint           = 40
 )
 
-// DeduplicateFindings groups findings by (LineNumber, CWE) and keeps one
-// winner per group.
+// DeduplicateFindings groups findings by (FilePath, LineNumber, CWE) and
+// keeps one winner per group.
+//
+// FilePath is part of the key because the slice mixes per-file findings with
+// interprocedural findings whose FilePath can point at a caller in a
+// different file (graph.PropagateInterproc emits caller-file findings):
+// "line 42, CWE-89" in handler.go and "line 42, CWE-89" in caller.go are
+// distinct issues and must both survive.
+//
+// Caller contract: normalize empty FilePath to the scanned file before
+// calling (scanner.Scan does this), otherwise rules that omit FilePath
+// split same-file groups and duplicates survive.
 //
 // Priority tiers: taint (40) > AST (30) > interprocedural (20) > regex (10).
 // Tiebreakers within a tier: higher severity first, then higher confidence.
@@ -28,6 +39,7 @@ func DeduplicateFindings(findings []rules.Finding) []rules.Finding {
 	}
 
 	type groupKey struct {
+		File string
 		Line int
 		CWE  string
 	}
@@ -46,7 +58,7 @@ func DeduplicateFindings(findings []rules.Finding) []rules.Finding {
 		}
 
 		cwe := strings.TrimPrefix(f.CWEID, "CWE-")
-		key := groupKey{Line: f.LineNumber, CWE: cwe}
+		key := groupKey{File: f.FilePath, Line: f.LineNumber, CWE: cwe}
 		if g, exists := groups[key]; exists {
 			g.members = append(g.members, i)
 			if beats(findings[i], findings[g.winnerIdx]) {
@@ -73,7 +85,7 @@ func DeduplicateFindings(findings []rules.Finding) []rules.Finding {
 		}
 
 		cwe := strings.TrimPrefix(f.CWEID, "CWE-")
-		key := groupKey{Line: f.LineNumber, CWE: cwe}
+		key := groupKey{File: f.FilePath, Line: f.LineNumber, CWE: cwe}
 		if seen[key] {
 			continue
 		}
@@ -116,18 +128,46 @@ func findingTier(f *rules.Finding) int {
 	return tierRegex
 }
 
-// isASTRuleID returns true if the rule ID belongs to any AST analyzer.
-// All AST analyzers use rule IDs that contain "AST":
+// astRuleIDPrefixes enumerates the exact rule-ID prefixes emitted by the
+// AST analyzers under batou-core/analyzer/. Classification must be an
+// anchored prefix match against this set — NOT a substring check — because
+// regex rule IDs can contain "AST" as an accidental substring
+// (BATOU-FW-FASTAPI-*). A substring match promoted those regex rules into
+// the AST tier: ConfBaseAST (0.7) base confidence, dedup wins over true
+// regex findings, and Critical regex findings reaching RiskScore
+// 1.0×0.7 = 0.7 — a pure regex rule blocking writes, which breaks the
+// regex-never-blocks invariant.
 //
-//	BATOU-AST-    (Go)         BATOU-PYAST-   (Python)
-//	BATOU-JSAST-  (JavaScript) BATOU-JAVAAST- (Java)
-//	BATOU-PHPAST- (PHP)        BATOU-RUBYAST- (Ruby)
-//	BATOU-CAST-   (C)          BATOU-CS-AST-  (C#)
-//	BATOU-KT-AST- (Kotlin)     BATOU-SWIFT-AST- (Swift)
-//	BATOU-RUST-AST- (Rust)     BATOU-LUA-AST- (Lua)
-//	BATOU-GVY-AST- (Groovy)
+// When adding a new AST analyzer, add its prefix here and to
+// TestDedup_AllASTLanguagePrefixes.
+var astRuleIDPrefixes = []string{
+	"BATOU-AST-",          // Go (goast)
+	"BATOU-PYAST-",        // Python (pyast)
+	"BATOU-JSAST-",        // JavaScript/TypeScript (jsast)
+	"BATOU-JAVAAST-",      // Java (javaast)
+	"BATOU-PHPAST-",       // PHP (phpast)
+	"BATOU-RUBYAST-",      // Ruby (rubyast)
+	"BATOU-CAST-",         // C/C++ (cast)
+	"BATOU-CS-AST-",       // C# (csast)
+	"BATOU-KT-AST-",       // Kotlin (ktast)
+	"BATOU-SWIFT-AST-",    // Swift (swiftast)
+	"BATOU-RUST-AST-",     // Rust (rustast)
+	"BATOU-LUA-AST-",      // Lua (luaast)
+	"BATOU-GVY-AST-",      // Groovy (gvyast)
+	"BATOU-PERL-AST-",     // Perl (perlast)
+	"BATOU-SH-AST-",       // Shell (shellast)
+	"BATOU-ZIG-AST-",      // Zig (zigast)
+	"BATOU-OWNCLOUD-AST-", // PHP ownCloud public-page analyzer (phpast/publicpage)
+}
+
+// isASTRuleID returns true if the rule ID belongs to any AST analyzer.
 func isASTRuleID(ruleID string) bool {
-	return strings.Contains(ruleID, "AST")
+	for _, p := range astRuleIDPrefixes {
+		if strings.HasPrefix(ruleID, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // beats returns true if challenger should replace current as group winner.

@@ -19,7 +19,7 @@ func (p *PHPASTAnalyzer) Name() string                    { return "PHP AST Secu
 func (p *PHPASTAnalyzer) DefaultSeverity() rules.Severity { return rules.Critical }
 func (p *PHPASTAnalyzer) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 func (p *PHPASTAnalyzer) Description() string {
-	return "AST-based analysis of PHP source for eval/exec/system/passthru injection, SQL concatenation injection, include/require path injection, unserialize deserialization, and preg_replace /e code execution."
+	return "AST-based analysis of PHP source for eval/exec/system/passthru injection, SQL concatenation injection, include/require path injection, unserialize deserialization, preg_replace /e code execution, and server-side template injection via Twig/Blade string-template compilation (createTemplate/compileString)."
 }
 
 func (p *PHPASTAnalyzer) Scan(ctx *rules.ScanContext) []rules.Finding {
@@ -137,6 +137,8 @@ func (c *phpChecker) walk() {
 		switch n.Type() {
 		case "function_call_expression":
 			c.checkFunctionCall(n)
+		case "member_call_expression":
+			c.checkMethodCall(n)
 		case "include_expression", "include_once_expression":
 			c.checkInclude(n, "include")
 		case "require_expression", "require_once_expression":
@@ -145,6 +147,66 @@ func (c *phpChecker) walk() {
 			c.checkSQLAssignment(n)
 		}
 		return true
+	})
+}
+
+// sstiTemplateMethods maps framework method names that compile a string into a
+// template (the SSTI primitive — server-side template injection, CWE-1336) to
+// their metadata. These are method calls on a template-engine object, e.g.
+// $twig->createTemplate($userInput) or Blade compile helpers. Detected at the
+// AST tier so second-order / stored shapes that taint cannot trace to a source
+// (the template string arrives from a variable, DB row, or earlier assignment)
+// still surface structurally.
+var sstiTemplateMethods = map[string]struct {
+	engine     string
+	suggestion string
+}{
+	"createTemplate": {
+		engine:     "Twig\\Environment",
+		suggestion: "Never compile user input as a Twig template. Render a fixed template file and pass user data as context variables: $twig->render('page.html.twig', ['name' => $userInput]).",
+	},
+	"compileString": {
+		engine:     "Laravel Blade",
+		suggestion: "Never compile user input as a Blade string. Render a fixed view and pass user data as data variables: view('page', ['name' => $userInput]).",
+	},
+}
+
+// checkMethodCall inspects $obj->method(arg) calls for framework template-injection
+// sinks that compile a string argument into an executable template (SSTI, CWE-1336).
+func (c *phpChecker) checkMethodCall(n *ast.Node) {
+	method := phpMethodName(n)
+	if method == "" {
+		return
+	}
+	info, ok := sstiTemplateMethods[method]
+	if !ok {
+		return
+	}
+	args := findChild(n, "arguments")
+	if args == nil {
+		return
+	}
+	firstArg := firstArgument(args)
+	// A literal template string is developer-authored, not user-controlled — skip it.
+	if firstArg == nil || isPHPLiteral(firstArg) {
+		return
+	}
+	line := int(n.StartRow()) + 1
+	c.findings = append(c.findings, rules.Finding{
+		RuleID:        "BATOU-PHPAST-007",
+		Severity:      rules.Critical,
+		SeverityLabel: rules.Critical.String(),
+		Title:         "Server-side template injection via " + method + "()",
+		Description:   info.engine + "::" + method + "() compiles its string argument into a template. When that string is user-controlled, an attacker can inject template expressions to execute arbitrary code on the server (SSTI).",
+		FilePath:      c.filePath,
+		LineNumber:    line,
+		MatchedText:   truncate(n.Text(), 200),
+		Suggestion:    info.suggestion,
+		CWEID:         "CWE-1336",
+		OWASPCategory: "A03:2021-Injection",
+		Language:      rules.LangPHP,
+		Confidence:    "high",
+		Tags:          []string{"ssti", "template-injection", "injection", "rce", "ast"},
 	})
 }
 
@@ -369,6 +431,28 @@ func phpFuncName(n *ast.Node) string {
 	funcNode := named[0]
 	if funcNode.Type() == "name" {
 		return funcNode.Text()
+	}
+	return ""
+}
+
+// phpMethodName extracts the invoked method name from a member_call_expression
+// ($obj->method(args)). Tree-sitter PHP shapes this as named children
+// [receiver, name(method), arguments]; the method name is the "name" node that
+// is not the receiver.
+func phpMethodName(n *ast.Node) string {
+	if n == nil || n.Type() != "member_call_expression" {
+		return ""
+	}
+	named := n.NamedChildren()
+	for i, ch := range named {
+		// Skip the receiver (first child) — the method name is the "name" node
+		// that follows it.
+		if i == 0 {
+			continue
+		}
+		if ch.Type() == "name" {
+			return ch.Text()
+		}
 	}
 	return ""
 }

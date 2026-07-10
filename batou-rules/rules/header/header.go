@@ -28,14 +28,14 @@ var (
 
 // BATOU-HDR-003: Missing X-Content-Type-Options
 var (
-	reXCTOHeader  = regexp.MustCompile(`(?i)["']X-Content-Type-Options["']`)
-	reHelmetXCTO  = regexp.MustCompile(`(?i)helmet\.noSniff|noSniff\s*\(`)
+	reXCTOHeader = regexp.MustCompile(`(?i)["']X-Content-Type-Options["']`)
+	reHelmetXCTO = regexp.MustCompile(`(?i)helmet\.noSniff|noSniff\s*\(`)
 )
 
 // BATOU-HDR-004: Missing Strict-Transport-Security
 var (
-	reHSTSHeader  = regexp.MustCompile(`(?i)["']Strict-Transport-Security["']`)
-	reHelmetHSTS  = regexp.MustCompile(`(?i)helmet\.hsts|hsts\s*\(`)
+	reHSTSHeader = regexp.MustCompile(`(?i)["']Strict-Transport-Security["']`)
+	reHelmetHSTS = regexp.MustCompile(`(?i)helmet\.hsts|hsts\s*\(`)
 )
 
 // BATOU-HDR-005: Permissive CSP (unsafe-inline / unsafe-eval)
@@ -64,9 +64,9 @@ var (
 
 // BATOU-HDR-009: Cache-Control missing no-store
 var (
-	reCacheControl    = regexp.MustCompile(`(?i)["']Cache-Control["']`)
-	reCacheNoStore    = regexp.MustCompile(`(?i)no-store`)
-	reSensitivePath   = regexp.MustCompile(`(?i)(?:login|auth|account|profile|admin|dashboard|settings|password|token|session|checkout|payment|billing)`)
+	reCacheControl  = regexp.MustCompile(`(?i)["']Cache-Control["']`)
+	reCacheNoStore  = regexp.MustCompile(`(?i)no-store`)
+	reSensitivePath = regexp.MustCompile(`(?i)(?:login|auth|account|profile|admin|dashboard|settings|password|token|session|checkout|payment|billing)`)
 )
 
 // BATOU-HDR-010: Server header disclosure
@@ -169,8 +169,8 @@ func init() {
 
 type MissingCSP struct{}
 
-func (r *MissingCSP) ID() string                     { return "BATOU-HDR-001" }
-func (r *MissingCSP) Name() string                   { return "MissingCSP" }
+func (r *MissingCSP) ID() string                      { return "BATOU-HDR-001" }
+func (r *MissingCSP) Name() string                    { return "MissingCSP" }
 func (r *MissingCSP) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingCSP) Description() string {
 	return "Detects HTTP handler files that set response headers but do not include a Content-Security-Policy header, leaving the application vulnerable to XSS and data injection attacks."
@@ -190,22 +190,23 @@ func (r *MissingCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	// Check if any response headers are being set
-	if !reResponseHeaders.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reResponseHeaders, ctx) {
 		return nil
 	}
 	// Check if CSP is already set
-	if reCSPHeader.MatchString(ctx.Content) || reHelmetCSP.MatchString(ctx.Content) || reMetaCSP.MatchString(ctx.Content) {
+	if rules.GMatchFile(reCSPHeader, ctx) || rules.GMatchFile(reHelmetCSP, ctx) || rules.GMatchFile(reMetaCSP, ctx) {
 		return nil
 	}
 
 	// Find the first header-setting line to anchor the finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if reResponseHeaders.MatchString(line) {
+		if rules.GMatchLower(reResponseHeaders, line, lowered[i]) {
 			return []rules.Finding{{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -233,8 +234,8 @@ func (r *MissingCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingXFrameOptions struct{}
 
-func (r *MissingXFrameOptions) ID() string                     { return "BATOU-HDR-002" }
-func (r *MissingXFrameOptions) Name() string                   { return "MissingXFrameOptions" }
+func (r *MissingXFrameOptions) ID() string                      { return "BATOU-HDR-002" }
+func (r *MissingXFrameOptions) Name() string                    { return "MissingXFrameOptions" }
 func (r *MissingXFrameOptions) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingXFrameOptions) Description() string {
 	return "Detects HTTP handler files missing X-Frame-Options header, leaving the application vulnerable to clickjacking attacks."
@@ -247,23 +248,24 @@ func (r *MissingXFrameOptions) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if isFrontendJSFile(ctx) {
 		return nil
 	}
-	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
+	if !isHTTPHandlerFile(ctx.Content) || !rules.GMatchFile(reResponseHeaders, ctx) {
 		return nil
 	}
 	if isRouteHandlerFile(ctx.Content) {
 		return nil
 	}
-	if reXFrameHeader.MatchString(ctx.Content) || reHelmetFrame.MatchString(ctx.Content) || reCSPFrameAnc.MatchString(ctx.Content) {
+	if rules.GMatchFile(reXFrameHeader, ctx) || rules.GMatchFile(reHelmetFrame, ctx) || rules.GMatchFile(reCSPFrameAnc, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if reResponseHeaders.MatchString(line) {
+		if rules.GMatchLower(reResponseHeaders, line, lowered[i]) {
 			return []rules.Finding{{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -291,8 +293,8 @@ func (r *MissingXFrameOptions) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingXContentTypeOptions struct{}
 
-func (r *MissingXContentTypeOptions) ID() string                     { return "BATOU-HDR-003" }
-func (r *MissingXContentTypeOptions) Name() string                   { return "MissingXContentTypeOptions" }
+func (r *MissingXContentTypeOptions) ID() string                      { return "BATOU-HDR-003" }
+func (r *MissingXContentTypeOptions) Name() string                    { return "MissingXContentTypeOptions" }
 func (r *MissingXContentTypeOptions) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *MissingXContentTypeOptions) Description() string {
 	return "Detects HTTP handler files missing X-Content-Type-Options: nosniff header, which prevents MIME-type sniffing attacks."
@@ -305,23 +307,24 @@ func (r *MissingXContentTypeOptions) Scan(ctx *rules.ScanContext) []rules.Findin
 	if isFrontendJSFile(ctx) {
 		return nil
 	}
-	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
+	if !isHTTPHandlerFile(ctx.Content) || !rules.GMatchFile(reResponseHeaders, ctx) {
 		return nil
 	}
 	if isRouteHandlerFile(ctx.Content) {
 		return nil
 	}
-	if reXCTOHeader.MatchString(ctx.Content) || reHelmetXCTO.MatchString(ctx.Content) {
+	if rules.GMatchFile(reXCTOHeader, ctx) || rules.GMatchFile(reHelmetXCTO, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if reResponseHeaders.MatchString(line) {
+		if rules.GMatchLower(reResponseHeaders, line, lowered[i]) {
 			return []rules.Finding{{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -349,8 +352,8 @@ func (r *MissingXContentTypeOptions) Scan(ctx *rules.ScanContext) []rules.Findin
 
 type MissingHSTS struct{}
 
-func (r *MissingHSTS) ID() string                     { return "BATOU-HDR-004" }
-func (r *MissingHSTS) Name() string                   { return "MissingHSTS" }
+func (r *MissingHSTS) ID() string                      { return "BATOU-HDR-004" }
+func (r *MissingHSTS) Name() string                    { return "MissingHSTS" }
 func (r *MissingHSTS) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingHSTS) Description() string {
 	return "Detects HTTP handler files missing Strict-Transport-Security (HSTS) header, leaving the application vulnerable to SSL-stripping attacks."
@@ -363,23 +366,24 @@ func (r *MissingHSTS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if isFrontendJSFile(ctx) {
 		return nil
 	}
-	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
+	if !isHTTPHandlerFile(ctx.Content) || !rules.GMatchFile(reResponseHeaders, ctx) {
 		return nil
 	}
 	if isRouteHandlerFile(ctx.Content) {
 		return nil
 	}
-	if reHSTSHeader.MatchString(ctx.Content) || reHelmetHSTS.MatchString(ctx.Content) {
+	if rules.GMatchFile(reHSTSHeader, ctx) || rules.GMatchFile(reHelmetHSTS, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if reResponseHeaders.MatchString(line) {
+		if rules.GMatchLower(reResponseHeaders, line, lowered[i]) {
 			return []rules.Finding{{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -407,8 +411,8 @@ func (r *MissingHSTS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PermissiveCSP struct{}
 
-func (r *PermissiveCSP) ID() string                     { return "BATOU-HDR-005" }
-func (r *PermissiveCSP) Name() string                   { return "PermissiveCSP" }
+func (r *PermissiveCSP) ID() string                      { return "BATOU-HDR-005" }
+func (r *PermissiveCSP) Name() string                    { return "PermissiveCSP" }
 func (r *PermissiveCSP) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PermissiveCSP) Description() string {
 	return "Detects Content-Security-Policy headers that include 'unsafe-inline' or 'unsafe-eval', which largely negate the XSS protection CSP provides."
@@ -425,22 +429,23 @@ func (r *PermissiveCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if !reCSPUnsafe.MatchString(line) {
+		if !rules.GMatchLower(reCSPUnsafe, line, lowered[i]) {
 			continue
 		}
 		// Only flag if in a CSP context
-		if !reCSPCtx.MatchString(line) && !reCSPCtx.MatchString(nearbyLines(lines, i, 3)) {
+		if !rules.GMatchLower(reCSPCtx, line, lowered[i]) && !reCSPCtx.MatchString(nearbyLines(lines, i, 3)) {
 			continue
 		}
 
-		m := reCSPUnsafe.FindString(line)
+		m := rules.GFindLower(reCSPUnsafe, line, lowered[i])
 		findings = append(findings, rules.Finding{
 			RuleID:        r.ID(),
 			Severity:      r.DefaultSeverity(),
@@ -467,8 +472,8 @@ func (r *PermissiveCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingXXSSProtection struct{}
 
-func (r *MissingXXSSProtection) ID() string                     { return "BATOU-HDR-006" }
-func (r *MissingXXSSProtection) Name() string                   { return "MissingXXSSProtection" }
+func (r *MissingXXSSProtection) ID() string                      { return "BATOU-HDR-006" }
+func (r *MissingXXSSProtection) Name() string                    { return "MissingXXSSProtection" }
 func (r *MissingXXSSProtection) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *MissingXXSSProtection) Description() string {
 	return "Detects HTTP handler files missing X-XSS-Protection header. While deprecated in modern browsers, it provides defense-in-depth for older browsers."
@@ -481,27 +486,28 @@ func (r *MissingXXSSProtection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if isFrontendJSFile(ctx) {
 		return nil
 	}
-	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
+	if !isHTTPHandlerFile(ctx.Content) || !rules.GMatchFile(reResponseHeaders, ctx) {
 		return nil
 	}
 	if isRouteHandlerFile(ctx.Content) {
 		return nil
 	}
-	if reXXSSHeader.MatchString(ctx.Content) {
+	if rules.GMatchFile(reXXSSHeader, ctx) {
 		return nil
 	}
 	// Only flag if CSP is also not present (CSP replaces X-XSS-Protection)
-	if reCSPHeader.MatchString(ctx.Content) || reHelmetCSP.MatchString(ctx.Content) {
+	if rules.GMatchFile(reCSPHeader, ctx) || rules.GMatchFile(reHelmetCSP, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if reResponseHeaders.MatchString(line) {
+		if rules.GMatchLower(reResponseHeaders, line, lowered[i]) {
 			return []rules.Finding{{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -529,8 +535,8 @@ func (r *MissingXXSSProtection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingReferrerPolicy struct{}
 
-func (r *MissingReferrerPolicy) ID() string                     { return "BATOU-HDR-007" }
-func (r *MissingReferrerPolicy) Name() string                   { return "MissingReferrerPolicy" }
+func (r *MissingReferrerPolicy) ID() string                      { return "BATOU-HDR-007" }
+func (r *MissingReferrerPolicy) Name() string                    { return "MissingReferrerPolicy" }
 func (r *MissingReferrerPolicy) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *MissingReferrerPolicy) Description() string {
 	return "Detects HTTP handler files missing Referrer-Policy header, which can leak sensitive URL information (tokens, session IDs) to third parties via the Referer header."
@@ -543,23 +549,24 @@ func (r *MissingReferrerPolicy) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if isFrontendJSFile(ctx) {
 		return nil
 	}
-	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
+	if !isHTTPHandlerFile(ctx.Content) || !rules.GMatchFile(reResponseHeaders, ctx) {
 		return nil
 	}
 	if isRouteHandlerFile(ctx.Content) {
 		return nil
 	}
-	if reReferrerHeader.MatchString(ctx.Content) || reHelmetReferrer.MatchString(ctx.Content) {
+	if rules.GMatchFile(reReferrerHeader, ctx) || rules.GMatchFile(reHelmetReferrer, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if reResponseHeaders.MatchString(line) {
+		if rules.GMatchLower(reResponseHeaders, line, lowered[i]) {
 			return []rules.Finding{{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -587,8 +594,8 @@ func (r *MissingReferrerPolicy) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingPermissionsPolicy struct{}
 
-func (r *MissingPermissionsPolicy) ID() string                     { return "BATOU-HDR-008" }
-func (r *MissingPermissionsPolicy) Name() string                   { return "MissingPermissionsPolicy" }
+func (r *MissingPermissionsPolicy) ID() string                      { return "BATOU-HDR-008" }
+func (r *MissingPermissionsPolicy) Name() string                    { return "MissingPermissionsPolicy" }
 func (r *MissingPermissionsPolicy) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *MissingPermissionsPolicy) Description() string {
 	return "Detects HTTP handler files missing Permissions-Policy header, which controls access to browser features like camera, microphone, and geolocation."
@@ -601,23 +608,24 @@ func (r *MissingPermissionsPolicy) Scan(ctx *rules.ScanContext) []rules.Finding 
 	if isFrontendJSFile(ctx) {
 		return nil
 	}
-	if !isHTTPHandlerFile(ctx.Content) || !reResponseHeaders.MatchString(ctx.Content) {
+	if !isHTTPHandlerFile(ctx.Content) || !rules.GMatchFile(reResponseHeaders, ctx) {
 		return nil
 	}
 	if isRouteHandlerFile(ctx.Content) {
 		return nil
 	}
-	if rePermPolicyHeader.MatchString(ctx.Content) || reFeaturePolicyH.MatchString(ctx.Content) || reHelmetPermPolicy.MatchString(ctx.Content) {
+	if rules.GMatchFile(rePermPolicyHeader, ctx) || rules.GMatchFile(reFeaturePolicyH, ctx) || rules.GMatchFile(reHelmetPermPolicy, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if reResponseHeaders.MatchString(line) {
+		if rules.GMatchLower(reResponseHeaders, line, lowered[i]) {
 			return []rules.Finding{{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -645,8 +653,8 @@ func (r *MissingPermissionsPolicy) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type CacheControlSensitive struct{}
 
-func (r *CacheControlSensitive) ID() string                     { return "BATOU-HDR-009" }
-func (r *CacheControlSensitive) Name() string                   { return "CacheControlSensitive" }
+func (r *CacheControlSensitive) ID() string                      { return "BATOU-HDR-009" }
+func (r *CacheControlSensitive) Name() string                    { return "CacheControlSensitive" }
 func (r *CacheControlSensitive) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *CacheControlSensitive) Description() string {
 	return "Detects sensitive pages (login, auth, account) that set Cache-Control but do not include no-store, potentially caching sensitive data in browsers or proxies."
@@ -663,22 +671,23 @@ func (r *CacheControlSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	// Only flag in files that handle sensitive routes
-	if !reSensitivePath.MatchString(ctx.FilePath) && !reSensitivePath.MatchString(ctx.Content) {
+	if !reSensitivePath.MatchString(ctx.FilePath) && !rules.GMatchFile(reSensitivePath, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if !reCacheControl.MatchString(line) {
+		if !rules.GMatchLower(reCacheControl, line, lowered[i]) {
 			continue
 		}
-		if reCacheNoStore.MatchString(line) {
+		if rules.GMatchLower(reCacheNoStore, line, lowered[i]) {
 			continue
 		}
 		findings = append(findings, rules.Finding{
@@ -707,8 +716,8 @@ func (r *CacheControlSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ServerHeaderDisclosure struct{}
 
-func (r *ServerHeaderDisclosure) ID() string                     { return "BATOU-HDR-010" }
-func (r *ServerHeaderDisclosure) Name() string                   { return "ServerHeaderDisclosure" }
+func (r *ServerHeaderDisclosure) ID() string                      { return "BATOU-HDR-010" }
+func (r *ServerHeaderDisclosure) Name() string                    { return "ServerHeaderDisclosure" }
 func (r *ServerHeaderDisclosure) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *ServerHeaderDisclosure) Description() string {
 	return "Detects code that explicitly sets the Server response header, which discloses web server software and version information useful for targeted attacks."
@@ -719,19 +728,20 @@ func (r *ServerHeaderDisclosure) Languages() []rules.Language {
 
 func (r *ServerHeaderDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Don't flag if the Server header is being removed
-	if reServerRemove.MatchString(ctx.Content) {
+	if rules.GMatchFile(reServerRemove, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if !reServerHeader.MatchString(line) {
+		if !rules.GMatchLower(reServerHeader, line, lowered[i]) {
 			continue
 		}
 		findings = append(findings, rules.Finding{
@@ -760,8 +770,8 @@ func (r *ServerHeaderDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XPoweredByDisclosure struct{}
 
-func (r *XPoweredByDisclosure) ID() string                     { return "BATOU-HDR-011" }
-func (r *XPoweredByDisclosure) Name() string                   { return "XPoweredByDisclosure" }
+func (r *XPoweredByDisclosure) ID() string                      { return "BATOU-HDR-011" }
+func (r *XPoweredByDisclosure) Name() string                    { return "XPoweredByDisclosure" }
 func (r *XPoweredByDisclosure) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *XPoweredByDisclosure) Description() string {
 	return "Detects code that explicitly sets the X-Powered-By response header, which discloses the application framework and aids attackers in targeting framework-specific vulnerabilities."
@@ -772,19 +782,20 @@ func (r *XPoweredByDisclosure) Languages() []rules.Language {
 
 func (r *XPoweredByDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Don't flag if being removed
-	if reXPoweredByRemove.MatchString(ctx.Content) || reExpressDisable.MatchString(ctx.Content) || reHelmetHidePower.MatchString(ctx.Content) {
+	if rules.GMatchFile(reXPoweredByRemove, ctx) || rules.GMatchFile(reExpressDisable, ctx) || rules.GMatchFile(reHelmetHidePower, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if !reXPoweredByHeader.MatchString(line) {
+		if !rules.GMatchLower(reXPoweredByHeader, line, lowered[i]) {
 			continue
 		}
 		findings = append(findings, rules.Finding{
@@ -813,8 +824,8 @@ func (r *XPoweredByDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CRLFHeaderInjection struct{}
 
-func (r *CRLFHeaderInjection) ID() string                     { return "BATOU-HDR-012" }
-func (r *CRLFHeaderInjection) Name() string                   { return "CRLFHeaderInjection" }
+func (r *CRLFHeaderInjection) ID() string                      { return "BATOU-HDR-012" }
+func (r *CRLFHeaderInjection) Name() string                    { return "CRLFHeaderInjection" }
 func (r *CRLFHeaderInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CRLFHeaderInjection) Description() string {
 	return "Detects HTTP response headers set with user-controlled values, enabling CRLF injection for HTTP response splitting, header injection, and cache poisoning."
@@ -825,7 +836,8 @@ func (r *CRLFHeaderInjection) Languages() []rules.Language {
 
 func (r *CRLFHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	patterns := []*regexp.Regexp{reCRLFHeaderInject, reCRLFDirectConcat, reCRLFPHPHeader}
 
@@ -835,7 +847,7 @@ func (r *CRLFHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, pat := range patterns {
-			if m := pat.FindString(line); m != "" {
+			if m := rules.GFindLower(pat, line, lowered[i]); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),

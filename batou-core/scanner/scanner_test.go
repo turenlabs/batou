@@ -156,6 +156,53 @@ db.query(q);`
 }
 
 // ---------------------------------------------------------------------------
+// Low-value heuristic demotion (real-world FP regression): CWE-117 log
+// injection is true-but-trivial (logs of exception messages, internal IDs) and
+// dominated the high-confidence headline on Grafana/Keycloak smoke tests. It
+// must EMIT (recall preserved as a hint) but be capped below the 0.7 block /
+// headline threshold. A real injection sink in the same file still blocks.
+// ---------------------------------------------------------------------------
+
+func TestScanLogOutput_DemotedToHint(t *testing.T) {
+	// User input flows to log.Println (CWE-117 log_output) AND to exec.Command
+	// (CWE-78 command injection). Only the latter should reach the block lane.
+	code := `package main
+
+import (
+	"log"
+	"net/http"
+	"os/exec"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	log.Println("user requested: " + name)
+	exec.Command("sh", "-c", "echo "+name).Run()
+}`
+	result := testutil.ScanContent(t, "/app/handler.go", code)
+
+	var logFinding *rules.Finding
+	for i := range result.Findings {
+		if result.Findings[i].RuleID == "BATOU-TAINT-log_output" {
+			logFinding = &result.Findings[i]
+			break
+		}
+	}
+	if logFinding == nil {
+		t.Skip("log_output flow not produced — taint catalog may have changed")
+	}
+
+	// Demotion, not deletion: the finding still emits...
+	if logFinding.ConfidenceScore > scanner.StyleHeuristicCap {
+		t.Errorf("log_output not demoted: cs=%.2f, want <= %.2f", logFinding.ConfidenceScore, scanner.StyleHeuristicCap)
+	}
+	// ...but it must never block a write.
+	if logFinding.ShouldBlock() {
+		t.Errorf("log_output still blocks: risk=%.2f", logFinding.RiskScore)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Confidence scoring integration: taint-confirmed Critical SHOULD block
 // ---------------------------------------------------------------------------
 

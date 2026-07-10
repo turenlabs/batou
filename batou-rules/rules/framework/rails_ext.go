@@ -13,26 +13,26 @@ import (
 
 var (
 	// BATOU-FW-RAILS-007: protect_from_forgery missing in ApplicationController
-	reRailsExtAppController    = regexp.MustCompile(`class\s+ApplicationController\s*<\s*ActionController::Base`)
-	reRailsExtProtectForgery   = regexp.MustCompile(`protect_from_forgery`)
+	reRailsExtAppController  = regexp.MustCompile(`class\s+ApplicationController\s*<\s*ActionController::Base`)
+	reRailsExtProtectForgery = regexp.MustCompile(`protect_from_forgery`)
 
 	// BATOU-FW-RAILS-008: Mass assignment via params.permit!
-	reRailsExtPermitBang       = regexp.MustCompile(`params\s*\.permit!`)
+	reRailsExtPermitBang = regexp.MustCompile(`params\s*\.permit!`)
 
 	// BATOU-FW-RAILS-009: send_file with user-controlled path
-	reRailsExtSendFile         = regexp.MustCompile(`send_file\s*\(\s*(?:params\[|"[^"]*#\{params|request\.|File\.join\s*\([^)]*params)`)
-	reRailsExtSendFileVar      = regexp.MustCompile(`send_file\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
+	reRailsExtSendFile    = regexp.MustCompile(`send_file\s*\(\s*(?:params\[|"[^"]*#\{params|request\.|File\.join\s*\([^)]*params)`)
+	reRailsExtSendFileVar = regexp.MustCompile(`send_file\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
 
 	// BATOU-FW-RAILS-010: config.force_ssl not enabled
-	reRailsExtForceSSLFalse    = regexp.MustCompile(`config\.force_ssl\s*=\s*false`)
+	reRailsExtForceSSLFalse = regexp.MustCompile(`config\.force_ssl\s*=\s*false`)
 
 	// BATOU-FW-RAILS-011: secret_key_base hardcoded in secrets.yml
 	reRailsExtSecretKeyBase    = regexp.MustCompile(`(?i)secret_key_base\s*:\s*[A-Za-z0-9]{30,}`)
 	reRailsExtSecretKeyBaseStr = regexp.MustCompile(`(?i)secret_key_base\s*[=:]\s*["'][A-Za-z0-9+/=]{30,}["']`)
 
 	// BATOU-FW-RAILS-012: Devise without lockable
-	reRailsExtDevise           = regexp.MustCompile(`devise\s*:`)
-	reRailsExtDeviseLockable   = regexp.MustCompile(`:lockable`)
+	reRailsExtDevise         = regexp.MustCompile(`devise\s*:`)
+	reRailsExtDeviseLockable = regexp.MustCompile(`:lockable`)
 )
 
 func init() {
@@ -61,22 +61,23 @@ func (r *RailsNoCSRFProtection) Languages() []rules.Language {
 }
 
 func (r *RailsNoCSRFProtection) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reRailsExtAppController.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reRailsExtAppController, ctx) {
 		return nil
 	}
-	if reRailsExtProtectForgery.MatchString(ctx.Content) {
+	if rules.GMatchFile(reRailsExtProtectForgery, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") {
 			continue
 		}
-		if reRailsExtAppController.MatchString(line) {
+		if rules.GMatchLower(reRailsExtAppController, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -121,14 +122,15 @@ func (r *RailsPermitBangExt) Languages() []rules.Language {
 
 func (r *RailsPermitBangExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") {
 			continue
 		}
-		if reRailsExtPermitBang.MatchString(line) {
+		if rules.GMatchLower(reRailsExtPermitBang, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -172,7 +174,8 @@ func (r *RailsSendFileTraversal) Languages() []rules.Language {
 
 func (r *RailsSendFileTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	hasParams := strings.Contains(ctx.Content, "params[") || strings.Contains(ctx.Content, "params.") ||
 		strings.Contains(ctx.Content, "request.")
@@ -183,7 +186,7 @@ func (r *RailsSendFileTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if m := reRailsExtSendFile.FindString(line); m != "" {
+		if m := rules.GFindLower(reRailsExtSendFile, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -204,7 +207,7 @@ func (r *RailsSendFileTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 				Confidence:    "high",
 				Tags:          []string{"framework", "rails", "path-traversal", "file-download"},
 			})
-		} else if hasParams && reRailsExtSendFileVar.MatchString(line) {
+		} else if hasParams && rules.GMatchLower(reRailsExtSendFileVar, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -248,14 +251,15 @@ func (r *RailsForceSSLDisabled) Languages() []rules.Language {
 
 func (r *RailsForceSSLDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") {
 			continue
 		}
-		if reRailsExtForceSSLFalse.MatchString(line) {
+		if rules.GMatchLower(reRailsExtForceSSLFalse, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -299,7 +303,8 @@ func (r *RailsHardcodedSecretKey) Languages() []rules.Language {
 
 func (r *RailsHardcodedSecretKey) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -308,9 +313,9 @@ func (r *RailsHardcodedSecretKey) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reRailsExtSecretKeyBase.FindString(line); m != "" {
+		if m := rules.GFindLower(reRailsExtSecretKeyBase, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reRailsExtSecretKeyBaseStr.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRailsExtSecretKeyBaseStr, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -360,22 +365,23 @@ func (r *RailsDeviseNoLockable) Languages() []rules.Language {
 }
 
 func (r *RailsDeviseNoLockable) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reRailsExtDevise.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reRailsExtDevise, ctx) {
 		return nil
 	}
-	if reRailsExtDeviseLockable.MatchString(ctx.Content) {
+	if rules.GMatchFile(reRailsExtDeviseLockable, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") {
 			continue
 		}
-		if reRailsExtDevise.MatchString(line) {
+		if rules.GMatchLower(reRailsExtDevise, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

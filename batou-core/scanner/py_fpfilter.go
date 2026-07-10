@@ -211,6 +211,24 @@ var pyHTTPCall = regexp.MustCompile(`(?i)(?:` +
 	`httpx\.(?:get|post|put|delete)\s*\(|` +
 	`urllib\.request\.urlopen\s*\(|` +
 	`aiohttp\.ClientSession|` +
+	// Non-HTTP network clients that are still genuine CWE-918 SSRF sinks
+	// (cov/python coverage adds): stdlib FTP/Telnet/mail-protocol clients and
+	// the XML-RPC ServerProxy endpoint. These are receiver-typed/module-
+	// anchored sinks (see python_sinks.go); when the catalog fires CWE-918 on
+	// one of these the line genuinely IS a network call, so the "no HTTP
+	// request here" guard below must not treat it as a misidentified
+	// `.get()`/dict access and suppress the real finding. Scoped to the exact
+	// module-qualified constructor spellings so this never matches unrelated
+	// code. DNS resolution (socket.gethostbyname/getaddrinfo) is deliberately
+	// NOT listed: it is a weak signal that legitimately appears inside SSRF
+	// *guard* code (resolve host -> reject private IPs), so allow-listing it
+	// would reintroduce FPs on hardened code (e.g. the CVE-2023-24329 safe
+	// fixture). The existing socket.getaddrinfo taint sink is unaffected — it
+	// does not flow through this pyHasHTTPCall guard.
+	`ftplib\.FTP|\bftps?\.connect\s*\(|` +
+	`telnetlib\.Telnet\s*\(|` +
+	`smtplib\.SMTP\s*\(|smtplib\.SMTP_SSL\s*\(|imaplib\.IMAP4|poplib\.POP3|` +
+	`xmlrpc\.client\.ServerProxy\s*\(|xmlrpclib\.(?:ServerProxy|Server)\s*\(|` +
 	`fetch\s*\(` +
 	`)`)
 

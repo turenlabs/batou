@@ -19,6 +19,9 @@ func init() {
 	rules.Register(&LaravelAppKey{})
 	rules.Register(&LaravelUnserialize{})
 	rules.Register(&LaravelStorageTraversal{})
+	rules.Register(&LaravelInsecureCookie{})
+	rules.Register(&LaravelUnsafeValidator{})
+	rules.Register(&LaravelMissingCSRF{})
 
 	// React rules
 	rules.Register(&ReactSSRUnsanitized{})

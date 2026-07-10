@@ -2,7 +2,6 @@ package graph_test
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-core/graph"
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"

@@ -18,9 +18,7 @@ var (
 	// enableIntrospection: true
 	reEnableIntrospection = regexp.MustCompile(`(?i)\benableIntrospection\s*[:=]\s*true\b`)
 	// GraphQL schema creation without introspection disabled
-	reSchemaCreate = regexp.MustCompile(`(?i)(?:new\s+(?:ApolloServer|GraphQLServer)|makeExecutableSchema|createServer|graphqlHTTP)\s*\(`)
 	// __schema query (introspection query)
-	reSchemaQuery = regexp.MustCompile(`(?i)__schema\b`)
 	// Introspection disabled patterns (used as guard)
 	reIntrospectionDisabled = regexp.MustCompile(`(?i)\bintrospection\s*[:=]\s*false\b`)
 	reDisableIntrospection  = regexp.MustCompile(`(?i)\b(?:disableIntrospection|NoIntrospection|IntrospectionDisabled)\b`)
@@ -47,7 +45,7 @@ var (
 var reLineComment = regexp.MustCompile(`^\s*(?://|#|--|;|%|/\*)`)
 
 func isCommentLine(line string) bool {
-	return reLineComment.MatchString(line)
+	return rules.GMatch(reLineComment, line)
 }
 
 func truncate(s string, maxLen int) string {
@@ -79,11 +77,11 @@ func (r IntrospectionEnabled) Languages() []rules.Language {
 
 func (r IntrospectionEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Check if introspection is explicitly disabled anywhere in the file
 	for _, l := range lines {
-		if reIntrospectionDisabled.MatchString(l) || reDisableIntrospection.MatchString(l) {
+		if rules.GMatch(reIntrospectionDisabled, l) || rules.GMatch(reDisableIntrospection, l) {
 			return findings
 		}
 	}
@@ -95,21 +93,21 @@ func (r IntrospectionEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if loc := reIntrospectionEnabled.FindString(line); loc != "" {
+		if loc := rules.GFind(reIntrospectionEnabled, line); loc != "" {
 			matched = loc
 		}
 		if matched == "" {
-			if loc := reEnableIntrospection.FindString(line); loc != "" {
+			if loc := rules.GFind(reEnableIntrospection, line); loc != "" {
 				matched = loc
 			}
 		}
 		if matched == "" {
-			if loc := rePyIntrospection.FindString(line); loc != "" {
+			if loc := rules.GFind(rePyIntrospection, line); loc != "" {
 				matched = loc
 			}
 		}
 		if matched == "" {
-			if loc := reJavaIntrospection.FindString(line); loc != "" {
+			if loc := rules.GFind(reJavaIntrospection, line); loc != "" {
 				matched = loc
 			}
 		}
@@ -158,11 +156,11 @@ func (r NoDepthLimiting) Languages() []rules.Language {
 
 func (r NoDepthLimiting) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Check if depth limiting or complexity analysis is configured anywhere
 	for _, l := range lines {
-		if reDepthLimit.MatchString(l) || reComplexity.MatchString(l) {
+		if rules.GMatch(reDepthLimit, l) || rules.GMatch(reComplexity, l) {
 			return findings
 		}
 	}
@@ -172,7 +170,7 @@ func (r NoDepthLimiting) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if loc := reGQLServerCreate.FindString(line); loc != "" {
+		if loc := rules.GFind(reGQLServerCreate, line); loc != "" {
 			// Check if validationRules is configured in a window after the server creation
 			hasValidation := false
 			end := i + 20
@@ -180,7 +178,7 @@ func (r NoDepthLimiting) Scan(ctx *rules.ScanContext) []rules.Finding {
 				end = len(lines)
 			}
 			for _, subsequent := range lines[i:end] {
-				if reValidationRule.MatchString(subsequent) || reDepthLimit.MatchString(subsequent) || reComplexity.MatchString(subsequent) {
+				if rules.GMatch(reValidationRule, subsequent) || rules.GMatch(reDepthLimit, subsequent) || rules.GMatch(reComplexity, subsequent) {
 					hasValidation = true
 					break
 				}

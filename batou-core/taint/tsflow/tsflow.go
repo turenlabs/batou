@@ -53,5 +53,7 @@ func AnalyzeWithTree(content string, filePath string, lang rules.Language, tree 
 
 	matcher := newTSMatcher(sources, sinks, sanitizers, cfg)
 
-	return walkTree(tree, cfg, matcher, filePath)
+	cliScript := isCLIScript(content, lang)
+
+	return walkTree(tree, cfg, matcher, filePath, cliScript)
 }

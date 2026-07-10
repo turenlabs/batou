@@ -21,13 +21,22 @@ var (
 	reSessionRegenPHP    = regexp.MustCompile(`(?i)session_regenerate_id\s*\(`)
 	reLoginNoRegenRuby   = regexp.MustCompile(`(?i)(?:def\s+(?:create|login|sign_in|authenticate)\b)`)
 	reSessionRegenRuby   = regexp.MustCompile(`(?i)(?:reset_session|regenerate)`)
-	reLoginNoRegenExpress = regexp.MustCompile(`(?i)(?:(?:app|router)\.\s*post\s*\(\s*["']/(?:login|auth|signin)["']|function\s+login|const\s+login)`)
+	// Tightening note (2026-04-25): the previous pattern had bare
+	// `const\s+login` and `function\s+login` alternatives — they
+	// matched any identifier starting with "login" (LoginPage,
+	// loginUrl, loginParams, logInAgainButton, etc.) producing 8 FPs
+	// in owncloud/web. Tightened so a `const`/`function` form must
+	// (a) declare a name that's exactly login/signin/authenticate
+	// (with `\b` after) AND (b) follow the function-handler shape:
+	// `= async (req, res) =>`, `= (req, res) =>`, or `= function`.
+	// The Express route form `app.post('/login', ...)` keeps its
+	// existing detection.
+	reLoginNoRegenExpress = regexp.MustCompile(`(?i)(?:(?:app|router)\.\s*post\s*\(\s*["']/(?:login|auth|signin)["']|function\s+(?:login|signIn|authenticate)\s*\(|(?:const|let|var)\s+(?:login|signIn|authenticate)\s*=\s*(?:async\s*)?(?:\(|function\b))`)
 	reSessionRegenJS     = regexp.MustCompile(`(?i)(?:req\.session\.regenerate|session\.regenerate|req\.session\.destroy)`)
 )
 
 // BATOU-SESS-002: Session cookie without HttpOnly flag
 var (
-	reCookieNoHttpOnly    = regexp.MustCompile(`(?i)(?:Set-Cookie|cookie)\s*[=:]\s*["'][^"']*(?:;|$)`)
 	reCookieHttpOnlyFalse = regexp.MustCompile(`(?i)(?:httpOnly|http_only|httponly)\s*[=:]\s*(?:false|False|FALSE|0)`)
 	reSessionCookieNoHttp = regexp.MustCompile(`(?i)(?:session\.cookie_httponly|SESSION_COOKIE_HTTPONLY|cookie_httponly)\s*[=:]\s*(?:false|False|FALSE|0)`)
 	rePHPIniNoHttpOnly    = regexp.MustCompile(`(?i)session\.cookie_httponly\s*=\s*(?:0|off|false|Off|False)`)
@@ -121,7 +130,7 @@ func hasNearbyPattern(lines []string, idx, before, after int, re *regexp.Regexp)
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if re.MatchString(l) {
+		if rules.GMatch(re, l) {
 			return true
 		}
 	}
@@ -146,7 +155,7 @@ func (r *SessionFixation) Languages() []rules.Language {
 
 func (r *SessionFixation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	var loginRe *regexp.Regexp
 	var regenRe *regexp.Regexp
@@ -176,7 +185,7 @@ func (r *SessionFixation) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if isComment(trimmed) {
 			continue
 		}
-		if loginRe.MatchString(line) {
+		if rules.GMatch(loginRe, line) {
 			// Check the next 30 lines for session regeneration
 			if !hasNearbyPattern(lines, i, 0, 30, regenRe) {
 				findings = append(findings, rules.Finding{
@@ -219,14 +228,14 @@ func (r *SessionNoHttpOnly) Languages() []rules.Language {
 
 func (r *SessionNoHttpOnly) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reCookieHttpOnlyFalse, reSessionCookieNoHttp, rePHPIniNoHttpOnly} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -268,14 +277,14 @@ func (r *SessionNoSecure) Languages() []rules.Language {
 
 func (r *SessionNoSecure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reCookieSecureFalse, reSessionCookieNoSecure, rePHPIniNoSecure} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -317,14 +326,14 @@ func (r *SessionNoSameSite) Languages() []rules.Language {
 
 func (r *SessionNoSameSite) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reCookieSameSiteNone, reSessionNoSameSite} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -366,14 +375,14 @@ func (r *SessionInStorage) Languages() []rules.Language {
 
 func (r *SessionInStorage) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reLocalStorageSession, reSessionStorageSession, reLocalStorageDirect} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -415,14 +424,14 @@ func (r *SessionInURL) Languages() []rules.Language {
 
 func (r *SessionInURL) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reSessionInURL, reSessionURLParam, reSessionURLConcat} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -464,7 +473,7 @@ func (r *SessionExcessiveTimeout) Languages() []rules.Language {
 
 func (r *SessionExcessiveTimeout) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// 86400 seconds = 24 hours; 86400000 milliseconds = 24 hours
 	for i, line := range lines {
@@ -473,7 +482,7 @@ func (r *SessionExcessiveTimeout) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reSessionTimeoutLarge, reSessionMaxAge, rePHPSessionGC} {
-			loc := re.FindStringSubmatch(line)
+			loc := rules.GFindSubmatch(re, line)
 			if len(loc) < 2 {
 				continue
 			}
@@ -549,7 +558,7 @@ func (r *SessionNoLogoutInvalidation) Languages() []rules.Language {
 
 func (r *SessionNoLogoutInvalidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	var logoutRe *regexp.Regexp
 	switch ctx.Language {
@@ -570,7 +579,7 @@ func (r *SessionNoLogoutInvalidation) Scan(ctx *rules.ScanContext) []rules.Findi
 		if isComment(trimmed) {
 			continue
 		}
-		if logoutRe.MatchString(line) {
+		if rules.GMatch(logoutRe, line) {
 			if !hasNearbyPattern(lines, i, 0, 20, reSessionDestroy) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -612,14 +621,14 @@ func (r *PredictableSessionID) Languages() []rules.Language {
 
 func (r *PredictableSessionID) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{rePredictableSessionMD5, rePredictableSessionTime, rePredictableSessionRand, rePredictableSessionSeq} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -661,14 +670,14 @@ func (r *SensitiveSessionData) Languages() []rules.Language {
 
 func (r *SensitiveSessionData) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		for _, re := range []*regexp.Regexp{reSensitiveCookieData, reSessionStoreSensitive, reCookieValueSensitive} {
-			if m := re.FindString(line); m != "" {
+			if m := rules.GFind(re, line); m != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -723,7 +732,7 @@ func (r *TrustBoundaryViolation) Languages() []rules.Language {
 
 func (r *TrustBoundaryViolation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Check if there's a user-input source anywhere in the file
 	hasRequestSource := regexp.MustCompile(`(?:request\.|params\[|req\.|getParameter|GET\[|POST\[|args\.get|form\.get|cookies\.get)`).MatchString(ctx.Content)
@@ -743,7 +752,7 @@ func (r *TrustBoundaryViolation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Python: session[bar] — check if bar (key variable) is tainted
 		if isPython {
-			if m := rePySessionKeyUserInput.FindStringSubmatch(line); len(m) > 1 {
+			if m := rules.GFindSubmatch(rePySessionKeyUserInput, line); len(m) > 1 {
 				keyVar := m[1]
 				if !rules.PyLastAssignmentIsSafe(lines, i, keyVar) && !rules.PyHasAlwaysSafeBranch(lines, i, keyVar) {
 					matched = m[0]
@@ -753,7 +762,7 @@ func (r *TrustBoundaryViolation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		if matched == "" {
 			for _, re := range []*regexp.Regexp{reJavaSessionSetAttr, reJavaSessionSetAttrBothVars, rePHPSessionUserInput, reSessionKeyFromRequest} {
-				if m := re.FindString(line); m != "" {
+				if m := rules.GFind(re, line); m != "" {
 					matched = m
 					break
 				}
@@ -762,11 +771,11 @@ func (r *TrustBoundaryViolation) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Python: flask.session['key'] = bar — check if bar (value) is tainted
 		if matched == "" && isPython {
-			if m := rePySessionValueUserInput.FindStringSubmatch(line); len(m) > 1 {
+			if m := rules.GFindSubmatch(rePySessionValueUserInput, line); len(m) > 1 {
 				varName := m[1]
 				// Only flag if the value variable is tainted (not safe)
 				if !rules.PyLastAssignmentIsSafe(lines, i, varName) {
-					matched = rePySessionValueUserInput.FindString(line)
+					matched = rules.GFind(rePySessionValueUserInput, line)
 				}
 			}
 		}

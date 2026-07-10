@@ -21,21 +21,20 @@ var (
 
 // PHP-014: extract() with user input
 var (
-	reExtractGet     = regexp.MustCompile(`\bextract\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)`)
-	reExtractVar     = regexp.MustCompile(`\bextract\s*\(\s*\$(?:data|input|params|request|body|payload|args|fields)`)
+	reExtractGet      = regexp.MustCompile(`\bextract\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)`)
+	reExtractVar      = regexp.MustCompile(`\bextract\s*\(\s*\$(?:data|input|params|request|body|payload|args|fields)`)
 	reExtractExtrSkip = regexp.MustCompile(`\bextract\s*\([^,]+,\s*EXTR_(?:SKIP|PREFIX_ALL|IF_EXISTS)`)
 )
 
 // PHP-015: preg_replace with /e modifier
 var (
-	rePregReplaceE  = regexp.MustCompile(`\bpreg_replace\s*\(\s*["']/[^/]*/[^"']*e[^"']*["']`)
-	rePregReplaceEVar = regexp.MustCompile(`\bpreg_replace\s*\(\s*\$[^,]*,\s*\$`)
+	rePregReplaceE = regexp.MustCompile(`\bpreg_replace\s*\(\s*["']/[^/]*/[^"']*e[^"']*["']`)
 )
 
 // PHP-016: register_globals enabled
 var (
-	reRegisterGlobals   = regexp.MustCompile(`(?i)register_globals\s*=\s*(?:on|1|true)`)
-	reIniSetRegGlobals  = regexp.MustCompile(`\bini_set\s*\(\s*["']register_globals["']\s*,\s*(?:1|'1'|"1"|true|'on'|"on")`)
+	reRegisterGlobals  = regexp.MustCompile(`(?i)register_globals\s*=\s*(?:on|1|true)`)
+	reIniSetRegGlobals = regexp.MustCompile(`\bini_set\s*\(\s*["']register_globals["']\s*,\s*(?:1|'1'|"1"|true|'on'|"on")`)
 )
 
 // PHP-017: file_put_contents with user path
@@ -47,19 +46,19 @@ var (
 
 // PHP-018: include/require with user input (extended LFI/RFI)
 var (
-	reIncludeVarExt   = regexp.MustCompile(`\b(?:include|include_once|require|require_once)\s*\(?\s*\$(?:_GET|_POST|_REQUEST|_COOKIE)\s*\[`)
-	reIncludeConcat2  = regexp.MustCompile(`\b(?:include|include_once|require|require_once)\s*\(?\s*(?:\$\w+\s*\.\s*\$_(?:GET|POST|REQUEST))`)
+	reIncludeVarExt  = regexp.MustCompile(`\b(?:include|include_once|require|require_once)\s*\(?\s*\$(?:_GET|_POST|_REQUEST|_COOKIE)\s*\[`)
+	reIncludeConcat2 = regexp.MustCompile(`\b(?:include|include_once|require|require_once)\s*\(?\s*(?:\$\w+\s*\.\s*\$_(?:GET|POST|REQUEST))`)
 )
 
 // PHP-019: assert() with user input
 var (
-	reAssertUser     = regexp.MustCompile(`\bassert\s*\(\s*\$(?:_GET|_POST|_REQUEST|_COOKIE|input|param|data|cmd|code|expr)`)
-	reAssertConcat   = regexp.MustCompile(`\bassert\s*\(\s*["'][^"']*["']\s*\.\s*\$`)
+	reAssertUser   = regexp.MustCompile(`\bassert\s*\(\s*\$(?:_GET|_POST|_REQUEST|_COOKIE|input|param|data|cmd|code|expr)`)
+	reAssertConcat = regexp.MustCompile(`\bassert\s*\(\s*["'][^"']*["']\s*\.\s*\$`)
 )
 
 // PHP-020: create_function with user input
 var (
-	reCreateFuncUser  = regexp.MustCompile(`\bcreate_function\s*\(\s*["'][^"']*["']\s*,\s*\$`)
+	reCreateFuncUser   = regexp.MustCompile(`\bcreate_function\s*\(\s*["'][^"']*["']\s*,\s*\$`)
 	reCreateFuncConcat = regexp.MustCompile(`\bcreate_function\s*\(\s*["'][^"']*["']\s*,\s*["'][^"']*["']\s*\.\s*\$`)
 )
 
@@ -71,21 +70,18 @@ var (
 
 // PHP-022: session.use_strict_mode disabled
 var (
-	reSessionStrictMode    = regexp.MustCompile(`(?i)session\.use_strict_mode\s*=\s*(?:0|off|false)`)
-	reIniSetStrictMode     = regexp.MustCompile(`\bini_set\s*\(\s*["']session\.use_strict_mode["']\s*,\s*(?:0|'0'|"0"|false|'false'|"false")`)
+	reSessionStrictMode = regexp.MustCompile(`(?i)session\.use_strict_mode\s*=\s*(?:0|off|false)`)
+	reIniSetStrictMode  = regexp.MustCompile(`\bini_set\s*\(\s*["']session\.use_strict_mode["']\s*,\s*(?:0|'0'|"0"|false|'false'|"false")`)
 )
 
 // PHP-023: display_errors On in production (extended)
 var (
-	reDisplayErrorsOn    = regexp.MustCompile(`(?i)\bdisplay_errors\b.*\b(?:On|1|true)\b`)
-	reErrorReporting     = regexp.MustCompile(`\berror_reporting\s*\(\s*E_ALL\s*\)`)
-	reDisplayStartupErr  = regexp.MustCompile(`(?i)display_startup_errors\s*=\s*(?:1|on|true)`)
+	reDisplayStartupErr = regexp.MustCompile(`(?i)display_startup_errors\s*=\s*(?:1|on|true)`)
 )
 
 // PHP-024: mysqli_real_escape_string misuse
 var (
 	reMysqliEscape     = regexp.MustCompile(`\bmysqli?_real_escape_string\s*\(`)
-	reMysqliEscapeLike = regexp.MustCompile(`LIKE\s*['"]%`)
 	reMysqliSetCharset = regexp.MustCompile(`\bmysqli?_set_charset\s*\(|SET\s+NAMES\b`)
 	reMysqliPrepare    = regexp.MustCompile(`\b(?:prepare|mysqli_prepare)\s*\(`)
 )
@@ -121,18 +117,19 @@ func (r *PHPAuthTypeJuggling) Languages() []rules.Language { return []rules.Lang
 
 func (r *PHPAuthTypeJuggling) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if rePasswordVerify.MatchString(ctx.Content) || reHashEquals.MatchString(ctx.Content) {
+	if rules.GMatchFile(rePasswordVerify, ctx) || rules.GMatchFile(reHashEquals, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reAuthLooseCompare.FindString(line); m != "" {
+		if m := rules.GFindLower(reAuthLooseCompare, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reAuthLooseRev.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reAuthLooseRev, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -174,18 +171,19 @@ func (r *PHPExtractUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "extract") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reExtractExtrSkip.MatchString(line) {
+		if rules.GMatchLower(reExtractExtrSkip, line, lowered[i]) {
 			continue
 		}
 		var matched string
-		if m := reExtractGet.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtractGet, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reExtractVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reExtractVar, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -227,12 +225,13 @@ func (r *PHPPregReplaceE) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "preg_replace") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if m := rePregReplaceE.FindString(line); m != "" {
+		if m := rules.GFindLower(rePregReplaceE, line, lowered[i]); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "preg_replace with /e modifier (code execution)",
@@ -268,15 +267,16 @@ func (r *PHPRegisterGlobals) Languages() []rules.Language { return []rules.Langu
 
 func (r *PHPRegisterGlobals) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reRegisterGlobals.FindString(line); m != "" {
+		if m := rules.GFindLower(reRegisterGlobals, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reIniSetRegGlobals.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reIniSetRegGlobals, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -318,18 +318,19 @@ func (r *PHPFilePutUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "file_put_contents") {
 		return nil
 	}
-	if reFilePutBasename.MatchString(ctx.Content) {
+	if rules.GMatchFile(reFilePutBasename, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reFilePutUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reFilePutUser, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reFilePutConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reFilePutConcat, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -368,15 +369,16 @@ func (r *PHPIncludeExtLFI) Languages() []rules.Language { return []rules.Languag
 
 func (r *PHPIncludeExtLFI) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reIncludeVarExt.FindString(line); m != "" {
+		if m := rules.GFindLower(reIncludeVarExt, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reIncludeConcat2.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reIncludeConcat2, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -418,15 +420,16 @@ func (r *PHPAssertUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "assert") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reAssertUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reAssertUser, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reAssertConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reAssertConcat, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -468,15 +471,16 @@ func (r *PHPCreateFunction) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "create_function") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reCreateFuncUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reCreateFuncUser, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reCreateFuncConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reCreateFuncConcat, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -518,17 +522,18 @@ func (r *PHPMailHeaderExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "mail") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
 		var detail string
-		if m := reMailFifthParam.FindString(line); m != "" {
+		if m := rules.GFindLower(reMailFifthParam, line, lowered[i]); m != "" {
 			matched = m
 			detail = "mail() 5th parameter with user input (sendmail argument injection)"
-		} else if m := reMailAdditionalHeaders.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reMailAdditionalHeaders, line, lowered[i]); m != "" {
 			matched = m
 			detail = "mail() additional headers with user-controlled value"
 		}
@@ -568,15 +573,16 @@ func (r *PHPSessionStrictMode) Languages() []rules.Language { return []rules.Lan
 
 func (r *PHPSessionStrictMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reSessionStrictMode.FindString(line); m != "" {
+		if m := rules.GFindLower(reSessionStrictMode, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reIniSetStrictMode.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reIniSetStrictMode, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -615,14 +621,15 @@ func (r *PHPDisplayErrorsExt) Languages() []rules.Language { return []rules.Lang
 
 func (r *PHPDisplayErrorsExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
 		var title string
-		if m := reDisplayStartupErr.FindString(line); m != "" {
+		if m := rules.GFindLower(reDisplayStartupErr, line, lowered[i]); m != "" {
 			matched = m
 			title = "display_startup_errors enabled (information disclosure)"
 		}
@@ -662,19 +669,20 @@ func (r *PHPMysqliEscapeMisuse) Languages() []rules.Language { return []rules.La
 
 func (r *PHPMysqliEscapeMisuse) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if !reMysqliEscape.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reMysqliEscape, ctx) {
 		return nil
 	}
-	if reMysqliPrepare.MatchString(ctx.Content) {
+	if rules.GMatchFile(reMysqliPrepare, ctx) {
 		return nil
 	}
-	hasCharset := reMysqliSetCharset.MatchString(ctx.Content)
-	lines := strings.Split(ctx.Content, "\n")
+	hasCharset := rules.GMatchFile(reMysqliSetCharset, ctx)
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reMysqliEscape.MatchString(line) {
+		if rules.GMatchLower(reMysqliEscape, line, lowered[i]) {
 			confidence := "medium"
 			desc := "mysqli_real_escape_string used instead of prepared statements"
 			if !hasCharset {

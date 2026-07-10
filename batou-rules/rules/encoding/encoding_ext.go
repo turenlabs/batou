@@ -14,17 +14,16 @@ import (
 // BATOU-ENC-009: UTF-7 XSS bypass (Content-Type without charset)
 var (
 	// batou:ignore BATOU-LOG-004 -- regex pattern definition, not logging
-	reContentTypeHTMLNoCharset = regexp.MustCompile(`(?i)Content-Type['":\s]*text/html\s*['"]?\s*[;)\]}]?\s*$`)
-	reContentTypeSetHTML       = regexp.MustCompile(`(?i)(?:\.setHeader|\.header|\.set|Header\(\)\.Set|\.writeHead|res\.type)\s*\([^)]*text/html`)
-	reCharsetPresent           = regexp.MustCompile(`(?i)charset\s*=`)
-	reUserOutputNearby         = regexp.MustCompile(`(?i)(?:res\.|response\.|write|send|render|print|echo|puts)\s*\(`)
+	reContentTypeSetHTML = regexp.MustCompile(`(?i)(?:\.setHeader|\.header|\.set|Header\(\)\.Set|\.writeHead|res\.type)\s*\([^)]*text/html`)
+	reCharsetPresent     = regexp.MustCompile(`(?i)charset\s*=`)
+	reUserOutputNearby   = regexp.MustCompile(`(?i)(?:res\.|response\.|write|send|render|print|echo|puts)\s*\(`)
 )
 
 // BATOU-ENC-010: Overlong UTF-8 / decode without normalization near file ops
 var (
-	reDecodeURI           = regexp.MustCompile(`(?i)(?:decodeURIComponent|decodeURI|unescape|urllib\.unquote|url\.QueryUnescape|URLDecoder\.decode|rawurldecode|urldecode|CGI\.unescape|Uri\.UnescapeDataString)\s*\(`)
-	reFilePathOp          = regexp.MustCompile(`(?i)(?:readFile|writeFile|createReadStream|open\s*\(|path\.join|path\.resolve|filepath\.Join|filepath\.Clean|os\.Open|os\.ReadFile|file_get_contents|fopen|File\.open|File\.read|include\s|require\s)`)
-	rePathNormalization   = regexp.MustCompile(`(?i)(?:path\.normalize|path\.resolve|filepath\.Clean|filepath\.Abs|realpath|os\.path\.abspath|os\.path\.normpath|Path\.GetFullPath|Pathname\.cleanpath)`)
+	reDecodeURI         = regexp.MustCompile(`(?i)(?:decodeURIComponent|decodeURI|unescape|urllib\.unquote|url\.QueryUnescape|URLDecoder\.decode|rawurldecode|urldecode|CGI\.unescape|Uri\.UnescapeDataString)\s*\(`)
+	reFilePathOp        = regexp.MustCompile(`(?i)(?:readFile|writeFile|createReadStream|open\s*\(|path\.join|path\.resolve|filepath\.Join|filepath\.Clean|os\.Open|os\.ReadFile|file_get_contents|fopen|File\.open|File\.read|include\s|require\s)`)
+	rePathNormalization = regexp.MustCompile(`(?i)(?:path\.normalize|path\.resolve|filepath\.Clean|filepath\.Abs|realpath|os\.path\.abspath|os\.path\.normpath|Path\.GetFullPath|Pathname\.cleanpath)`)
 )
 
 func init() {
@@ -50,7 +49,7 @@ func (r *UTF7XSSBypass) Languages() []rules.Language {
 
 func (r *UTF7XSSBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -59,12 +58,12 @@ func (r *UTF7XSSBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Check for Content-Type set to text/html
-		if !reContentTypeSetHTML.MatchString(line) {
+		if !rules.GMatch(reContentTypeSetHTML, line) {
 			continue
 		}
 
 		// Check if charset is specified on this line or nearby
-		if reCharsetPresent.MatchString(line) {
+		if rules.GMatch(reCharsetPresent, line) {
 			continue
 		}
 
@@ -85,7 +84,7 @@ func (r *UTF7XSSBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Only flag if there's user output in the file (not just config)
-		if !reUserOutputNearby.MatchString(ctx.Content) {
+		if !rules.GMatchFile(reUserOutputNearby, ctx) {
 			continue
 		}
 
@@ -134,26 +133,26 @@ func (r *DecodeWithoutNormalization) Scan(ctx *rules.ScanContext) []rules.Findin
 	var findings []rules.Finding
 
 	// Only check files that have both decode and file operations
-	if !reDecodeURI.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reDecodeURI, ctx) {
 		return nil
 	}
-	if !reFilePathOp.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reFilePathOp, ctx) {
 		return nil
 	}
 
 	// If normalization is present in the file, skip
-	if rePathNormalization.MatchString(ctx.Content) {
+	if rules.GMatchFile(rePathNormalization, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 
-		if m := reDecodeURI.FindString(line); m != "" {
+		if m := rules.GFind(reDecodeURI, line); m != "" {
 			// Check if file path operations are nearby
 			window := nearbyLines(lines, i, 10)
 			if !reFilePathOp.MatchString(window) {

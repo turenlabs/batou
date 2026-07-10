@@ -3,10 +3,8 @@ package taint_test
 import (
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
-
 	// Register all catalogs.
 	_ "github.com/turenlabs/batou-core/taint/languages"
 )
@@ -285,6 +283,90 @@ func TestTaintFlowToFinding(t *testing.T) {
 	}
 	if len(finding.Tags) == 0 {
 		t.Error("expected at least one tag")
+	}
+
+	// Structured taint path: source → propagation steps → sink.
+	if len(finding.TaintPath) < 2 {
+		t.Fatalf("expected TaintPath with at least source+sink, got %d steps", len(finding.TaintPath))
+	}
+	first := finding.TaintPath[0]
+	last := finding.TaintPath[len(finding.TaintPath)-1]
+	if first.Kind != rules.TaintStepSource {
+		t.Errorf("first step kind = %q, want %q", first.Kind, rules.TaintStepSource)
+	}
+	if first.Line != 5 {
+		t.Errorf("first step line = %d, want 5", first.Line)
+	}
+	if first.File != "test.go" {
+		t.Errorf("first step file = %q, want test.go", first.File)
+	}
+	if first.Label != "FormValue" {
+		t.Errorf("first step label = %q, want FormValue", first.Label)
+	}
+	if last.Kind != rules.TaintStepSink {
+		t.Errorf("last step kind = %q, want %q", last.Kind, rules.TaintStepSink)
+	}
+	if last.Line != 10 {
+		t.Errorf("last step line = %d, want 10", last.Line)
+	}
+	if last.Label != "Query" {
+		t.Errorf("last step label = %q, want Query", last.Label)
+	}
+}
+
+func TestTaintFlowToFinding_PathWithSteps(t *testing.T) {
+	flow := taint.TaintFlow{
+		Source: taint.SourceDef{
+			Category:   taint.SrcUserInput,
+			MethodName: "FormValue",
+		},
+		Sink: taint.SinkDef{
+			Category:   taint.SnkSQLQuery,
+			MethodName: "Query",
+			Severity:   rules.Critical,
+			CWEID:      "CWE-89",
+		},
+		SourceLine: 3,
+		SinkLine:   12,
+		Steps: []taint.FlowStep{
+			{Line: 3, Description: "tainted by FormValue", VarName: "id"},
+			{Line: 5, Description: "assigned from id", VarName: "query"},
+			{Line: 8, Description: "assigned from query", VarName: "q2"},
+		},
+		FilePath:   "handler.go",
+		ScopeName:  "h",
+		Confidence: 0.85,
+	}
+
+	finding := flow.ToFinding()
+	// 1 source + (3 steps, first deduped against source line) + 1 sink = 4.
+	if len(finding.TaintPath) != 4 {
+		t.Fatalf("expected 4-step TaintPath (source + 2 prop + sink), got %d: %+v", len(finding.TaintPath), finding.TaintPath)
+	}
+	kinds := []string{
+		rules.TaintStepSource,
+		rules.TaintStepPropagation,
+		rules.TaintStepPropagation,
+		rules.TaintStepSink,
+	}
+	for i, want := range kinds {
+		if finding.TaintPath[i].Kind != want {
+			t.Errorf("step %d kind = %q, want %q", i, finding.TaintPath[i].Kind, want)
+		}
+		if finding.TaintPath[i].File != "handler.go" {
+			t.Errorf("step %d file = %q, want handler.go", i, finding.TaintPath[i].File)
+		}
+	}
+	if finding.TaintPath[1].Line != 5 || finding.TaintPath[2].Line != 8 {
+		t.Errorf("propagation step lines = %d,%d, want 5,8", finding.TaintPath[1].Line, finding.TaintPath[2].Line)
+	}
+	// Rendering helper should produce the chain with file:line per step.
+	rendered := finding.FormatTaintPath()
+	if !strings.Contains(rendered, "handler.go:5") {
+		t.Errorf("FormatTaintPath() missing intermediate step location, got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "CWE-89") {
+		t.Errorf("FormatTaintPath() missing CWE on sink line, got:\n%s", rendered)
 	}
 }
 

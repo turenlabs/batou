@@ -14,10 +14,10 @@ func init() {
 	rules.Register(&SwiftASTAnalyzer{})
 }
 
-func (s *SwiftASTAnalyzer) ID() string                        { return "BATOU-SWIFT-AST" }
-func (s *SwiftASTAnalyzer) Name() string                      { return "Swift AST Security Analyzer" }
-func (s *SwiftASTAnalyzer) DefaultSeverity() rules.Severity   { return rules.High }
-func (s *SwiftASTAnalyzer) Languages() []rules.Language        { return []rules.Language{rules.LangSwift} }
+func (s *SwiftASTAnalyzer) ID() string                      { return "BATOU-SWIFT-AST" }
+func (s *SwiftASTAnalyzer) Name() string                    { return "Swift AST Security Analyzer" }
+func (s *SwiftASTAnalyzer) DefaultSeverity() rules.Severity { return rules.High }
+func (s *SwiftASTAnalyzer) Languages() []rules.Language     { return []rules.Language{rules.LangSwift} }
 func (s *SwiftASTAnalyzer) Description() string {
 	return "AST-based analysis of Swift code for SQLite injection, command injection, UIWebView usage, sensitive data in UserDefaults, and insecure URL sessions."
 }
@@ -71,8 +71,8 @@ func (c *swiftChecker) checkSQLiteInjection(n *ast.Node) {
 	funcName := getSwiftFuncName(n)
 	sqliteFuncs := map[string]bool{
 		"sqlite3_prepare_v2": true,
-		"sqlite3_exec":      true,
-		"sqlite3_prepare":   true,
+		"sqlite3_exec":       true,
+		"sqlite3_prepare":    true,
 	}
 	if !sqliteFuncs[funcName] {
 		return
@@ -251,9 +251,15 @@ func (c *swiftChecker) checkProcessAssignment(n *ast.Node) {
 		return
 	}
 
-	// Check if the RHS is a variable (not a literal)
+	// Flag when the RHS carries a non-literal value. Two shapes matter:
+	//   1. a bare variable:           task.launchPath = userPath
+	//   2. an array literal holding a variable:  process.arguments = ["-c", cmd]
+	// The array-literal form is the canonical Swift way to set Process.arguments,
+	// so missing it left the real command-injection sink undetected at its line
+	// (only the generic Process() creation finding fired). Pure string-literal
+	// arrays (e.g. ["-la", "/tmp"]) stay clean.
 	rhs := named[1]
-	if rhs.Type() == "simple_identifier" {
+	if rhs.Type() == "simple_identifier" || (isArguments && arrayLiteralHasVariable(rhs)) {
 		label := "launchPath"
 		if isArguments {
 			label = "arguments"
@@ -275,6 +281,24 @@ func (c *swiftChecker) checkProcessAssignment(n *ast.Node) {
 			Tags:          []string{"command-injection", "injection"},
 		})
 	}
+}
+
+// arrayLiteralHasVariable reports whether an array_literal node contains at
+// least one direct element that is a variable reference (simple_identifier or a
+// navigation/interpolation expression) rather than a pure constant literal. Used
+// to flag `process.arguments = ["-c", cmd]` while leaving all-literal arrays
+// such as `["-la", "/tmp"]` unflagged.
+func arrayLiteralHasVariable(n *ast.Node) bool {
+	if n.Type() != "array_literal" {
+		return false
+	}
+	for _, child := range n.NamedChildren() {
+		switch child.Type() {
+		case "simple_identifier", "navigation_expression", "call_expression":
+			return true
+		}
+	}
+	return false
 }
 
 // getSwiftFuncName extracts the function name from a call_expression.

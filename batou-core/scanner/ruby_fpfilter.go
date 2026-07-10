@@ -14,11 +14,54 @@ func rubyFilterAllFindings(content string, findings []rules.Finding) []rules.Fin
 	lines := strings.Split(content, "\n")
 	kept := make([]rules.Finding, 0, len(findings))
 
+	// Pre-compute file-level Ruby signals for rule-specific suppression.
+	isRailsController := rbIsRailsController.MatchString(content)
+	hasSQLFragment := rbHasSQLFragment.MatchString(content)
+
 	for _, f := range findings {
 		lineIdx := f.LineNumber - 1
 		if lineIdx < 0 || lineIdx >= len(lines) {
 			kept = append(kept, f)
 			continue
+		}
+
+		// Rule-specific suppressions for Ruby language mismatches.
+		// These rules fire on patterns that are dangerous in other languages
+		// but benign or standard practice in Ruby/Rails.
+		switch f.RuleID {
+		case "BATOU-TRV-002":
+			// Ruby `require`/`load` loads from the Ruby load path ($LOAD_PATH),
+			// NOT from user-controlled filesystem paths. This is fundamentally
+			// different from PHP's include/require which opens files by path.
+			// Suppress entirely for Ruby — file inclusion from user input would
+			// be caught by BATOU-TRV-001 (path traversal) or taint analysis.
+			continue
+
+		case "BATOU-RACE-002":
+			// Ruby web frameworks (Rails/Sinatra/Hanami) handle each HTTP request
+			// in a single thread within a forked process (Puma/Unicorn). Check-
+			// then-act patterns are safe in this model. The regex fires on any
+			// if-nil-check, producing hundreds of FPs on idiomatic Ruby code.
+			continue
+
+		case "BATOU-VAL-001":
+			// In Rails, `params[]` is THE standard way to read request data.
+			// Every controller accesses params. The finding is "you read user
+			// input" which is not a vulnerability — the vulnerability is what
+			// you DO with it. Taint analysis (Layer 3) tracks the downstream
+			// usage. Suppress the params-access finding in Rails controllers.
+			if isRailsController {
+				continue
+			}
+
+		case "BATOU-INJ-027":
+			// SQL fragment injection regex fires on string interpolation near
+			// SQL keywords. In Rails/Discourse, DB.sql_fragment() and
+			// sanitize_sql() parameterize these safely. Suppress when the
+			// file uses known parameterization helpers.
+			if hasSQLFragment {
+				continue
+			}
 		}
 
 		cwe := strings.TrimPrefix(f.CWEID, "CWE-")
@@ -32,7 +75,20 @@ func rubyFilterAllFindings(content string, findings []rules.Finding) []rules.Fin
 		case "79": // XSS
 			suppressed = rubyScanHasXSSGuard(lines, lineIdx)
 		case "78": // Command Injection
-			suppressed = rubyScanHasCmdiGuard(lines, lineIdx)
+			// The cmdi guard is a COARSE line-proximity regex heuristic
+			// (`.to_i` / array-form `system("x", …)` / Open3 / Shellwords within
+			// ~15 lines). It exists to suppress regex-TIER false positives where
+			// no dataflow is available. A data-flow-confirmed finding
+			// (BATOU-TAINT-*) has already had precise, segment-aware sanitizer
+			// analysis applied by the taint engine — a `.to_i` on a SIBLING
+			// interpolation (`system("cp #{file.original_filename} #{Time.now
+			// .to_i}")`) no longer suppresses the tainted segment there — so
+			// re-applying this proximity guard would wrongly drop the genuine
+			// flow (the railsgoat CWE-78 miss). Skip the guard for taint-tier
+			// findings; keep it for regex-tier findings.
+			if !strings.HasPrefix(f.RuleID, "BATOU-TAINT-") {
+				suppressed = rubyScanHasCmdiGuard(lines, lineIdx)
+			}
 		case "918": // SSRF
 			suppressed = rubyScanHasSSRFGuard(lines, lineIdx)
 		case "502": // Deserialization
@@ -48,6 +104,10 @@ func rubyFilterAllFindings(content string, findings []rules.Finding) []rules.Fin
 	}
 	return kept
 }
+
+// --- File-level signals for rule-specific suppression ---
+var rbIsRailsController = regexp.MustCompile(`(?:class\s+\w+Controller\s*<|ApplicationController|ActionController::Base|Sinatra::Base)`)
+var rbHasSQLFragment = regexp.MustCompile(`DB\.sql_fragment\s*\(|sanitize_sql\s*\(|sanitize_sql_array\s*\(|connection\.quote\s*\(`)
 
 // --- Regex patterns for scanner-level Ruby FP filtering ---
 

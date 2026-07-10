@@ -3,10 +3,8 @@ package scanner_test
 import (
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/hook"
 	"github.com/turenlabs/batou-core/scanner"
-
 	// Register all rule packages.
 	_ "github.com/turenlabs/batou-rules/rules/auth"
 	_ "github.com/turenlabs/batou-rules/rules/crypto"
@@ -19,7 +17,6 @@ import (
 	_ "github.com/turenlabs/batou-rules/rules/traversal"
 	_ "github.com/turenlabs/batou-rules/rules/validation"
 	_ "github.com/turenlabs/batou-rules/rules/xss"
-
 	// Taint catalogs.
 	_ "github.com/turenlabs/batou-core/taint"
 	_ "github.com/turenlabs/batou-core/taint/languages"

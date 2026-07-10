@@ -1,6 +1,7 @@
 package graph_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/turenlabs/batou-core/graph"
@@ -47,6 +48,39 @@ func Bar() {
 	// Foo should call Bar.
 	if len(foo.Calls) != 1 || foo.Calls[0] != "/project/main.go:Bar" {
 		t.Errorf("Foo.Calls = %v, want [/project/main.go:Bar]", foo.Calls)
+	}
+}
+
+// TestUpdateFileGoLinkNameStub regression-tests against the panic that fired
+// in graph.buildGoNodes when scanning files containing //go:linkname stubs
+// (e.g. nats-server/internal/fastrand/fastrand.go), where FuncDecl.Body is nil.
+func TestUpdateFileGoLinkNameStub(t *testing.T) {
+	cg := graph.NewCallGraph("/project", "s1")
+
+	content := `package fastrand
+
+import _ "unsafe"
+
+//go:linkname Uint32 runtime.fastrand
+func Uint32() uint32
+
+//go:linkname Uint32n runtime.fastrandn
+func Uint32n(n uint32) uint32
+
+func WithBody() uint32 {
+	return Uint32()
+}
+`
+
+	// Should not panic. Body-less stubs are skipped; the function with a
+	// body still ends up in the graph.
+	graph.UpdateFile(cg, "/project/fastrand.go", content, rules.LangGo)
+
+	if cg.GetNode("/project/fastrand.go:Uint32") != nil {
+		t.Error("body-less Uint32 stub should not be registered as a graph node")
+	}
+	if cg.GetNode("/project/fastrand.go:WithBody") == nil {
+		t.Error("WithBody (with body) should be registered")
 	}
 }
 
@@ -193,4 +227,220 @@ func TestExtractCallsFiltersKeywords(t *testing.T) {
 			}
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Closure (FuncLit) nodes — PR-S
+// ---------------------------------------------------------------------------
+
+// TestUpdateFileGoHTTPHandlerFactoryClosure covers the canonical Go HTTP
+// handler factory pattern: `func HandleX(c *Controller) http.HandlerFunc {
+// return func(w http.ResponseWriter, r *http.Request) { ... } }`. Before
+// PR-S the closure's params and body calls were invisible to the call
+// graph; this test pins the new behavior.
+func TestUpdateFileGoHTTPHandlerFactoryClosure(t *testing.T) {
+	cg := graph.NewCallGraph("/project", "s1")
+
+	content := `package handler
+
+import "net/http"
+
+func HandleDiff(ctrl *Controller) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		render(ctrl, w, r)
+	}
+}
+
+func render(c *Controller, w http.ResponseWriter, r *http.Request) {}
+`
+
+	graph.UpdateFile(cg, "/project/handler.go", content, rules.LangGo)
+
+	// Outer FuncDecl node still exists with just its `ctrl` param.
+	outer := cg.GetNode("/project/handler.go:HandleDiff")
+	if outer == nil {
+		t.Fatal("expected HandleDiff outer node")
+	}
+
+	// Closure FuncNode at the `return func(...)` site (line 6, column 9).
+	// The exact column matches go/token.Position.Column for the FuncLit.
+	closure := findClosureNode(t, cg, "/project/handler.go", "HandleDiff")
+	if closure == nil {
+		t.Fatal("expected one closure node under HandleDiff")
+	}
+	if !strings.HasPrefix(closure.Name, "HandleDiff.closure@") {
+		t.Errorf("closure name = %q, want prefix %q", closure.Name, "HandleDiff.closure@")
+	}
+	if closure.FilePath != "/project/handler.go" {
+		t.Errorf("closure FilePath = %q, want /project/handler.go", closure.FilePath)
+	}
+	if closure.Language != rules.LangGo {
+		t.Errorf("closure Language = %q, want LangGo", closure.Language)
+	}
+	if closure.StartLine == 0 || closure.EndLine == 0 {
+		t.Errorf("closure StartLine=%d EndLine=%d, want both > 0", closure.StartLine, closure.EndLine)
+	}
+
+	// Synthetic edge: outer.Calls includes the closure ID, closure.CalledBy
+	// includes the outer ID.
+	if !containsString(outer.Calls, closure.ID) {
+		t.Errorf("outer.Calls = %v, want to include closure ID %q", outer.Calls, closure.ID)
+	}
+	if !containsString(closure.CalledBy, outer.ID) {
+		t.Errorf("closure.CalledBy = %v, want to include outer ID %q", closure.CalledBy, outer.ID)
+	}
+
+	// Calls *inside* the closure body (render) are attributed to the
+	// CLOSURE, not the outer function. This is the key behavioral change.
+	renderID := "/project/handler.go:render"
+	if containsString(outer.Calls, renderID) {
+		t.Errorf("outer.Calls = %v, should NOT include render — that call is inside the closure body", outer.Calls)
+	}
+	if !containsString(closure.Calls, renderID) {
+		t.Errorf("closure.Calls = %v, want to include render ID %q", closure.Calls, renderID)
+	}
+}
+
+// TestUpdateFileGoNestedClosures verifies the stack-based attribution
+// correctly handles closures-within-closures: each inner call goes to
+// the innermost enclosing FuncLit, not to the outer FuncDecl.
+func TestUpdateFileGoNestedClosures(t *testing.T) {
+	cg := graph.NewCallGraph("/project", "s1")
+
+	content := `package handler
+
+func Outer() func() func() {
+	return func() func() {
+		return func() {
+			inner()
+		}
+	}
+}
+
+func inner() {}
+`
+
+	graph.UpdateFile(cg, "/project/nested.go", content, rules.LangGo)
+
+	// We expect three nodes for Outer + 2 nested closures (the outermost
+	// FuncLit and the inner FuncLit).
+	outer := cg.GetNode("/project/nested.go:Outer")
+	if outer == nil {
+		t.Fatal("expected Outer node")
+	}
+	innerID := "/project/nested.go:inner"
+
+	// Outer.Calls must NOT include inner — that call is two levels deep
+	// inside closures.
+	if containsString(outer.Calls, innerID) {
+		t.Errorf("Outer.Calls = %v, should NOT include inner (call is inside nested closure)", outer.Calls)
+	}
+
+	// Find the deepest closure node — it should be the only one with
+	// `inner` in its Calls.
+	var found *graph.FuncNode
+	for _, n := range cg.NodesInFile("/project/nested.go") {
+		if containsString(n.Calls, innerID) {
+			if found != nil {
+				t.Errorf("multiple nodes claim inner: %q and %q", found.ID, n.ID)
+			}
+			found = n
+		}
+	}
+	if found == nil {
+		t.Fatal("no node claims the call to inner")
+	}
+	if !strings.HasPrefix(found.Name, "Outer.closure@") {
+		t.Errorf("innermost-claimer name = %q, want prefix Outer.closure@", found.Name)
+	}
+}
+
+// TestUpdateFileGoClosureDeterministicID ensures the same source produces
+// the same closure node ID across runs (required for the persisted call
+// graph to round-trip stably).
+func TestUpdateFileGoClosureDeterministicID(t *testing.T) {
+	content := `package x
+
+func F() func() {
+	return func() { g() }
+}
+
+func g() {}
+`
+
+	cg1 := graph.NewCallGraph("/project", "s1")
+	graph.UpdateFile(cg1, "/project/x.go", content, rules.LangGo)
+	cg2 := graph.NewCallGraph("/project", "s2")
+	graph.UpdateFile(cg2, "/project/x.go", content, rules.LangGo)
+
+	closure1 := findClosureNode(t, cg1, "/project/x.go", "F")
+	closure2 := findClosureNode(t, cg2, "/project/x.go", "F")
+	if closure1 == nil || closure2 == nil {
+		t.Fatal("expected closure nodes in both graphs")
+	}
+	if closure1.ID != closure2.ID {
+		t.Errorf("closure IDs differ across runs: %q vs %q", closure1.ID, closure2.ID)
+	}
+}
+
+// TestUpdateFileGoUnchangedContentPreservesClosureNodes verifies the
+// outer-unchanged fast path still emits closure nodes (and doesn't
+// duplicate edges on rescan).
+func TestUpdateFileGoUnchangedContentPreservesClosureNodes(t *testing.T) {
+	content := `package x
+
+func F() func() {
+	return func() { g() }
+}
+
+func g() {}
+`
+	cg := graph.NewCallGraph("/project", "s1")
+	graph.UpdateFile(cg, "/project/x.go", content, rules.LangGo)
+	closure1 := findClosureNode(t, cg, "/project/x.go", "F")
+	if closure1 == nil {
+		t.Fatal("expected closure node on first scan")
+	}
+	calls1Len := len(closure1.Calls)
+
+	// Rescan the unchanged content. The closure node must still exist
+	// and edges must not be duplicated.
+	graph.UpdateFile(cg, "/project/x.go", content, rules.LangGo)
+	closure2 := findClosureNode(t, cg, "/project/x.go", "F")
+	if closure2 == nil {
+		t.Fatal("expected closure node still present after rescan")
+	}
+	if closure2.ID != closure1.ID {
+		t.Errorf("closure ID changed on rescan: %q -> %q", closure1.ID, closure2.ID)
+	}
+	if len(closure2.Calls) != calls1Len {
+		t.Errorf("closure.Calls length changed on rescan: %d -> %d (edges duplicated?)", calls1Len, len(closure2.Calls))
+	}
+}
+
+// findClosureNode returns the single closure node anchored under
+// enclosingName in filePath, or nil if none exists. Fatals if multiple
+// closures are found (use NodesInFile manually for nested-closure tests).
+func findClosureNode(t *testing.T, cg *graph.CallGraph, filePath, enclosingName string) *graph.FuncNode {
+	t.Helper()
+	prefix := enclosingName + ".closure@"
+	var found *graph.FuncNode
+	for _, n := range cg.NodesInFile(filePath) {
+		if strings.HasPrefix(n.Name, prefix) {
+			if found != nil {
+				return nil // multiple — caller should disambiguate
+			}
+			found = n
+		}
+	}
+	return found
+}
+
+func containsString(ss []string, s string) bool {
+	for _, v := range ss {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }

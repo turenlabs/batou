@@ -136,6 +136,40 @@ func TestINJ002_Safe_JS(t *testing.T) {
 	testutil.MustNotFindRule(t, result, "BATOU-INJ-002")
 }
 
+// Regression: gitea (xorm) flagged 18× by INJ-002 because the
+// child_process pattern was case-insensitive AND made the
+// `child_process.` prefix optional, so it matched Go's
+// `xorm.Engine.Exec("..." + col)`. Pin the fix.
+func TestINJ002_NoMisfireOnGoXormExec(t *testing.T) {
+	content := `package db
+
+import "xorm.io/xorm"
+
+func alterCollation(x *xorm.Engine, collation string) error {
+	_, err := x.Exec("ALTER DATABASE CHARACTER SET utf8mb4 COLLATE " + collation)
+	return err
+}
+
+func deleteAll(x *xorm.Engine, table string) error {
+	_, err := x.Exec("DELETE FROM " + table)
+	return err
+}
+`
+	result := testutil.ScanContent(t, "/app/models/db/collation.go", content)
+	testutil.MustNotFindRule(t, result, "BATOU-INJ-002")
+}
+
+// Confirm the fix didn't break the actual JS detection it's supposed to catch.
+func TestINJ002_StillCatchesChildProcessExec(t *testing.T) {
+	content := `const child_process = require('child_process');
+function run(userInput) {
+  return child_process.exec('cmd ' + userInput);
+}
+`
+	result := testutil.ScanContent(t, "/app/routes/run.js", content)
+	testutil.MustFindRule(t, result, "BATOU-INJ-002")
+}
+
 // --- BATOU-INJ-003: Code Injection ---
 
 func TestINJ003_CodeInjection_Inline_Eval(t *testing.T) {

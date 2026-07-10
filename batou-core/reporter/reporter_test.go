@@ -3,7 +3,6 @@ package reporter_test
 import (
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/reporter"
 	"github.com/turenlabs/batou-rules/rules"
 )
@@ -389,5 +388,68 @@ func TestFormatBlockMessage_LuaCommentPrefix(t *testing.T) {
 
 	if !strings.Contains(msg, "-- batou:ignore") {
 		t.Error("expected Lua comment prefix -- in suppression guidance")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Structured taint-path rendering
+// ---------------------------------------------------------------------------
+
+func taintPathFinding() rules.Finding {
+	return rules.Finding{
+		RuleID:          "BATOU-TAINT-sql_query",
+		Severity:        rules.Critical,
+		SeverityLabel:   "CRITICAL",
+		Title:           "Tainted data flows from user_input to sql_query",
+		Description:     "User input reaches a SQL query without sanitization.",
+		FilePath:        "/app/handler.go",
+		LineNumber:      120,
+		CWEID:           "CWE-89",
+		ConfidenceScore: 0.9,
+		RiskScore:       0.9,
+		Confidence:      "high",
+		MatchedText:     "request.args.get('id') (line 42) → query → execute (line 120)",
+		TaintPath: []rules.TaintStep{
+			{File: "/app/handler.go", Line: 42, Kind: rules.TaintStepSource, Label: "request.args.get('id')"},
+			{File: "/app/service.go", Line: 88, Kind: rules.TaintStepPropagation, Label: "passed to buildQuery(id)"},
+			{File: "/app/repo.go", Line: 120, Kind: rules.TaintStepSink, Label: "cursor.execute(query)"},
+		},
+	}
+}
+
+func TestFormatForClaude_RendersTaintPath(t *testing.T) {
+	result := &reporter.ScanResult{
+		FilePath: "/app/handler.go",
+		Language: rules.LangPython,
+		Findings: []rules.Finding{taintPathFinding()},
+	}
+	out := reporter.FormatForClaude(result)
+	if !strings.Contains(out, "Data-flow path:") {
+		t.Errorf("expected 'Data-flow path:' header in output, got:\n%s", out)
+	}
+	// Intermediate step location must appear.
+	if !strings.Contains(out, "/app/service.go:88") {
+		t.Errorf("expected intermediate step location /app/service.go:88, got:\n%s", out)
+	}
+	if !strings.Contains(out, "passed to buildQuery(id)") {
+		t.Errorf("expected intermediate step label, got:\n%s", out)
+	}
+	if !strings.Contains(out, "/app/repo.go:120") {
+		t.Errorf("expected sink step location, got:\n%s", out)
+	}
+}
+
+func TestFormatBlockMessage_RendersTaintPath(t *testing.T) {
+	result := &reporter.ScanResult{
+		FilePath: "/app/handler.go",
+		Language: rules.LangPython,
+		Findings: []rules.Finding{taintPathFinding()},
+	}
+	out := reporter.FormatBlockMessage(result)
+	if !strings.Contains(out, "Data-flow path:") {
+		t.Errorf("expected 'Data-flow path:' in block message, got:\n%s", out)
+	}
+	if !strings.Contains(out, "/app/service.go:88") {
+		t.Errorf("expected intermediate step location in block message, got:\n%s", out)
 	}
 }

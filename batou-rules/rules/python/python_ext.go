@@ -20,18 +20,23 @@ var (
 
 // PY-020: Flask debug mode enabled in production
 var (
-	reFlaskDebugTrue     = regexp.MustCompile(`app\.debug\s*=\s*True`)
-	reFlaskRunDebug      = regexp.MustCompile(`\.run\s*\([^)]*debug\s*=\s*True`)
-	reFlaskEnvDebug      = regexp.MustCompile(`FLASK_DEBUG\s*=\s*["']?1["']?`)
-	reFlaskConfigDebug   = regexp.MustCompile(`config\s*\[\s*["']DEBUG["']\s*\]\s*=\s*True`)
+	reFlaskDebugTrue   = regexp.MustCompile(`app\.debug\s*=\s*True`)
+	reFlaskEnvDebug    = regexp.MustCompile(`FLASK_DEBUG\s*=\s*["']?1["']?`)
+	reFlaskConfigDebug = regexp.MustCompile(`config\s*\[\s*["']DEBUG["']\s*\]\s*=\s*True`)
 )
 
 // PY-021: Insecure use of xml.etree without defusedxml
 var (
-	reXMLParse       = regexp.MustCompile(`(?:xml\.etree\.ElementTree|ET)\.(?:parse|fromstring|iterparse|XMLParser)\s*\(`)
-	reXMLSaxParse    = regexp.MustCompile(`xml\.sax\.(?:parse|parseString|make_parser)\s*\(`)
-	reXMLDomParse    = regexp.MustCompile(`xml\.dom\.(?:minidom|pulldom)\.(?:parse|parseString)\s*\(`)
-	reDefusedXML     = regexp.MustCompile(`defusedxml`)
+	reXMLParse = regexp.MustCompile(`(?:xml\.etree\.ElementTree|ET)\.(?:parse|fromstring|iterparse|XMLParser)\s*\(`)
+	// xml.sax.parse data sink. make_parser() is parser *construction* (no
+	// document argument) and is gated by the make_parser default-safe /
+	// setFeature logic, so it is not treated as a standalone data sink here.
+	reXMLSaxParse = regexp.MustCompile(`xml\.sax\.(?:parse|parseString)\s*\(`)
+	reXMLDomParse = regexp.MustCompile(`xml\.dom\.(?:minidom|pulldom)\.(?:parse|parseString)\s*\(`)
+	// Generic parser-object data sink (parser.parse(input)/doc.parseString(bar))
+	// — only meaningful in files that build a SAX parser via make_parser().
+	reXMLParserObjParse = regexp.MustCompile(`\bparse(?:String)?\s*\(\s*[a-zA-Z_]\w*\s*[,)]`)
+	reDefusedXML        = regexp.MustCompile(`defusedxml`)
 	// Python SAX parser: safe defaults since Python 3.7.1 (external entities disabled)
 	rePySAXMakeParser    = regexp.MustCompile(`xml\.sax\.make_parser`)
 	rePySAXExtEntEnabled = regexp.MustCompile(`feature_external_ges\s*,\s*True|feature_external_pes\s*,\s*True`)
@@ -52,15 +57,14 @@ var (
 
 // PY-024: Tarfile extractall without path validation
 var (
-	reTarOpen        = regexp.MustCompile(`tarfile\.open\s*\(`)
-	reTarExtract     = regexp.MustCompile(`\.extract(?:all)?\s*\(`)
-	reTarFilterSafe  = regexp.MustCompile(`filter\s*=\s*['"](?:data|tar|fully_trusted)['"]`)
+	reTarExtract    = regexp.MustCompile(`\.extract(?:all)?\s*\(`)
+	reTarFilterSafe = regexp.MustCompile(`filter\s*=\s*['"](?:data|tar|fully_trusted)['"]`)
 )
 
 // PY-025: Django SECRET_KEY hardcoded
 var (
-	reDjangoSecretKey      = regexp.MustCompile(`SECRET_KEY\s*=\s*["'][^"']{8,}["']`)
-	reDjangoSecretKeyEnv   = regexp.MustCompile(`SECRET_KEY\s*=\s*(?:os\.(?:environ|getenv)|config\s*\(|env\s*\()`)
+	reDjangoSecretKey    = regexp.MustCompile(`SECRET_KEY\s*=\s*["'][^"']{8,}["']`)
+	reDjangoSecretKeyEnv = regexp.MustCompile(`SECRET_KEY\s*=\s*(?:os\.(?:environ|getenv)|config\s*\(|env\s*\()`)
 )
 
 // PY-026: Insecure deserialization via jsonpickle/dill
@@ -81,22 +85,20 @@ var (
 // PY-028: Django ALLOWED_HOSTS wildcard
 var (
 	reDjangoAllowedHostsStar = regexp.MustCompile(`ALLOWED_HOSTS\s*=\s*\[\s*["']\*["']\s*\]`)
-	reDjangoAllowedEmpty     = regexp.MustCompile(`ALLOWED_HOSTS\s*=\s*\[\s*\]`)
 )
 
 // PY-029: Zipfile extract without checking filename
 var (
-	reZipfileExtract    = regexp.MustCompile(`(?:ZipFile|zipfile\.ZipFile)\s*\([^)]*\)`)
-	reZipExtractMethod  = regexp.MustCompile(`\.extract\s*\(`)
-	reZipExtractAll     = regexp.MustCompile(`\.extractall\s*\(`)
-	reZipNameCheck      = regexp.MustCompile(`(?:\.filename|\.name|os\.path\.basename|startswith|realpath)`)
+	reZipExtractMethod = regexp.MustCompile(`\.extract\s*\(`)
+	reZipExtractAll    = regexp.MustCompile(`\.extractall\s*\(`)
+	reZipNameCheck     = regexp.MustCompile(`(?:\.filename|\.name|os\.path\.basename|startswith|realpath)`)
 )
 
 // PY-030: Unsafe regex with user input
 var (
-	reReCompileVar   = regexp.MustCompile(`re\.compile\s*\(\s*(?:request\.|user_input|param|query|pattern|search|data|payload|args\[)`)
-	reReSearchVar    = regexp.MustCompile(`re\.(?:search|match|findall|sub|split)\s*\(\s*(?:request\.|user_input|param|query|pattern|search|data|payload|args\[)`)
-	reReEscapeUsed   = regexp.MustCompile(`re\.escape\s*\(`)
+	reReCompileVar = regexp.MustCompile(`re\.compile\s*\(\s*(?:request\.|user_input|param|query|pattern|search|data|payload|args\[)`)
+	reReSearchVar  = regexp.MustCompile(`re\.(?:search|match|findall|sub|split)\s*\(\s*(?:request\.|user_input|param|query|pattern|search|data|payload|args\[)`)
+	reReEscapeUsed = regexp.MustCompile(`re\.escape\s*\(`)
 )
 
 func init() {
@@ -130,18 +132,19 @@ func (r *DjangoRawSQLFStr) Languages() []rules.Language { return []rules.Languag
 
 func (r *DjangoRawSQLFStr) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
 		var matched string
-		if m := reDjangoRawFStr.FindString(line); m != "" {
+		if m := rules.GFindLower(reDjangoRawFStr, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reDjangoRawFormat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reDjangoRawFormat, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reDjangoCursorFStr.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reDjangoCursorFStr, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -183,18 +186,19 @@ func (r *FlaskDebugEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "flask") && !strings.Contains(ctx.Content, "Flask") && !strings.Contains(ctx.Content, "debug") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
 		var matched string
-		if m := reFlaskDebugTrue.FindString(line); m != "" {
+		if m := rules.GFindLower(reFlaskDebugTrue, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reFlaskConfigDebug.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reFlaskConfigDebug, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reFlaskEnvDebug.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reFlaskEnvDebug, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -233,29 +237,46 @@ func (r *InsecureXMLParsing) Languages() []rules.Language { return []rules.Langu
 
 func (r *InsecureXMLParsing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if reDefusedXML.MatchString(ctx.Content) {
+	if rules.GMatchFile(reDefusedXML, ctx) {
 		return nil
 	}
 	// Python's xml.sax.make_parser() disables external entities by default (since 3.7.1).
 	// Only flag if external entities are explicitly enabled via setFeature().
-	if rePySAXMakeParser.MatchString(ctx.Content) && !rePySAXExtEntEnabled.MatchString(ctx.Content) {
+	if rules.GMatchFile(rePySAXMakeParser, ctx) && !rules.GMatchFile(rePySAXExtEntEnabled, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
+	// In files that build a SAX parser via make_parser(), the data sink is a
+	// parser-object call (parser.parse(input)/doc.parseString(bar)). Enable the
+	// generic parser-object sink only in that context.
+	saxParser := rules.GMatchFile(rePySAXMakeParser, ctx)
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
 		var matched string
-		if m := reXMLParse.FindString(line); m != "" {
+		if m := rules.GFindLower(reXMLParse, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reXMLSaxParse.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reXMLSaxParse, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reXMLDomParse.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reXMLDomParse, line, lowered[i]); m != "" {
 			matched = m
+		} else if saxParser {
+			if m := rules.GFindLower(reXMLParserObjParse, line, lowered[i]); m != "" {
+				matched = m
+			}
 		}
 		if matched != "" {
+			// FP suppression: the regexes above land on the actual parse sink
+			// (e.g. xml.dom.minidom.parseString(bar, parser)). Check whether the
+			// document argument was last assigned a safe (non-tainted) value,
+			// distinguishing constant/sanitized input from attacker-controlled
+			// data via the same helper used by BATOU-GEN-003.
+			if rules.PySinkVarIsSafe(lines, i) {
+				continue
+			}
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "Insecure XML parsing without defusedxml (XXE vulnerability)",
@@ -291,18 +312,19 @@ func (r *OsChmodPermissive) Languages() []rules.Language { return []rules.Langua
 
 func (r *OsChmodPermissive) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
 		var matched string
-		if m := reOsChmod777.FindString(line); m != "" {
+		if m := rules.GFindLower(reOsChmod777, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reOsChmod666.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reOsChmod666, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reOsChmodStat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reOsChmodStat, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -344,16 +366,17 @@ func (r *RequestsNoSSL) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "session") && !strings.Contains(ctx.Content, "Session") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
 		var matched string
-		if m := reRequestsSessionVerify.FindString(line); m != "" {
+		if m := rules.GFindLower(reRequestsSessionVerify, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSessionGetNoVerify.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSessionGetNoVerify, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -388,23 +411,26 @@ func (r *TarfilePathTraversal) DefaultSeverity() rules.Severity { return rules.H
 func (r *TarfilePathTraversal) Description() string {
 	return "Detects tarfile.extractall() without filter parameter (CVE-2007-4559 path traversal)."
 }
-func (r *TarfilePathTraversal) Languages() []rules.Language { return []rules.Language{rules.LangPython} }
+func (r *TarfilePathTraversal) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *TarfilePathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	if !strings.Contains(ctx.Content, "tarfile") {
 		return nil
 	}
-	if reTarFilterSafe.MatchString(ctx.Content) {
+	if rules.GMatchFile(reTarFilterSafe, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
-		if reTarExtract.MatchString(line) && !reTarFilterSafe.MatchString(line) {
+		if rules.GMatchLower(reTarExtract, line, lowered[i]) && !rules.GMatchLower(reTarFilterSafe, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "Tarfile extraction without path validation (CVE-2007-4559)",
@@ -436,23 +462,26 @@ func (r *DjangoHardcodedSecret) DefaultSeverity() rules.Severity { return rules.
 func (r *DjangoHardcodedSecret) Description() string {
 	return "Detects Django SECRET_KEY hardcoded as a string literal instead of loaded from environment."
 }
-func (r *DjangoHardcodedSecret) Languages() []rules.Language { return []rules.Language{rules.LangPython} }
+func (r *DjangoHardcodedSecret) Languages() []rules.Language {
+	return []rules.Language{rules.LangPython}
+}
 
 func (r *DjangoHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	if !strings.Contains(ctx.Content, "SECRET_KEY") {
 		return nil
 	}
-	if reDjangoSecretKeyEnv.MatchString(ctx.Content) {
+	if rules.GMatchFile(reDjangoSecretKeyEnv, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
-		if m := reDjangoSecretKey.FindString(line); m != "" {
+		if m := rules.GFindLower(reDjangoSecretKey, line, lowered[i]); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "Django SECRET_KEY hardcoded in source code",
@@ -490,7 +519,8 @@ func (r *InsecureDeserJsonpickle) Languages() []rules.Language {
 
 func (r *InsecureDeserJsonpickle) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
@@ -498,13 +528,13 @@ func (r *InsecureDeserJsonpickle) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		var matched string
 		var lib string
-		if m := reJsonpickleLoad.FindString(line); m != "" {
+		if m := rules.GFindLower(reJsonpickleLoad, line, lowered[i]); m != "" {
 			matched = m
 			lib = "jsonpickle"
-		} else if m := reDillLoad.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reDillLoad, line, lowered[i]); m != "" {
 			matched = m
 			lib = "dill"
-		} else if m := reJoblib.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reJoblib, line, lowered[i]); m != "" {
 			matched = m
 			lib = "joblib"
 		}
@@ -546,20 +576,21 @@ func (r *SQLAlchemyTextInjection) Languages() []rules.Language {
 
 func (r *SQLAlchemyTextInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
 		var matched string
-		if m := reSATextFStr.FindString(line); m != "" {
+		if m := rules.GFindLower(reSATextFStr, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSATextFormat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSATextFormat, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSATextPercent.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSATextPercent, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSAExecuteFStr.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSAExecuteFStr, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -603,13 +634,14 @@ func (r *DjangoAllowedHostsWild) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "ALLOWED_HOSTS") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
-		if m := reDjangoAllowedHostsStar.FindString(line); m != "" {
+		if m := rules.GFindLower(reDjangoAllowedHostsStar, line, lowered[i]); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "Django ALLOWED_HOSTS set to wildcard ['*']",
@@ -648,16 +680,17 @@ func (r *ZipfileZipSlip) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "zipfile") && !strings.Contains(ctx.Content, "ZipFile") {
 		return nil
 	}
-	if reZipNameCheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reZipNameCheck, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
-		if reZipExtractAll.MatchString(line) || reZipExtractMethod.MatchString(line) {
+		if rules.GMatchLower(reZipExtractAll, line, lowered[i]) || rules.GMatchLower(reZipExtractMethod, line, lowered[i]) {
 			if strings.Contains(line, "zipfile") || strings.Contains(line, "ZipFile") || strings.Contains(ctx.Content, "ZipFile") {
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
@@ -697,19 +730,20 @@ func (r *UnsafeRegexUserInput) Languages() []rules.Language {
 
 func (r *UnsafeRegexUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if reReEscapeUsed.MatchString(ctx.Content) {
+	if rules.GMatchFile(reReEscapeUsed, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if isPyComment(t) {
 			continue
 		}
 		var matched string
-		if m := reReCompileVar.FindString(line); m != "" {
+		if m := rules.GFindLower(reReCompileVar, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reReSearchVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reReSearchVar, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {

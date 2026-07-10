@@ -13,18 +13,17 @@ import (
 
 // BATOU-MASS-005: Django model form without Meta.fields
 var (
-	reDjangoModelForm     = regexp.MustCompile(`class\s+\w+\s*\(\s*(?:forms\.ModelForm|ModelForm)\s*\)`)
-	reDjangoMetaFields    = regexp.MustCompile(`(?:fields\s*=|exclude\s*=)`)
-	reDjangoFieldsAll     = regexp.MustCompile(`fields\s*=\s*['"]__all__['"]`)
-	reDjangoExcludeEmpty  = regexp.MustCompile(`exclude\s*=\s*(?:\[\s*\]|\(\s*\))`)
+	reDjangoModelForm    = regexp.MustCompile(`class\s+\w+\s*\(\s*(?:forms\.ModelForm|ModelForm)\s*\)`)
+	reDjangoFieldsAll    = regexp.MustCompile(`fields\s*=\s*['"]__all__['"]`)
+	reDjangoExcludeEmpty = regexp.MustCompile(`exclude\s*=\s*(?:\[\s*\]|\(\s*\))`)
 )
 
 // BATOU-MASS-006: Spring @ModelAttribute without @InitBinder
 var (
-	reSpringModelAttr    = regexp.MustCompile(`@ModelAttribute\b`)
-	reSpringInitBinder   = regexp.MustCompile(`@InitBinder\b`)
+	reSpringModelAttr     = regexp.MustCompile(`@ModelAttribute\b`)
+	reSpringInitBinder    = regexp.MustCompile(`@InitBinder\b`)
 	reSpringAllowedFields = regexp.MustCompile(`setAllowedFields\b`)
-	reSpringDisallowed   = regexp.MustCompile(`setDisallowedFields\b`)
+	reSpringDisallowed    = regexp.MustCompile(`setDisallowedFields\b`)
 )
 
 // BATOU-MASS-007: Express body parsed directly into DB query
@@ -35,24 +34,32 @@ var (
 
 // BATOU-MASS-008: ASP.NET model binding without [Bind]
 var (
-	reAspNetAction      = regexp.MustCompile(`(?:public\s+(?:async\s+)?(?:IActionResult|ActionResult|Task<IActionResult>|Task<ActionResult>)\s+\w+\s*\([^)]*\w+\s+\w+\s*\))`)
-	reAspNetBind        = regexp.MustCompile(`\[Bind\b`)
-	reAspNetBindNever   = regexp.MustCompile(`\[BindNever\b`)
-	reAspNetFromBody    = regexp.MustCompile(`\[FromBody\b`)
+	reAspNetAction    = regexp.MustCompile(`(?:public\s+(?:async\s+)?(?:IActionResult|ActionResult|Task<IActionResult>|Task<ActionResult>)\s+\w+\s*\([^)]*\w+\s+\w+\s*\))`)
+	reAspNetBind      = regexp.MustCompile(`\[Bind\b`)
+	reAspNetBindNever = regexp.MustCompile(`\[BindNever\b`)
+	reAspNetFromBody  = regexp.MustCompile(`\[FromBody\b`)
 )
 
 // BATOU-MASS-009: Go struct binding from JSON without field tags
+//
+// Tightening note (2026-04-26): the previous pattern included a bare
+// `.Decode(` alternative that matched every `.Decode()` call (XML,
+// YAML, gob, gRPC, custom decoders) — produced 105 FPs in
+// owncloud/ocis. Tightened to specific JSON-binding APIs only.
+//
+// Also added an HTTP-handler context gate (reGoHTTPHandler): files
+// without HTTP handlers don't suffer mass-assignment from request
+// bodies, so config-file loaders and internal serialization paths
+// no longer trigger this rule.
 var (
-	reGoJSONBind      = regexp.MustCompile(`(?:json\.NewDecoder|json\.Unmarshal|\.ShouldBindJSON|\.BindJSON|\.Decode)\s*\(`)
-	reGoStructDef     = regexp.MustCompile(`type\s+\w+\s+struct\s*\{`)
-	reGoJSONTag       = regexp.MustCompile(`json:"[^"]*"`)
-	reGoJSONDash      = regexp.MustCompile(`json:"-"`)
+	reGoJSONBind    = regexp.MustCompile(`(?:json\.NewDecoder|json\.Unmarshal|\.ShouldBindJSON|\.BindJSON)\s*\(`)
+	reGoJSONDash    = regexp.MustCompile(`json:"-"`)
+	reGoHTTPHandler = regexp.MustCompile(`(?:\bhttp\.(?:Handler(?:Func)?|Request|ResponseWriter)\b|\bgin\.(?:Context|H)\b|\becho\.Context\b|\bfiber\.Ctx\b|\br\s*\*\s*http\.Request\b|\bw\s+http\.ResponseWriter\b|\.HandleFunc\s*\(|\.Handle\s*\(|\bmux\.NewRouter\b|\bchi\.Router\b)`)
 )
 
 // BATOU-MASS-010: PHP Eloquent $guarded empty array
 var (
 	rePHPGuardedEmpty = regexp.MustCompile(`\$guarded\s*=\s*\[\s*\]`)
-	rePHPFillable     = regexp.MustCompile(`\$fillable\s*=`)
 )
 
 // ---------------------------------------------------------------------------
@@ -61,8 +68,8 @@ var (
 
 type DjangoModelFormNoFields struct{}
 
-func (r *DjangoModelFormNoFields) ID() string                     { return "BATOU-MASS-005" }
-func (r *DjangoModelFormNoFields) Name() string                   { return "DjangoModelFormNoFields" }
+func (r *DjangoModelFormNoFields) ID() string                      { return "BATOU-MASS-005" }
+func (r *DjangoModelFormNoFields) Name() string                    { return "DjangoModelFormNoFields" }
 func (r *DjangoModelFormNoFields) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DjangoModelFormNoFields) Languages() []rules.Language {
 	return []rules.Language{rules.LangPython}
@@ -73,13 +80,13 @@ func (r *DjangoModelFormNoFields) Description() string {
 
 func (r *DjangoModelFormNoFields) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
-		if reDjangoModelForm.MatchString(line) {
+		if rules.GMatch(reDjangoModelForm, line) {
 			// Check the next 15 lines for Meta class with fields
 			end := i + 15
 			if end > len(lines) {
@@ -137,8 +144,8 @@ func (r *DjangoModelFormNoFields) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SpringModelAttrNoInitBinder struct{}
 
-func (r *SpringModelAttrNoInitBinder) ID() string                     { return "BATOU-MASS-006" }
-func (r *SpringModelAttrNoInitBinder) Name() string                   { return "SpringModelAttrNoInitBinder" }
+func (r *SpringModelAttrNoInitBinder) ID() string                      { return "BATOU-MASS-006" }
+func (r *SpringModelAttrNoInitBinder) Name() string                    { return "SpringModelAttrNoInitBinder" }
 func (r *SpringModelAttrNoInitBinder) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SpringModelAttrNoInitBinder) Languages() []rules.Language {
 	return []rules.Language{rules.LangJava}
@@ -150,19 +157,19 @@ func (r *SpringModelAttrNoInitBinder) Description() string {
 func (r *SpringModelAttrNoInitBinder) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
-	if !reSpringModelAttr.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reSpringModelAttr, ctx) {
 		return nil
 	}
-	if reSpringInitBinder.MatchString(ctx.Content) && (reSpringAllowedFields.MatchString(ctx.Content) || reSpringDisallowed.MatchString(ctx.Content)) {
+	if rules.GMatchFile(reSpringInitBinder, ctx) && (rules.GMatchFile(reSpringAllowedFields, ctx) || rules.GMatchFile(reSpringDisallowed, ctx)) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
-		if reSpringModelAttr.MatchString(line) {
+		if rules.GMatch(reSpringModelAttr, line) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -194,8 +201,8 @@ func (r *SpringModelAttrNoInitBinder) Scan(ctx *rules.ScanContext) []rules.Findi
 
 type ExpressBodyToDB struct{}
 
-func (r *ExpressBodyToDB) ID() string                     { return "BATOU-MASS-007" }
-func (r *ExpressBodyToDB) Name() string                   { return "ExpressBodyToDB" }
+func (r *ExpressBodyToDB) ID() string                      { return "BATOU-MASS-007" }
+func (r *ExpressBodyToDB) Name() string                    { return "ExpressBodyToDB" }
 func (r *ExpressBodyToDB) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ExpressBodyToDB) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -206,16 +213,16 @@ func (r *ExpressBodyToDB) Description() string {
 
 func (r *ExpressBodyToDB) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
 		matched := ""
-		if loc := reExpressBodyToDB.FindString(line); loc != "" {
+		if loc := rules.GFind(reExpressBodyToDB, line); loc != "" {
 			matched = loc
-		} else if loc := reExpressSpreadDB.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reExpressSpreadDB, line); loc != "" {
 			matched = loc
 		}
 		if matched != "" {
@@ -249,8 +256,8 @@ func (r *ExpressBodyToDB) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AspNetModelBindingNoBind struct{}
 
-func (r *AspNetModelBindingNoBind) ID() string                     { return "BATOU-MASS-008" }
-func (r *AspNetModelBindingNoBind) Name() string                   { return "AspNetModelBindingNoBind" }
+func (r *AspNetModelBindingNoBind) ID() string                      { return "BATOU-MASS-008" }
+func (r *AspNetModelBindingNoBind) Name() string                    { return "AspNetModelBindingNoBind" }
 func (r *AspNetModelBindingNoBind) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *AspNetModelBindingNoBind) Languages() []rules.Language {
 	return []rules.Language{rules.LangCSharp}
@@ -263,16 +270,16 @@ func (r *AspNetModelBindingNoBind) Scan(ctx *rules.ScanContext) []rules.Finding 
 	var findings []rules.Finding
 
 	// Skip if [Bind] or [BindNever] is used in the file
-	if reAspNetBind.MatchString(ctx.Content) || reAspNetBindNever.MatchString(ctx.Content) {
+	if rules.GMatchFile(reAspNetBind, ctx) || rules.GMatchFile(reAspNetBindNever, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
-		if reAspNetAction.MatchString(line) && !reAspNetFromBody.MatchString(line) {
+		if rules.GMatch(reAspNetAction, line) && !rules.GMatch(reAspNetFromBody, line) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -304,8 +311,8 @@ func (r *AspNetModelBindingNoBind) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type GoStructBindNoTags struct{}
 
-func (r *GoStructBindNoTags) ID() string                     { return "BATOU-MASS-009" }
-func (r *GoStructBindNoTags) Name() string                   { return "GoStructBindNoTags" }
+func (r *GoStructBindNoTags) ID() string                      { return "BATOU-MASS-009" }
+func (r *GoStructBindNoTags) Name() string                    { return "GoStructBindNoTags" }
 func (r *GoStructBindNoTags) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GoStructBindNoTags) Languages() []rules.Language {
 	return []rules.Language{rules.LangGo}
@@ -318,19 +325,25 @@ func (r *GoStructBindNoTags) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only flag if the file has JSON binding but no json:"-" tags to exclude fields
-	if !reGoJSONBind.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reGoJSONBind, ctx) {
 		return nil
 	}
-	if reGoJSONDash.MatchString(ctx.Content) {
+	if rules.GMatchFile(reGoJSONDash, ctx) {
+		return nil
+	}
+	// Mass-assignment requires user-controlled input. Only flag files
+	// that actually handle HTTP requests; config loaders, internal
+	// serialization, and gRPC paths don't have this attack surface.
+	if !rules.GMatchFile(reGoHTTPHandler, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
-		if loc := reGoJSONBind.FindString(line); loc != "" {
+		if loc := rules.GFind(reGoJSONBind, line); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -359,8 +372,8 @@ func (r *GoStructBindNoTags) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPEloquentGuardedEmpty struct{}
 
-func (r *PHPEloquentGuardedEmpty) ID() string                     { return "BATOU-MASS-010" }
-func (r *PHPEloquentGuardedEmpty) Name() string                   { return "PHPEloquentGuardedEmpty" }
+func (r *PHPEloquentGuardedEmpty) ID() string                      { return "BATOU-MASS-010" }
+func (r *PHPEloquentGuardedEmpty) Name() string                    { return "PHPEloquentGuardedEmpty" }
 func (r *PHPEloquentGuardedEmpty) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PHPEloquentGuardedEmpty) Languages() []rules.Language {
 	return []rules.Language{rules.LangPHP}
@@ -371,13 +384,13 @@ func (r *PHPEloquentGuardedEmpty) Description() string {
 
 func (r *PHPEloquentGuardedEmpty) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(strings.TrimSpace(line)) {
 			continue
 		}
-		if loc := rePHPGuardedEmpty.FindString(line); loc != "" {
+		if loc := rules.GFind(rePHPGuardedEmpty, line); loc != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

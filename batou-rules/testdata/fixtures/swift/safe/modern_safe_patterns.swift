@@ -57,13 +57,13 @@ class SafeWebViewController {
     }
 }
 
-// SAFE: Process with fixed command and validated args
-func listDirectory(path: String) {
-    guard path.wholeMatch(of: /^[a-zA-Z0-9_\/\-\.]+$/) != nil else { return }
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/bin/ls")
-    process.arguments = ["-la", path]
-    try? process.run()
+// SAFE: directory listing via FileManager — no shell/Process, so no command
+// injection surface at all (the secure Swift idiom; avoids spawning /bin/ls).
+func listDirectory(path: String) -> [String] {
+    guard path.wholeMatch(of: /^[a-zA-Z0-9_\/\-\.]+$/) != nil else { return [] }
+    let fm = FileManager.default
+    let contents = (try? fm.contentsOfDirectory(atPath: path)) ?? []
+    return contents
 }
 
 // SAFE: URLComponents safe construction

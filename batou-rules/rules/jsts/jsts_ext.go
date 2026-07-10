@@ -13,54 +13,49 @@ import (
 
 // JSTS-019: Electron nodeIntegration enabled (more specific than JSTS-013)
 var (
-	reElectronNodeIntExt    = regexp.MustCompile(`nodeIntegration\s*:\s*true`)
-	reElectronPreloadExt    = regexp.MustCompile(`preload\s*:`)
-	reElectronSandboxFalse  = regexp.MustCompile(`sandbox\s*:\s*false`)
+	reElectronNodeIntExt   = regexp.MustCompile(`nodeIntegration\s*:\s*true`)
+	reElectronSandboxFalse = regexp.MustCompile(`sandbox\s*:\s*false`)
 )
 
 // JSTS-020: Electron contextIsolation disabled
 var (
 	reElectronCtxIsoFalse = regexp.MustCompile(`contextIsolation\s*:\s*false`)
-	reElectronCtxBridge   = regexp.MustCompile(`contextBridge\.exposeInMainWorld`)
 )
 
 // JSTS-021: postMessage without origin check (extended)
 var (
-	reOnMessage          = regexp.MustCompile(`\.onmessage\s*=\s*`)
-	rePostMsgWildcard    = regexp.MustCompile(`\.postMessage\s*\([^,]+,\s*["']\*["']\s*\)`)
+	rePostMsgWildcard = regexp.MustCompile(`\.postMessage\s*\([^,]+,\s*["']\*["']\s*\)`)
 )
 
 // JSTS-022: Insecure WebView loadURL with user input
 var (
-	reWebViewLoadURL     = regexp.MustCompile(`\.loadURL\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|url|param|data)`)
-	reWebViewSrc         = regexp.MustCompile(`<webview[^>]*src\s*=\s*\{`)
-	reWebViewNavPolicy   = regexp.MustCompile(`will-navigate|new-window`)
+	reWebViewLoadURL = regexp.MustCompile(`\.loadURL\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|url|param|data)`)
 )
 
 // JSTS-023: Prototype pollution via Object.assign/spread
 var (
-	reObjectAssignReq   = regexp.MustCompile(`Object\.assign\s*\(\s*\{\s*\}\s*,\s*(?:req\.(?:body|query|params)|userInput|user[Ii]nput|input|data|payload)`)
-	reSpreadReq         = regexp.MustCompile(`\{\s*\.\.\.(?:req\.(?:body|query|params)|userInput|user[Ii]nput|input|data|payload)\s*\}`)
-	reMergeDeep         = regexp.MustCompile(`(?:merge|deepMerge|_.merge|lodash\.merge|extend)\s*\(\s*\{\s*\}\s*,\s*(?:req\.(?:body|query|params)|userInput|user[Ii]nput|input|data|payload)`)
+	reObjectAssignReq = regexp.MustCompile(`Object\.assign\s*\(\s*\{\s*\}\s*,\s*(?:req\.(?:body|query|params)|userInput|user[Ii]nput|input|data|payload)`)
+	reSpreadReq       = regexp.MustCompile(`\{\s*\.\.\.(?:req\.(?:body|query|params)|userInput|user[Ii]nput|input|data|payload)\s*\}`)
+	reMergeDeep       = regexp.MustCompile(`(?:merge|deepMerge|_.merge|lodash\.merge|extend)\s*\(\s*\{\s*\}\s*,\s*(?:req\.(?:body|query|params)|userInput|user[Ii]nput|input|data|payload)`)
 )
 
 // JSTS-024: Regex DoS (catastrophic backtracking patterns)
 var (
-	reCatastrophicRegex  = regexp.MustCompile(`/\([^)]*[+*]\)[+*]`)
-	reNestedQuantifier   = regexp.MustCompile(`/\([^)]*\([^)]*[+*]\)[^)]*\)[+*]`)
-	reRegexFromInput     = regexp.MustCompile(`new\s+RegExp\s*\(\s*(?:req\.|user|input|query|search|param|data)`)
+	reCatastrophicRegex = regexp.MustCompile(`/\([^)]*[+*]\)[+*]`)
+	reNestedQuantifier  = regexp.MustCompile(`/\([^)]*\([^)]*[+*]\)[^)]*\)[+*]`)
+	reRegexFromInput    = regexp.MustCompile(`new\s+RegExp\s*\(\s*(?:req\.|user|input|query|search|param|data)`)
 )
 
 // JSTS-025: npm script postinstall executing remote code
 var (
-	rePostinstallCurl  = regexp.MustCompile(`"(?:postinstall|preinstall|install)"\s*:\s*"[^"]*(?:curl|wget|node\s+-e|sh\s+-c|bash\s+-c)`)
-	rePostinstallPipe  = regexp.MustCompile(`"(?:postinstall|preinstall|install)"\s*:\s*"[^"]*\|`)
+	rePostinstallCurl = regexp.MustCompile(`"(?:postinstall|preinstall|install)"\s*:\s*"[^"]*(?:curl|wget|node\s+-e|sh\s+-c|bash\s+-c)`)
+	rePostinstallPipe = regexp.MustCompile(`"(?:postinstall|preinstall|install)"\s*:\s*"[^"]*\|`)
 )
 
 // JSTS-026: Insecure use of Math.random for security
 var (
-	reMathRandom        = regexp.MustCompile(`Math\.random\s*\(\s*\)`)
-	reMathRandSecurity  = regexp.MustCompile(`(?i)(?:token|password|secret|key|nonce|salt|otp|csrf|session|uuid|auth|api[_\-]?key|hash|encrypt|credential|random[Bb]ytes)`)
+	reMathRandom       = regexp.MustCompile(`Math\.random\s*\(\s*\)`)
+	reMathRandSecurity = regexp.MustCompile(`(?i)(?:token|password|secret|key|nonce|salt|otp|csrf|session|uuid|auth|api[_\-]?key|hash|encrypt|credential|random[Bb]ytes)`)
 )
 
 // JSTS-027: DOM clobbering via unsanitized element IDs (extended)
@@ -72,24 +67,23 @@ var (
 
 // JSTS-028: Missing Content-Type header in API response
 var (
-	reResJSON          = regexp.MustCompile(`res\.(?:send|write)\s*\(`)
-	reResContentType   = regexp.MustCompile(`res\.(?:setHeader|set|type|header)\s*\(\s*["'](?:Content-Type|content-type)["']`)
-	reResJsonMethod    = regexp.MustCompile(`res\.json\s*\(`)
-	reExpressApp       = regexp.MustCompile(`(?:express\s*\(\s*\)|app\s*\.\s*(?:get|post|put|delete|patch|all)\s*\()`)
+	reResJSON        = regexp.MustCompile(`res\.(?:send|write)\s*\(`)
+	reResContentType = regexp.MustCompile(`res\.(?:setHeader|set|type|header)\s*\(\s*["'](?:Content-Type|content-type)["']`)
+	reResJsonMethod  = regexp.MustCompile(`res\.json\s*\(`)
+	reExpressApp     = regexp.MustCompile(`(?:express\s*\(\s*\)|app\s*\.\s*(?:get|post|put|delete|patch|all)\s*\()`)
 )
 
 // JSTS-029: Node.js require() with user-controlled path
 var (
-	reRequireUserVar   = regexp.MustCompile(`require\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|param|module|plugin|name|path)\b`)
-	reRequireConcat    = regexp.MustCompile(`require\s*\(\s*(?:['"][^'"]*['"]\s*\+\s*(?:req\.|user|input|param)|` + "`[^`]*\\$\\{" + `)`)
-	reImportExprUser   = regexp.MustCompile(`import\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|param|module)`)
+	reRequireUserVar = regexp.MustCompile(`require\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|param|module|plugin|name|path)\b`)
+	reRequireConcat  = regexp.MustCompile(`require\s*\(\s*(?:['"][^'"]*['"]\s*\+\s*(?:req\.|user|input|param)|` + "`[^`]*\\$\\{" + `)`)
+	reImportExprUser = regexp.MustCompile(`import\s*\(\s*(?:req\.(?:query|params|body)|userInput|user[Ii]nput|input|param|module)`)
 )
 
 // JSTS-030: Insecure cookie settings
 var (
-	reSetCookieHeader   = regexp.MustCompile(`res\.setHeader\s*\(\s*["']Set-Cookie["']`)
-	reCookieNoHttpOnly  = regexp.MustCompile(`Set-Cookie["'][^)]*(?:session|token|auth|jwt)`)
-	reCookieParserNoOpts = regexp.MustCompile(`cookieParser\s*\(\s*\)`)
+	reSetCookieHeader  = regexp.MustCompile(`res\.setHeader\s*\(\s*["']Set-Cookie["']`)
+	reCookieNoHttpOnly = regexp.MustCompile(`Set-Cookie["'][^)]*(?:session|token|auth|jwt)`)
 )
 
 func init() {
@@ -113,8 +107,8 @@ func init() {
 
 type ElectronNodeIntExt struct{}
 
-func (r *ElectronNodeIntExt) ID() string                     { return "BATOU-JSTS-019" }
-func (r *ElectronNodeIntExt) Name() string                   { return "ElectronNodeIntExt" }
+func (r *ElectronNodeIntExt) ID() string                      { return "BATOU-JSTS-019" }
+func (r *ElectronNodeIntExt) Name() string                    { return "ElectronNodeIntExt" }
 func (r *ElectronNodeIntExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ElectronNodeIntExt) Description() string {
 	return "Detects Electron BrowserWindow with nodeIntegration:true without sandbox, giving renderer full Node.js access."
@@ -131,12 +125,12 @@ func (r *ElectronNodeIntExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reElectronNodeIntExt.MatchString(line) && !reElectronSandboxFalse.MatchString(line) {
+		if rules.GMatch(reElectronNodeIntExt, line) && !rules.GMatch(reElectronSandboxFalse, line) {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "Electron nodeIntegration enabled (RCE risk)",
@@ -162,8 +156,8 @@ func (r *ElectronNodeIntExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ElectronCtxIsoExt struct{}
 
-func (r *ElectronCtxIsoExt) ID() string                     { return "BATOU-JSTS-020" }
-func (r *ElectronCtxIsoExt) Name() string                   { return "ElectronCtxIsoExt" }
+func (r *ElectronCtxIsoExt) ID() string                      { return "BATOU-JSTS-020" }
+func (r *ElectronCtxIsoExt) Name() string                    { return "ElectronCtxIsoExt" }
 func (r *ElectronCtxIsoExt) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ElectronCtxIsoExt) Description() string {
 	return "Detects Electron with contextIsolation:false, allowing renderer scripts to access preload script context."
@@ -180,12 +174,12 @@ func (r *ElectronCtxIsoExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reElectronCtxIsoFalse.MatchString(line) {
+		if rules.GMatch(reElectronCtxIsoFalse, line) {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "Electron contextIsolation disabled (privilege escalation risk)",
@@ -211,8 +205,8 @@ func (r *ElectronCtxIsoExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PostMsgOriginExt struct{}
 
-func (r *PostMsgOriginExt) ID() string                     { return "BATOU-JSTS-021" }
-func (r *PostMsgOriginExt) Name() string                   { return "PostMsgOriginExt" }
+func (r *PostMsgOriginExt) ID() string                      { return "BATOU-JSTS-021" }
+func (r *PostMsgOriginExt) Name() string                    { return "PostMsgOriginExt" }
 func (r *PostMsgOriginExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PostMsgOriginExt) Description() string {
 	return "Detects postMessage with wildcard '*' target origin, sending data to any window that receives it."
@@ -226,12 +220,12 @@ func (r *PostMsgOriginExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if m := rePostMsgWildcard.FindString(line); m != "" {
+		if m := rules.GFind(rePostMsgWildcard, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "postMessage with wildcard '*' target origin",
@@ -257,8 +251,8 @@ func (r *PostMsgOriginExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WebViewLoadURLExt struct{}
 
-func (r *WebViewLoadURLExt) ID() string                     { return "BATOU-JSTS-022" }
-func (r *WebViewLoadURLExt) Name() string                   { return "WebViewLoadURLExt" }
+func (r *WebViewLoadURLExt) ID() string                      { return "BATOU-JSTS-022" }
+func (r *WebViewLoadURLExt) Name() string                    { return "WebViewLoadURLExt" }
 func (r *WebViewLoadURLExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *WebViewLoadURLExt) Description() string {
 	return "Detects Electron/WebView loadURL with user-controlled input, enabling XSS or arbitrary page loading."
@@ -272,12 +266,12 @@ func (r *WebViewLoadURLExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if m := reWebViewLoadURL.FindString(line); m != "" {
+		if m := rules.GFind(reWebViewLoadURL, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "WebView/BrowserWindow loadURL with user-controlled input",
@@ -303,8 +297,8 @@ func (r *WebViewLoadURLExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PrototypePollution struct{}
 
-func (r *PrototypePollution) ID() string                     { return "BATOU-JSTS-023" }
-func (r *PrototypePollution) Name() string                   { return "PrototypePollution" }
+func (r *PrototypePollution) ID() string                      { return "BATOU-JSTS-023" }
+func (r *PrototypePollution) Name() string                    { return "PrototypePollution" }
 func (r *PrototypePollution) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PrototypePollution) Description() string {
 	return "Detects Object.assign, spread operator, or deep merge with user input, enabling prototype pollution."
@@ -318,17 +312,17 @@ func (r *PrototypePollution) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reObjectAssignReq.FindString(line); m != "" {
+		if m := rules.GFind(reObjectAssignReq, line); m != "" {
 			matched = m
-		} else if m := reSpreadReq.FindString(line); m != "" {
+		} else if m := rules.GFind(reSpreadReq, line); m != "" {
 			matched = m
-		} else if m := reMergeDeep.FindString(line); m != "" {
+		} else if m := rules.GFind(reMergeDeep, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -357,8 +351,8 @@ func (r *PrototypePollution) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RegexCatastrophic struct{}
 
-func (r *RegexCatastrophic) ID() string                     { return "BATOU-JSTS-024" }
-func (r *RegexCatastrophic) Name() string                   { return "RegexCatastrophic" }
+func (r *RegexCatastrophic) ID() string                      { return "BATOU-JSTS-024" }
+func (r *RegexCatastrophic) Name() string                    { return "RegexCatastrophic" }
 func (r *RegexCatastrophic) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RegexCatastrophic) Description() string {
 	return "Detects regex patterns with nested quantifiers that cause catastrophic backtracking, or RegExp with user input."
@@ -372,17 +366,17 @@ func (r *RegexCatastrophic) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reCatastrophicRegex.FindString(line); m != "" {
+		if m := rules.GFind(reCatastrophicRegex, line); m != "" {
 			matched = m
-		} else if m := reNestedQuantifier.FindString(line); m != "" {
+		} else if m := rules.GFind(reNestedQuantifier, line); m != "" {
 			matched = m
-		} else if m := reRegexFromInput.FindString(line); m != "" {
+		} else if m := rules.GFind(reRegexFromInput, line); m != "" {
 			if !strings.Contains(line, "escapeRegExp") && !strings.Contains(line, "escape_regex") {
 				matched = m
 			}
@@ -413,8 +407,8 @@ func (r *RegexCatastrophic) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NPMPostinstallRCE struct{}
 
-func (r *NPMPostinstallRCE) ID() string                     { return "BATOU-JSTS-025" }
-func (r *NPMPostinstallRCE) Name() string                   { return "NPMPostinstallRCE" }
+func (r *NPMPostinstallRCE) ID() string                      { return "BATOU-JSTS-025" }
+func (r *NPMPostinstallRCE) Name() string                    { return "NPMPostinstallRCE" }
 func (r *NPMPostinstallRCE) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *NPMPostinstallRCE) Description() string {
 	return "Detects npm lifecycle scripts (postinstall/preinstall) that download and execute remote code."
@@ -431,15 +425,15 @@ func (r *NPMPostinstallRCE) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := rePostinstallCurl.FindString(line); m != "" {
+		if m := rules.GFind(rePostinstallCurl, line); m != "" {
 			matched = m
-		} else if m := rePostinstallPipe.FindString(line); m != "" {
+		} else if m := rules.GFind(rePostinstallPipe, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -468,8 +462,8 @@ func (r *NPMPostinstallRCE) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MathRandomSecurity struct{}
 
-func (r *MathRandomSecurity) ID() string                     { return "BATOU-JSTS-026" }
-func (r *MathRandomSecurity) Name() string                   { return "MathRandomSecurity" }
+func (r *MathRandomSecurity) ID() string                      { return "BATOU-JSTS-026" }
+func (r *MathRandomSecurity) Name() string                    { return "MathRandomSecurity" }
 func (r *MathRandomSecurity) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MathRandomSecurity) Description() string {
 	return "Detects Math.random() used in security-sensitive contexts (tokens, keys, sessions)."
@@ -482,17 +476,17 @@ func (r *MathRandomSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !isJSOrTS(ctx.Language) {
 		return nil
 	}
-	if !reMathRandom.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reMathRandom, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reMathRandom.MatchString(line) {
-			if reMathRandSecurity.MatchString(line) || hasNearbyMatch(lines, i, reMathRandSecurity, 5) {
+		if rules.GMatch(reMathRandom, line) {
+			if rules.GMatch(reMathRandSecurity, line) || hasNearbyMatch(lines, i, reMathRandSecurity, 5) {
 				findings = append(findings, rules.Finding{
 					RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 					Title:         "Math.random() used in security-sensitive context",
@@ -519,8 +513,8 @@ func (r *MathRandomSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DOMClobberingExt struct{}
 
-func (r *DOMClobberingExt) ID() string                     { return "BATOU-JSTS-027" }
-func (r *DOMClobberingExt) Name() string                   { return "DOMClobberingExt" }
+func (r *DOMClobberingExt) ID() string                      { return "BATOU-JSTS-027" }
+func (r *DOMClobberingExt) Name() string                    { return "DOMClobberingExt" }
 func (r *DOMClobberingExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DOMClobberingExt) Description() string {
 	return "Detects DOM element access via dynamic IDs or named collections vulnerable to DOM clobbering attacks."
@@ -534,17 +528,17 @@ func (r *DOMClobberingExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reDOMIdAccess.FindString(line); m != "" {
+		if m := rules.GFind(reDOMIdAccess, line); m != "" {
 			matched = m
-		} else if m := reWindowNameAccess.FindString(line); m != "" {
+		} else if m := rules.GFind(reWindowNameAccess, line); m != "" {
 			matched = m
-		} else if m := reDOMNamedAccess.FindString(line); m != "" {
+		} else if m := rules.GFind(reDOMNamedAccess, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -573,8 +567,8 @@ func (r *DOMClobberingExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingContentType struct{}
 
-func (r *MissingContentType) ID() string                     { return "BATOU-JSTS-028" }
-func (r *MissingContentType) Name() string                   { return "MissingContentType" }
+func (r *MissingContentType) ID() string                      { return "BATOU-JSTS-028" }
+func (r *MissingContentType) Name() string                    { return "MissingContentType" }
 func (r *MissingContentType) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *MissingContentType) Description() string {
 	return "Detects Express res.send/write without Content-Type, allowing MIME sniffing and XSS."
@@ -587,19 +581,19 @@ func (r *MissingContentType) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !isJSOrTS(ctx.Language) {
 		return nil
 	}
-	if !reExpressApp.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reExpressApp, ctx) {
 		return nil
 	}
-	if reResContentType.MatchString(ctx.Content) || reResJsonMethod.MatchString(ctx.Content) {
+	if rules.GMatchFile(reResContentType, ctx) || rules.GMatchFile(reResJsonMethod, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reResJSON.MatchString(line) && !reResJsonMethod.MatchString(line) {
+		if rules.GMatch(reResJSON, line) && !rules.GMatch(reResJsonMethod, line) {
 			findings = append(findings, rules.Finding{
 				RuleID: r.ID(), Severity: r.DefaultSeverity(), SeverityLabel: r.DefaultSeverity().String(),
 				Title:         "API response without explicit Content-Type header",
@@ -625,8 +619,8 @@ func (r *MissingContentType) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RequireUserPath struct{}
 
-func (r *RequireUserPath) ID() string                     { return "BATOU-JSTS-029" }
-func (r *RequireUserPath) Name() string                   { return "RequireUserPath" }
+func (r *RequireUserPath) ID() string                      { return "BATOU-JSTS-029" }
+func (r *RequireUserPath) Name() string                    { return "RequireUserPath" }
 func (r *RequireUserPath) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RequireUserPath) Description() string {
 	return "Detects require() or dynamic import() with user-controlled paths, enabling arbitrary module loading and RCE."
@@ -640,17 +634,17 @@ func (r *RequireUserPath) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if m := reRequireUserVar.FindString(line); m != "" {
+		if m := rules.GFind(reRequireUserVar, line); m != "" {
 			matched = m
-		} else if m := reRequireConcat.FindString(line); m != "" {
+		} else if m := rules.GFind(reRequireConcat, line); m != "" {
 			matched = m
-		} else if m := reImportExprUser.FindString(line); m != "" {
+		} else if m := rules.GFind(reImportExprUser, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -679,8 +673,8 @@ func (r *RequireUserPath) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureCookieExt struct{}
 
-func (r *InsecureCookieExt) ID() string                     { return "BATOU-JSTS-030" }
-func (r *InsecureCookieExt) Name() string                   { return "InsecureCookieExt" }
+func (r *InsecureCookieExt) ID() string                      { return "BATOU-JSTS-030" }
+func (r *InsecureCookieExt) Name() string                    { return "InsecureCookieExt" }
 func (r *InsecureCookieExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureCookieExt) Description() string {
 	return "Detects Set-Cookie headers for sensitive cookies without httpOnly/secure flags, or cookieParser without options."
@@ -694,14 +688,14 @@ func (r *InsecureCookieExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
 		var title string
-		if reSetCookieHeader.MatchString(line) && reCookieNoHttpOnly.MatchString(line) {
+		if rules.GMatch(reSetCookieHeader, line) && rules.GMatch(reCookieNoHttpOnly, line) {
 			if !strings.Contains(line, "HttpOnly") && !strings.Contains(line, "httponly") {
 				matched = strings.TrimSpace(line)
 				title = "Sensitive cookie set via Set-Cookie header without HttpOnly flag"

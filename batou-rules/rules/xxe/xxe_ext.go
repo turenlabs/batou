@@ -14,21 +14,31 @@ import (
 var (
 	// BATOU-XXE-005: XML parsing without disabling DTD (C#/.NET)
 	reExtCSharpXmlDoc      = regexp.MustCompile(`\bnew\s+XmlDocument\s*\(`)
-	reExtCSharpXmlLoad     = regexp.MustCompile(`\.Load(?:Xml)?\s*\(`)
 	reExtCSharpDtdParse    = regexp.MustCompile(`DtdProcessing\s*=\s*DtdProcessing\.Parse`)
 	reExtCSharpProhibitDTD = regexp.MustCompile(`(?:DtdProcessing\s*=\s*DtdProcessing\.Prohibit|XmlResolver\s*=\s*null|ProhibitDtd\s*=\s*true)`)
 
 	// BATOU-XXE-006: XSLT processing with external entities
-	reExtXSLTProcess    = regexp.MustCompile(`(?i)(?:XslCompiledTransform|XslTransform|TransformerFactory|newTransformer|xsltproc|lxml\.etree\.XSLT|XsltProcessor)\s*[\(.]`)
-	reExtXSLTSafe       = regexp.MustCompile(`(?i)(?:FEATURE_SECURE_PROCESSING|setFeature|ACCESS_EXTERNAL|resolve_entities\s*=\s*False)`)
+	reExtXSLTProcess = regexp.MustCompile(`(?i)(?:XslCompiledTransform|XslTransform|TransformerFactory|newTransformer|xsltproc|lxml\.etree\.XSLT|XsltProcessor)\s*[\(.]`)
+	reExtXSLTSafe    = regexp.MustCompile(`(?i)(?:FEATURE_SECURE_PROCESSING|setFeature|ACCESS_EXTERNAL|resolve_entities\s*=\s*False)`)
 
-	// BATOU-XXE-007: XInclude processing enabled
-	reExtXInclude       = regexp.MustCompile(`(?i)(?:xinclude|xi:include|XIncludeAware|setXIncludeAware\s*\(\s*true|process_?xincludes|parse.*xinclude)`)
-	reExtXIncludeNS     = regexp.MustCompile(`xmlns:xi\s*=\s*["']http://www\.w3\.org/2001/XInclude["']`)
+	// BATOU-XXE-007: XInclude processing enabled. The catch-all `XIncludeAware`
+	// alternative previously matched the safe-hardening shape
+	// `factory.setXIncludeAware(false)` — both vulnerable and safe call
+	// contained `XIncludeAware`. The fix: require the setter argument to be
+	// `true` (the only call shape that enables XInclude). All other
+	// alternatives kept intact.
+	reExtXInclude = regexp.MustCompile(`(?i)(?:xinclude|xi:include|setXIncludeAware\s*\(\s*true|process_?xincludes|parse.*xinclude)`)
+	// XInclude-disable hardening lines (defense-in-depth). When the line
+	// turns XInclude OFF, suppress the BATOU-XXE-007 finding even though the
+	// bare keyword "xinclude" still matches reExtXInclude. This keeps the
+	// rule sensitive to mentions of XInclude in comments / XML namespaces
+	// without flagging the OWASP-recommended `setXIncludeAware(false)`
+	// hardening line.
+	reExtXIncludeDisabled = regexp.MustCompile(`(?i)setXIncludeAware\s*\(\s*false`)
+	reExtXIncludeNS       = regexp.MustCompile(`xmlns:xi\s*=\s*["']http://www\.w3\.org/2001/XInclude["']`)
 
 	// BATOU-XXE-008: SOAP XML parsing without protection
-	reExtSOAPParse      = regexp.MustCompile(`(?i)(?:SOAPMessage|SoapClient|suds|zeep|savon|MessageFactory\.newInstance|SOAPConnectionFactory|soap_client|SoapServer|nusoap)`)
-	reExtSOAPWithInput  = regexp.MustCompile(`(?i)(?:SOAPMessage|SoapClient|suds|zeep|savon|soap_client|SoapServer|nusoap).*(?:req\.|request\.|input|body|param|\$_)`)
+	reExtSOAPWithInput = regexp.MustCompile(`(?i)(?:SOAPMessage|SoapClient|suds|zeep|savon|soap_client|SoapServer|nusoap).*(?:req\.|request\.|input|body|param|\$_)`)
 
 	// BATOU-XXE-009: XML parsing in mobile app (Android/iOS)
 	reExtAndroidXML     = regexp.MustCompile(`(?i)(?:XmlPullParser|SAXParser|DocumentBuilder|XMLReader)\s*(?:\.|\.newInstance|\.newSAXParser)`)
@@ -36,9 +46,9 @@ var (
 	reExtAndroidFactory = regexp.MustCompile(`(?i)(?:XmlPullParserFactory|SAXParserFactory|DocumentBuilderFactory)\.newInstance\s*\(`)
 
 	// BATOU-XXE-010: SVG/RSS/Atom feed XML parsing
-	reExtFeedParse      = regexp.MustCompile(`(?i)(?:feedparser|rss|atom|svg).*(?:parse|read|load|from_?string)\s*\(`)
-	reExtSVGParse       = regexp.MustCompile(`(?i)(?:svg|image/svg).*(?:parse|render|load|process|convert|transform)\s*\(`)
-	reExtFeedLib        = regexp.MustCompile(`(?i)(?:feedparser|rss-parser|atom-parser|xml-rss|simplepie|rome|SyndFeedInput)`)
+	reExtFeedParse = regexp.MustCompile(`(?i)(?:feedparser|rss|atom|svg).*(?:parse|read|load|from_?string)\s*\(`)
+	reExtSVGParse  = regexp.MustCompile(`(?i)(?:svg|image/svg).*(?:parse|render|load|process|convert|transform)\s*\(`)
+	reExtFeedLib   = regexp.MustCompile(`(?i)(?:feedparser|rss-parser|atom-parser|xml-rss|simplepie|rome|SyndFeedInput)`)
 )
 
 // ---------------------------------------------------------------------------
@@ -60,8 +70,8 @@ func init() {
 
 type CSharpXMLDTD struct{}
 
-func (r *CSharpXMLDTD) ID() string                     { return "BATOU-XXE-005" }
-func (r *CSharpXMLDTD) Name() string                   { return "CSharpXMLDTD" }
+func (r *CSharpXMLDTD) ID() string                      { return "BATOU-XXE-005" }
+func (r *CSharpXMLDTD) Name() string                    { return "CSharpXMLDTD" }
 func (r *CSharpXMLDTD) DefaultSeverity() rules.Severity { return rules.High }
 func (r *CSharpXMLDTD) Description() string {
 	return "Detects C#/.NET XmlDocument instantiation without disabling DTD processing, enabling XXE attacks."
@@ -72,19 +82,19 @@ func (r *CSharpXMLDTD) Languages() []rules.Language {
 
 func (r *CSharpXMLDTD) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// If file has DTD prohibit settings, skip
-	if reExtCSharpProhibitDTD.MatchString(ctx.Content) {
+	if rules.GMatchFile(reExtCSharpProhibitDTD, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		var matched string
-		if m := reExtCSharpXmlDoc.FindString(line); m != "" {
+		if m := rules.GFind(reExtCSharpXmlDoc, line); m != "" {
 			matched = m
-		} else if m := reExtCSharpDtdParse.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtCSharpDtdParse, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -115,8 +125,8 @@ func (r *CSharpXMLDTD) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XSLTExtEntities struct{}
 
-func (r *XSLTExtEntities) ID() string                     { return "BATOU-XXE-006" }
-func (r *XSLTExtEntities) Name() string                   { return "XSLTExtEntities" }
+func (r *XSLTExtEntities) ID() string                      { return "BATOU-XXE-006" }
+func (r *XSLTExtEntities) Name() string                    { return "XSLTExtEntities" }
 func (r *XSLTExtEntities) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XSLTExtEntities) Description() string {
 	return "Detects XSLT processing that may allow external entity resolution, enabling XXE via XSLT stylesheets."
@@ -126,16 +136,16 @@ func (r *XSLTExtEntities) Languages() []rules.Language {
 }
 
 func (r *XSLTExtEntities) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if reExtXSLTSafe.MatchString(ctx.Content) {
+	if rules.GMatchFile(reExtXSLTSafe, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtXSLTProcess.FindString(line); m != "" {
+		if m := rules.GFind(reExtXSLTProcess, line); m != "" {
 			if hasSecureXMLConfig(lines, i) {
 				continue
 			}
@@ -166,8 +176,8 @@ func (r *XSLTExtEntities) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type XIncludeProcessing struct{}
 
-func (r *XIncludeProcessing) ID() string                     { return "BATOU-XXE-007" }
-func (r *XIncludeProcessing) Name() string                   { return "XIncludeProcessing" }
+func (r *XIncludeProcessing) ID() string                      { return "BATOU-XXE-007" }
+func (r *XIncludeProcessing) Name() string                    { return "XIncludeProcessing" }
 func (r *XIncludeProcessing) DefaultSeverity() rules.Severity { return rules.High }
 func (r *XIncludeProcessing) Description() string {
 	return "Detects XInclude processing being enabled, which can include external XML documents and enable XXE."
@@ -178,15 +188,20 @@ func (r *XIncludeProcessing) Languages() []rules.Language {
 
 func (r *XIncludeProcessing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		var matched string
-		if m := reExtXInclude.FindString(line); m != "" {
+		// Skip lines that explicitly disable XInclude (`setXIncludeAware(false)`)
+		// — this is the OWASP-recommended hardening, not a misconfiguration.
+		if rules.GMatch(reExtXIncludeDisabled, line) {
+			continue
+		}
+		if m := rules.GFind(reExtXInclude, line); m != "" {
 			matched = m
-		} else if m := reExtXIncludeNS.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtXIncludeNS, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -220,8 +235,8 @@ func (r *XIncludeProcessing) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SOAPXMLParsing struct{}
 
-func (r *SOAPXMLParsing) ID() string                     { return "BATOU-XXE-008" }
-func (r *SOAPXMLParsing) Name() string                   { return "SOAPXMLParsing" }
+func (r *SOAPXMLParsing) ID() string                      { return "BATOU-XXE-008" }
+func (r *SOAPXMLParsing) Name() string                    { return "SOAPXMLParsing" }
 func (r *SOAPXMLParsing) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SOAPXMLParsing) Description() string {
 	return "Detects SOAP/WSDL client/server usage that parses XML without explicit XXE protection."
@@ -232,12 +247,12 @@ func (r *SOAPXMLParsing) Languages() []rules.Language {
 
 func (r *SOAPXMLParsing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtSOAPWithInput.FindString(line); m != "" {
+		if m := rules.GFind(reExtSOAPWithInput, line); m != "" {
 			if hasSecureXMLConfigWithSetters(lines, i) {
 				continue
 			}
@@ -272,8 +287,8 @@ func (r *SOAPXMLParsing) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MobileXMLParsing struct{}
 
-func (r *MobileXMLParsing) ID() string                     { return "BATOU-XXE-009" }
-func (r *MobileXMLParsing) Name() string                   { return "MobileXMLParsing" }
+func (r *MobileXMLParsing) ID() string                      { return "BATOU-XXE-009" }
+func (r *MobileXMLParsing) Name() string                    { return "MobileXMLParsing" }
 func (r *MobileXMLParsing) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MobileXMLParsing) Description() string {
 	return "Detects XML parsing in Android/iOS applications without disabling external entities."
@@ -284,17 +299,17 @@ func (r *MobileXMLParsing) Languages() []rules.Language {
 
 func (r *MobileXMLParsing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		var matched string
-		if m := reExtAndroidXML.FindString(line); m != "" {
+		if m := rules.GFind(reExtAndroidXML, line); m != "" {
 			matched = m
-		} else if m := reExtIOSXML.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtIOSXML, line); m != "" {
 			matched = m
-		} else if m := reExtAndroidFactory.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtAndroidFactory, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -328,8 +343,8 @@ func (r *MobileXMLParsing) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FeedXMLParsing struct{}
 
-func (r *FeedXMLParsing) ID() string                     { return "BATOU-XXE-010" }
-func (r *FeedXMLParsing) Name() string                   { return "FeedXMLParsing" }
+func (r *FeedXMLParsing) ID() string                      { return "BATOU-XXE-010" }
+func (r *FeedXMLParsing) Name() string                    { return "FeedXMLParsing" }
 func (r *FeedXMLParsing) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *FeedXMLParsing) Description() string {
 	return "Detects SVG, RSS, or Atom feed XML parsing that may be vulnerable to XXE if processing untrusted content."
@@ -340,23 +355,23 @@ func (r *FeedXMLParsing) Languages() []rules.Language {
 
 func (r *FeedXMLParsing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
-	hasFeedLib := reExtFeedLib.MatchString(ctx.Content)
+	lines := ctx.SplitLines()
+	hasFeedLib := rules.GMatchFile(reExtFeedLib, ctx)
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		var matched string
-		if m := reExtFeedParse.FindString(line); m != "" {
+		if m := rules.GFind(reExtFeedParse, line); m != "" {
 			matched = m
-		} else if m := reExtSVGParse.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtSVGParse, line); m != "" {
 			matched = m
 		}
 		if matched == "" && hasFeedLib {
 			if strings.Contains(line, "parse") || strings.Contains(line, "read") || strings.Contains(line, "load") {
-				if reExtFeedLib.MatchString(line) {
-					matched = reExtFeedLib.FindString(line)
+				if rules.GMatch(reExtFeedLib, line) {
+					matched = rules.GFind(reExtFeedLib, line)
 				}
 			}
 		}

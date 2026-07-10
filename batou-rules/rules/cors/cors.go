@@ -81,7 +81,7 @@ func (r *CORSWildcardCredentials) Scan(ctx *rules.ScanContext) []rules.Finding {
 	wildcardLine := 0
 	wildcardMatch := ""
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -94,68 +94,68 @@ func (r *CORSWildcardCredentials) Scan(ctx *rules.ScanContext) []rules.Finding {
 		// Check per-language patterns for wildcard origin
 		switch ctx.Language {
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if jsCorsOriginStar.MatchString(line) || headerAllowOriginStar.MatchString(line) || goHeaderSetOriginStar.MatchString(line) {
+			if rules.GMatch(jsCorsOriginStar, line) || rules.GMatch(headerAllowOriginStar, line) || rules.GMatch(goHeaderSetOriginStar, line) {
 				hasWildcardOrigin = true
 				if wildcardLine == 0 {
 					wildcardLine = lineNum
 					wildcardMatch = trimmed
 				}
 			}
-			if jsCorsCredentials.MatchString(line) || headerAllowCreds.MatchString(line) {
+			if rules.GMatch(jsCorsCredentials, line) || rules.GMatch(headerAllowCreds, line) {
 				hasCredentials = true
 			}
 		case rules.LangJava:
-			if springCrossOriginStar.MatchString(line) || springAllowedOriginStar.MatchString(line) {
+			if rules.GMatch(springCrossOriginStar, line) || rules.GMatch(springAllowedOriginStar, line) {
 				hasWildcardOrigin = true
 				if wildcardLine == 0 {
 					wildcardLine = lineNum
 					wildcardMatch = trimmed
 				}
 			}
-			if springAllowCredentials.MatchString(line) {
+			if rules.GMatch(springAllowCredentials, line) {
 				hasCredentials = true
 			}
 		case rules.LangPython:
-			if djangoCorsAllowAll.MatchString(line) {
+			if rules.GMatch(djangoCorsAllowAll, line) {
 				hasWildcardOrigin = true
 				if wildcardLine == 0 {
 					wildcardLine = lineNum
 					wildcardMatch = trimmed
 				}
 			}
-			if djangoCorsAllowCreds.MatchString(line) {
+			if rules.GMatch(djangoCorsAllowCreds, line) {
 				hasCredentials = true
 			}
-			if flaskCorsWildcard.MatchString(line) {
+			if rules.GMatch(flaskCorsWildcard, line) {
 				hasWildcardOrigin = true
 				if wildcardLine == 0 {
 					wildcardLine = lineNum
 					wildcardMatch = trimmed
 				}
 			}
-			if flaskCorsCreds.MatchString(line) {
+			if rules.GMatch(flaskCorsCreds, line) {
 				hasCredentials = true
 			}
 		case rules.LangGo:
-			if goHeaderSetOriginStar.MatchString(line) || headerAllowOriginStar.MatchString(line) {
+			if rules.GMatch(goHeaderSetOriginStar, line) || rules.GMatch(headerAllowOriginStar, line) {
 				hasWildcardOrigin = true
 				if wildcardLine == 0 {
 					wildcardLine = lineNum
 					wildcardMatch = trimmed
 				}
 			}
-			if goHeaderSetCreds.MatchString(line) || headerAllowCreds.MatchString(line) {
+			if rules.GMatch(goHeaderSetCreds, line) || rules.GMatch(headerAllowCreds, line) {
 				hasCredentials = true
 			}
 		default:
-			if headerAllowOriginStar.MatchString(line) {
+			if rules.GMatch(headerAllowOriginStar, line) {
 				hasWildcardOrigin = true
 				if wildcardLine == 0 {
 					wildcardLine = lineNum
 					wildcardMatch = trimmed
 				}
 			}
-			if headerAllowCreds.MatchString(line) {
+			if rules.GMatch(headerAllowCreds, line) {
 				hasCredentials = true
 			}
 		}
@@ -218,7 +218,7 @@ func (r *CORSReflectedOrigin) Description() string {
 
 func (r *CORSReflectedOrigin) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -233,19 +233,19 @@ func (r *CORSReflectedOrigin) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := jsReflectedOrigin.FindString(line); loc != "" {
+			if loc := rules.GFind(jsReflectedOrigin, line); loc != "" {
 				matched = loc
 			}
 		case rules.LangGo:
-			if loc := goReflectedOrigin.FindString(line); loc != "" {
+			if loc := rules.GFind(goReflectedOrigin, line); loc != "" {
 				matched = loc
 			}
 		case rules.LangPython:
-			if loc := pyReflectedOrigin.FindString(line); loc != "" {
+			if loc := rules.GFind(pyReflectedOrigin, line); loc != "" {
 				matched = loc
 			}
 		case rules.LangPHP:
-			if loc := phpReflectedOrigin.FindString(line); loc != "" {
+			if loc := rules.GFind(phpReflectedOrigin, line); loc != "" {
 				matched = loc
 			}
 		}

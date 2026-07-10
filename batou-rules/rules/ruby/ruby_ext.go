@@ -2,7 +2,6 @@ package ruby
 
 import (
 	"regexp"
-	"strings"
 
 	"github.com/turenlabs/batou-rules/rules"
 )
@@ -32,14 +31,14 @@ var (
 
 // RB-016: Kernel.system with string interpolation
 var (
-	reKernelSystemInterp = regexp.MustCompile(`\bKernel\.system\s*\(\s*"[^"]*#\{`)
+	reKernelSystemInterp  = regexp.MustCompile(`\bKernel\.system\s*\(\s*"[^"]*#\{`)
 	reSystemInterpGeneric = regexp.MustCompile(`\bsystem\s*\(\s*"[^"]*#\{`)
 )
 
 // RB-017: YAML.load with untrusted input
 var (
-	reYAMLLoadUser   = regexp.MustCompile(`\bYAML\.load\s*\(\s*(?:params|request|body|data|input|payload)`)
-	reYAMLLoadIO     = regexp.MustCompile(`\bYAML\.load\s*\(\s*(?:File\.read|IO\.read|open|Net::HTTP)`)
+	reYAMLLoadUser = regexp.MustCompile(`\bYAML\.load\s*\(\s*(?:params|request|body|data|input|payload)`)
+	reYAMLLoadIO   = regexp.MustCompile(`\bYAML\.load\s*\(\s*(?:File\.read|IO\.read|open|Net::HTTP)`)
 )
 
 // RB-018: Regexp with user input (ReDoS)
@@ -50,16 +49,16 @@ var (
 
 // RB-019: ERB.new with user data
 var (
-	reERBNew       = regexp.MustCompile(`\bERB\.new\s*\(`)
-	reERBNewUser   = regexp.MustCompile(`\bERB\.new\s*\(\s*(?:params|request|session|cookies|body|data|input)`)
-	reERBNewVar    = regexp.MustCompile(`\bERB\.new\s*\(\s*[a-z_]\w*\s*[,)]`)
+	reERBNew     = regexp.MustCompile(`\bERB\.new\s*\(`)
+	reERBNewUser = regexp.MustCompile(`\bERB\.new\s*\(\s*(?:params|request|session|cookies|body|data|input)`)
+	reERBNewVar  = regexp.MustCompile(`\bERB\.new\s*\(\s*[a-z_]\w*\s*[,)]`)
 )
 
 // RB-020: File.read/write with user-controlled path
 var (
-	reFileReadUser  = regexp.MustCompile(`\bFile\.(?:read|readlines|write|open|binread|binwrite|delete|unlink|rename)\s*\(\s*(?:params|request|session|cookies)\s*\[`)
+	reFileReadUser   = regexp.MustCompile(`\bFile\.(?:read|readlines|write|open|binread|binwrite|delete|unlink|rename)\s*\(\s*(?:params|request|session|cookies)\s*\[`)
 	reFileReadInterp = regexp.MustCompile(`\bFile\.(?:read|readlines|write|open|binread|binwrite|delete|unlink|rename)\s*\(\s*"[^"]*#\{\s*(?:params|request|session|cookies)`)
-	reFileReadVar   = regexp.MustCompile(`\bFile\.(?:read|readlines|write|open|binread|binwrite|delete|unlink|rename)\s*\(\s*[a-z_]\w*\s*[,)]`)
+	reFileReadVar    = regexp.MustCompile(`\bFile\.(?:read|readlines|write|open|binread|binwrite|delete|unlink|rename)\s*\(\s*[a-z_]\w*\s*[,)]`)
 )
 
 func init() {
@@ -79,15 +78,18 @@ func init() {
 
 type RubySendUserMethod struct{}
 
-func (r *RubySendUserMethod) ID() string                      { return "BATOU-RB-013" }
-func (r *RubySendUserMethod) Name() string                    { return "RubySendUserMethod" }
-func (r *RubySendUserMethod) Description() string             { return "Detects Ruby send/public_send/__send__ with user-controlled method name via interpolation or params, enabling arbitrary method invocation." }
+func (r *RubySendUserMethod) ID() string   { return "BATOU-RB-013" }
+func (r *RubySendUserMethod) Name() string { return "RubySendUserMethod" }
+func (r *RubySendUserMethod) Description() string {
+	return "Detects Ruby send/public_send/__send__ with user-controlled method name via interpolation or params, enabling arbitrary method invocation."
+}
 func (r *RubySendUserMethod) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RubySendUserMethod) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
 func (r *RubySendUserMethod) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -95,9 +97,9 @@ func (r *RubySendUserMethod) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reSendInterp.FindString(line); m != "" {
+		if m := rules.GFindLower(reSendInterp, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSendParamsIndex.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSendParamsIndex, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -132,20 +134,23 @@ func (r *RubySendUserMethod) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RubyConstantize struct{}
 
-func (r *RubyConstantize) ID() string                      { return "BATOU-RB-014" }
-func (r *RubyConstantize) Name() string                    { return "RubyConstantize" }
-func (r *RubyConstantize) Description() string             { return "Detects Ruby constantize/classify with user input, enabling arbitrary class instantiation." }
+func (r *RubyConstantize) ID() string   { return "BATOU-RB-014" }
+func (r *RubyConstantize) Name() string { return "RubyConstantize" }
+func (r *RubyConstantize) Description() string {
+	return "Detects Ruby constantize/classify with user input, enabling arbitrary class instantiation."
+}
 func (r *RubyConstantize) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RubyConstantize) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
 func (r *RubyConstantize) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Quick bail: no constantize/classify in the file
-	if !reConstantize.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reConstantize, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -154,9 +159,9 @@ func (r *RubyConstantize) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		confidence := "high"
 
-		if m := reConstantizeUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reConstantizeUser, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reConstantizeInterp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reConstantizeInterp, line, lowered[i]); m != "" {
 			// Only flag if user input source nearby
 			if hasNearbyPattern(lines, i, reUserInputSource) {
 				matched = m
@@ -195,15 +200,18 @@ func (r *RubyConstantize) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RubyOpenCmdPipe struct{}
 
-func (r *RubyOpenCmdPipe) ID() string                      { return "BATOU-RB-015" }
-func (r *RubyOpenCmdPipe) Name() string                    { return "RubyOpenCmdPipe" }
-func (r *RubyOpenCmdPipe) Description() string             { return "Detects Ruby Kernel#open with user-controlled path, which allows command injection if input starts with pipe character." }
+func (r *RubyOpenCmdPipe) ID() string   { return "BATOU-RB-015" }
+func (r *RubyOpenCmdPipe) Name() string { return "RubyOpenCmdPipe" }
+func (r *RubyOpenCmdPipe) Description() string {
+	return "Detects Ruby Kernel#open with user-controlled path, which allows command injection if input starts with pipe character."
+}
 func (r *RubyOpenCmdPipe) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RubyOpenCmdPipe) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
 func (r *RubyOpenCmdPipe) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -211,9 +219,9 @@ func (r *RubyOpenCmdPipe) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reOpenUserPath.FindString(line); m != "" {
+		if m := rules.GFindLower(reOpenUserPath, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reOpenInterp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reOpenInterp, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -248,15 +256,20 @@ func (r *RubyOpenCmdPipe) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RubyKernelSystemInterp struct{}
 
-func (r *RubyKernelSystemInterp) ID() string                      { return "BATOU-RB-016" }
-func (r *RubyKernelSystemInterp) Name() string                    { return "RubyKernelSystemInterp" }
-func (r *RubyKernelSystemInterp) Description() string             { return "Detects Ruby Kernel.system or system() with string interpolation, enabling command injection." }
+func (r *RubyKernelSystemInterp) ID() string   { return "BATOU-RB-016" }
+func (r *RubyKernelSystemInterp) Name() string { return "RubyKernelSystemInterp" }
+func (r *RubyKernelSystemInterp) Description() string {
+	return "Detects Ruby Kernel.system or system() with string interpolation, enabling command injection."
+}
 func (r *RubyKernelSystemInterp) DefaultSeverity() rules.Severity { return rules.High }
-func (r *RubyKernelSystemInterp) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
+func (r *RubyKernelSystemInterp) Languages() []rules.Language {
+	return []rules.Language{rules.LangRuby}
+}
 
 func (r *RubyKernelSystemInterp) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -264,9 +277,9 @@ func (r *RubyKernelSystemInterp) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reKernelSystemInterp.FindString(line); m != "" {
+		if m := rules.GFindLower(reKernelSystemInterp, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reSystemInterpGeneric.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSystemInterpGeneric, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -301,15 +314,18 @@ func (r *RubyKernelSystemInterp) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RubyYAMLLoadUntrusted struct{}
 
-func (r *RubyYAMLLoadUntrusted) ID() string                      { return "BATOU-RB-017" }
-func (r *RubyYAMLLoadUntrusted) Name() string                    { return "RubyYAMLLoadUntrusted" }
-func (r *RubyYAMLLoadUntrusted) Description() string             { return "Detects Ruby YAML.load with untrusted input sources (params, request body, IO, network), enabling unsafe deserialization." }
+func (r *RubyYAMLLoadUntrusted) ID() string   { return "BATOU-RB-017" }
+func (r *RubyYAMLLoadUntrusted) Name() string { return "RubyYAMLLoadUntrusted" }
+func (r *RubyYAMLLoadUntrusted) Description() string {
+	return "Detects Ruby YAML.load with untrusted input sources (params, request body, IO, network), enabling unsafe deserialization."
+}
 func (r *RubyYAMLLoadUntrusted) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RubyYAMLLoadUntrusted) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
 func (r *RubyYAMLLoadUntrusted) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -318,10 +334,10 @@ func (r *RubyYAMLLoadUntrusted) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reYAMLLoadUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reYAMLLoadUser, line, lowered[i]); m != "" {
 			matched = m
 			desc = "YAML.load() is called with user-controlled data (params, request body, etc.). YAML.load deserializes arbitrary Ruby objects, allowing gadget chain attacks for remote code execution."
-		} else if m := reYAMLLoadIO.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reYAMLLoadIO, line, lowered[i]); m != "" {
 			matched = m
 			desc = "YAML.load() is called with data from a file or network source. If the source is user-controlled or untrusted, an attacker can inject malicious YAML to achieve code execution."
 		}
@@ -357,15 +373,18 @@ func (r *RubyYAMLLoadUntrusted) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RubyRegexpReDoS struct{}
 
-func (r *RubyRegexpReDoS) ID() string                      { return "BATOU-RB-018" }
-func (r *RubyRegexpReDoS) Name() string                    { return "RubyRegexpReDoS" }
-func (r *RubyRegexpReDoS) Description() string             { return "Detects Ruby regex construction with user input via interpolation or Regexp.new, enabling ReDoS attacks." }
+func (r *RubyRegexpReDoS) ID() string   { return "BATOU-RB-018" }
+func (r *RubyRegexpReDoS) Name() string { return "RubyRegexpReDoS" }
+func (r *RubyRegexpReDoS) Description() string {
+	return "Detects Ruby regex construction with user input via interpolation or Regexp.new, enabling ReDoS attacks."
+}
 func (r *RubyRegexpReDoS) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *RubyRegexpReDoS) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
 func (r *RubyRegexpReDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -373,9 +392,9 @@ func (r *RubyRegexpReDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 
-		if m := reRegexpSlashInterp.FindString(line); m != "" {
+		if m := rules.GFindLower(reRegexpSlashInterp, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reRegexpNewDynamic.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reRegexpNewDynamic, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -410,20 +429,23 @@ func (r *RubyRegexpReDoS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RubyERBNewUser struct{}
 
-func (r *RubyERBNewUser) ID() string                      { return "BATOU-RB-019" }
-func (r *RubyERBNewUser) Name() string                    { return "RubyERBNewUser" }
-func (r *RubyERBNewUser) Description() string             { return "Detects Ruby ERB.new with user-controlled template data, enabling server-side template injection (SSTI)." }
+func (r *RubyERBNewUser) ID() string   { return "BATOU-RB-019" }
+func (r *RubyERBNewUser) Name() string { return "RubyERBNewUser" }
+func (r *RubyERBNewUser) Description() string {
+	return "Detects Ruby ERB.new with user-controlled template data, enabling server-side template injection (SSTI)."
+}
 func (r *RubyERBNewUser) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RubyERBNewUser) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
 func (r *RubyERBNewUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Quick bail
-	if !reERBNew.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reERBNew, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -432,9 +454,9 @@ func (r *RubyERBNewUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		confidence := "high"
 
-		if m := reERBNewUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reERBNewUser, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reERBNewVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reERBNewVar, line, lowered[i]); m != "" {
 			if hasNearbyPattern(lines, i, reUserInputSource) {
 				matched = m
 				confidence = "medium"
@@ -472,15 +494,18 @@ func (r *RubyERBNewUser) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RubyFilePathTraversal struct{}
 
-func (r *RubyFilePathTraversal) ID() string                      { return "BATOU-RB-020" }
-func (r *RubyFilePathTraversal) Name() string                    { return "RubyFilePathTraversal" }
-func (r *RubyFilePathTraversal) Description() string             { return "Detects Ruby File.read/write/open/delete with user-controlled path, enabling path traversal attacks." }
+func (r *RubyFilePathTraversal) ID() string   { return "BATOU-RB-020" }
+func (r *RubyFilePathTraversal) Name() string { return "RubyFilePathTraversal" }
+func (r *RubyFilePathTraversal) Description() string {
+	return "Detects Ruby File.read/write/open/delete with user-controlled path, enabling path traversal attacks."
+}
 func (r *RubyFilePathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RubyFilePathTraversal) Languages() []rules.Language     { return []rules.Language{rules.LangRuby} }
 
 func (r *RubyFilePathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -489,11 +514,11 @@ func (r *RubyFilePathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		confidence := "high"
 
-		if m := reFileReadUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reFileReadUser, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reFileReadInterp.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reFileReadInterp, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reFileReadVar.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reFileReadVar, line, lowered[i]); m != "" {
 			if hasNearbyPattern(lines, i, reUserInputSource) {
 				matched = m
 				confidence = "medium"

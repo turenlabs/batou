@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
 	_ "github.com/turenlabs/batou-core/taintrule"
 )
 

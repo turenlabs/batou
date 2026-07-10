@@ -1,12 +1,12 @@
 package languages
 
 import (
-	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
+	"github.com/turenlabs/batou-rules/rules"
 )
 
 func (c *GoCatalog) Sinks() []taint.SinkDef {
-	return []taint.SinkDef{
+	return append([]taint.SinkDef{
 		// --- SQL Injection (CWE-89) ---
 		{
 			ID:            "go.database.sql.query",
@@ -91,12 +91,18 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 
 		// --- Path Traversal / File Write (CWE-22) ---
 		{
-			ID:            "go.os.open",
-			Category:      taint.SnkFileWrite,
-			Language:      rules.LangGo,
-			Pattern:       `os\.Open\(`,
+			ID:       "go.os.open",
+			Category: taint.SnkFileWrite,
+			Language: rules.LangGo,
+			Pattern:  `os\.Open\(`,
+			// MethodName is package-qualified on purpose: a bare "Open"
+			// matches ANY receiver's .Open() in the AST matcher when the
+			// receiver type is unknown — zip.Reader.Open(entryName) and
+			// friends read from inside the archive, not the filesystem,
+			// and were mislabeled as CWE-22 (same package-blind family as
+			// the ssaflow methodComponents fix).
 			ObjectType:    "",
-			MethodName:    "Open",
+			MethodName:    "os.Open",
 			DangerousArgs: []int{0},
 			Severity:      rules.High,
 			Description:   "File open with potentially tainted path",
@@ -143,12 +149,29 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			OWASPCategory: "A01:2021-Broken Access Control",
 		},
 		{
-			ID:            "go.filepath.join",
+			ID:            "go.os.link",
 			Category:      taint.SnkFileWrite,
 			Language:      rules.LangGo,
-			Pattern:       `filepath\.Join\(`,
+			Pattern:       `os\.Link\(`,
 			ObjectType:    "",
-			MethodName:    "Join",
+			MethodName:    "Link",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Hard link creation with potentially tainted path (external control of file name)",
+			CWEID:         "CWE-73",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:         "go.filepath.join",
+			Category:   taint.SnkFileWrite,
+			Language:   rules.LangGo,
+			Pattern:    `(?:filepath|path)\.Join\(`,
+			ObjectType: "",
+			// Package-qualified so the AST/SSA matchers verify the receiver
+			// package is filepath/path — bare "Join" matched any package-level
+			// Join (errors.Join, strings.Join), producing path-traversal FPs on
+			// error-aggregation and string-joining calls.
+			MethodName:    "filepath.Join/path.Join",
 			DangerousArgs: []int{1},
 			Severity:      rules.Medium,
 			Description:   "File path construction with potentially tainted component",
@@ -213,6 +236,79 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 		},
 
 		// --- Open Redirect (CWE-601) ---
+		// fasthttp RequestCtx.Redirect must be declared before the bare
+		// MethodName="Redirect" net/http entry below. The package-level
+		// entry uses a single-component MethodName which matches any
+		// ".Redirect(...)" call, so without this ordering, ctx.Redirect on a
+		// *fasthttp.RequestCtx would fall through to go.http.redirect's
+		// DangerousArgs=[2] (wrong index for fasthttp).
+		{
+			ID:            "go.fasthttp.ctx.redirect",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangGo,
+			Pattern:       `ctx\.Redirect\s*\(`,
+			ObjectType:    "*fasthttp.RequestCtx",
+			MethodName:    "Redirect",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "fasthttp RequestCtx.Redirect with potentially tainted URL (open redirect)",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// Gitea / Macaron-style wrapped Redirect. Same shape as fasthttp's
+		// ctx.Redirect but operating on a different context type. The
+		// canonical Gitea open-redirect CVE pattern (CVE-2021-45328 /
+		// CVE-2022-1058) was a route handler reading a user-supplied
+		// `?redirect_to=` query param and passing it straight to
+		// ctx.Redirect with no relative-URL / scheme check.
+		{
+			ID:            "go.gitea.ctx.redirect",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangGo,
+			Pattern:       `ctx\.Redirect(?:To)?\s*\(`,
+			ObjectType:    "*code.gitea.io/gitea/modules/context.Context",
+			MethodName:    "Redirect/RedirectTo",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Gitea/Macaron Context.Redirect / RedirectTo with potentially tainted URL — open redirect if the value isn't a relative path or scheme-allowlisted absolute URL",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		// Outbound HTTP from Gitea webhook delivery / migration / OpenID
+		// discovery — the canonical SSRF pathway behind CVE-2018-15192,
+		// CVE-2019-11228, CVE-2021-45325, CVE-2022-30781. The actual call
+		// site is `http.Client.Do(req)` / `client.Get(url)` — already
+		// covered by go.http.client.do — but Gitea wraps the URL in a
+		// `proxy.NewRequest(url, ...)` / `services/webhook.deliver(...)` /
+		// `services/migrations.NewDownloader(url)` helper. Match those
+		// wrapper signatures so taint reaches the sink even when the
+		// underlying http.Client isn't visible.
+		{
+			ID:            "go.gitea.webhook.deliver",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `webhook\.NewRequest\s*\(|webhook_service\.NewRequest\s*\(|notifier\.Deliver\s*\(`,
+			ObjectType:    "code.gitea.io/gitea/services/webhook",
+			MethodName:    "NewRequest/Deliver",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Gitea webhook NewRequest / Deliver with attacker-influenced URL — fires an outbound HTTP request to a user-configured endpoint (SSRF risk; CVE-2018-15192 class)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.gitea.migrations.downloader",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `migrations\.New\w+Downloader\s*\(|migration\.MigrateRepository\s*\(`,
+			ObjectType:    "code.gitea.io/gitea/services/migrations",
+			MethodName:    "NewDownloader/MigrateRepository",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "Gitea migrations.New<Type>Downloader / MigrateRepository with user-supplied remote URL — clones / pulls metadata from an attacker-controlled host (SSRF; CVE-2019-11228, CVE-2022-30781 class)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
 		{
 			ID:            "go.http.redirect",
 			Category:      taint.SnkRedirect,
@@ -266,6 +362,263 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			Description:   "Fiber redirect with potentially tainted URL",
 			CWEID:         "CWE-601",
 			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.fasthttp.redirectbytes",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangGo,
+			Pattern:       `\.RedirectBytes\(`,
+			ObjectType:    "*fasthttp.RequestCtx",
+			MethodName:    "RedirectBytes",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "fasthttp RedirectBytes with potentially tainted URL",
+		},
+		{
+			ID:            "go.fiber.redirect.route",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangGo,
+			Pattern:       `c\.Redirect\(\)\.Route\(`,
+			ObjectType:    "*fiber.Ctx",
+			MethodName:    "Redirect().Route",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Fiber redirect to named route with potentially tainted route name",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.iris.redirect",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangGo,
+			Pattern:       `\.Redirect\(`,
+			ObjectType:    "iris.Context",
+			MethodName:    "Redirect",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Iris redirect with potentially tainted URL",
+		},
+		{
+			ID:            "go.fiber.redirect.back",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangGo,
+			Pattern:       `c\.Redirect\(\)\.Back\(`,
+			ObjectType:    "*fiber.Ctx",
+			MethodName:    "Redirect().Back",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Fiber back redirect with potentially tainted fallback URL",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.buffalo.redirect",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangGo,
+			Pattern:       `\.Redirect\(`,
+			ObjectType:    "buffalo.Context",
+			MethodName:    "Redirect",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Buffalo redirect with potentially tainted URL (arg 1 after status code)",
+		},
+		{
+			ID:            "go.http.redirecthandler",
+			Category:      taint.SnkRedirect,
+			Language:      rules.LangGo,
+			Pattern:       `http\.RedirectHandler\s*\(`,
+			ObjectType:    "",
+			MethodName:    "http.RedirectHandler",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "net/http RedirectHandler with potentially tainted URL",
+			CWEID:         "CWE-601",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.fiber.sendstring",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `c\.SendString\s*\(`,
+			ObjectType:    "*fiber.Ctx",
+			MethodName:    "SendString",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Fiber SendString response with potentially tainted data (XSS if Content-Type is HTML)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.fiber.sendfile",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangGo,
+			Pattern:       `c\.SendFile\s*\(`,
+			ObjectType:    "*fiber.Ctx",
+			MethodName:    "SendFile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Fiber SendFile with user-controlled path (path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.fiber.download",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangGo,
+			Pattern:       `c\.Download\s*\(`,
+			ObjectType:    "*fiber.Ctx",
+			MethodName:    "Download",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Fiber Download with user-controlled path (path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.fiber.render",
+			Category:      taint.SnkTemplate,
+			Language:      rules.LangGo,
+			Pattern:       `c\.Render\s*\(`,
+			ObjectType:    "*fiber.Ctx",
+			MethodName:    "Render",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "Fiber template rendering with potentially tainted data",
+			CWEID:         "CWE-1336",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.fiber.append",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangGo,
+			Pattern:       `c\.Append\s*\(`,
+			ObjectType:    "*fiber.Ctx",
+			MethodName:    "Append",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "Fiber response header append with potentially tainted value",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- fasthttp framework (valyala/fasthttp) SSRF (CWE-918) ---
+		// Declared before the net/http generic SSRF sinks below so that
+		// package-prefixed MethodName values ("fasthttp.Get", etc.) are
+		// matched first and don't fall through to the bare "Get"/"Head"/
+		// "Post" catch-all entries.
+		{
+			ID:            "go.fasthttp.get",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `fasthttp\.Get\s*\(`,
+			ObjectType:    "",
+			MethodName:    "fasthttp.Get",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "fasthttp.Get with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.fasthttp.gettimeout",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `fasthttp\.GetTimeout\s*\(`,
+			ObjectType:    "",
+			MethodName:    "fasthttp.GetTimeout",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "fasthttp.GetTimeout with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.fasthttp.getdeadline",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `fasthttp\.GetDeadline\s*\(`,
+			ObjectType:    "",
+			MethodName:    "fasthttp.GetDeadline",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "fasthttp.GetDeadline with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.fasthttp.post",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `fasthttp\.Post\s*\(`,
+			ObjectType:    "",
+			MethodName:    "fasthttp.Post",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "fasthttp.Post with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.fasthttp.do",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `fasthttp\.Do\s*\(`,
+			ObjectType:    "",
+			MethodName:    "fasthttp.Do",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "fasthttp.Do with potentially tainted Request (SSRF via Request URI)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			// (*net/http.Client).Do(req) / http.DefaultClient.Do(req): the
+			// canonical SSRF sink. ObjectType-gated to *http.Client so the
+			// receiver-type matcher resolves it precisely. The stale comment
+			// at the webhook block referenced "go.http.client.do" but no such
+			// entry was ever defined — these calls were only ever caught
+			// package-blind via the fasthttp.Do bug. This is the correctly
+			// labelled replacement that survives the ssaflow matcher fix.
+			ID:            "go.http.client.do",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Do\s*\(`,
+			ObjectType:    "*http.Client",
+			MethodName:    "Do",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "(*http.Client).Do with a potentially tainted request URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- fasthttp RequestCtx response sinks (body / XSS) ---
+		// ctx.Redirect is declared earlier in this file, above go.http.redirect.
+		{
+			ID:            "go.fasthttp.ctx.setbodystring",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `ctx\.SetBodyString\s*\(`,
+			ObjectType:    "*fasthttp.RequestCtx",
+			MethodName:    "SetBodyString",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "fasthttp RequestCtx.SetBodyString with tainted input (XSS if HTML)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.fasthttp.ctx.setbody",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `ctx\.SetBody\s*\(`,
+			ObjectType:    "*fasthttp.RequestCtx",
+			MethodName:    "SetBody",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "fasthttp RequestCtx.SetBody with tainted input (XSS if HTML)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
 		},
 
 		// --- SSRF: Additional patterns (CWE-918) ---
@@ -335,6 +688,123 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			DangerousArgs: []int{0},
 			Severity:      rules.Medium,
 			Description:   "Storing potentially tainted data in gorilla session (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.scs.session.put",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `\.Put\s*\(`,
+			ObjectType:    "*scs.SessionManager",
+			MethodName:    "Put",
+			DangerousArgs: []int{2},
+			Severity:      rules.Medium,
+			Description:   "Storing potentially tainted data in SCS session (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.gin.session.set",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `session\.Set\s*\(`,
+			ObjectType:    "sessions.Session",
+			MethodName:    "Set",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "Storing potentially tainted data in gin session (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.fiber.session.set",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `sess\.Set\s*\(`,
+			ObjectType:    "*fiber.Session",
+			MethodName:    "Set",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "Storing potentially tainted data in Fiber session (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.redis.trust.set",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `\.Set\s*\(\s*ctx`,
+			ObjectType:    "*redis.Client",
+			MethodName:    "Set",
+			DangerousArgs: []int{2},
+			Severity:      rules.Medium,
+			Description:   "Storing potentially tainted data in Redis (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.redis.trust.hset",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `\.HSet\s*\(`,
+			ObjectType:    "*redis.Client",
+			MethodName:    "HSet",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "Storing potentially tainted data in Redis hash (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.redis.trust.setnx",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `\.SetNX\s*\(`,
+			ObjectType:    "*redis.Client",
+			MethodName:    "SetNX",
+			DangerousArgs: []int{2},
+			Severity:      rules.Medium,
+			Description:   "Storing potentially tainted data in Redis via SetNX (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.memcache.set",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `\.Set\s*\(\s*&memcache\.Item`,
+			ObjectType:    "*memcache.Client",
+			MethodName:    "Set",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "Storing potentially tainted data in Memcache (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.os.setenv",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `os\.Setenv\s*\(`,
+			ObjectType:    "",
+			MethodName:    "os.Setenv",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "Setting environment variable with potentially tainted data (trust boundary violation)",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.context.withvalue",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `context\.WithValue\s*\(`,
+			ObjectType:    "",
+			MethodName:    "context.WithValue",
+			DangerousArgs: []int{2},
+			Severity:      rules.Medium,
+			Description:   "Storing potentially tainted data in context (trust boundary violation)",
 			CWEID:         "CWE-501",
 			OWASPCategory: "A04:2021-Insecure Design",
 		},
@@ -444,15 +914,87 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-79",
 			OWASPCategory: "A03:2021-Injection",
 		},
+		{
+			// io.WriteString(w, tainted) — writes a string directly to an
+			// io.Writer. When the writer is the HTTP ResponseWriter, tainted
+			// data is reflected into the response body unescaped (reflected
+			// XSS if Content-Type is text/html). MethodName carries the
+			// "io." package prefix so matchesPackageCall verifies the call
+			// resolves to the io package and the first arg is gated to a
+			// ResponseWriter-named receiver below, avoiding collisions with
+			// unrelated io.WriteString-to-buffer calls.
+			ID:            "go.io.writestring.response",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `io\.WriteString\(\s*w\b`,
+			ObjectType:    "",
+			MethodName:    "io.WriteString",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "io.WriteString to HTTP response writer with potentially tainted data (reflected XSS)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			// http.Error(w, taintedMsg, code) — writes the message string
+			// to the response body (plus a trailing newline). A tainted
+			// error message is reflected unescaped (reflected XSS / content
+			// spoofing). MethodName "http.Error" forces package-prefix
+			// verification so the common err.Error()/c.Error() method calls
+			// do not match.
+			ID:            "go.http.error.response",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `http\.Error\(\s*w\b`,
+			ObjectType:    "",
+			MethodName:    "http.Error",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "http.Error reflects a potentially tainted message into the HTTP response (reflected XSS / content spoofing)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- CSV / spreadsheet formula injection (CWE-1236) ---
+		// encoding/csv (*csv.Writer).WriteAll([][]string) — when the records
+		// hold user-controlled cell values, strings beginning with =, +, -, @,
+		// tab or CR are interpreted as formulas by Excel / LibreOffice / Google
+		// Sheets when the exported file is opened (DDE / command execution on
+		// the viewer's machine). Receiver-bound to *csv.Writer so unrelated
+		// WriteAll methods (csv from a third-party lib, bufio, etc.) don't
+		// match. (Module/RequireModule is not used: the receiver is a typed
+		// local — `w := csv.NewWriter(...)` — not a package alias, so module
+		// binding can't apply; the *csv.Writer ObjectType is the real
+		// constraint.) (*csv.Writer).Write is intentionally NOT a sink: bare
+		// `w.Write(` collides with the http.ResponseWriter.Write sink (CWE-79)
+		// under astflow's name-based receiver matching, and disambiguating it
+		// is out of scope here. WriteAll is collision-free.
+		{
+			ID:            "go.encoding.csv.writeall",
+			Category:      taint.SnkCSV,
+			Language:      rules.LangGo,
+			Pattern:       `\.WriteAll\s*\(`,
+			ObjectType:    "csv.Writer",
+			MethodName:    "WriteAll",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "encoding/csv (*csv.Writer).WriteAll() with user-controlled records — cell values beginning with =, +, -, @ become formulas when the CSV is opened in a spreadsheet (CSV/formula injection)",
+			CWEID:         "CWE-1236",
+			OWASPCategory: "A03:2021-Injection",
+		},
 
 		// --- SSRF (CWE-918) ---
 		{
-			ID:            "go.http.get",
-			Category:      taint.SnkURLFetch,
-			Language:      rules.LangGo,
-			Pattern:       `http\.Get\(`,
-			ObjectType:    "",
-			MethodName:    "Get",
+			ID:         "go.http.get",
+			Category:   taint.SnkURLFetch,
+			Language:   rules.LangGo,
+			Pattern:    `http\.Get\(`,
+			ObjectType: "",
+			// Package-qualified so the AST/SSA matchers verify the receiver
+			// package is net/http — bare "Get" matched any package-level Get and
+			// any `x.Get(...)` whose receiver name is unresolved (e.g. in-memory
+			// `cache.Get(key)`), producing SSRF FPs on non-HTTP lookups.
+			MethodName:    "http.Get",
 			DangerousArgs: []int{0},
 			Severity:      rules.High,
 			Description:   "HTTP GET with potentially tainted URL (SSRF)",
@@ -469,6 +1011,58 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			DangerousArgs: []int{1},
 			Severity:      rules.High,
 			Description:   "HTTP request construction with potentially tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- Raw-socket SSRF below the HTTP layer (CWE-918) ---
+		// A tainted host:port reaching net.Dial / net.DialContext / tls.Dial
+		// opens an outbound TCP/TLS connection to an attacker-chosen
+		// destination (internal services, cloud metadata, etc.) — SSRF that
+		// HTTP-client sinks miss. MethodName carries the package prefix so
+		// matchesPackageCall verifies net./tls. and bare *.Dial( method calls
+		// on unrelated receivers (e.g. a driver's conn.Dial) do not match.
+		{
+			// net.Dial(network, address) — address is arg 1.
+			ID:            "go.net.dial",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `net\.Dial\(`,
+			ObjectType:    "",
+			MethodName:    "net.Dial",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "net.Dial with potentially tainted address opens an outbound connection to an attacker-controlled host:port (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			// (*net.Dialer).DialContext(ctx, network, address) — address is
+			// arg 2. DialContext is a method on net.Dialer (not a package
+			// func), so this is receiver-bound to *net.Dialer.
+			ID:            "go.net.dialer.dialcontext",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.DialContext\(`,
+			ObjectType:    "*net.Dialer",
+			MethodName:    "DialContext",
+			DangerousArgs: []int{2},
+			Severity:      rules.High,
+			Description:   "net.Dialer.DialContext with potentially tainted address opens an outbound connection to an attacker-controlled host:port (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			// tls.Dial(network, addr, config) — addr is arg 1.
+			ID:            "go.tls.dial",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `tls\.Dial\(`,
+			ObjectType:    "",
+			MethodName:    "tls.Dial",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "tls.Dial with potentially tainted address opens an outbound TLS connection to an attacker-controlled host:port (SSRF)",
 			CWEID:         "CWE-918",
 			OWASPCategory: "A10:2021-Server-Side Request Forgery",
 		},
@@ -1055,6 +1649,110 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-643",
 			OWASPCategory: "A03:2021-Injection",
 		},
+		{
+			ID:            "go.xmlquery.find",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangGo,
+			Pattern:       `xmlquery\.Find\s*\(|xmlquery\.FindOne\s*\(`,
+			ObjectType:    "",
+			MethodName:    "xmlquery.Find/xmlquery.FindOne",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "antchfx/xmlquery Find/FindOne with tainted XPath expression",
+			CWEID:         "CWE-643",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.xmlquery.query",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangGo,
+			Pattern:       `xmlquery\.Query\s*\(|xmlquery\.QueryAll\s*\(`,
+			ObjectType:    "",
+			MethodName:    "xmlquery.Query/xmlquery.QueryAll",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "antchfx/xmlquery Query/QueryAll with tainted XPath expression",
+			CWEID:         "CWE-643",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.xmlquery.findeach",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangGo,
+			Pattern:       `xmlquery\.FindEach\s*\(|xmlquery\.FindEachWithBreak\s*\(`,
+			ObjectType:    "",
+			MethodName:    "xmlquery.FindEach/xmlquery.FindEachWithBreak",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "antchfx/xmlquery FindEach iteration with tainted XPath expression",
+			CWEID:         "CWE-643",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.jsonquery.find",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangGo,
+			Pattern:       `jsonquery\.Find\s*\(|jsonquery\.FindOne\s*\(`,
+			ObjectType:    "",
+			MethodName:    "jsonquery.Find/jsonquery.FindOne",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "antchfx/jsonquery Find/FindOne with tainted XPath expression",
+			CWEID:         "CWE-643",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.jsonquery.query",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangGo,
+			Pattern:       `jsonquery\.Query\s*\(|jsonquery\.QueryAll\s*\(`,
+			ObjectType:    "",
+			MethodName:    "jsonquery.Query/jsonquery.QueryAll",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "antchfx/jsonquery Query/QueryAll with tainted XPath expression",
+			CWEID:         "CWE-643",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.etree.compilepath",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangGo,
+			Pattern:       `etree\.CompilePath\s*\(|etree\.MustCompilePath\s*\(`,
+			ObjectType:    "",
+			MethodName:    "etree.CompilePath/etree.MustCompilePath",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "beevik/etree CompilePath/MustCompilePath with tainted XPath-style path expression",
+			CWEID:         "CWE-643",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.antchfx.xpath.select",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangGo,
+			Pattern:       `xpath\.Select\s*\(`,
+			ObjectType:    "",
+			MethodName:    "xpath.Select",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "antchfx/xpath Select with tainted expression",
+			CWEID:         "CWE-643",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.antchfx.xpath.compilewithns",
+			Category:      taint.SnkXPath,
+			Language:      rules.LangGo,
+			Pattern:       `xpath\.CompileWithNS\s*\(`,
+			ObjectType:    "",
+			MethodName:    "xpath.CompileWithNS",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "antchfx/xpath CompileWithNS with tainted expression",
+			CWEID:         "CWE-643",
+			OWASPCategory: "A03:2021-Injection",
+		},
 
 		// --- Template Injection (CWE-1336) ---
 		{
@@ -1125,6 +1823,161 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			OWASPCategory: "A10:2021-Server-Side Request Forgery",
 		},
 
+		// --- go-resty/resty SSRF (CWE-918) ---
+		// resty is a popular Go HTTP client (https://github.com/go-resty/resty).
+		// These entries target unique resty method names that don't collide with
+		// net/http so astflow can attribute findings precisely to the resty API
+		// via typeEnv. (For chained calls like client.R().Get(url), the existing
+		// net/http SSRF entries already catch the flow via the generic method
+		// fallback in matchesPackageCall.)
+		{
+			ID:            "go.resty.client.setbaseurl",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.SetBaseURL\s*\(`,
+			ObjectType:    "*resty.Client",
+			MethodName:    "SetBaseURL",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "resty Client.SetBaseURL with tainted URL (SSRF via base URL config)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.resty.client.sethosturl",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.SetHostURL\s*\(`,
+			ObjectType:    "*resty.Client",
+			MethodName:    "SetHostURL",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "resty Client.SetHostURL (deprecated alias for SetBaseURL) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.resty.client.setproxy",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.SetProxy\s*\(`,
+			ObjectType:    "*resty.Client",
+			MethodName:    "SetProxy",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "resty Client.SetProxy with tainted proxy URL (SSRF / outbound redirection)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.resty.request.execute",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Execute\s*\(`,
+			ObjectType:    "*resty.Request",
+			MethodName:    "Execute",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "resty Request.Execute(method, url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		// resty Request.{Get,Post,Put,Delete,Patch,Head,Options}(url) are the
+		// canonical per-verb shortcuts on *resty.Request. Each takes the URL as
+		// arg 0 and dispatches through the same outbound HTTP path as Execute,
+		// so a tainted URL is the same SSRF surface (CWE-918).
+		{
+			ID:            "go.resty.request.get",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Get\s*\(`,
+			ObjectType:    "*resty.Request",
+			MethodName:    "Get",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "resty Request.Get(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.resty.request.post",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Post\s*\(`,
+			ObjectType:    "*resty.Request",
+			MethodName:    "Post",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "resty Request.Post(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.resty.request.put",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Put\s*\(`,
+			ObjectType:    "*resty.Request",
+			MethodName:    "Put",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "resty Request.Put(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.resty.request.delete",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Delete\s*\(`,
+			ObjectType:    "*resty.Request",
+			MethodName:    "Delete",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "resty Request.Delete(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.resty.request.patch",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Patch\s*\(`,
+			ObjectType:    "*resty.Request",
+			MethodName:    "Patch",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "resty Request.Patch(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.resty.request.head",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Head\s*\(`,
+			ObjectType:    "*resty.Request",
+			MethodName:    "Head",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "resty Request.Head(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.resty.request.options",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Options\s*\(`,
+			ObjectType:    "*resty.Request",
+			MethodName:    "Options",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "resty Request.Options(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
 		// --- HTTP Header Injection (CWE-113) ---
 		{
 			ID:            "go.http.header.set",
@@ -1153,6 +2006,37 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			OWASPCategory: "A03:2021-Injection",
 		},
 
+		// --- go-resty/resty HTTP Header Injection (CWE-113) ---
+		// resty's SetHeader / SetHeaderVerbatim write straight to http.Header.Set
+		// internally, which does not strip CRLF. A tainted value in the header
+		// body can splice additional headers into the outbound request.
+		{
+			ID:            "go.resty.request.setheader",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangGo,
+			Pattern:       `\.SetHeader\s*\(`,
+			ObjectType:    "*resty.Request",
+			MethodName:    "SetHeader",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "resty SetHeader with tainted header value (CRLF header injection)",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.resty.request.setheaderverbatim",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangGo,
+			Pattern:       `\.SetHeaderVerbatim\s*\(`,
+			ObjectType:    "*resty.Request",
+			MethodName:    "SetHeaderVerbatim",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "resty SetHeaderVerbatim with tainted header value (CRLF header injection, preserves case)",
+			CWEID:         "CWE-113",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
 		// --- Framework HTML Output (CWE-79) ---
 		{
 			ID:            "go.gin.html",
@@ -1177,6 +2061,110 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			DangerousArgs: []int{1},
 			Severity:      rules.Medium,
 			Description:   "Echo HTML response with tainted data",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		// ozzo-routing writes the response body via *routing.Context.Write
+		// (and WriteWithStatus). The payload (arg 0) is sent to the client
+		// through the configured DataWriter without HTML escaping — a string
+		// or []byte goes out verbatim, so tainted input reflected into an
+		// HTML response is reflected XSS. Receiver-scoped to *routing.Context
+		// so it does not collide with io.Writer.Write / http.ResponseWriter.
+		{
+			ID:            "go.ozzo.routing.context.write",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `\.Write\s*\(`,
+			ObjectType:    "*routing.Context",
+			MethodName:    "Write",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "ozzo-routing *routing.Context.Write reflects potentially tainted data into the response body (reflected XSS if served as HTML)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.ozzo.routing.context.writewithstatus",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `\.WriteWithStatus\s*\(`,
+			ObjectType:    "*routing.Context",
+			MethodName:    "WriteWithStatus",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "ozzo-routing *routing.Context.WriteWithStatus reflects potentially tainted data into the response body (reflected XSS if served as HTML)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Framework reflected-text body output (CWE-79) ---
+		// gin/echo write the response body directly from a tainted string or
+		// byte slice. The values are NOT HTML-escaped, so if the response is
+		// rendered as HTML (text/html via c.Data/c.Blob content-type, or a
+		// browser sniffing c.String output) tainted input is reflected
+		// verbatim — reflected XSS. Receiver-bound to the framework context
+		// type (c/ctx naming heuristic) so unrelated .String/.Data/.Blob
+		// methods on other receivers do not match.
+		{
+			// gin.Context.String(code int, format string, values ...any)
+			// — the format string (arg 1) and trailing values (arg 2) are
+			// reflected into the body.
+			ID:            "go.gin.string",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `c\.String\s*\(`,
+			ObjectType:    "*gin.Context",
+			MethodName:    "String",
+			DangerousArgs: []int{1, 2},
+			Severity:      rules.Medium,
+			Description:   "Gin Context.String reflects potentially tainted data into the response body (reflected XSS if rendered as HTML)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			// gin.Context.Data(code int, contentType string, data []byte)
+			// — raw bytes written to the body; tainted data (arg 2) reflected
+			// unescaped, XSS when contentType is text/html.
+			ID:            "go.gin.data",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `c\.Data\s*\(`,
+			ObjectType:    "*gin.Context",
+			MethodName:    "Data",
+			DangerousArgs: []int{2},
+			Severity:      rules.Medium,
+			Description:   "Gin Context.Data writes potentially tainted raw bytes to the response body (reflected XSS if Content-Type is HTML)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			// echo.Context.String(code int, s string) — reflects the string
+			// (arg 1) into the body unescaped.
+			ID:            "go.echo.string",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `c\.String\s*\(`,
+			ObjectType:    "echo.Context",
+			MethodName:    "String",
+			DangerousArgs: []int{1},
+			Severity:      rules.Medium,
+			Description:   "Echo Context.String reflects potentially tainted data into the response body (reflected XSS if rendered as HTML)",
+			CWEID:         "CWE-79",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			// echo.Context.Blob(code int, contentType string, b []byte) —
+			// raw bytes (arg 2) reflected unescaped, XSS when contentType is
+			// text/html.
+			ID:            "go.echo.blob",
+			Category:      taint.SnkHTMLOutput,
+			Language:      rules.LangGo,
+			Pattern:       `c\.Blob\s*\(`,
+			ObjectType:    "echo.Context",
+			MethodName:    "Blob",
+			DangerousArgs: []int{2},
+			Severity:      rules.Medium,
+			Description:   "Echo Context.Blob writes potentially tainted raw bytes to the response body (reflected XSS if Content-Type is HTML)",
 			CWEID:         "CWE-79",
 			OWASPCategory: "A03:2021-Injection",
 		},
@@ -1211,7 +2199,7 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			OWASPCategory: "A01:2021-Broken Access Control",
 		},
 
-		// --- File Rename with Tainted Path (CWE-22) ---
+		// --- File Rename with Tainted Path (CWE-73) ---
 		{
 			ID:            "go.os.rename",
 			Category:      taint.SnkFileWrite,
@@ -1221,8 +2209,8 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			MethodName:    "Rename",
 			DangerousArgs: []int{0, 1},
 			Severity:      rules.High,
-			Description:   "File rename with potentially tainted source or destination path",
-			CWEID:         "CWE-22",
+			Description:   "File rename with potentially tainted source or destination path (external control of file name)",
+			CWEID:         "CWE-73",
 			OWASPCategory: "A01:2021-Broken Access Control",
 		},
 
@@ -1241,7 +2229,90 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			OWASPCategory: "A03:2021-Injection",
 		},
 
+		// Backtracking third-party regex engines (CWE-1333, SnkRegexDoS).
+		//
+		// The stdlib `regexp` package above uses RE2 and runs in guaranteed
+		// linear time, so it is NOT actually catastrophic-backtracking-prone
+		// (the entry above is kept for historical reasons). The real ReDoS
+		// exposure in Go comes from third-party libraries that implement a
+		// backtracking engine and accept the *pattern* (arg 0) from the
+		// caller:
+		//   - github.com/dlclark/regexp2 — .NET-compatible backtracking engine
+		//     (powers dop251/goja and others); supports lookaround/backrefs.
+		//   - github.com/GRbit/go-pcre & github.com/gijsbers/go-pcre — cgo PCRE
+		//     bindings; classic backtracking PCRE.
+		// Compiling an attacker-controlled pattern with any of these enables
+		// catastrophic backtracking → CPU exhaustion (denial of service).
+		// Mitigation: allowlist/validate the pattern, bound its length, or use
+		// the linear-time stdlib `regexp` (RE2) instead.
+		//
+		// NOTE: the bare `*.MustCompile` entry points (regexp2.MustCompile,
+		// pcre.MustCompile) are already flagged as CWE-1333 by the broad
+		// `go.regexp.compile` entry above (its "MustCompile" alternative
+		// matches any package), so they are intentionally NOT duplicated here
+		// to avoid a same-(line,CWE) dedup collision. The entries below cover
+		// the Compile / JIT variants that the broad entry does not reach.
+		{
+			ID:            "go.regexp2.compile",
+			Category:      taint.SnkRegexDoS,
+			Language:      rules.LangGo,
+			Pattern:       `regexp2\.Compile\s*\(`,
+			ObjectType:    "",
+			MethodName:    "regexp2.Compile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "dlclark/regexp2.Compile() with a tainted pattern — backtracking regex engine enables catastrophic-backtracking ReDoS (CPU exhaustion); validate/allowlist the pattern or use the linear-time stdlib regexp (RE2)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pcre.compile",
+			Category:      taint.SnkRegexDoS,
+			Language:      rules.LangGo,
+			Pattern:       `pcre\.Compile\s*\(`,
+			ObjectType:    "",
+			MethodName:    "pcre.Compile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "go-pcre Compile() with a tainted pattern — cgo PCRE backtracking engine enables catastrophic-backtracking ReDoS (CPU exhaustion); validate/allowlist the pattern or use the linear-time stdlib regexp (RE2)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pcre.compilejit",
+			Category:      taint.SnkRegexDoS,
+			Language:      rules.LangGo,
+			Pattern:       `pcre\.CompileJIT\s*\(`,
+			ObjectType:    "",
+			MethodName:    "pcre.CompileJIT",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "go-pcre CompileJIT() with a tainted pattern — JIT-compiled cgo PCRE backtracking engine enables catastrophic-backtracking ReDoS (CPU exhaustion); validate/allowlist the pattern or use the linear-time stdlib regexp (RE2)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pcre.mustcompilejit",
+			Category:      taint.SnkRegexDoS,
+			Language:      rules.LangGo,
+			Pattern:       `pcre\.MustCompileJIT\s*\(`,
+			ObjectType:    "",
+			MethodName:    "pcre.MustCompileJIT",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "go-pcre MustCompileJIT() with a tainted pattern — JIT-compiled cgo PCRE backtracking engine enables catastrophic-backtracking ReDoS (CPU exhaustion); validate/allowlist the pattern or use the linear-time stdlib regexp (RE2)",
+			CWEID:         "CWE-1333",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
 		// --- XML Deserialization (CWE-611) ---
+		// Go's encoding/xml is memory-safe: it decodes into typed structs and
+		// does NOT resolve external entities or DTDs (no classic XXE), and it
+		// cannot instantiate attacker-chosen types (unlike Java/PHP/Python
+		// deserializers). Kept as a hint-tier (Medium) breadcrumb for awareness
+		// — deliberately NOT block-eligible, since flagging every
+		// xml.Unmarshal/NewDecoder of a request body as CRITICAL is a real-repo
+		// false-positive generator on Go web services.
 		{
 			ID:            "go.xml.unmarshal",
 			Category:      taint.SnkDeserialize,
@@ -1250,8 +2321,8 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			ObjectType:    "",
 			MethodName:    "xml.Unmarshal",
 			DangerousArgs: []int{0},
-			Severity:      rules.High,
-			Description:   "XML deserialization of potentially tainted data (XXE risk)",
+			Severity:      rules.Medium,
+			Description:   "XML deserialization of potentially tainted data. Go's encoding/xml decodes into typed structs and does not expand external entities (no XXE by default), so this is not an RCE/XXE pathway like Java or libxml2 — main residual risks are DoS via deeply nested input; validate/limit size for untrusted sources.",
 			CWEID:         "CWE-611",
 			OWASPCategory: "A05:2021-Security Misconfiguration",
 		},
@@ -1265,18 +2336,41 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			ObjectType:    "",
 			MethodName:    "xml.NewDecoder",
 			DangerousArgs: []int{0},
-			Severity:      rules.High,
-			Description:   "XML decoder from untrusted reader (XXE risk)",
+			Severity:      rules.Medium,
+			Description:   "XML decoder from untrusted reader. Go's encoding/xml does not resolve external entities/DTDs by default (no XXE) and decodes into typed structs, so this is not a critical deserialization sink; hint-tier awareness only.",
 			CWEID:         "CWE-611",
 			OWASPCategory: "A05:2021-Security Misconfiguration",
 		},
 
 		// --- Gob Deserialization (CWE-502) ---
+		// gob.NewDecoder(reader): untrusted bytes enter via arg 0; taint reaches
+		// the gob graph here even though decode-into happens later at
+		// (*gob.Decoder).Decode(&v). Mirrors xml/yaml NewDecoder. Previously this
+		// only fired by accident via the package-blind bare-"NewDecoder" bug
+		// (now fixed in ssaflow); this is the correctly-labelled standalone entry.
 		{
-			ID:            "go.gob.decode",
+			ID:            "go.gob.newdecoder",
 			Category:      taint.SnkDeserialize,
 			Language:      rules.LangGo,
-			Pattern:       `gob\.NewDecoder\(|\.Decode\(`,
+			Pattern:       `gob\.NewDecoder\(`,
+			ObjectType:    "",
+			MethodName:    "gob.NewDecoder",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Gob streaming decoder from untrusted reader (deserialization of attacker-controlled data)",
+			CWEID:         "CWE-502",
+			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
+		},
+		{
+			ID:       "go.gob.decode",
+			Category: taint.SnkDeserialize,
+			Language: rules.LangGo,
+			// Narrowed from `gob\.NewDecoder\(|\.Decode\(`: the bare `\.Decode\(`
+			// alternative matched every decoder's Decode (json/xml/yaml) in the
+			// regex-fallback engine. Go routes to astflow/ssaflow which bind on
+			// ObjectType "*gob.Decoder" + MethodName "Decode", so detection of
+			// dec.Decode(&v) is unaffected; gob.NewDecoder has its own entry above.
+			Pattern:       `gob\.NewDecoder\(`,
 			ObjectType:    "*gob.Decoder",
 			MethodName:    "Decode",
 			DangerousArgs: []int{0},
@@ -1291,6 +2385,14 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 		// vulnerable to RCE (unlike Java ObjectInputStream or Python pickle).
 
 		// --- YAML Deserialization (CWE-502) ---
+		// Go's gopkg.in/yaml.v3 deserialises into typed Go structs (no
+		// dynamic type loading, no custom tag handlers that exec code) so
+		// it is NOT comparable to Python's yaml.unsafe_load or Java's
+		// SnakeYAML default constructor. Keep as a hint-tier finding for
+		// awareness — only block when interproc analysis confirms a
+		// concrete CVE-class flow (DoS via aliases / billion-laughs is
+		// the realistic risk, covered separately by decompression-bomb
+		// rules).
 		{
 			ID:            "go.yaml.unmarshal",
 			Category:      taint.SnkDeserialize,
@@ -1299,8 +2401,8 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			ObjectType:    "",
 			MethodName:    "yaml.Unmarshal",
 			DangerousArgs: []int{0},
-			Severity:      rules.High,
-			Description:   "YAML deserialization of potentially tainted data (custom tag handler risk)",
+			Severity:      rules.Medium,
+			Description:   "YAML deserialization of potentially tainted data. Go's gopkg.in/yaml.v3 deserialises into typed structs so this isn't an RCE pathway (unlike Python pickle or Java SnakeYAML); main risk is alias-expansion DoS — limit input size and prefer yaml.Decoder.KnownFields(true).",
 			CWEID:         "CWE-502",
 			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
 		},
@@ -1312,8 +2414,12 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			ObjectType:    "",
 			MethodName:    "yaml.NewDecoder",
 			DangerousArgs: []int{0},
-			Severity:      rules.High,
-			Description:   "YAML streaming decoder from untrusted reader",
+			// Memory-safe like yaml.Unmarshal above: gopkg.in/yaml decodes into
+			// typed Go structs and cannot instantiate attacker-chosen types.
+			// Hint-tier (Medium) so it is never block-eligible; the realistic
+			// risk is alias-expansion DoS, not RCE.
+			Severity:      rules.Medium,
+			Description:   "YAML streaming decoder from untrusted reader. Go's gopkg.in/yaml deserialises into typed structs (not an RCE pathway unlike Python pickle or Java SnakeYAML); main risk is alias-expansion DoS — limit input size and prefer Decoder.KnownFields(true).",
 			CWEID:         "CWE-502",
 			OWASPCategory: "A08:2021-Software and Data Integrity Failures",
 		},
@@ -1527,20 +2633,522 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			OWASPCategory: "A03:2021-Injection",
 		},
 
-		// --- File Read / Path Traversal (CWE-22) ---
+		// --- MongoDB NoSQL Injection (CWE-943) ---
 		{
-			ID:            "go.http.servecontent",
+			ID:            "go.mongo.find",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `collection\.Find\s*\(`,
+			ObjectType:    "*mongo.Collection",
+			MethodName:    "Find",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "MongoDB Find with potentially tainted filter (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.mongo.findone",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `collection\.FindOne\s*\(`,
+			ObjectType:    "*mongo.Collection",
+			MethodName:    "FindOne",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "MongoDB FindOne with potentially tainted filter (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.mongo.aggregate",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `collection\.Aggregate\s*\(`,
+			ObjectType:    "*mongo.Collection",
+			MethodName:    "Aggregate",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "MongoDB Aggregate with potentially tainted pipeline (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.mongo.updateone",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `collection\.UpdateOne\s*\(`,
+			ObjectType:    "*mongo.Collection",
+			MethodName:    "UpdateOne",
+			DangerousArgs: []int{1, 2},
+			Severity:      rules.High,
+			Description:   "MongoDB UpdateOne with potentially tainted filter/update (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.mongo.deleteone",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `collection\.DeleteOne\s*\(`,
+			ObjectType:    "*mongo.Collection",
+			MethodName:    "DeleteOne",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "MongoDB DeleteOne with potentially tainted filter (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.mongo.deletemany",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `collection\.DeleteMany\s*\(`,
+			ObjectType:    "*mongo.Collection",
+			MethodName:    "DeleteMany",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "MongoDB DeleteMany with potentially tainted filter (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- AWS DynamoDB PartiQL NoSQL Injection (CWE-943) ---
+		// PartiQL is a SQL-like query language executed via the DynamoDB
+		// ExecuteStatement/BatchExecuteStatement/ExecuteTransaction APIs.
+		// When the Statement string is built from user input, it is
+		// injectable (AWS explicitly recommends parameterized statements).
+		// Matches both aws-sdk-go-v2 (*dynamodb.Client, arg 1) and the
+		// legacy aws-sdk-go v1 (*dynamodb.DynamoDB, arg 0) via -1 any-arg.
+		{
+			ID:            "go.dynamodb.executestatement",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.ExecuteStatement\s*\(`,
+			ObjectType:    "*dynamodb.Client",
+			MethodName:    "ExecuteStatement",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "DynamoDB ExecuteStatement with potentially tainted PartiQL statement (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.dynamodb.batchexecutestatement",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.BatchExecuteStatement\s*\(`,
+			ObjectType:    "*dynamodb.Client",
+			MethodName:    "BatchExecuteStatement",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "DynamoDB BatchExecuteStatement with potentially tainted PartiQL statements (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.dynamodb.executetransaction",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.ExecuteTransaction\s*\(`,
+			ObjectType:    "*dynamodb.Client",
+			MethodName:    "ExecuteTransaction",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "DynamoDB ExecuteTransaction with potentially tainted PartiQL statements (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Apache Cassandra / ScyllaDB CQL Injection via gocql (CWE-943) ---
+		// CQL is SQL-like and accepts parameterized queries; building CQL
+		// by string concatenation from user input is injectable.
+		// gocql: Session.Query(stmt, values...) / Session.Bind(stmt, fn)
+		//        Batch.Query(stmt, values...)   / Batch.Bind(stmt, fn)
+		// Stmt is always the first positional argument.
+		{
+			ID:            "go.gocql.session.query",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Query\s*\(`,
+			ObjectType:    "*gocql.Session",
+			MethodName:    "Query",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Cassandra CQL query via gocql Session.Query with potentially tainted statement (CQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gocql.session.bind",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Bind\s*\(`,
+			ObjectType:    "*gocql.Session",
+			MethodName:    "Bind",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Cassandra CQL bind via gocql Session.Bind with potentially tainted statement (CQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gocql.batch.query",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Query\s*\(`,
+			ObjectType:    "*gocql.Batch",
+			MethodName:    "Query",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Cassandra CQL batch query via gocql Batch.Query with potentially tainted statement (CQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gocql.batch.bind",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Bind\s*\(`,
+			ObjectType:    "*gocql.Batch",
+			MethodName:    "Bind",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Cassandra CQL batch bind via gocql Batch.Bind with potentially tainted statement (CQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Couchbase N1QL / SQL++ Injection via gocb v2 (CWE-943) ---
+		// N1QL (now SQL++) is Couchbase's SQL-like query language. The gocb
+		// v2 driver (github.com/couchbase/gocb/v2) accepts a statement string
+		// as the first positional argument; user input must be passed via
+		// QueryOptions.NamedParameters or PositionalParameters, never
+		// concatenated into the statement string. Real-world incidents:
+		// CVE-2019-9039 (Sync Gateway) and GHSA-jfwg-rxf3-p7r9 (authorizerdev
+		// using fmt.Sprintf to interpolate into N1QL).
+		// Method signatures:
+		//   Cluster.Query(statement string, opts *QueryOptions)
+		//   Cluster.AnalyticsQuery(statement string, opts *AnalyticsOptions)
+		//   Scope.Query(statement string, opts *QueryOptions)
+		//   Scope.AnalyticsQuery(statement string, opts *AnalyticsOptions)
+		{
+			ID:            "go.gocb.cluster.query",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Query\s*\(`,
+			ObjectType:    "*gocb.Cluster",
+			MethodName:    "Query",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Couchbase N1QL query via gocb Cluster.Query with potentially tainted statement (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gocb.cluster.analyticsquery",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.AnalyticsQuery\s*\(`,
+			ObjectType:    "*gocb.Cluster",
+			MethodName:    "AnalyticsQuery",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Couchbase Analytics SQL++ query via gocb Cluster.AnalyticsQuery with potentially tainted statement (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gocb.scope.query",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Query\s*\(`,
+			ObjectType:    "*gocb.Scope",
+			MethodName:    "Query",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Couchbase scope-level N1QL query via gocb Scope.Query with potentially tainted statement (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gocb.scope.analyticsquery",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.AnalyticsQuery\s*\(`,
+			ObjectType:    "*gocb.Scope",
+			MethodName:    "AnalyticsQuery",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Couchbase scope-level Analytics SQL++ query via gocb Scope.AnalyticsQuery with potentially tainted statement (NoSQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Neo4j Cypher Injection via neo4j-go-driver (CWE-943) ---
+		// Cypher is Neo4j's query language; building Cypher by string
+		// concatenation from user input is injectable (CWE-943). The driver
+		// supports parameterized queries — the fix is to pass user input via
+		// the params map, never interpolate into the Cypher string.
+		// v5 (github.com/neo4j/neo4j-go-driver/v5/neo4j):
+		//   SessionWithContext.Run(ctx, cypher, params)
+		//   ManagedTransaction.Run(ctx, cypher, params)
+		//   ExplicitTransaction.Run(ctx, cypher, params)
+		//   neo4j.ExecuteQuery(ctx, driver, cypher, params, ...)
+		// v4 (github.com/neo4j/neo4j-go-driver/v4/neo4j):
+		//   Transaction.Run(cypher, params)
+		//   (v4 Session.Run is intentionally not catalogued: its type name
+		//   "neo4j.Session" is a strict prefix of the v5 "neo4j.SessionWithContext",
+		//   which the astflow substring-based type matcher cannot disambiguate.)
+		{
+			ID:            "go.neo4j.session.run",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Run\s*\(`,
+			ObjectType:    "neo4j.SessionWithContext",
+			MethodName:    "Run",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Neo4j Cypher query via SessionWithContext.Run with potentially tainted statement (Cypher injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.neo4j.managedtransaction.run",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Run\s*\(`,
+			ObjectType:    "neo4j.ManagedTransaction",
+			MethodName:    "Run",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Neo4j Cypher query via ManagedTransaction.Run with potentially tainted statement (Cypher injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.neo4j.explicittransaction.run",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Run\s*\(`,
+			ObjectType:    "neo4j.ExplicitTransaction",
+			MethodName:    "Run",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "Neo4j Cypher query via ExplicitTransaction.Run with potentially tainted statement (Cypher injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.neo4j.executequery",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `neo4j\.ExecuteQuery\s*\(`,
+			ObjectType:    "",
+			MethodName:    "neo4j.ExecuteQuery",
+			DangerousArgs: []int{2},
+			Severity:      rules.High,
+			Description:   "Neo4j Cypher query via neo4j.ExecuteQuery with potentially tainted statement (Cypher injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.neo4j.v4.transaction.run",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Run\s*\(`,
+			ObjectType:    "neo4j.Transaction",
+			MethodName:    "Run",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Neo4j v4 Cypher query via Transaction.Run with potentially tainted statement (Cypher injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- SSH remote command execution (CWE-78) ---
+		// golang.org/x/crypto/ssh is the standard Go SSH client. After
+		// client.NewSession(), (*ssh.Session).{Run,Start,Output,CombinedOutput}
+		// execute their string argument as a command on the remote host, so a
+		// tainted command string is a remote OS command-injection sink.
+		// matchesReceiverType() resolves the common receiver names ("session",
+		// "sess") for these so the typical `sess, _ := client.NewSession()` idiom
+		// is covered even without explicit type info.
+		{
+			ID:            "go.ssh.session.run",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangGo,
+			Pattern:       `\.Run\s*\(`,
+			ObjectType:    "*ssh.Session",
+			MethodName:    "Run",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "SSH remote command execution via (*ssh.Session).Run with potentially tainted command (CWE-78)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.ssh.session.start",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangGo,
+			Pattern:       `\.Start\s*\(`,
+			ObjectType:    "*ssh.Session",
+			MethodName:    "Start",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "SSH remote command execution via (*ssh.Session).Start with potentially tainted command (CWE-78)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.ssh.session.output",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangGo,
+			Pattern:       `\.Output\s*\(`,
+			ObjectType:    "*ssh.Session",
+			MethodName:    "Output",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "SSH remote command execution via (*ssh.Session).Output with potentially tainted command (CWE-78)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.ssh.session.combinedoutput",
+			Category:      taint.SnkCommand,
+			Language:      rules.LangGo,
+			Pattern:       `\.CombinedOutput\s*\(`,
+			ObjectType:    "*ssh.Session",
+			MethodName:    "CombinedOutput",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "SSH remote command execution via (*ssh.Session).CombinedOutput with potentially tainted command (CWE-78)",
+			CWEID:         "CWE-78",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- SFTP remote path traversal (CWE-22) ---
+		// github.com/pkg/sftp is the standard Go SFTP client (layered on
+		// golang.org/x/crypto/ssh). Its *sftp.Client methods take a remote path
+		// as their first argument; a tainted path lets an attacker read, write,
+		// rename or delete arbitrary files on the SFTP server. These entries are
+		// ObjectType-scoped to "*sftp.Client" so a precise rule ID is reported
+		// when the client value is statically typed (e.g. a function parameter);
+		// the untyped `client, _ := sftp.NewClient(conn)` idiom is also caught by
+		// the generic go.os.{Open,Create,OpenFile,Remove,Mkdir,Rename,...} sinks
+		// above, which match any package-style receiver on these method names.
+		{
+			ID:            "go.sftp.client.open",
 			Category:      taint.SnkFileRead,
 			Language:      rules.LangGo,
-			Pattern:       `http\.ServeContent\s*\(`,
-			ObjectType:    "",
-			MethodName:    "ServeContent",
-			DangerousArgs: []int{3},
+			Pattern:       `\.Open\s*\(`,
+			ObjectType:    "*sftp.Client",
+			MethodName:    "Open",
+			DangerousArgs: []int{0},
 			Severity:      rules.High,
-			Description:   "http.ServeContent with potentially tainted name or content",
+			Description:   "SFTP remote file open via (*sftp.Client).Open with potentially tainted path (path traversal)",
 			CWEID:         "CWE-22",
 			OWASPCategory: "A01:2021-Broken Access Control",
 		},
+		{
+			ID:            "go.sftp.client.openfile",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGo,
+			Pattern:       `\.OpenFile\s*\(`,
+			ObjectType:    "*sftp.Client",
+			MethodName:    "OpenFile",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SFTP remote file open via (*sftp.Client).OpenFile with potentially tainted path (path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.sftp.client.create",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGo,
+			Pattern:       `\.Create\s*\(`,
+			ObjectType:    "*sftp.Client",
+			MethodName:    "Create",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SFTP remote file create via (*sftp.Client).Create with potentially tainted path (path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.sftp.client.remove",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGo,
+			Pattern:       `\.Remove\s*\(|\.RemoveDirectory\s*\(`,
+			ObjectType:    "*sftp.Client",
+			MethodName:    "Remove/RemoveDirectory",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SFTP remote file/dir removal via (*sftp.Client).Remove/RemoveDirectory with potentially tainted path (path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.sftp.client.mkdir",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGo,
+			Pattern:       `\.Mkdir\s*\(|\.MkdirAll\s*\(`,
+			ObjectType:    "*sftp.Client",
+			MethodName:    "Mkdir/MkdirAll",
+			DangerousArgs: []int{0},
+			Severity:      rules.Medium,
+			Description:   "SFTP remote directory creation via (*sftp.Client).Mkdir/MkdirAll with potentially tainted path (path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.sftp.client.rename",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGo,
+			Pattern:       `\.Rename\s*\(|\.PosixRename\s*\(`,
+			ObjectType:    "*sftp.Client",
+			MethodName:    "Rename/PosixRename",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "SFTP remote file rename via (*sftp.Client).Rename/PosixRename with potentially tainted source or destination path (path traversal)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.sftp.client.symlink",
+			Category:      taint.SnkFileWrite,
+			Language:      rules.LangGo,
+			Pattern:       `\.Symlink\s*\(|\.Link\s*\(`,
+			ObjectType:    "*sftp.Client",
+			MethodName:    "Symlink/Link",
+			DangerousArgs: []int{0, 1},
+			Severity:      rules.High,
+			Description:   "SFTP remote link creation via (*sftp.Client).Symlink/Link with potentially tainted path (path traversal / link following)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+		{
+			ID:            "go.sftp.client.readdir",
+			Category:      taint.SnkFileRead,
+			Language:      rules.LangGo,
+			Pattern:       `\.ReadDir\s*\(`,
+			ObjectType:    "*sftp.Client",
+			MethodName:    "ReadDir",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "SFTP remote directory listing via (*sftp.Client).ReadDir with potentially tainted path (path traversal / disclosure)",
+			CWEID:         "CWE-22",
+			OWASPCategory: "A01:2021-Broken Access Control",
+		},
+
+		// --- File Read / Path Traversal (CWE-22) ---
+		// Removed: http.ServeContent — does not open a file (caller passes
+		// an io.ReadSeeker), and its DangerousArgs pointed at arg[3] which
+		// is `modtime time.Time` — a type that cannot carry user-controlled
+		// string data. The path-traversal sink for net/http is
+		// http.ServeFile (already registered as go.http.servefile above).
+		// Caught by `make audit-catalog`.
 		{
 			ID:            "go.os.stat",
 			Category:      taint.SnkFileRead,
@@ -1632,5 +3240,1587 @@ func (c *GoCatalog) Sinks() []taint.SinkDef {
 			CWEID:         "CWE-22",
 			OWASPCategory: "A01:2021-Broken Access Control",
 		},
-	}
+
+		// --- Embedded script VM / expression evaluator code injection (CWE-94) ---
+
+		// goja (dop251/goja) — JavaScript VM for Go (used in k6, Grafana)
+		{
+			ID:            "go.goja.runstring",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `\.RunString\s*\(`,
+			ObjectType:    "",
+			MethodName:    "RunString",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "JavaScript code execution via goja VM RunString (code injection)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.goja.compile",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `goja\.Compile\s*\(`,
+			ObjectType:    "",
+			MethodName:    "goja.Compile",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "JavaScript code compilation via goja (compiled code can be executed)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// gopher-lua (yuin/gopher-lua) — Lua VM for Go
+		{
+			ID:            "go.gopherlua.dostring",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `\.DoString\s*\(`,
+			ObjectType:    "",
+			MethodName:    "DoString",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Lua code execution via gopher-lua DoString (code injection)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gopherlua.dofile",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `\.DoFile\s*\(`,
+			ObjectType:    "",
+			MethodName:    "DoFile",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Lua script loading and execution via gopher-lua DoFile (code injection via path)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// expr (antonmedv/expr) — expression evaluator (CVE-2025-29786: DoS)
+		{
+			ID:            "go.expr.eval",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `expr\.Eval\s*\(`,
+			ObjectType:    "",
+			MethodName:    "expr.Eval",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Expression evaluation via antonmedv/expr with user-controlled input (CVE-2025-29786)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.expr.compile",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `expr\.Compile\s*\(`,
+			ObjectType:    "",
+			MethodName:    "expr.Compile",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Expression compilation via antonmedv/expr with user-controlled input",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// govaluate (Knetic/govaluate) — expression evaluator
+		{
+			ID:            "go.govaluate.newexpression",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `govaluate\.NewEvaluableExpression\s*\(`,
+			ObjectType:    "",
+			MethodName:    "govaluate.NewEvaluableExpression",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "Expression evaluation via govaluate with user-controlled input",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// tengo (d5/tengo) — embedded scripting language for Go
+		{
+			ID:            "go.tengo.newscript",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `tengo\.NewScript\s*\(`,
+			ObjectType:    "",
+			MethodName:    "tengo.NewScript",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Tengo script compilation with user-controlled code (full scripting language, code injection)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Elasticsearch NoSQL / Lucene query injection (CWE-943) ---
+		// olivere/elastic is the most widely-used community Go client for
+		// Elasticsearch (pre-v8 clusters). The following constructors accept
+		// raw Lucene / JSON / Painless input and interpolate it into the
+		// query sent to Elasticsearch, enabling query-structure manipulation
+		// (filter bypass, data exfiltration) when the input is tainted.
+		{
+			ID:            "go.olivere.elastic.newquerystringquery",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `elastic\.NewQueryStringQuery\s*\(`,
+			ObjectType:    "",
+			MethodName:    "elastic.NewQueryStringQuery",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "olivere/elastic Lucene query_string query with tainted expression (NoSQL injection — filter bypass via OR/NOT/field syntax)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.olivere.elastic.newsimplequerystringquery",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `elastic\.NewSimpleQueryStringQuery\s*\(`,
+			ObjectType:    "",
+			MethodName:    "elastic.NewSimpleQueryStringQuery",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "olivere/elastic simple_query_string with tainted expression (NoSQL injection — Lucene operator injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.olivere.elastic.newrawstringquery",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `elastic\.NewRawStringQuery\s*\(`,
+			ObjectType:    "",
+			MethodName:    "elastic.NewRawStringQuery",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "olivere/elastic raw JSON query with tainted body (NoSQL injection — arbitrary query-DSL structure)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.olivere.elastic.newscriptinline",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `elastic\.NewScriptInline\s*\(`,
+			ObjectType:    "",
+			MethodName:    "elastic.NewScriptInline",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "olivere/elastic inline Painless script with tainted source (server-side script evaluation on the Elasticsearch cluster)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Elasticsearch v8 / OpenSearch v3 query-DSL + Painless script injection ---
+		// Modern Go clients (github.com/elastic/go-elasticsearch/v8 and
+		// github.com/opensearch-project/opensearch-go) expose direct methods
+		// on the Client where the body is an io.Reader containing raw
+		// JSON / NDJSON of the query DSL. Tainted body permits arbitrary
+		// query-structure injection (CWE-943) and — for endpoints accepting
+		// a `script.source` Painless field (Reindex / PutScript) — persistent
+		// server-side code execution on the cluster (CWE-94).
+		//
+		// Symmetric to the Java entries added in #436 and PHP entries in #438.
+		// The older olivere/elastic constructors (NewRawStringQuery,
+		// NewScriptInline) are already covered above.
+		//
+		// Refs:
+		//   https://pkg.go.dev/github.com/elastic/go-elasticsearch/v8/esapi
+		//   https://pkg.go.dev/github.com/opensearch-project/opensearch-go
+		//   https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-execute-api.html
+		{
+			ID:            "go.elasticsearch.bulk",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Bulk\s*\(`,
+			ObjectType:    "*elasticsearch.Client",
+			MethodName:    "Bulk",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "elasticsearch v8 Client.Bulk with tainted NDJSON body — DSL injection across mixed index/update/delete actions on the cluster",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.elasticsearch.msearch",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Msearch\s*\(`,
+			ObjectType:    "*elasticsearch.Client",
+			MethodName:    "Msearch",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "elasticsearch v8 Client.Msearch with tainted NDJSON body — per-shard DSL injection / cross-index data exfiltration",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.elasticsearch.deletebyquery",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.DeleteByQuery\s*\(`,
+			ObjectType:    "*elasticsearch.Client",
+			MethodName:    "DeleteByQuery",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "elasticsearch v8 Client.DeleteByQuery with tainted query body — DSL injection on a destructive bulk operation (mass document deletion outside intended scope)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.elasticsearch.reindex",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `\.Reindex\s*\(`,
+			ObjectType:    "*elasticsearch.Client",
+			MethodName:    "Reindex",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "elasticsearch v8 Client.Reindex body accepts a 'script' field (Painless) — tainted source = arbitrary code execution on the cluster plus DSL injection over source/dest selectors",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.elasticsearch.putscript",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `\.PutScript\s*\(`,
+			ObjectType:    "*elasticsearch.Client",
+			MethodName:    "PutScript",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "elasticsearch v8 Client.PutScript stores a tainted Painless script — every later invocation executes the attacker-supplied code on the cluster (persistent RCE)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.opensearch.bulk",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Bulk\s*\(`,
+			ObjectType:    "*opensearch.Client",
+			MethodName:    "Bulk",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "opensearch-go Client.Bulk with tainted NDJSON body — DSL injection across mixed index/update/delete actions on the cluster",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.opensearch.msearch",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Msearch\s*\(`,
+			ObjectType:    "*opensearch.Client",
+			MethodName:    "Msearch",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "opensearch-go Client.Msearch with tainted NDJSON body — per-shard DSL injection / cross-index data exfiltration",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.opensearch.deletebyquery",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.DeleteByQuery\s*\(`,
+			ObjectType:    "*opensearch.Client",
+			MethodName:    "DeleteByQuery",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "opensearch-go Client.DeleteByQuery with tainted query body — DSL injection on a destructive bulk operation (mass document deletion outside intended scope)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.opensearch.reindex",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `\.Reindex\s*\(`,
+			ObjectType:    "*opensearch.Client",
+			MethodName:    "Reindex",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "opensearch-go Client.Reindex body accepts a 'script' field (Painless) — tainted source = arbitrary code execution on the cluster plus DSL injection over source/dest selectors",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.opensearch.putscript",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `\.PutScript\s*\(`,
+			ObjectType:    "*opensearch.Client",
+			MethodName:    "PutScript",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "opensearch-go Client.PutScript stores a tainted Painless script — every later invocation executes the attacker-supplied code on the cluster (persistent RCE)",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- ClickHouse-go v2 native interface SQL injection (CWE-89) ---
+		// The v2 native driver (github.com/ClickHouse/clickhouse-go/v2)
+		// exposes a clickhouse.Conn (= driver.Conn) interface that is NOT
+		// routed through database/sql. All query-accepting methods take
+		// the SQL string directly, so string-concatenated user input is
+		// injectable. Parameterized binding uses `$N` placeholders or
+		// clickhouse.Named(...).
+		{
+			ID:            "go.clickhouse.conn.query",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Query\s*\(`,
+			ObjectType:    "clickhouse.Conn",
+			MethodName:    "Query",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "ClickHouse-go v2 Conn.Query with potentially tainted statement (SQL injection)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.clickhouse.conn.queryrow",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.QueryRow\s*\(`,
+			ObjectType:    "clickhouse.Conn",
+			MethodName:    "QueryRow",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "ClickHouse-go v2 Conn.QueryRow with potentially tainted statement (SQL injection)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.clickhouse.conn.exec",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Exec\s*\(`,
+			ObjectType:    "clickhouse.Conn",
+			MethodName:    "Exec",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "ClickHouse-go v2 Conn.Exec with potentially tainted statement (SQL injection)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.clickhouse.conn.select",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Select\s*\(`,
+			ObjectType:    "clickhouse.Conn",
+			MethodName:    "Select",
+			DangerousArgs: []int{2},
+			Severity:      rules.Critical,
+			Description:   "ClickHouse-go v2 Conn.Select with potentially tainted statement (SQL injection)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.clickhouse.conn.preparebatch",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.PrepareBatch\s*\(`,
+			ObjectType:    "clickhouse.Conn",
+			MethodName:    "PrepareBatch",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "ClickHouse-go v2 Conn.PrepareBatch with potentially tainted INSERT statement (SQL injection)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.clickhouse.conn.asyncinsert",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.AsyncInsert\s*\(`,
+			ObjectType:    "clickhouse.Conn",
+			MethodName:    "AsyncInsert",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "ClickHouse-go v2 Conn.AsyncInsert with potentially tainted INSERT statement (SQL injection)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Message broker / task queue producer trust boundary (CWE-501) ---
+		// Producer side: a web handler publishes user-controlled values into a
+		// broker (RabbitMQ / NATS / GCP Pub/Sub / Sarama-Kafka) or a task queue
+		// (Asynq). The payload is serialized to the broker and later
+		// deserialized + re-processed by a consumer running in a privileged
+		// context. That crossing is a trust-boundary violation — consumer code
+		// that assumes internal/validated payloads is exposed to secondary
+		// injection, logic bypass, or deserialization exploits.
+		//
+		// Go already has the consumer-side sources (go.amqp.channel.consume,
+		// go.nats.subscription.nextmsg, go.gcp.pubsub.receive, go.kafka.reader.readmessage,
+		// go.kafka.consumer.readmessage) but no producer-side trust-boundary sink.
+		// Mirrors Java PR #426, Rust PR #424, Python Celery/RQ, Ruby Sidekiq/ActiveJob,
+		// JavaScript BullMQ/amqplib, and Kotlin trust-boundary sinks.
+		{
+			ID:            "go.amqp.channel.publish",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `(?:ch|channel|amqpCh)\.Publish\s*\(`,
+			ObjectType:    "*amqp.Channel",
+			MethodName:    "Publish",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "RabbitMQ amqp091-go Channel.Publish with tainted payload — consumer deserializes and processes across trust boundary",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.amqp.channel.publishwithcontext",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `(?:ch|channel|amqpCh)\.PublishWithContext\s*\(`,
+			ObjectType:    "*amqp.Channel",
+			MethodName:    "PublishWithContext",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "RabbitMQ amqp091-go Channel.PublishWithContext with tainted payload — consumer deserializes and processes across trust boundary",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.nats.conn.publish",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `(?:nc|nats|conn)\.Publish\s*\(`,
+			ObjectType:    "*nats.Conn",
+			MethodName:    "Publish",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "NATS Conn.Publish with tainted payload — subscriber deserializes and processes across trust boundary",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.nats.conn.publishmsg",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `(?:nc|nats|conn)\.PublishMsg\s*\(`,
+			ObjectType:    "*nats.Conn",
+			MethodName:    "PublishMsg",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "NATS Conn.PublishMsg with tainted *nats.Msg — subscriber deserializes and processes across trust boundary",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.gcp.pubsub.topic.publish",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `(?:topic|t)\.Publish\s*\(`,
+			ObjectType:    "*pubsub.Topic",
+			MethodName:    "Publish",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "GCP Pub/Sub Topic.Publish with tainted *pubsub.Message — subscriber deserializes and processes across trust boundary",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.asynq.client.enqueue",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `(?:client|asynqClient|c)\.Enqueue\s*\(`,
+			ObjectType:    "*asynq.Client",
+			MethodName:    "Enqueue",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "Asynq Client.Enqueue with tainted *asynq.Task payload — worker deserializes and re-executes across trust boundary",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.sarama.syncproducer.sendmessage",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `(?:producer|syncProducer|p)\.SendMessage\s*\(`,
+			ObjectType:    "sarama.SyncProducer",
+			MethodName:    "SendMessage",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "Sarama SyncProducer.SendMessage with tainted *sarama.ProducerMessage — Kafka consumer deserializes and processes across trust boundary",
+			CWEID:         "CWE-501",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+
+		// --- InfluxDB query-language injection (CWE-943) ---
+		// Two driver families ship today:
+		//
+		//  v2 (github.com/influxdata/influxdb-client-go/v2): the api.QueryAPI
+		//  interface exposes Query(ctx, flux) and QueryRaw(ctx, flux, dialect)
+		//  that take the Flux source as a plain string. String-concatenated
+		//  user input is injectable; the parameterized variants
+		//  QueryWithParams / QueryRawWithParams are the safe alternative
+		//  (intentionally NOT flagged here).
+		//
+		//  v1 (github.com/influxdata/influxdb1-client/v2): client.NewQuery is
+		//  the package-level constructor that captures the InfluxQL command
+		//  string into a Query struct, which Client.Query later sends to the
+		//  server. Treating the constructor as the sink catches the moment
+		//  the unparameterized string is committed.
+		//
+		// Both Flux and InfluxQL accept multi-statement input (`;` separator
+		// in InfluxQL, multiple `from(...)` pipelines in Flux), so a single
+		// concatenation is enough to read from arbitrary buckets/measurements
+		// or run admin statements.
+		{
+			ID:            "go.influxdb2.queryapi.query",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.Query\s*\(`,
+			ObjectType:    "api.QueryAPI",
+			MethodName:    "Query",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "influxdb-client-go v2 api.QueryAPI.Query with potentially tainted Flux query string (Flux injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.influxdb2.queryapi.queryraw",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.QueryRaw\s*\(`,
+			ObjectType:    "api.QueryAPI",
+			MethodName:    "QueryRaw",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "influxdb-client-go v2 api.QueryAPI.QueryRaw with potentially tainted Flux query string (Flux injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.influxdb1.client.newquery",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `client\.NewQuery\s*\(`,
+			ObjectType:    "",
+			MethodName:    "client.NewQuery",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "influxdb1-client v2 client.NewQuery with potentially tainted InfluxQL command — first arg is the raw InfluxQL string later dispatched by Client.Query (InfluxQL injection)",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- File-upload sinks (CWE-434) ---
+		// The Go HTTP multipart APIs return a tainted *multipart.FileHeader
+		// whose Filename comes from the client. Persisting that file without
+		// validating the extension / MIME type and clamping the destination
+		// path is unrestricted-file-upload territory — an attacker can drop
+		// a webshell or executable under a web-served directory.
+		{
+			ID:            "go.multipart.fileheader.open",
+			Category:      taint.SnkUpload,
+			Language:      rules.LangGo,
+			Pattern:       `\.Open\s*\(\s*\)`,
+			ObjectType:    "*multipart.FileHeader",
+			MethodName:    "Open",
+			DangerousArgs: []int{-1},
+			Severity:      rules.High,
+			Description:   "(*multipart.FileHeader).Open() — opens the client-supplied uploaded file; subsequent io.Copy to a tainted-path os.Create is unrestricted file upload (CWE-434). Validate extension/MIME against an allowlist and store under a confined, non-executable directory with a server-generated filename.",
+			CWEID:         "CWE-434",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+		{
+			ID:            "go.http.request.multipart_reader",
+			Category:      taint.SnkUpload,
+			Language:      rules.LangGo,
+			Pattern:       `\.MultipartReader\s*\(`,
+			ObjectType:    "*http.Request",
+			MethodName:    "MultipartReader",
+			DangerousArgs: []int{-1},
+			Severity:      rules.Medium,
+			Description:   "(*http.Request).MultipartReader() — streams an attacker-controlled multipart body. Treat returned Part.FileName() and Part contents as tainted for downstream file-write/path-traversal sinks (CWE-434).",
+			CWEID:         "CWE-434",
+			OWASPCategory: "A04:2021-Insecure Design",
+		},
+
+		// =================================================================
+		// Mined from public MIT-licensed security-model data.
+		// database/sql, net/http, gorilla, gin, beego, echo, mongo-driver, etc.
+		// =================================================================
+
+		{ID: "go.databasesqldriver.connpreparecontext.preparecontext", Category: taint.SnkSQLQuery, Pattern: `\.PrepareContext\s*\(`, ObjectType: "database/sql/driver.ConnPrepareContext", MethodName: "PrepareContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "database/sql/driver.ConnPrepareContext.PrepareContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.databasesql.conn.preparecontext", Category: taint.SnkSQLQuery, Pattern: `\.PrepareContext\s*\(`, ObjectType: "database/sql.Conn", MethodName: "PrepareContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "database/sql.Conn.PrepareContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.databasesql.conn.queryrowcontext", Category: taint.SnkSQLQuery, Pattern: `\.QueryRowContext\s*\(`, ObjectType: "database/sql.Conn", MethodName: "QueryRowContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "database/sql.Conn.QueryRowContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.databasesql.db.preparecontext", Category: taint.SnkSQLQuery, Pattern: `\.PrepareContext\s*\(`, ObjectType: "database/sql.DB", MethodName: "PrepareContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "database/sql.DB.PrepareContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.databasesql.db.queryrowcontext", Category: taint.SnkSQLQuery, Pattern: `\.QueryRowContext\s*\(`, ObjectType: "database/sql.DB", MethodName: "QueryRowContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "database/sql.DB.QueryRowContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.databasesql.tx.preparecontext", Category: taint.SnkSQLQuery, Pattern: `\.PrepareContext\s*\(`, ObjectType: "database/sql.Tx", MethodName: "PrepareContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "database/sql.Tx.PrepareContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.databasesql.tx.queryrowcontext", Category: taint.SnkSQLQuery, Pattern: `\.QueryRowContext\s*\(`, ObjectType: "database/sql.Tx", MethodName: "QueryRowContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "database/sql.Tx.QueryRowContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comantchfxhtmlquery..queryall", Category: taint.SnkXPath, Pattern: `\.QueryAll\s*\(`, ObjectType: "github.com/antchfx/htmlquery.", MethodName: "QueryAll", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/antchfx/htmlquery..QueryAll — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comantchfxjsonquery..queryall", Category: taint.SnkXPath, Pattern: `\.QueryAll\s*\(`, ObjectType: "github.com/antchfx/jsonquery.", MethodName: "QueryAll", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/antchfx/jsonquery..QueryAll — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comantchfxxmlquery..findeach", Category: taint.SnkXPath, Pattern: `\.FindEach\s*\(`, ObjectType: "github.com/antchfx/xmlquery.", MethodName: "FindEach", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/antchfx/xmlquery..FindEach — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comantchfxxmlquery..findeachwithbreak", Category: taint.SnkXPath, Pattern: `\.FindEachWithBreak\s*\(`, ObjectType: "github.com/antchfx/xmlquery.", MethodName: "FindEachWithBreak", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/antchfx/xmlquery..FindEachWithBreak — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comantchfxxmlquery..queryall", Category: taint.SnkXPath, Pattern: `\.QueryAll\s*\(`, ObjectType: "github.com/antchfx/xmlquery.", MethodName: "QueryAll", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/antchfx/xmlquery..QueryAll — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comantchfxxmlquery.node.selectelement", Category: taint.SnkXPath, Pattern: `\.SelectElement\s*\(`, ObjectType: "github.com/antchfx/xmlquery.Node", MethodName: "SelectElement", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/antchfx/xmlquery.Node.SelectElement — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comantchfxxmlquery.node.selectelements", Category: taint.SnkXPath, Pattern: `\.SelectElements\s*\(`, ObjectType: "github.com/antchfx/xmlquery.Node", MethodName: "SelectElements", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/antchfx/xmlquery.Node.SelectElements — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comantchfxxpath..compilewithns", Category: taint.SnkXPath, Pattern: `\.CompileWithNS\s*\(`, ObjectType: "github.com/antchfx/xpath.", MethodName: "CompileWithNS", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/antchfx/xpath..CompileWithNS — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.db.preparecontext", Category: taint.SnkSQLQuery, Pattern: `\.PrepareContext\s*\(`, ObjectType: "group:beego-orm.DB", MethodName: "PrepareContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:beego-orm.DB.PrepareContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.db.queryrowcontext", Category: taint.SnkSQLQuery, Pattern: `\.QueryRowContext\s*\(`, ObjectType: "group:beego-orm.DB", MethodName: "QueryRowContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:beego-orm.DB.QueryRowContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.and", Category: taint.SnkSQLQuery, Pattern: `\.And\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "And", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.And — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.from", Category: taint.SnkSQLQuery, Pattern: `\.From\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "From", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.From — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.groupby", Category: taint.SnkSQLQuery, Pattern: `\.GroupBy\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "GroupBy", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.GroupBy — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.having", Category: taint.SnkSQLQuery, Pattern: `\.Having\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "Having", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.Having — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.in", Category: taint.SnkSQLQuery, Pattern: `\.In\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "In", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.In — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.innerjoin", Category: taint.SnkSQLQuery, Pattern: `\.InnerJoin\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "InnerJoin", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.InnerJoin — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.insertinto", Category: taint.SnkSQLQuery, Pattern: `\.InsertInto\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "InsertInto", DangerousArgs: []int{0, 1}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.InsertInto — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.leftjoin", Category: taint.SnkSQLQuery, Pattern: `\.LeftJoin\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "LeftJoin", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.LeftJoin — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.on", Category: taint.SnkSQLQuery, Pattern: `\.On\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "On", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.On — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.or", Category: taint.SnkSQLQuery, Pattern: `\.Or\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "Or", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.Or — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.orderby", Category: taint.SnkSQLQuery, Pattern: `\.OrderBy\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "OrderBy", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.OrderBy — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.rightjoin", Category: taint.SnkSQLQuery, Pattern: `\.RightJoin\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "RightJoin", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.RightJoin — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.subquery", Category: taint.SnkSQLQuery, Pattern: `\.Subquery\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "Subquery", DangerousArgs: []int{0, 1}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.Subquery — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.update", Category: taint.SnkSQLQuery, Pattern: `\.Update\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "Update", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.Update — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.querybuilder.values", Category: taint.SnkSQLQuery, Pattern: `\.Values\s*\(`, ObjectType: "group:beego-orm.QueryBuilder", MethodName: "Values", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:beego-orm.QueryBuilder.Values — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeegoorm.queryseter.filterraw", Category: taint.SnkSQLQuery, Pattern: `\.FilterRaw\s*\(`, ObjectType: "group:beego-orm.QuerySeter", MethodName: "FilterRaw", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:beego-orm.QuerySeter.FilterRaw — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeego.controller.savetofile", Category: taint.SnkFileWrite, Pattern: `\.SaveToFile\s*\(`, ObjectType: "group:beego.Controller", MethodName: "SaveToFile", DangerousArgs: []int{1}, Severity: rules.High, Description: "group:beego.Controller.SaveToFile — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupbeego.controller.savetofilewithbuffer", Category: taint.SnkFileWrite, Pattern: `\.SaveToFileWithBuffer\s*\(`, ObjectType: "group:beego.Controller", MethodName: "SaveToFileWithBuffer", DangerousArgs: []int{1}, Severity: rules.High, Description: "group:beego.Controller.SaveToFileWithBuffer — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comchristrenkampgoxpath..mustparse", Category: taint.SnkXPath, Pattern: `\.MustParse\s*\(`, ObjectType: "github.com/ChrisTrenkamp/goxpath.", MethodName: "MustParse", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/ChrisTrenkamp/goxpath..MustParse — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comchristrenkampgoxpath..parse", Category: taint.SnkXPath, Pattern: `\.Parse\s*\(`, ObjectType: "github.com/ChrisTrenkamp/goxpath.", MethodName: "Parse", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/ChrisTrenkamp/goxpath..Parse — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comchristrenkampgoxpath..parseexec", Category: taint.SnkXPath, Pattern: `\.ParseExec\s*\(`, ObjectType: "github.com/ChrisTrenkamp/goxpath.", MethodName: "ParseExec", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/ChrisTrenkamp/goxpath..ParseExec — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comcodeskybluegosh.session.call", Category: taint.SnkCommand, Pattern: `\.Call\s*\(`, ObjectType: "github.com/codeskyblue/go-sh.Session", MethodName: "Call", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/codeskyblue/go-sh.Session.Call — command injection sink", CWEID: "CWE-78", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgocb1.bucket.executen1qlquery", Category: taint.SnkNoSQL, Pattern: `\.ExecuteN1qlQuery\s*\(`, ObjectType: "group:gocb1.Bucket", MethodName: "ExecuteN1qlQuery", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gocb1.Bucket.ExecuteN1qlQuery — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgocb1.bucket.executeanalyticsquery", Category: taint.SnkNoSQL, Pattern: `\.ExecuteAnalyticsQuery\s*\(`, ObjectType: "group:gocb1.Bucket", MethodName: "ExecuteAnalyticsQuery", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gocb1.Bucket.ExecuteAnalyticsQuery — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgocb1.cluster.executen1qlquery", Category: taint.SnkNoSQL, Pattern: `\.ExecuteN1qlQuery\s*\(`, ObjectType: "group:gocb1.Cluster", MethodName: "ExecuteN1qlQuery", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gocb1.Cluster.ExecuteN1qlQuery — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgocb1.cluster.executeanalyticsquery", Category: taint.SnkNoSQL, Pattern: `\.ExecuteAnalyticsQuery\s*\(`, ObjectType: "group:gocb1.Cluster", MethodName: "ExecuteAnalyticsQuery", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gocb1.Cluster.ExecuteAnalyticsQuery — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgingonicgin.context.file", Category: taint.SnkFileWrite, Pattern: `\.File\s*\(`, ObjectType: "github.com/gin-gonic/gin.Context", MethodName: "File", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/gin-gonic/gin.Context.File — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgingonicgin.context.fileattachment", Category: taint.SnkFileWrite, Pattern: `\.FileAttachment\s*\(`, ObjectType: "github.com/gin-gonic/gin.Context", MethodName: "FileAttachment", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/gin-gonic/gin.Context.FileAttachment — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgingonicgin.context.saveuploadedfile", Category: taint.SnkFileWrite, Pattern: `\.SaveUploadedFile\s*\(`, ObjectType: "github.com/gin-gonic/gin.Context", MethodName: "SaveUploadedFile", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/gin-gonic/gin.Context.SaveUploadedFile — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgofiberfiber.ctx.savefile", Category: taint.SnkFileWrite, Pattern: `\.SaveFile\s*\(`, ObjectType: "github.com/gofiber/fiber.Ctx", MethodName: "SaveFile", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/gofiber/fiber.Ctx.SaveFile — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgofiberfiber.ctx.savefiletostorage", Category: taint.SnkFileWrite, Pattern: `\.SaveFileToStorage\s*\(`, ObjectType: "github.com/gofiber/fiber.Ctx", MethodName: "SaveFileToStorage", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/gofiber/fiber.Ctx.SaveFileToStorage — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.docommit", Category: taint.SnkSQLQuery, Pattern: `\.DoCommit\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "DoCommit", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.DoCommit — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.doexec", Category: taint.SnkSQLQuery, Pattern: `\.DoExec\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "DoExec", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.DoExec — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.dogetall", Category: taint.SnkSQLQuery, Pattern: `\.DoGetAll\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "DoGetAll", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.DoGetAll — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.doquery", Category: taint.SnkSQLQuery, Pattern: `\.DoQuery\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "DoQuery", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.DoQuery — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.doprepare", Category: taint.SnkSQLQuery, Pattern: `\.DoPrepare\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "DoPrepare", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.DoPrepare — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.getall", Category: taint.SnkSQLQuery, Pattern: `\.GetAll\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "GetAll", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.GetAll — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.getarray", Category: taint.SnkSQLQuery, Pattern: `\.GetArray\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "GetArray", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.GetArray — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.getcount", Category: taint.SnkSQLQuery, Pattern: `\.GetCount\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "GetCount", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.GetCount — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.getone", Category: taint.SnkSQLQuery, Pattern: `\.GetOne\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "GetOne", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.GetOne — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.getscan", Category: taint.SnkSQLQuery, Pattern: `\.GetScan\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "GetScan", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.GetScan — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.getstruct", Category: taint.SnkSQLQuery, Pattern: `\.GetStruct\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "GetStruct", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.GetStruct — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.getstructs", Category: taint.SnkSQLQuery, Pattern: `\.GetStructs\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "GetStructs", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.GetStructs — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.core.getvalue", Category: taint.SnkSQLQuery, Pattern: `\.GetValue\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Core", MethodName: "GetValue", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Core.GetValue — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.docommit", Category: taint.SnkSQLQuery, Pattern: `\.DoCommit\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "DoCommit", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.DoCommit — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.doexec", Category: taint.SnkSQLQuery, Pattern: `\.DoExec\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "DoExec", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.DoExec — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.dogetall", Category: taint.SnkSQLQuery, Pattern: `\.DoGetAll\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "DoGetAll", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.DoGetAll — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.doquery", Category: taint.SnkSQLQuery, Pattern: `\.DoQuery\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "DoQuery", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.DoQuery — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.doprepare", Category: taint.SnkSQLQuery, Pattern: `\.DoPrepare\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "DoPrepare", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.DoPrepare — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.getall", Category: taint.SnkSQLQuery, Pattern: `\.GetAll\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "GetAll", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.GetAll — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.getarray", Category: taint.SnkSQLQuery, Pattern: `\.GetArray\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "GetArray", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.GetArray — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.getcount", Category: taint.SnkSQLQuery, Pattern: `\.GetCount\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "GetCount", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.GetCount — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.getone", Category: taint.SnkSQLQuery, Pattern: `\.GetOne\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "GetOne", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.GetOne — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.getscan", Category: taint.SnkSQLQuery, Pattern: `\.GetScan\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "GetScan", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.GetScan — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.getstruct", Category: taint.SnkSQLQuery, Pattern: `\.GetStruct\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "GetStruct", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.GetStruct — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.getstructs", Category: taint.SnkSQLQuery, Pattern: `\.GetStructs\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "GetStructs", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.GetStructs — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.db.getvalue", Category: taint.SnkSQLQuery, Pattern: `\.GetValue\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.DB", MethodName: "GetValue", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.DB.GetValue — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.docommit", Category: taint.SnkSQLQuery, Pattern: `\.DoCommit\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "DoCommit", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.DoCommit — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.doexec", Category: taint.SnkSQLQuery, Pattern: `\.DoExec\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "DoExec", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.DoExec — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.dogetall", Category: taint.SnkSQLQuery, Pattern: `\.DoGetAll\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "DoGetAll", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.DoGetAll — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.doquery", Category: taint.SnkSQLQuery, Pattern: `\.DoQuery\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "DoQuery", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.DoQuery — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.doprepare", Category: taint.SnkSQLQuery, Pattern: `\.DoPrepare\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "DoPrepare", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.DoPrepare — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.getall", Category: taint.SnkSQLQuery, Pattern: `\.GetAll\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "GetAll", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.GetAll — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.getarray", Category: taint.SnkSQLQuery, Pattern: `\.GetArray\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "GetArray", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.GetArray — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.getcount", Category: taint.SnkSQLQuery, Pattern: `\.GetCount\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "GetCount", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.GetCount — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.getone", Category: taint.SnkSQLQuery, Pattern: `\.GetOne\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "GetOne", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.GetOne — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.getscan", Category: taint.SnkSQLQuery, Pattern: `\.GetScan\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "GetScan", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.GetScan — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.getstruct", Category: taint.SnkSQLQuery, Pattern: `\.GetStruct\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "GetStruct", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.GetStruct — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.getstructs", Category: taint.SnkSQLQuery, Pattern: `\.GetStructs\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "GetStructs", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.GetStructs — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comgogfgfdatabasegdb.tx.getvalue", Category: taint.SnkSQLQuery, Pattern: `\.GetValue\s*\(`, ObjectType: "github.com/gogf/gf/database/gdb.Tx", MethodName: "GetValue", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/gogf/gf/database/gdb.Tx.GetValue — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comjmoironsqlx.db.namedquery", Category: taint.SnkSQLQuery, Pattern: `\.NamedQuery\s*\(`, ObjectType: "github.com/jmoiron/sqlx.DB", MethodName: "NamedQuery", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/jmoiron/sqlx.DB.NamedQuery — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comjmoironsqlx.tx.namedquery", Category: taint.SnkSQLQuery, Pattern: `\.NamedQuery\s*\(`, ObjectType: "github.com/jmoiron/sqlx.Tx", MethodName: "NamedQuery", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/jmoiron/sqlx.Tx.NamedQuery — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupiriscontext.context.sendfilewithrate", Category: taint.SnkFileWrite, Pattern: `\.SendFileWithRate\s*\(`, ObjectType: "group:iris-context.Context", MethodName: "SendFileWithRate", DangerousArgs: []int{0}, Severity: rules.High, Description: "group:iris-context.Context.SendFileWithRate — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupiriscontext.context.servefilewithrate", Category: taint.SnkFileWrite, Pattern: `\.ServeFileWithRate\s*\(`, ObjectType: "group:iris-context.Context", MethodName: "ServeFileWithRate", DangerousArgs: []int{0}, Severity: rules.High, Description: "group:iris-context.Context.ServeFileWithRate — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupiriscontext.context.uploadformfiles", Category: taint.SnkFileWrite, Pattern: `\.UploadFormFiles\s*\(`, ObjectType: "group:iris-context.Context", MethodName: "UploadFormFiles", DangerousArgs: []int{0}, Severity: rules.High, Description: "group:iris-context.Context.UploadFormFiles — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupiriscontext.context.saveformfile", Category: taint.SnkFileWrite, Pattern: `\.SaveFormFile\s*\(`, ObjectType: "group:iris-context.Context", MethodName: "SaveFormFile", DangerousArgs: []int{1}, Severity: rules.High, Description: "group:iris-context.Context.SaveFormFile — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comlabstackecho.context.attachment", Category: taint.SnkFileWrite, Pattern: `\.Attachment\s*\(`, ObjectType: "github.com/labstack/echo.Context", MethodName: "Attachment", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/labstack/echo.Context.Attachment — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comlabstackecho.context.file", Category: taint.SnkFileWrite, Pattern: `\.File\s*\(`, ObjectType: "github.com/labstack/echo.Context", MethodName: "File", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/labstack/echo.Context.File — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comlestrratgolibxml2parser.parser.parse", Category: taint.SnkXPath, Pattern: `\.Parse\s*\(`, ObjectType: "github.com/lestrrat-go/libxml2/parser.Parser", MethodName: "Parse", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/lestrrat-go/libxml2/parser.Parser.Parse — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comlestrratgolibxml2parser.parser.parsereader", Category: taint.SnkXPath, Pattern: `\.ParseReader\s*\(`, ObjectType: "github.com/lestrrat-go/libxml2/parser.Parser", MethodName: "ParseReader", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/lestrrat-go/libxml2/parser.Parser.ParseReader — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comlestrratgolibxml2parser.parser.parsestring", Category: taint.SnkXPath, Pattern: `\.ParseString\s*\(`, ObjectType: "github.com/lestrrat-go/libxml2/parser.Parser", MethodName: "ParseString", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/lestrrat-go/libxml2/parser.Parser.ParseString — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel..expr", Category: taint.SnkSQLQuery, Pattern: `\.Expr\s*\(`, ObjectType: "group:squirrel.", MethodName: "Expr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel..Expr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel..insert", Category: taint.SnkSQLQuery, Pattern: `\.Insert\s*\(`, ObjectType: "group:squirrel.", MethodName: "Insert", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel..Insert — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel..update", Category: taint.SnkSQLQuery, Pattern: `\.Update\s*\(`, ObjectType: "group:squirrel.", MethodName: "Update", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel..Update — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.deletebuilder.from", Category: taint.SnkSQLQuery, Pattern: `\.From\s*\(`, ObjectType: "group:squirrel.DeleteBuilder", MethodName: "From", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.DeleteBuilder.From — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.deletebuilder.orderby", Category: taint.SnkSQLQuery, Pattern: `\.OrderBy\s*\(`, ObjectType: "group:squirrel.DeleteBuilder", MethodName: "OrderBy", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.DeleteBuilder.OrderBy — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.deletebuilder.prefix", Category: taint.SnkSQLQuery, Pattern: `\.Prefix\s*\(`, ObjectType: "group:squirrel.DeleteBuilder", MethodName: "Prefix", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.DeleteBuilder.Prefix — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.deletebuilder.suffix", Category: taint.SnkSQLQuery, Pattern: `\.Suffix\s*\(`, ObjectType: "group:squirrel.DeleteBuilder", MethodName: "Suffix", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.DeleteBuilder.Suffix — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.insertbuilder.columns", Category: taint.SnkSQLQuery, Pattern: `\.Columns\s*\(`, ObjectType: "group:squirrel.InsertBuilder", MethodName: "Columns", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.InsertBuilder.Columns — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.insertbuilder.into", Category: taint.SnkSQLQuery, Pattern: `\.Into\s*\(`, ObjectType: "group:squirrel.InsertBuilder", MethodName: "Into", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.InsertBuilder.Into — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.insertbuilder.prefix", Category: taint.SnkSQLQuery, Pattern: `\.Prefix\s*\(`, ObjectType: "group:squirrel.InsertBuilder", MethodName: "Prefix", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.InsertBuilder.Prefix — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.insertbuilder.suffix", Category: taint.SnkSQLQuery, Pattern: `\.Suffix\s*\(`, ObjectType: "group:squirrel.InsertBuilder", MethodName: "Suffix", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.InsertBuilder.Suffix — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.crossjoin", Category: taint.SnkSQLQuery, Pattern: `\.CrossJoin\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "CrossJoin", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.CrossJoin — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.column", Category: taint.SnkSQLQuery, Pattern: `\.Column\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "Column", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.Column — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.columns", Category: taint.SnkSQLQuery, Pattern: `\.Columns\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "Columns", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.Columns — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.from", Category: taint.SnkSQLQuery, Pattern: `\.From\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "From", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.From — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.groupby", Category: taint.SnkSQLQuery, Pattern: `\.GroupBy\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "GroupBy", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.GroupBy — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.innerjoin", Category: taint.SnkSQLQuery, Pattern: `\.InnerJoin\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "InnerJoin", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.InnerJoin — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.leftjoin", Category: taint.SnkSQLQuery, Pattern: `\.LeftJoin\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "LeftJoin", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.LeftJoin — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.orderby", Category: taint.SnkSQLQuery, Pattern: `\.OrderBy\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "OrderBy", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.OrderBy — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.prefix", Category: taint.SnkSQLQuery, Pattern: `\.Prefix\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "Prefix", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.Prefix — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.rightjoin", Category: taint.SnkSQLQuery, Pattern: `\.RightJoin\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "RightJoin", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.RightJoin — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.selectbuilder.suffix", Category: taint.SnkSQLQuery, Pattern: `\.Suffix\s*\(`, ObjectType: "group:squirrel.SelectBuilder", MethodName: "Suffix", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.SelectBuilder.Suffix — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.updatebuilder.from", Category: taint.SnkSQLQuery, Pattern: `\.From\s*\(`, ObjectType: "group:squirrel.UpdateBuilder", MethodName: "From", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.UpdateBuilder.From — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.updatebuilder.orderby", Category: taint.SnkSQLQuery, Pattern: `\.OrderBy\s*\(`, ObjectType: "group:squirrel.UpdateBuilder", MethodName: "OrderBy", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.UpdateBuilder.OrderBy — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.updatebuilder.prefix", Category: taint.SnkSQLQuery, Pattern: `\.Prefix\s*\(`, ObjectType: "group:squirrel.UpdateBuilder", MethodName: "Prefix", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.UpdateBuilder.Prefix — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.updatebuilder.suffix", Category: taint.SnkSQLQuery, Pattern: `\.Suffix\s*\(`, ObjectType: "group:squirrel.UpdateBuilder", MethodName: "Suffix", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.UpdateBuilder.Suffix — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupsquirrel.updatebuilder.table", Category: taint.SnkSQLQuery, Pattern: `\.Table\s*\(`, ObjectType: "group:squirrel.UpdateBuilder", MethodName: "Table", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:squirrel.UpdateBuilder.Table — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgokogirixml.node.searchwithvariables", Category: taint.SnkXPath, Pattern: `\.SearchWithVariables\s*\(`, ObjectType: "group:gokogiri/xml.Node", MethodName: "SearchWithVariables", DangerousArgs: []int{0}, Severity: rules.High, Description: "group:gokogiri/xml.Node.SearchWithVariables — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgokogirixml.node.evalxpath", Category: taint.SnkXPath, Pattern: `\.EvalXPath\s*\(`, ObjectType: "group:gokogiri/xml.Node", MethodName: "EvalXPath", DangerousArgs: []int{0}, Severity: rules.High, Description: "group:gokogiri/xml.Node.EvalXPath — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgokogirixml.node.evalxpathasboolean", Category: taint.SnkXPath, Pattern: `\.EvalXPathAsBoolean\s*\(`, ObjectType: "group:gokogiri/xml.Node", MethodName: "EvalXPathAsBoolean", DangerousArgs: []int{0}, Severity: rules.High, Description: "group:gokogiri/xml.Node.EvalXPathAsBoolean — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.grouprevel.controller.renderfilename", Category: taint.SnkFileWrite, Pattern: `\.RenderFileName\s*\(`, ObjectType: "group:revel.Controller", MethodName: "RenderFileName", DangerousArgs: []int{0}, Severity: rules.High, Description: "group:revel.Controller.RenderFileName — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queryone", Category: taint.SnkSQLQuery, Pattern: `\.QueryOne\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueryOne", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueryOne — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queryonecontext", Category: taint.SnkSQLQuery, Pattern: `\.QueryOneContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueryOneContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueryOneContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queryoneparameterized", Category: taint.SnkSQLQuery, Pattern: `\.QueryOneParameterized\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueryOneParameterized", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueryOneParameterized — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queryoneparameterizedcontext", Category: taint.SnkSQLQuery, Pattern: `\.QueryOneParameterizedContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueryOneParameterizedContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueryOneParameterizedContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queryparameterized", Category: taint.SnkSQLQuery, Pattern: `\.QueryParameterized\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueryParameterized", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueryParameterized — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queryparameterizedcontext", Category: taint.SnkSQLQuery, Pattern: `\.QueryParameterizedContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueryParameterizedContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueryParameterizedContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queue", Category: taint.SnkSQLQuery, Pattern: `\.Queue\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "Queue", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorqlite.Connection.Queue — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queuecontext", Category: taint.SnkSQLQuery, Pattern: `\.QueueContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueueContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueueContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queueone", Category: taint.SnkSQLQuery, Pattern: `\.QueueOne\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueueOne", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueueOne — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queueonecontext", Category: taint.SnkSQLQuery, Pattern: `\.QueueOneContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueueOneContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueueOneContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queueoneparameterized", Category: taint.SnkSQLQuery, Pattern: `\.QueueOneParameterized\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueueOneParameterized", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueueOneParameterized — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queueoneparameterizedcontext", Category: taint.SnkSQLQuery, Pattern: `\.QueueOneParameterizedContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueueOneParameterizedContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueueOneParameterizedContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queueparameterized", Category: taint.SnkSQLQuery, Pattern: `\.QueueParameterized\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueueParameterized", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueueParameterized — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.queueparameterizedcontext", Category: taint.SnkSQLQuery, Pattern: `\.QueueParameterizedContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "QueueParameterizedContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.QueueParameterizedContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.writecontext", Category: taint.SnkSQLQuery, Pattern: `\.WriteContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "WriteContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.WriteContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.writeone", Category: taint.SnkSQLQuery, Pattern: `\.WriteOne\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "WriteOne", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorqlite.Connection.WriteOne — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.writeonecontext", Category: taint.SnkSQLQuery, Pattern: `\.WriteOneContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "WriteOneContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.WriteOneContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.writeoneparameterized", Category: taint.SnkSQLQuery, Pattern: `\.WriteOneParameterized\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "WriteOneParameterized", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorqlite.Connection.WriteOneParameterized — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.writeoneparameterizedcontext", Category: taint.SnkSQLQuery, Pattern: `\.WriteOneParameterizedContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "WriteOneParameterizedContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.WriteOneParameterizedContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.writeparameterized", Category: taint.SnkSQLQuery, Pattern: `\.WriteParameterized\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "WriteParameterized", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorqlite.Connection.WriteParameterized — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorqlite.connection.writeparameterizedcontext", Category: taint.SnkSQLQuery, Pattern: `\.WriteParameterizedContext\s*\(`, ObjectType: "group:gorqlite.Connection", MethodName: "WriteParameterizedContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:gorqlite.Connection.WriteParameterizedContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comsanthoshtekurixpathparser..parse", Category: taint.SnkXPath, Pattern: `\.Parse\s*\(`, ObjectType: "github.com/santhosh-tekuri/xpathparser.", MethodName: "Parse", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/santhosh-tekuri/xpathparser..Parse — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comsanthoshtekurixpathparser..mustparse", Category: taint.SnkXPath, Pattern: `\.MustParse\s*\(`, ObjectType: "github.com/santhosh-tekuri/xpathparser.", MethodName: "MustParse", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/santhosh-tekuri/xpathparser..MustParse — XPath injection sink", CWEID: "CWE-643", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comspf13afero.httpfs.removeall", Category: taint.SnkFileWrite, Pattern: `\.RemoveAll\s*\(`, ObjectType: "github.com/spf13/afero.HttpFs", MethodName: "RemoveAll", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/spf13/afero.HttpFs.RemoveAll — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comspf13afero.memmapfs.removeall", Category: taint.SnkFileWrite, Pattern: `\.RemoveAll\s*\(`, ObjectType: "github.com/spf13/afero.MemMapFs", MethodName: "RemoveAll", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/spf13/afero.MemMapFs.RemoveAll — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comspf13afero.osfs.readlinkifpossible", Category: taint.SnkFileWrite, Pattern: `\.ReadlinkIfPossible\s*\(`, ObjectType: "github.com/spf13/afero.OsFs", MethodName: "ReadlinkIfPossible", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/spf13/afero.OsFs.ReadlinkIfPossible — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comspf13afero.osfs.removeall", Category: taint.SnkFileWrite, Pattern: `\.RemoveAll\s*\(`, ObjectType: "github.com/spf13/afero.OsFs", MethodName: "RemoveAll", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/spf13/afero.OsFs.RemoveAll — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comspf13afero.readonlyfs.readlinkifpossible", Category: taint.SnkFileWrite, Pattern: `\.ReadlinkIfPossible\s*\(`, ObjectType: "github.com/spf13/afero.ReadOnlyFs", MethodName: "ReadlinkIfPossible", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/spf13/afero.ReadOnlyFs.ReadlinkIfPossible — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comspf13afero.regexpfs.removeall", Category: taint.SnkFileWrite, Pattern: `\.RemoveAll\s*\(`, ObjectType: "github.com/spf13/afero.RegexpFs", MethodName: "RemoveAll", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/spf13/afero.RegexpFs.RemoveAll — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun..newrawquery", Category: taint.SnkSQLQuery, Pattern: `\.NewRawQuery\s*\(`, ObjectType: "github.com/uptrace/bun.", MethodName: "NewRawQuery", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/uptrace/bun..NewRawQuery — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.addcolumnquery.columnexpr", Category: taint.SnkSQLQuery, Pattern: `\.ColumnExpr\s*\(`, ObjectType: "github.com/uptrace/bun.AddColumnQuery", MethodName: "ColumnExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.AddColumnQuery.ColumnExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.addcolumnquery.modeltableexpr", Category: taint.SnkSQLQuery, Pattern: `\.ModelTableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.AddColumnQuery", MethodName: "ModelTableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.AddColumnQuery.ModelTableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.addcolumnquery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.AddColumnQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.AddColumnQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.conn.preparecontext", Category: taint.SnkSQLQuery, Pattern: `\.PrepareContext\s*\(`, ObjectType: "github.com/uptrace/bun.Conn", MethodName: "PrepareContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/uptrace/bun.Conn.PrepareContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.conn.queryrowcontext", Category: taint.SnkSQLQuery, Pattern: `\.QueryRowContext\s*\(`, ObjectType: "github.com/uptrace/bun.Conn", MethodName: "QueryRowContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/uptrace/bun.Conn.QueryRowContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.createindexquery.columnexpr", Category: taint.SnkSQLQuery, Pattern: `\.ColumnExpr\s*\(`, ObjectType: "github.com/uptrace/bun.CreateIndexQuery", MethodName: "ColumnExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.CreateIndexQuery.ColumnExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.createindexquery.modeltableexpr", Category: taint.SnkSQLQuery, Pattern: `\.ModelTableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.CreateIndexQuery", MethodName: "ModelTableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.CreateIndexQuery.ModelTableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.createindexquery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.CreateIndexQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.CreateIndexQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.createindexquery.whereor", Category: taint.SnkSQLQuery, Pattern: `\.WhereOr\s*\(`, ObjectType: "github.com/uptrace/bun.CreateIndexQuery", MethodName: "WhereOr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.CreateIndexQuery.WhereOr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.createtablequery.columnexpr", Category: taint.SnkSQLQuery, Pattern: `\.ColumnExpr\s*\(`, ObjectType: "github.com/uptrace/bun.CreateTableQuery", MethodName: "ColumnExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.CreateTableQuery.ColumnExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.createtablequery.modeltableexpr", Category: taint.SnkSQLQuery, Pattern: `\.ModelTableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.CreateTableQuery", MethodName: "ModelTableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.CreateTableQuery.ModelTableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.createtablequery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.CreateTableQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.CreateTableQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.db.preparecontext", Category: taint.SnkSQLQuery, Pattern: `\.PrepareContext\s*\(`, ObjectType: "github.com/uptrace/bun.DB", MethodName: "PrepareContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/uptrace/bun.DB.PrepareContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.db.queryrowcontext", Category: taint.SnkSQLQuery, Pattern: `\.QueryRowContext\s*\(`, ObjectType: "github.com/uptrace/bun.DB", MethodName: "QueryRowContext", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "github.com/uptrace/bun.DB.QueryRowContext — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.deletequery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.DeleteQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.DeleteQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.deletequery.whereor", Category: taint.SnkSQLQuery, Pattern: `\.WhereOr\s*\(`, ObjectType: "github.com/uptrace/bun.DeleteQuery", MethodName: "WhereOr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.DeleteQuery.WhereOr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.dropcolumnquery.columnexpr", Category: taint.SnkSQLQuery, Pattern: `\.ColumnExpr\s*\(`, ObjectType: "github.com/uptrace/bun.DropColumnQuery", MethodName: "ColumnExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.DropColumnQuery.ColumnExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.dropcolumnquery.modeltableexpr", Category: taint.SnkSQLQuery, Pattern: `\.ModelTableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.DropColumnQuery", MethodName: "ModelTableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.DropColumnQuery.ModelTableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.dropcolumnquery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.DropColumnQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.DropColumnQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.droptablequery.modeltableexpr", Category: taint.SnkSQLQuery, Pattern: `\.ModelTableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.DropTableQuery", MethodName: "ModelTableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.DropTableQuery.ModelTableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.droptablequery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.DropTableQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.DropTableQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.insertquery.columnexpr", Category: taint.SnkSQLQuery, Pattern: `\.ColumnExpr\s*\(`, ObjectType: "github.com/uptrace/bun.InsertQuery", MethodName: "ColumnExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.InsertQuery.ColumnExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.insertquery.modeltableexpr", Category: taint.SnkSQLQuery, Pattern: `\.ModelTableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.InsertQuery", MethodName: "ModelTableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.InsertQuery.ModelTableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.insertquery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.InsertQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.InsertQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.insertquery.whereor", Category: taint.SnkSQLQuery, Pattern: `\.WhereOr\s*\(`, ObjectType: "github.com/uptrace/bun.InsertQuery", MethodName: "WhereOr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.InsertQuery.WhereOr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.mergequery.modeltableexpr", Category: taint.SnkSQLQuery, Pattern: `\.ModelTableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.MergeQuery", MethodName: "ModelTableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.MergeQuery.ModelTableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.mergequery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.MergeQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.MergeQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.selectquery.columnexpr", Category: taint.SnkSQLQuery, Pattern: `\.ColumnExpr\s*\(`, ObjectType: "github.com/uptrace/bun.SelectQuery", MethodName: "ColumnExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.SelectQuery.ColumnExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.selectquery.distincton", Category: taint.SnkSQLQuery, Pattern: `\.DistinctOn\s*\(`, ObjectType: "github.com/uptrace/bun.SelectQuery", MethodName: "DistinctOn", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.SelectQuery.DistinctOn — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.selectquery.for", Category: taint.SnkSQLQuery, Pattern: `\.For\s*\(`, ObjectType: "github.com/uptrace/bun.SelectQuery", MethodName: "For", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.SelectQuery.For — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.selectquery.groupexpr", Category: taint.SnkSQLQuery, Pattern: `\.GroupExpr\s*\(`, ObjectType: "github.com/uptrace/bun.SelectQuery", MethodName: "GroupExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.SelectQuery.GroupExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.selectquery.having", Category: taint.SnkSQLQuery, Pattern: `\.Having\s*\(`, ObjectType: "github.com/uptrace/bun.SelectQuery", MethodName: "Having", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.SelectQuery.Having — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.selectquery.modeltableexpr", Category: taint.SnkSQLQuery, Pattern: `\.ModelTableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.SelectQuery", MethodName: "ModelTableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.SelectQuery.ModelTableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.selectquery.orderexpr", Category: taint.SnkSQLQuery, Pattern: `\.OrderExpr\s*\(`, ObjectType: "github.com/uptrace/bun.SelectQuery", MethodName: "OrderExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.SelectQuery.OrderExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.selectquery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.SelectQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.SelectQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.selectquery.whereor", Category: taint.SnkSQLQuery, Pattern: `\.WhereOr\s*\(`, ObjectType: "github.com/uptrace/bun.SelectQuery", MethodName: "WhereOr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.SelectQuery.WhereOr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.truncatetablequery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.TruncateTableQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.TruncateTableQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.updatequery.modeltableexpr", Category: taint.SnkSQLQuery, Pattern: `\.ModelTableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.UpdateQuery", MethodName: "ModelTableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.UpdateQuery.ModelTableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.updatequery.tableexpr", Category: taint.SnkSQLQuery, Pattern: `\.TableExpr\s*\(`, ObjectType: "github.com/uptrace/bun.UpdateQuery", MethodName: "TableExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.UpdateQuery.TableExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comuptracebun.updatequery.whereor", Category: taint.SnkSQLQuery, Pattern: `\.WhereOr\s*\(`, ObjectType: "github.com/uptrace/bun.UpdateQuery", MethodName: "WhereOr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "github.com/uptrace/bun.UpdateQuery.WhereOr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp..getdeadline", Category: taint.SnkURLFetch, Pattern: `\.GetDeadline\s*\(`, ObjectType: "github.com/valyala/fasthttp.", MethodName: "GetDeadline", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/valyala/fasthttp..GetDeadline — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp..gettimeout", Category: taint.SnkURLFetch, Pattern: `\.GetTimeout\s*\(`, ObjectType: "github.com/valyala/fasthttp.", MethodName: "GetTimeout", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/valyala/fasthttp..GetTimeout — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp.client.getdeadline", Category: taint.SnkURLFetch, Pattern: `\.GetDeadline\s*\(`, ObjectType: "github.com/valyala/fasthttp.Client", MethodName: "GetDeadline", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/valyala/fasthttp.Client.GetDeadline — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp.client.gettimeout", Category: taint.SnkURLFetch, Pattern: `\.GetTimeout\s*\(`, ObjectType: "github.com/valyala/fasthttp.Client", MethodName: "GetTimeout", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/valyala/fasthttp.Client.GetTimeout — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp.hostclient.getdeadline", Category: taint.SnkURLFetch, Pattern: `\.GetDeadline\s*\(`, ObjectType: "github.com/valyala/fasthttp.HostClient", MethodName: "GetDeadline", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/valyala/fasthttp.HostClient.GetDeadline — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp.hostclient.gettimeout", Category: taint.SnkURLFetch, Pattern: `\.GetTimeout\s*\(`, ObjectType: "github.com/valyala/fasthttp.HostClient", MethodName: "GetTimeout", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/valyala/fasthttp.HostClient.GetTimeout — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp.request.sethost", Category: taint.SnkURLFetch, Pattern: `\.SetHost\s*\(`, ObjectType: "github.com/valyala/fasthttp.Request", MethodName: "SetHost", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/valyala/fasthttp.Request.SetHost — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp.request.sethostbytes", Category: taint.SnkURLFetch, Pattern: `\.SetHostBytes\s*\(`, ObjectType: "github.com/valyala/fasthttp.Request", MethodName: "SetHostBytes", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/valyala/fasthttp.Request.SetHostBytes — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp.request.setrequesturi", Category: taint.SnkURLFetch, Pattern: `\.SetRequestURI\s*\(`, ObjectType: "github.com/valyala/fasthttp.Request", MethodName: "SetRequestURI", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/valyala/fasthttp.Request.SetRequestURI — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp.request.setrequesturibytes", Category: taint.SnkURLFetch, Pattern: `\.SetRequestURIBytes\s*\(`, ObjectType: "github.com/valyala/fasthttp.Request", MethodName: "SetRequestURIBytes", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/valyala/fasthttp.Request.SetRequestURIBytes — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp.request.seturi", Category: taint.SnkURLFetch, Pattern: `\.SetURI\s*\(`, ObjectType: "github.com/valyala/fasthttp.Request", MethodName: "SetURI", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/valyala/fasthttp.Request.SetURI — server-side request forgery (SSRF) sink", CWEID: "CWE-918", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp..savemultipartfile", Category: taint.SnkFileWrite, Pattern: `\.SaveMultipartFile\s*\(`, ObjectType: "github.com/valyala/fasthttp.", MethodName: "SaveMultipartFile", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/valyala/fasthttp..SaveMultipartFile — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp..servefilebytes", Category: taint.SnkFileWrite, Pattern: `\.ServeFileBytes\s*\(`, ObjectType: "github.com/valyala/fasthttp.", MethodName: "ServeFileBytes", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/valyala/fasthttp..ServeFileBytes — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp..servefilebytesuncompressed", Category: taint.SnkFileWrite, Pattern: `\.ServeFileBytesUncompressed\s*\(`, ObjectType: "github.com/valyala/fasthttp.", MethodName: "ServeFileBytesUncompressed", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/valyala/fasthttp..ServeFileBytesUncompressed — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp..servefileuncompressed", Category: taint.SnkFileWrite, Pattern: `\.ServeFileUncompressed\s*\(`, ObjectType: "github.com/valyala/fasthttp.", MethodName: "ServeFileUncompressed", DangerousArgs: []int{1}, Severity: rules.High, Description: "github.com/valyala/fasthttp..ServeFileUncompressed — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.comvalyalafasthttp.requestctx.sendfilebytes", Category: taint.SnkFileWrite, Pattern: `\.SendFileBytes\s*\(`, ObjectType: "github.com/valyala/fasthttp.RequestCtx", MethodName: "SendFileBytes", DangerousArgs: []int{0}, Severity: rules.High, Description: "github.com/valyala/fasthttp.RequestCtx.SendFileBytes — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.orgmongodrivermongo.collection.countdocuments", Category: taint.SnkNoSQL, Pattern: `\.CountDocuments\s*\(`, ObjectType: "go.mongodb.org/mongo-driver/mongo.Collection", MethodName: "CountDocuments", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "go.mongodb.org/mongo-driver/mongo.Collection.CountDocuments — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.orgmongodrivermongo.collection.distinct", Category: taint.SnkNoSQL, Pattern: `\.Distinct\s*\(`, ObjectType: "go.mongodb.org/mongo-driver/mongo.Collection", MethodName: "Distinct", DangerousArgs: []int{2}, Severity: rules.Critical, Description: "go.mongodb.org/mongo-driver/mongo.Collection.Distinct — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.orgmongodrivermongo.collection.findoneanddelete", Category: taint.SnkNoSQL, Pattern: `\.FindOneAndDelete\s*\(`, ObjectType: "go.mongodb.org/mongo-driver/mongo.Collection", MethodName: "FindOneAndDelete", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "go.mongodb.org/mongo-driver/mongo.Collection.FindOneAndDelete — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.orgmongodrivermongo.collection.findoneandreplace", Category: taint.SnkNoSQL, Pattern: `\.FindOneAndReplace\s*\(`, ObjectType: "go.mongodb.org/mongo-driver/mongo.Collection", MethodName: "FindOneAndReplace", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "go.mongodb.org/mongo-driver/mongo.Collection.FindOneAndReplace — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.orgmongodrivermongo.collection.findoneandupdate", Category: taint.SnkNoSQL, Pattern: `\.FindOneAndUpdate\s*\(`, ObjectType: "go.mongodb.org/mongo-driver/mongo.Collection", MethodName: "FindOneAndUpdate", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "go.mongodb.org/mongo-driver/mongo.Collection.FindOneAndUpdate — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.orgmongodrivermongo.collection.replaceone", Category: taint.SnkNoSQL, Pattern: `\.ReplaceOne\s*\(`, ObjectType: "go.mongodb.org/mongo-driver/mongo.Collection", MethodName: "ReplaceOne", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "go.mongodb.org/mongo-driver/mongo.Collection.ReplaceOne — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.orgmongodrivermongo.collection.updatemany", Category: taint.SnkNoSQL, Pattern: `\.UpdateMany\s*\(`, ObjectType: "go.mongodb.org/mongo-driver/mongo.Collection", MethodName: "UpdateMany", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "go.mongodb.org/mongo-driver/mongo.Collection.UpdateMany — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.orgmongodrivermongo.collection.watch", Category: taint.SnkNoSQL, Pattern: `\.Watch\s*\(`, ObjectType: "go.mongodb.org/mongo-driver/mongo.Collection", MethodName: "Watch", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "go.mongodb.org/mongo-driver/mongo.Collection.Watch — nosql injection sink", CWEID: "CWE-943", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorm.db.order", Category: taint.SnkSQLQuery, Pattern: `\.Order\s*\(`, ObjectType: "group:gorm.DB", MethodName: "Order", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorm.DB.Order — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorm.db.not", Category: taint.SnkSQLQuery, Pattern: `\.Not\s*\(`, ObjectType: "group:gorm.DB", MethodName: "Not", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorm.DB.Not — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorm.db.or", Category: taint.SnkSQLQuery, Pattern: `\.Or\s*\(`, ObjectType: "group:gorm.DB", MethodName: "Or", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorm.DB.Or — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorm.db.table", Category: taint.SnkSQLQuery, Pattern: `\.Table\s*\(`, ObjectType: "group:gorm.DB", MethodName: "Table", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorm.DB.Table — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorm.db.group", Category: taint.SnkSQLQuery, Pattern: `\.Group\s*\(`, ObjectType: "group:gorm.DB", MethodName: "Group", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorm.DB.Group — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorm.db.having", Category: taint.SnkSQLQuery, Pattern: `\.Having\s*\(`, ObjectType: "group:gorm.DB", MethodName: "Having", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorm.DB.Having — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorm.db.joins", Category: taint.SnkSQLQuery, Pattern: `\.Joins\s*\(`, ObjectType: "group:gorm.DB", MethodName: "Joins", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorm.DB.Joins — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorm.db.distinct", Category: taint.SnkSQLQuery, Pattern: `\.Distinct\s*\(`, ObjectType: "group:gorm.DB", MethodName: "Distinct", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorm.DB.Distinct — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupgorm.db.pluck", Category: taint.SnkSQLQuery, Pattern: `\.Pluck\s*\(`, ObjectType: "group:gorm.DB", MethodName: "Pluck", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:gorm.DB.Pluck — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.ioioutil..tempdir", Category: taint.SnkFileWrite, Pattern: `\.TempDir\s*\(`, ObjectType: "io/ioutil.", MethodName: "TempDir", DangerousArgs: []int{0, 1}, Severity: rules.High, Description: "io/ioutil..TempDir — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.ioioutil..tempfile", Category: taint.SnkFileWrite, Pattern: `\.TempFile\s*\(`, ObjectType: "io/ioutil.", MethodName: "TempFile", DangerousArgs: []int{0, 1}, Severity: rules.High, Description: "io/ioutil..TempFile — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..chdir", Category: taint.SnkFileWrite, Pattern: `\.Chdir\s*\(`, ObjectType: "os.", MethodName: "Chdir", DangerousArgs: []int{0}, Severity: rules.High, Description: "os..Chdir — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..chmod", Category: taint.SnkFileWrite, Pattern: `\.Chmod\s*\(`, ObjectType: "os.", MethodName: "Chmod", DangerousArgs: []int{0}, Severity: rules.High, Description: "os..Chmod — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..chown", Category: taint.SnkFileWrite, Pattern: `\.Chown\s*\(`, ObjectType: "os.", MethodName: "Chown", DangerousArgs: []int{0}, Severity: rules.High, Description: "os..Chown — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..chtimes", Category: taint.SnkFileWrite, Pattern: `\.Chtimes\s*\(`, ObjectType: "os.", MethodName: "Chtimes", DangerousArgs: []int{0}, Severity: rules.High, Description: "os..Chtimes — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..lchown", Category: taint.SnkFileWrite, Pattern: `\.Lchown\s*\(`, ObjectType: "os.", MethodName: "Lchown", DangerousArgs: []int{0}, Severity: rules.High, Description: "os..Lchown — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..newfile", Category: taint.SnkFileWrite, Pattern: `\.NewFile\s*\(`, ObjectType: "os.", MethodName: "NewFile", DangerousArgs: []int{1}, Severity: rules.High, Description: "os..NewFile — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..readlink", Category: taint.SnkFileWrite, Pattern: `\.Readlink\s*\(`, ObjectType: "os.", MethodName: "Readlink", DangerousArgs: []int{0}, Severity: rules.High, Description: "os..Readlink — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..removeall", Category: taint.SnkFileWrite, Pattern: `\.RemoveAll\s*\(`, ObjectType: "os.", MethodName: "RemoveAll", DangerousArgs: []int{0}, Severity: rules.High, Description: "os..RemoveAll — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..truncate", Category: taint.SnkFileWrite, Pattern: `\.Truncate\s*\(`, ObjectType: "os.", MethodName: "Truncate", DangerousArgs: []int{0}, Severity: rules.High, Description: "os..Truncate — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..dirfs", Category: taint.SnkFileWrite, Pattern: `\.DirFS\s*\(`, ObjectType: "os.", MethodName: "DirFS", DangerousArgs: []int{0}, Severity: rules.High, Description: "os..DirFS — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..mkdirtemp", Category: taint.SnkFileWrite, Pattern: `\.MkdirTemp\s*\(`, ObjectType: "os.", MethodName: "MkdirTemp", DangerousArgs: []int{0, 1}, Severity: rules.High, Description: "os..MkdirTemp — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..createtemp", Category: taint.SnkFileWrite, Pattern: `\.CreateTemp\s*\(`, ObjectType: "os.", MethodName: "CreateTemp", DangerousArgs: []int{0}, Severity: rules.High, Description: "os..CreateTemp — path traversal sink", CWEID: "CWE-22", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.os..startprocess", Category: taint.SnkCommand, Pattern: `\.StartProcess\s*\(`, ObjectType: "os.", MethodName: "StartProcess", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "os..StartProcess — command injection sink", CWEID: "CWE-78", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.syscall..forkexec", Category: taint.SnkCommand, Pattern: `\.ForkExec\s*\(`, ObjectType: "syscall.", MethodName: "ForkExec", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "syscall..ForkExec — command injection sink", CWEID: "CWE-78", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.syscall..startprocess", Category: taint.SnkCommand, Pattern: `\.StartProcess\s*\(`, ObjectType: "syscall.", MethodName: "StartProcess", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "syscall..StartProcess — command injection sink", CWEID: "CWE-78", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.syscall..createprocess", Category: taint.SnkCommand, Pattern: `\.CreateProcess\s*\(`, ObjectType: "syscall.", MethodName: "CreateProcess", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "syscall..CreateProcess — command injection sink", CWEID: "CWE-78", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.syscall..createprocessasuser", Category: taint.SnkCommand, Pattern: `\.CreateProcessAsUser\s*\(`, ObjectType: "syscall.", MethodName: "CreateProcessAsUser", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "syscall..CreateProcessAsUser — command injection sink", CWEID: "CWE-78", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.alias", Category: taint.SnkSQLQuery, Pattern: `\.Alias\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "Alias", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Engine.Alias — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.and", Category: taint.SnkSQLQuery, Pattern: `\.And\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "And", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Engine.And — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.groupby", Category: taint.SnkSQLQuery, Pattern: `\.GroupBy\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "GroupBy", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Engine.GroupBy — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.having", Category: taint.SnkSQLQuery, Pattern: `\.Having\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "Having", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Engine.Having — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.in", Category: taint.SnkSQLQuery, Pattern: `\.In\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "In", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Engine.In — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.notin", Category: taint.SnkSQLQuery, Pattern: `\.NotIn\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "NotIn", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Engine.NotIn — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.or", Category: taint.SnkSQLQuery, Pattern: `\.Or\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "Or", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Engine.Or — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.orderby", Category: taint.SnkSQLQuery, Pattern: `\.OrderBy\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "OrderBy", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Engine.OrderBy — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.setexpr", Category: taint.SnkSQLQuery, Pattern: `\.SetExpr\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "SetExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Engine.SetExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.sql", Category: taint.SnkSQLQuery, Pattern: `\.SQL\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "SQL", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Engine.SQL — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.sum", Category: taint.SnkSQLQuery, Pattern: `\.Sum\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "Sum", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:xorm.Engine.Sum — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.sums", Category: taint.SnkSQLQuery, Pattern: `\.Sums\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "Sums", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:xorm.Engine.Sums — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.sumint", Category: taint.SnkSQLQuery, Pattern: `\.SumInt\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "SumInt", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:xorm.Engine.SumInt — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.engine.sumsint", Category: taint.SnkSQLQuery, Pattern: `\.SumsInt\s*\(`, ObjectType: "group:xorm.Engine", MethodName: "SumsInt", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:xorm.Engine.SumsInt — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.alias", Category: taint.SnkSQLQuery, Pattern: `\.Alias\s*\(`, ObjectType: "group:xorm.Session", MethodName: "Alias", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Session.Alias — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.and", Category: taint.SnkSQLQuery, Pattern: `\.And\s*\(`, ObjectType: "group:xorm.Session", MethodName: "And", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Session.And — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.groupby", Category: taint.SnkSQLQuery, Pattern: `\.GroupBy\s*\(`, ObjectType: "group:xorm.Session", MethodName: "GroupBy", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Session.GroupBy — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.having", Category: taint.SnkSQLQuery, Pattern: `\.Having\s*\(`, ObjectType: "group:xorm.Session", MethodName: "Having", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Session.Having — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.in", Category: taint.SnkSQLQuery, Pattern: `\.In\s*\(`, ObjectType: "group:xorm.Session", MethodName: "In", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Session.In — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.notin", Category: taint.SnkSQLQuery, Pattern: `\.NotIn\s*\(`, ObjectType: "group:xorm.Session", MethodName: "NotIn", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Session.NotIn — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.or", Category: taint.SnkSQLQuery, Pattern: `\.Or\s*\(`, ObjectType: "group:xorm.Session", MethodName: "Or", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Session.Or — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.orderby", Category: taint.SnkSQLQuery, Pattern: `\.OrderBy\s*\(`, ObjectType: "group:xorm.Session", MethodName: "OrderBy", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Session.OrderBy — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.setexpr", Category: taint.SnkSQLQuery, Pattern: `\.SetExpr\s*\(`, ObjectType: "group:xorm.Session", MethodName: "SetExpr", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Session.SetExpr — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.sql", Category: taint.SnkSQLQuery, Pattern: `\.SQL\s*\(`, ObjectType: "group:xorm.Session", MethodName: "SQL", DangerousArgs: []int{0}, Severity: rules.Critical, Description: "group:xorm.Session.SQL — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.sum", Category: taint.SnkSQLQuery, Pattern: `\.Sum\s*\(`, ObjectType: "group:xorm.Session", MethodName: "Sum", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:xorm.Session.Sum — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.sums", Category: taint.SnkSQLQuery, Pattern: `\.Sums\s*\(`, ObjectType: "group:xorm.Session", MethodName: "Sums", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:xorm.Session.Sums — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.sumint", Category: taint.SnkSQLQuery, Pattern: `\.SumInt\s*\(`, ObjectType: "group:xorm.Session", MethodName: "SumInt", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:xorm.Session.SumInt — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+		{ID: "go.groupxorm.session.sumsint", Category: taint.SnkSQLQuery, Pattern: `\.SumsInt\s*\(`, ObjectType: "group:xorm.Session", MethodName: "SumsInt", DangerousArgs: []int{1}, Severity: rules.Critical, Description: "group:xorm.Session.SumsInt — SQL injection sink", CWEID: "CWE-89", OWASPCategory: "A03:2021-Injection"},
+
+		// --- hashicorp/go-retryablehttp SSRF (CWE-918) ---
+		// retryablehttp is HashiCorp's drop-in net/http replacement with retries
+		// (https://github.com/hashicorp/go-retryablehttp), used across the Vault /
+		// Terraform ecosystem. Its *Client convenience methods mirror net/http and
+		// take the request URL as arg 0, so a tainted URL is the same SSRF surface.
+		// ObjectType scopes each entry to *retryablehttp.Client via astflow typeEnv,
+		// so they don't collide with the net/http or resty entries.
+		{
+			ID:            "go.retryablehttp.client.get",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Get\s*\(`,
+			ObjectType:    "*retryablehttp.Client",
+			MethodName:    "Get",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "go-retryablehttp Client.Get(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.retryablehttp.client.head",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Head\s*\(`,
+			ObjectType:    "*retryablehttp.Client",
+			MethodName:    "Head",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "go-retryablehttp Client.Head(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.retryablehttp.client.post",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Post\s*\(`,
+			ObjectType:    "*retryablehttp.Client",
+			MethodName:    "Post",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "go-retryablehttp Client.Post(url, bodyType, body) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.retryablehttp.client.postform",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.PostForm\s*\(`,
+			ObjectType:    "*retryablehttp.Client",
+			MethodName:    "PostForm",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "go-retryablehttp Client.PostForm(url, data) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.retryablehttp.newrequest",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `retryablehttp\.NewRequest\s*\(`,
+			ObjectType:    "",
+			MethodName:    "retryablehttp.NewRequest",
+			DangerousArgs: []int{1},
+			Severity:      rules.High,
+			Description:   "go-retryablehttp NewRequest(method, url, body) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- parnurzeal/gorequest SSRF (CWE-918) ---
+		// gorequest is a widely-used SuperAgent-style HTTP client
+		// (https://github.com/parnurzeal/gorequest). Every HTTP-verb method on
+		// *gorequest.SuperAgent takes the target URL as arg 0 and returns the agent
+		// for chaining, so a tainted URL reaches the outbound request when .End() is
+		// called. Proxy(proxyUrl) likewise redirects all traffic through a tainted
+		// proxy. ObjectType scopes these to *gorequest.SuperAgent via typeEnv.
+		{
+			ID:            "go.gorequest.superagent.get",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Get\s*\(`,
+			ObjectType:    "*gorequest.SuperAgent",
+			MethodName:    "Get",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "gorequest SuperAgent.Get(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.gorequest.superagent.post",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Post\s*\(`,
+			ObjectType:    "*gorequest.SuperAgent",
+			MethodName:    "Post",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "gorequest SuperAgent.Post(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.gorequest.superagent.put",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Put\s*\(`,
+			ObjectType:    "*gorequest.SuperAgent",
+			MethodName:    "Put",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "gorequest SuperAgent.Put(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.gorequest.superagent.delete",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Delete\s*\(`,
+			ObjectType:    "*gorequest.SuperAgent",
+			MethodName:    "Delete",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "gorequest SuperAgent.Delete(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.gorequest.superagent.head",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Head\s*\(`,
+			ObjectType:    "*gorequest.SuperAgent",
+			MethodName:    "Head",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "gorequest SuperAgent.Head(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.gorequest.superagent.patch",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Patch\s*\(`,
+			ObjectType:    "*gorequest.SuperAgent",
+			MethodName:    "Patch",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "gorequest SuperAgent.Patch(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.gorequest.superagent.options",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Options\s*\(`,
+			ObjectType:    "*gorequest.SuperAgent",
+			MethodName:    "Options",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "gorequest SuperAgent.Options(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.gorequest.superagent.proxy",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Proxy\s*\(`,
+			ObjectType:    "*gorequest.SuperAgent",
+			MethodName:    "Proxy",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "gorequest SuperAgent.Proxy(proxyUrl) with tainted proxy URL (SSRF / outbound redirection)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- imroc/req v3 SSRF (CWE-918) ---
+		// req is a popular black-magic HTTP client (https://github.com/imroc/req).
+		// *req.Request verb methods take the URL as arg 0; *req.Client SetBaseURL /
+		// SetProxyURL configure where every request is sent. A tainted value in any
+		// of these is the SSRF surface (cf. advisory GO-2024-3098). ObjectType scopes
+		// each entry to the req types via typeEnv so they don't collide with resty's
+		// SetBaseURL or net/http's bare verbs.
+		{
+			ID:            "go.req.client.setbaseurl",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.SetBaseURL\s*\(`,
+			ObjectType:    "*req.Client",
+			MethodName:    "SetBaseURL",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "imroc/req Client.SetBaseURL with tainted URL (SSRF via base URL config)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.req.client.setproxyurl",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.SetProxyURL\s*\(`,
+			ObjectType:    "*req.Client",
+			MethodName:    "SetProxyURL",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "imroc/req Client.SetProxyURL with tainted proxy URL (SSRF / outbound redirection)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.req.request.get",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Get\s*\(`,
+			ObjectType:    "*req.Request",
+			MethodName:    "Get",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "imroc/req Request.Get(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.req.request.post",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Post\s*\(`,
+			ObjectType:    "*req.Request",
+			MethodName:    "Post",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "imroc/req Request.Post(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.req.request.put",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Put\s*\(`,
+			ObjectType:    "*req.Request",
+			MethodName:    "Put",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "imroc/req Request.Put(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+		{
+			ID:            "go.req.request.delete",
+			Category:      taint.SnkURLFetch,
+			Language:      rules.LangGo,
+			Pattern:       `\.Delete\s*\(`,
+			ObjectType:    "*req.Request",
+			MethodName:    "Delete",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "imroc/req Request.Delete(url) with tainted URL (SSRF)",
+			CWEID:         "CWE-918",
+			OWASPCategory: "A10:2021-Server-Side Request Forgery",
+		},
+
+		// --- jackc/pgx (PostgreSQL driver, v4/v5) raw SQL sinks (CWE-89) ---
+		// pgx is parameterized by default ($1, $2 placeholders), so these fire
+		// only when the SQL *string argument itself* is tainted (built by
+		// concatenation) — not when user input is passed as a separate query
+		// parameter. For Conn/Pool/Tx methods ctx is arg 0, so the SQL text is
+		// at index 1; pgx.Batch.Queue takes the SQL as arg 0. The existing
+		// go.pgx.queryrow regex sanitizer neutralizes parameterized ($N) forms
+		// in the Layer-1 fallback engine.
+		{
+			ID:            "go.pgx.conn.exec",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Exec\s*\(`,
+			ObjectType:    "*pgx.Conn",
+			MethodName:    "Exec",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "pgx Conn.Exec with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgx.conn.query",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Query\s*\(`,
+			ObjectType:    "*pgx.Conn",
+			MethodName:    "Query",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "pgx Conn.Query with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgx.conn.queryrow",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.QueryRow\s*\(`,
+			ObjectType:    "*pgx.Conn",
+			MethodName:    "QueryRow",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "pgx Conn.QueryRow with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgx.conn.prepare",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Prepare\s*\(`,
+			ObjectType:    "*pgx.Conn",
+			MethodName:    "Prepare",
+			DangerousArgs: []int{2},
+			Severity:      rules.Critical,
+			Description:   "pgx Conn.Prepare with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgxpool.pool.exec",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Exec\s*\(`,
+			ObjectType:    "*pgxpool.Pool",
+			MethodName:    "Exec",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "pgxpool Pool.Exec with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgxpool.pool.query",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Query\s*\(`,
+			ObjectType:    "*pgxpool.Pool",
+			MethodName:    "Query",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "pgxpool Pool.Query with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgxpool.pool.queryrow",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.QueryRow\s*\(`,
+			ObjectType:    "*pgxpool.Pool",
+			MethodName:    "QueryRow",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "pgxpool Pool.QueryRow with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgx.tx.exec",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Exec\s*\(`,
+			ObjectType:    "pgx.Tx",
+			MethodName:    "Exec",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "pgx Tx.Exec with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgx.tx.query",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Query\s*\(`,
+			ObjectType:    "pgx.Tx",
+			MethodName:    "Query",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "pgx Tx.Query with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgx.tx.queryrow",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.QueryRow\s*\(`,
+			ObjectType:    "pgx.Tx",
+			MethodName:    "QueryRow",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "pgx Tx.QueryRow with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgx.tx.prepare",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Prepare\s*\(`,
+			ObjectType:    "pgx.Tx",
+			MethodName:    "Prepare",
+			DangerousArgs: []int{2},
+			Severity:      rules.Critical,
+			Description:   "pgx Tx.Prepare with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.pgx.batch.queue",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Queue\s*\(`,
+			ObjectType:    "*pgx.Batch",
+			MethodName:    "Queue",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "pgx Batch.Queue with tainted SQL string (concatenated query)",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Server-Side Template Injection / code eval via tainted
+		//     template BODY (CWE-94) ---
+		//
+		// Batou already models *text/template.Template.Execute as CWE-79
+		// (output escaping). This is the distinct, RCE-class case where the
+		// template SOURCE STRING ITSELF is attacker-controlled: a tainted
+		// `{{...}}` body can invoke arbitrary methods/fields on the data
+		// context. We anchor on the package-qualified *template.Template
+		// receiver (so a bare `.Parse(` on an unrelated type cannot match)
+		// and only flag the DangerousArg (the template body, arg 0). A
+		// constant template literal — the overwhelming common case — carries
+		// no taint and so never fires. This holds for html/template too: its
+		// auto-escaping protects the DATA context, not a user-controlled
+		// template BODY, so a tainted Parse arg is a real finding in both.
+		{
+			ID:            "go.text.template.parse",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `\.Parse\s*\(`,
+			ObjectType:    "*template.Template",
+			MethodName:    "Parse",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "Template body parsed from tainted input — server-side template injection (the {{...}} actions can invoke methods/fields on the data context, an RCE-class flaw). Parse a constant template and pass user data only as the Execute data context.",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- JWT signature bypass (CWE-347) ---
+		//
+		// The existing BATOU-JWT regex rules only match Python/JS/generic
+		// `alg:none` / `verify=false` string patterns and never match Go's
+		// golang-jwt API. ParseUnverified's ENTIRE documented purpose is to
+		// skip signature verification ("WARNING: Don't use this method unless
+		// you know what you're doing") — so reaching it with a token whose
+		// claims are then trusted is the actionable finding. We anchor on the
+		// package-qualified *jwt.Parser receiver method so a bare `.ParseUnverified`
+		// on some unrelated type can't collide. DangerousArg[0] is the raw
+		// token string; reaching this sink from request-tainted data is the
+		// auth-bypass flow.
+		{
+			ID:            "go.jwt.parser.parseunverified",
+			Category:      taint.SnkTrustBoundary,
+			Language:      rules.LangGo,
+			Pattern:       `\.ParseUnverified\s*\(`,
+			ObjectType:    "*jwt.Parser",
+			MethodName:    "ParseUnverified",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "JWT parsed with ParseUnverified — signature verification is SKIPPED. Trusting these claims for auth is a token-forgery / auth-bypass vulnerability (CWE-347). Use jwt.Parse / jwt.ParseWithClaims with a keyfunc that returns the verification key.",
+			CWEID:         "CWE-347",
+			OWASPCategory: "A02:2021-Cryptographic Failures",
+		},
+
+		// --- Email header / content injection via gomail (CWE-93) ---
+		//
+		// Complements the existing bare net/smtp.SendMail sink. gomail builds
+		// a message from SetHeader / SetAddressHeader; a tainted Subject or
+		// header VALUE that still contains CRLF lets an attacker inject extra
+		// headers or smuggle body content. Anchored on the package-qualified
+		// *gomail.Message receiver; the DangerousArg is the header value
+		// (SetHeader's variadic values start at arg 1; SetAddressHeader's
+		// address+name at args 1,2) — never the field name. A canonicalized /
+		// newline-stripped value is the matching sanitizer (registered in
+		// go_sanitizers.go).
+		{
+			ID:            "go.gomail.message.setheader",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangGo,
+			Pattern:       `\.SetHeader\s*\(`,
+			ObjectType:    "*gomail.Message",
+			MethodName:    "SetHeader",
+			DangerousArgs: []int{1, 2, 3},
+			Severity:      rules.Medium,
+			Description:   "gomail message header set from tainted value — CRLF in the value enables email header injection (smuggled headers / body, CWE-93). Strip CR/LF or reject values containing them before setting the header.",
+			CWEID:         "CWE-93",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gomail.message.setaddressheader",
+			Category:      taint.SnkHeader,
+			Language:      rules.LangGo,
+			Pattern:       `\.SetAddressHeader\s*\(`,
+			ObjectType:    "*gomail.Message",
+			MethodName:    "SetAddressHeader",
+			DangerousArgs: []int{1, 2},
+			Severity:      rules.Medium,
+			Description:   "gomail address header set from tainted value — CRLF in the address/name enables email header injection (CWE-93). Validate the address and strip CR/LF before setting it.",
+			CWEID:         "CWE-93",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- go-pg / go-pg ORM SQL injection (CWE-89) (ECL: coverage-breadth) ---
+		// github.com/go-pg/pg (v9/v10) is a widely-used Postgres ORM distinct
+		// from pgx/gorm/bun. Its DB/Tx accept a query string whose `?`
+		// placeholders are parameterized — but a tainted *string* passed as the
+		// query (rather than as a placeholder arg) is a SQLi sink. ORM builders
+		// (orm.Query) take raw SQL fragments in Where/Having/OrderExpr/ColumnExpr.
+		// Anchored on the real package types so they never collide with
+		// database/sql's *sql.DB. The placeholder-arg case is covered by the
+		// parameterization sanitizer below.
+		{
+			ID:            "go.gopg.db.exec",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Exec\s*\(|\.ExecOne\s*\(|\.ExecContext\s*\(`,
+			ObjectType:    "*pg.DB",
+			MethodName:    "Exec/ExecOne/ExecContext",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "go-pg DB.Exec with a tainted query string (SQL injection). Pass user input as a `?` placeholder argument, never concatenated into the query.",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gopg.db.query",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Query\s*\(|\.QueryOne\s*\(|\.QueryContext\s*\(`,
+			ObjectType:    "*pg.DB",
+			MethodName:    "Query/QueryOne/QueryContext",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "go-pg DB.Query with a tainted query string (SQL injection). Use `?` placeholders for user input.",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gopg.tx.exec",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Exec\s*\(|\.ExecOne\s*\(|\.Query\s*\(|\.QueryOne\s*\(`,
+			ObjectType:    "*pg.Tx",
+			MethodName:    "Exec/ExecOne/Query/QueryOne",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "go-pg Tx.Exec/Query with a tainted query string (SQL injection). Use `?` placeholders for user input.",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gopg.orm.where",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.Where\s*\(|\.WhereOr\s*\(|\.Having\s*\(`,
+			ObjectType:    "*orm.Query",
+			MethodName:    "Where/WhereOr/Having",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "go-pg ORM Query.Where/Having with a tainted SQL fragment (SQL injection). Keep the condition a constant and pass values as `?` placeholder args.",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.gopg.orm.expr",
+			Category:      taint.SnkSQLQuery,
+			Language:      rules.LangGo,
+			Pattern:       `\.OrderExpr\s*\(|\.ColumnExpr\s*\(|\.GroupExpr\s*\(|\.TableExpr\s*\(`,
+			ObjectType:    "*orm.Query",
+			MethodName:    "OrderExpr/ColumnExpr/GroupExpr/TableExpr",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "go-pg ORM Query raw-expression builder with a tainted fragment (SQL injection). Allowlist column/order identifiers; never interpolate user input.",
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- otto JavaScript VM code injection (CWE-94) (ECL: coverage-breadth) ---
+		// github.com/robertkrimen/otto is a pure-Go JS interpreter. Running a
+		// tainted string as script is arbitrary code execution in-process.
+		// (goja, expr, govaluate, tengo are already covered; otto was the gap.)
+		{
+			ID:            "go.otto.run",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `\.Run\s*\(|\.Eval\s*\(`,
+			ObjectType:    "*otto.Otto",
+			MethodName:    "Run/Eval",
+			DangerousArgs: []int{0},
+			Severity:      rules.Critical,
+			Description:   "otto JavaScript VM executes a tainted script string (code injection, CWE-94). Never pass user input to the interpreter; expose a fixed, audited API instead.",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.otto.runfunction",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `\.Call\s*\(`,
+			ObjectType:    "*otto.Otto",
+			MethodName:    "Call",
+			DangerousArgs: []int{0},
+			Severity:      rules.High,
+			Description:   "otto VM Call invokes a JS function named by a tainted string (code injection, CWE-94).",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- Starlark embedded-script execution (CWE-94) (ECL: coverage-breadth) ---
+		// go.starlark.net/starlark — Google's Python-dialect config language
+		// (used by Bazel, Tilt, drone). Executing a tainted program string is
+		// in-process code execution within the Starlark sandbox; combined with
+		// host-exposed builtins it is an injection sink.
+		{
+			ID:            "go.starlark.execfile",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `starlark\.ExecFile\s*\(|starlark\.ExecFileOptions\s*\(`,
+			ObjectType:    "",
+			MethodName:    "ExecFile",
+			Module:        "starlark",
+			RequireModule: true,
+			DangerousArgs: []int{2, 3},
+			Severity:      rules.High,
+			Description:   "Starlark ExecFile runs a tainted program string (script injection, CWE-94). Only execute trusted, version-pinned Starlark sources.",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+		{
+			ID:            "go.starlark.eval",
+			Category:      taint.SnkEval,
+			Language:      rules.LangGo,
+			Pattern:       `starlark\.Eval\s*\(|starlark\.EvalOptions\s*\(`,
+			ObjectType:    "",
+			MethodName:    "Eval",
+			Module:        "starlark",
+			RequireModule: true,
+			DangerousArgs: []int{2, 3},
+			Severity:      rules.High,
+			Description:   "Starlark Eval evaluates a tainted expression string (script injection, CWE-94).",
+			CWEID:         "CWE-94",
+			OWASPCategory: "A03:2021-Injection",
+		},
+
+		// --- MongoDB Database.RunCommand NoSQL/JS injection (CWE-943) (ECL) ---
+		// mongo.Database.RunCommand executes a raw command document; a tainted
+		// command (e.g. an `$eval`/`$where`/aggregation pipeline built from user
+		// input) is server-side JS / NoSQL operator injection. Collection-level
+		// operators are already covered; the Database command surface was the gap.
+		{
+			ID:            "go.mongo.database.runcommand",
+			Category:      taint.SnkNoSQL,
+			Language:      rules.LangGo,
+			Pattern:       `\.RunCommand\s*\(|\.RunCommandCursor\s*\(`,
+			ObjectType:    "*mongo.Database",
+			MethodName:    "RunCommand/RunCommandCursor",
+			DangerousArgs: []int{1},
+			Severity:      rules.Critical,
+			Description:   "MongoDB Database.RunCommand with a tainted command document (NoSQL / server-side operator injection, CWE-943). Build commands from constants; never embed user input as operators.",
+			CWEID:         "CWE-943",
+			OWASPCategory: "A03:2021-Injection",
+		},
+	}, goGiteaSinks()...)
 }

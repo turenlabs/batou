@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/gofrs/flock"
 	"github.com/turenlabs/batou-rules/rules"
 )
 
@@ -60,9 +60,9 @@ type Record struct {
 
 // Store manages the findings database file.
 type Store struct {
-	path     string
-	records  map[string]*Record // keyed by Record.Key
-	lockFile *os.File           // exclusive lock held during Open→Save
+	path    string
+	records map[string]*Record // keyed by Record.Key
+	lock    *flock.Flock       // advisory lock held during Open→Save (cross-platform via gofrs/flock)
 }
 
 // FindRoot locates the .batou directory, creating it if needed.
@@ -110,22 +110,23 @@ func Open(batouDir string) (*Store, error) {
 	path := filepath.Join(batouDir, "findings.json")
 	lockPath := filepath.Join(batouDir, "findings.lock")
 
-	// Acquire exclusive lock with timeout. If we can't get it in 2s,
-	// proceed without the lock rather than blocking the scan.
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		// Can't open lock file — proceed without lock
-		fmt.Fprintf(os.Stderr, "Batou: findings lock unavailable: %v\n", err)
-	} else if err := tryLock(lockFile, 2*time.Second); err != nil {
+	// Acquire exclusive advisory lock with timeout (cross-platform via
+	// gofrs/flock — flock on Unix, LockFileEx on Windows). If we can't
+	// get it in 2s, proceed without the lock rather than blocking the scan.
+	lock := flock.New(lockPath)
+	acquired, lockErr := tryLock(lock, 2*time.Second)
+	if lockErr != nil {
+		fmt.Fprintf(os.Stderr, "Batou: findings lock unavailable: %v\n", lockErr)
+		lock = nil
+	} else if !acquired {
 		fmt.Fprintf(os.Stderr, "Batou: findings lock timeout, proceeding unlocked\n")
-		_ = lockFile.Close()
-		lockFile = nil
+		lock = nil
 	}
 
 	s := &Store{
-		path:     path,
-		records:  make(map[string]*Record),
-		lockFile: lockFile,
+		path:    path,
+		records: make(map[string]*Record),
+		lock:    lock,
 	}
 
 	data, err := os.ReadFile(path)
@@ -403,7 +404,7 @@ func (s *Store) ComputeDeltas(filePath string, currentFindings []rules.Finding, 
 
 	// Collect only NEWLY suppressed findings — those that were active before
 	// this scan and are now being suppressed. Already-suppressed findings from
-	// prior scans should not be re-sent to downstream consumers.
+	// prior scans should not be re-sent to downstream findings consumers.
 	for _, sf := range suppressedFindings {
 		for _, f := range sf {
 			key := DedupKey(f)
@@ -447,34 +448,44 @@ func DedupKey(f rules.Finding) string {
 	return fmt.Sprintf("%x", h[:12]) // 24-char hex
 }
 
-// tryLock attempts to acquire an exclusive flock with a timeout.
-// Uses non-blocking LOCK_NB in a retry loop to avoid permanent deadlock
-// if a previous batou process crashed while holding the lock.
-func tryLock(f *os.File, timeout time.Duration) error {
+// tryLock attempts to acquire an exclusive advisory lock via gofrs/flock
+// with a timeout. Retries non-blocking TryLock until the deadline; the OS
+// drops the lock automatically if the holder dies, so there's no stale-lock
+// path to clean up (unlike the previous O_EXCL-based graph lock).
+//
+// Returns (acquired, error). error is non-nil only for system-level
+// failures; (false, nil) means "timed out, still busy".
+func tryLock(lock *flock.Flock, timeout time.Duration) (bool, error) {
 	deadline := time.Now().Add(timeout)
 	for {
-		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
-		if err == nil {
-			return nil
+		locked, err := lock.TryLock()
+		if err != nil {
+			return false, err
+		}
+		if locked {
+			return true, nil
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("lock timeout after %s", timeout)
+			return false, nil
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 }
 
-// unlock releases the file lock acquired during Open and removes the lock file.
+// unlock releases the advisory lock acquired during Open and removes the
+// lock file. No-op if the lock was never acquired.
 func (s *Store) unlock() {
-	if s.lockFile != nil {
-		name := s.lockFile.Name()
-		_ = syscall.Flock(int(s.lockFile.Fd()), syscall.LOCK_UN)
-		_ = s.lockFile.Close()
-		s.lockFile = nil
-		// Best-effort cleanup — lock file is harmless if removal fails
-		// (e.g., another process already removed it).
-		if err := os.Remove(name); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Batou: lock cleanup: %v\n", err)
-		}
+	if s.lock == nil {
+		return
+	}
+	name := s.lock.Path()
+	if err := s.lock.Unlock(); err != nil {
+		fmt.Fprintf(os.Stderr, "Batou: lock release: %v\n", err)
+	}
+	s.lock = nil
+	// Best-effort cleanup — lock file is harmless if removal fails
+	// (e.g., another process already removed it).
+	if err := os.Remove(name); err != nil && !os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Batou: lock cleanup: %v\n", err)
 	}
 }

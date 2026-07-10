@@ -19,6 +19,10 @@ var (
 	reMarshalLoads = regexp.MustCompile(`\bmarshal\.loads?\s*\(`)
 	// Java: XStream.fromXML() — XML deserialization, many CVEs
 	reXStreamFromXML = regexp.MustCompile(`\bXStream\s*\(\s*\)|\.fromXML\s*\(`)
+	// XStream allowlist / security framework hardening (CVE-2017-9805 fix
+	// pattern). When the file contains any of these calls, the XStream
+	// instance is locked down to a type allowlist — skip the regex finding.
+	reXStreamAllowlist = regexp.MustCompile(`\.allowTypes\s*\(|\.allowTypesByRegExp\s*\(|\.allowTypeHierarchy\s*\(|\.addPermission\s*\(\s*NoTypePermission|\.setupDefaultSecurity\s*\(`)
 	// Java: Kryo.readObject() / readClassAndObject()
 	reKryoRead = regexp.MustCompile(`\b(?:kryo|Kryo)\s*\.\s*(?:readObject|readClassAndObject)\s*\(`)
 	// Java: XMLDecoder (java.beans.XMLDecoder)
@@ -76,8 +80,8 @@ var (
 
 type ExtendedDeserialization struct{}
 
-func (r *ExtendedDeserialization) ID() string                     { return "BATOU-DESER-001" }
-func (r *ExtendedDeserialization) Name() string                   { return "ExtendedDeserialization" }
+func (r *ExtendedDeserialization) ID() string                      { return "BATOU-DESER-001" }
+func (r *ExtendedDeserialization) Name() string                    { return "ExtendedDeserialization" }
 func (r *ExtendedDeserialization) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *ExtendedDeserialization) Description() string {
 	return "Detects additional deserialization sinks beyond the core set: Python shelve/marshal, Java XStream/Kryo/XMLDecoder/SnakeYAML, .NET BinaryFormatter/JSON.NET TypeNameHandling."
@@ -90,7 +94,7 @@ func (r *ExtendedDeserialization) Languages() []rules.Language {
 
 func (r *ExtendedDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -104,39 +108,48 @@ func (r *ExtendedDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangPython:
-			if m := reShelveOpen.FindString(line); m != "" {
+			if m := rules.GFind(reShelveOpen, line); m != "" {
 				matched = m
 				detail = "shelve.open() uses pickle internally. If the shelf file path is user-controlled or the file content is untrusted, this leads to arbitrary code execution via pickle deserialization."
-			} else if m := reMarshalLoads.FindString(line); m != "" {
+			} else if m := rules.GFind(reMarshalLoads, line); m != "" {
 				matched = m
 				detail = "marshal.loads()/load() is not safe for untrusted data. The marshal format is not designed to be secure against malicious input and can crash the interpreter."
 			}
 
 		case rules.LangJava:
-			if m := reXStreamFromXML.FindString(line); m != "" {
+			if m := rules.GFind(reXStreamFromXML, line); m != "" {
+				// Skip when the file (function scope is unavailable to a
+				// line-by-line rule, so file scope is the next-best heuristic)
+				// installs an XStream type allowlist or security framework.
+				// CVE-2017-9805 fix shape: `xs.addPermission(NoTypePermission.NONE);
+				// xs.allowTypes(new Class[]{Foo.class});`. Without this guard,
+				// every safe `XStream + allowTypes + fromXML` block FPs.
+				if rules.GMatchFile(reXStreamAllowlist, ctx) {
+					continue
+				}
 				matched = m
 				detail = "XStream deserialization has numerous CVEs allowing remote code execution. Configure a security framework with an allowlist of permitted classes."
-			} else if m := reKryoRead.FindString(line); m != "" {
+			} else if m := rules.GFind(reKryoRead, line); m != "" {
 				matched = m
 				detail = "Kryo deserialization with untrusted data can lead to arbitrary code execution. Use setRegistrationRequired(true) and register only safe classes."
 				sev = rules.High
-			} else if m := reJavaXMLDecoder.FindString(line); m != "" {
+			} else if m := rules.GFind(reJavaXMLDecoder, line); m != "" {
 				matched = m
 				detail = "XMLDecoder can execute arbitrary code from XML input. Never use XMLDecoder with untrusted data."
-			} else if reSnakeYAMLLoad.MatchString(line) || reSnakeYAMLLoadCall.MatchString(line) {
+			} else if rules.GMatch(reSnakeYAMLLoad, line) || rules.GMatch(reSnakeYAMLLoadCall, line) {
 				// Check for SnakeYAML new Yaml() without SafeConstructor
-				if reSnakeYAMLLoad.MatchString(line) && !reSnakeYAMLSafeCtor.MatchString(ctx.Content) {
-					m := reSnakeYAMLLoad.FindString(line)
+				if rules.GMatch(reSnakeYAMLLoad, line) && !rules.GMatchFile(reSnakeYAMLSafeCtor, ctx) {
+					m := rules.GFind(reSnakeYAMLLoad, line)
 					matched = m
 					detail = "SnakeYAML Yaml() without SafeConstructor deserializes arbitrary Java objects via !!java.lang.Runtime and similar tags, leading to RCE. Use new Yaml(new SafeConstructor())."
 				}
 			}
 
 		case rules.LangCSharp:
-			if m := reDotNetBinaryFmt.FindString(line); m != "" {
+			if m := rules.GFind(reDotNetBinaryFmt, line); m != "" {
 				matched = m
 				detail = "BinaryFormatter/LosFormatter/SoapFormatter deserialization is inherently insecure and can execute arbitrary code. Microsoft recommends not using BinaryFormatter. Use System.Text.Json or DataContractSerializer with known types."
-			} else if m := reJsonNetTypeName.FindString(line); m != "" {
+			} else if m := rules.GFind(reJsonNetTypeName, line); m != "" {
 				matched = m
 				detail = "JSON.NET TypeNameHandling set to All/Auto/Objects/Arrays allows type-discriminated deserialization, enabling remote code execution via crafted JSON payloads. Use TypeNameHandling.None or a custom SerializationBinder."
 				sev = rules.High
@@ -171,8 +184,8 @@ func (r *ExtendedDeserialization) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RubyDynamicExecution struct{}
 
-func (r *RubyDynamicExecution) ID() string                     { return "BATOU-DESER-002" }
-func (r *RubyDynamicExecution) Name() string                   { return "RubyDynamicExecution" }
+func (r *RubyDynamicExecution) ID() string                      { return "BATOU-DESER-002" }
+func (r *RubyDynamicExecution) Name() string                    { return "RubyDynamicExecution" }
 func (r *RubyDynamicExecution) DefaultSeverity() rules.Severity { return rules.High }
 func (r *RubyDynamicExecution) Description() string {
 	return "Detects Ruby dynamic code execution patterns (eval, instance_eval, class_eval, send, public_send, constantize) that can lead to RCE when used with user input."
@@ -183,7 +196,7 @@ func (r *RubyDynamicExecution) Languages() []rules.Language {
 
 func (r *RubyDynamicExecution) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -196,27 +209,27 @@ func (r *RubyDynamicExecution) Scan(ctx *rules.ScanContext) []rules.Finding {
 		confidence := "high"
 		sev := r.DefaultSeverity()
 
-		if m := reRubyEval.FindString(line); m != "" {
+		if m := rules.GFind(reRubyEval, line); m != "" {
 			matched = m
 			detail = "eval() with a dynamic argument executes arbitrary Ruby code. If the argument is user-controlled, this leads to remote code execution."
 			sev = rules.Critical
-		} else if m := reRubyInstanceEval.FindString(line); m != "" {
+		} else if m := rules.GFind(reRubyInstanceEval, line); m != "" {
 			matched = m
 			detail = "instance_eval/class_eval/module_eval with a dynamic argument can execute arbitrary code in the context of the receiver object. If the argument is user-controlled, this leads to RCE."
 			sev = rules.Critical
-		} else if m := reRubySend.FindString(line); m != "" {
+		} else if m := rules.GFind(reRubySend, line); m != "" {
 			matched = m
 			detail = "send()/public_send() with user-controlled method name allows calling arbitrary methods on an object, potentially including dangerous methods like system(), eval(), or exit."
-		} else if m := reRubySendVar.FindString(line); m != "" {
+		} else if m := rules.GFind(reRubySendVar, line); m != "" {
 			// Lower confidence unless user input source is nearby
 			if hasNearbyPattern(lines, i, reRubyUserSource) {
 				matched = m
 				detail = "send()/public_send()/__send__() with a variable that may originate from user input. This allows arbitrary method invocation."
 				confidence = "medium"
 			}
-		} else if reRubyConstantize.MatchString(line) {
+		} else if rules.GMatch(reRubyConstantize, line) {
 			if hasNearbyPattern(lines, i, reRubyUserSource) {
-				matched = reRubyConstantize.FindString(line)
+				matched = rules.GFind(reRubyConstantize, line)
 				detail = "constantize converts a user-controlled string to a Ruby class constant. An attacker can instantiate arbitrary classes, leading to code execution."
 				confidence = "medium"
 			}
@@ -250,8 +263,8 @@ func (r *RubyDynamicExecution) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PHPDangerousPatterns struct{}
 
-func (r *PHPDangerousPatterns) ID() string                     { return "BATOU-DESER-003" }
-func (r *PHPDangerousPatterns) Name() string                   { return "PHPDangerousPatterns" }
+func (r *PHPDangerousPatterns) ID() string                      { return "BATOU-DESER-003" }
+func (r *PHPDangerousPatterns) Name() string                    { return "PHPDangerousPatterns" }
 func (r *PHPDangerousPatterns) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PHPDangerousPatterns) Description() string {
 	return "Detects PHP-specific dangerous patterns: preg_replace /e modifier, extract() with superglobals, assert() with variable, create_function(), and variable function calls."
@@ -262,7 +275,7 @@ func (r *PHPDangerousPatterns) Languages() []rules.Language {
 
 func (r *PHPDangerousPatterns) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -274,22 +287,22 @@ func (r *PHPDangerousPatterns) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var detail string
 		sev := r.DefaultSeverity()
 
-		if m := rePHPPregE.FindString(line); m != "" {
+		if m := rules.GFind(rePHPPregE, line); m != "" {
 			matched = m
 			detail = "preg_replace() with /e modifier evaluates the replacement string as PHP code. This was removed in PHP 7.0 due to security risks. An attacker can achieve arbitrary code execution."
 			sev = rules.Critical
-		} else if m := rePHPExtract.FindString(line); m != "" {
+		} else if m := rules.GFind(rePHPExtract, line); m != "" {
 			matched = m
 			detail = "extract() with superglobals ($_GET, $_POST, $_REQUEST, $_COOKIE) overwrites local variables with user-controlled values. This can lead to authentication bypass, variable injection, and other logic flaws."
-		} else if m := rePHPAssert.FindString(line); m != "" {
+		} else if m := rules.GFind(rePHPAssert, line); m != "" {
 			matched = m
 			detail = "assert() with a string argument evaluates it as PHP code (in PHP < 8.0). If the argument contains user input, this leads to arbitrary code execution."
 			sev = rules.Critical
-		} else if m := rePHPCreateFunc.FindString(line); m != "" {
+		} else if m := rules.GFind(rePHPCreateFunc, line); m != "" {
 			matched = m
 			detail = "create_function() is deprecated and uses eval() internally. If any argument is user-controlled, this leads to code injection."
 			sev = rules.Critical
-		} else if m := rePHPVarFunc.FindString(line); m != "" {
+		} else if m := rules.GFind(rePHPVarFunc, line); m != "" {
 			matched = m
 			detail = "Variable variable function call ($$var()) can invoke arbitrary functions. If the variable name comes from user input, this leads to code execution."
 		}
@@ -322,8 +335,8 @@ func (r *PHPDangerousPatterns) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JSTimerStringExec struct{}
 
-func (r *JSTimerStringExec) ID() string                     { return "BATOU-DESER-004" }
-func (r *JSTimerStringExec) Name() string                   { return "JSTimerStringExec" }
+func (r *JSTimerStringExec) ID() string                      { return "BATOU-DESER-004" }
+func (r *JSTimerStringExec) Name() string                    { return "JSTimerStringExec" }
 func (r *JSTimerStringExec) DefaultSeverity() rules.Severity { return rules.High }
 func (r *JSTimerStringExec) Description() string {
 	return "Detects setTimeout/setInterval with string arguments containing user input, which acts as implicit eval() and can lead to code injection."
@@ -334,9 +347,9 @@ func (r *JSTimerStringExec) Languages() []rules.Language {
 
 func (r *JSTimerStringExec) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
-	hasUserInput := reJSUserInputHint.MatchString(ctx.Content)
+	hasUserInput := rules.GMatchFile(reJSUserInputHint, ctx)
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -347,9 +360,9 @@ func (r *JSTimerStringExec) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 
 		// setTimeout/setInterval with string literal argument
-		if m := reJSTimerLiteral.FindString(line); m != "" {
+		if m := rules.GFind(reJSTimerLiteral, line); m != "" {
 			matched = m
-		} else if m := reJSTimerString.FindString(line); m != "" {
+		} else if m := rules.GFind(reJSTimerString, line); m != "" {
 			// setTimeout/setInterval with variable — only flag if user input nearby
 			if hasUserInput || hasNearbyPattern(lines, i, reJSUserInputHint) {
 				matched = m
@@ -397,7 +410,7 @@ func hasNearbyPattern(lines []string, idx int, pat *regexp.Regexp) bool {
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if pat.MatchString(l) {
+		if rules.GMatch(pat, l) {
 			return true
 		}
 	}

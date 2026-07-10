@@ -45,6 +45,29 @@ var (
 	rbStrongParams = regexp.MustCompile(`\.permit\s*\(`)
 	// Direct params usage without permit
 	rbParamsDirectAssign = regexp.MustCompile(`\.\s*(?:update|update!|assign_attributes)\s*\(\s*params\)`)
+	// permit! / to_unsafe_h — the distinctive "permit everything / unfiltered
+	// hash" enablers. Unlike the inline rbModelNewParams form, real Rails
+	// controllers assign the unfiltered hash to a variable first
+	// (`p = params.require(:user).permit!`; `h = params[:user].to_unsafe_h`)
+	// then pass it to the model write on a later line, so the variable
+	// indirection escapes the inline-`params[:` patterns. permit! (bang, no
+	// allowlist) and to_unsafe_h are themselves the mass-assignment: each
+	// hands the model the full attacker-controlled hash, defeating strong
+	// parameters. They are anchored on those distinctive method names — there
+	// is no benign controller use — so they don't collide with ordinary
+	// .update / Hash#update calls the way a bare `.update` sink would.
+	// `permit!` ends in `!`, a hard Ruby method terminator that cannot be part
+	// of a longer identifier, so no trailing boundary is needed (and a `\b`
+	// after `!` would never match, since `!` is itself a non-word char). The
+	// to_unsafe_h arm carries `\b` so `to_unsafe_h`/`to_unsafe_hash` don't
+	// swallow a longer unrelated identifier.
+	rbPermitBangUnsafe = regexp.MustCompile(`\.permit!|\.to_unsafe_h(?:ash)?\b`)
+	// Explicit key allowlist applied before permit! — `.slice(:a, :b).permit!`
+	// (or .only/.except) restricts the hash to named keys first, so permit!
+	// only blesses an attacker-irrelevant, developer-chosen field set. That is
+	// the safe idiom; don't flag it. Anchored to a same-line allowlist chain
+	// directly feeding permit! so it can't suppress an unrelated slice elsewhere.
+	rbSliceAllowlistBeforePermit = regexp.MustCompile(`\.(?:slice|only|except)\s*\([^)]*\)[^.]*\.permit!`)
 )
 
 // BATOU-MASS-004: Java/Spring mass assignment
@@ -55,7 +78,6 @@ var (
 	// BeanUtils.copyProperties with request data
 	javaBeanCopy = regexp.MustCompile(`BeanUtils\.copyProperties\s*\(`)
 	// Spring Data save with raw binding
-	javaRequestBodyDirect = regexp.MustCompile(`@RequestBody\s+\w+\s+\w+`)
 )
 
 func init() {
@@ -69,9 +91,9 @@ func init() {
 
 type MassAssignJS struct{}
 
-func (r *MassAssignJS) ID() string                        { return "BATOU-MASS-001" }
-func (r *MassAssignJS) Name() string                      { return "MassAssignJS" }
-func (r *MassAssignJS) DefaultSeverity() rules.Severity   { return rules.High }
+func (r *MassAssignJS) ID() string                      { return "BATOU-MASS-001" }
+func (r *MassAssignJS) Name() string                    { return "MassAssignJS" }
+func (r *MassAssignJS) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MassAssignJS) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
 }
@@ -82,7 +104,7 @@ func (r *MassAssignJS) Description() string {
 
 func (r *MassAssignJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -96,14 +118,14 @@ func (r *MassAssignJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var confidence string
 		var title string
 
-		if loc := jsObjectAssignModel.FindString(line); loc != "" {
+		if loc := rules.GFind(jsObjectAssignModel, line); loc != "" {
 			matched = loc
 			confidence = "high"
 			title = "Mass assignment via Object.assign with user input into model"
 		}
 
 		if matched == "" {
-			if loc := jsSpreadIntoModel.FindString(line); loc != "" {
+			if loc := rules.GFind(jsSpreadIntoModel, line); loc != "" {
 				matched = loc
 				confidence = "medium"
 				title = "Mass assignment via spread operator with user input into model"
@@ -111,7 +133,7 @@ func (r *MassAssignJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if matched == "" {
-			if loc := jsORMUpdateRaw.FindString(line); loc != "" {
+			if loc := rules.GFind(jsORMUpdateRaw, line); loc != "" {
 				matched = loc
 				confidence = "high"
 				title = "ORM update with raw user input (mass assignment)"
@@ -119,7 +141,7 @@ func (r *MassAssignJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if matched == "" {
-			if loc := jsModelConstructor.FindString(line); loc != "" {
+			if loc := rules.GFind(jsModelConstructor, line); loc != "" {
 				matched = loc
 				confidence = "medium"
 				title = "Model constructor with raw user input (mass assignment)"
@@ -157,9 +179,9 @@ func (r *MassAssignJS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MassAssignPython struct{}
 
-func (r *MassAssignPython) ID() string                        { return "BATOU-MASS-002" }
-func (r *MassAssignPython) Name() string                      { return "MassAssignPython" }
-func (r *MassAssignPython) DefaultSeverity() rules.Severity   { return rules.High }
+func (r *MassAssignPython) ID() string                      { return "BATOU-MASS-002" }
+func (r *MassAssignPython) Name() string                    { return "MassAssignPython" }
+func (r *MassAssignPython) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MassAssignPython) Languages() []rules.Language {
 	return []rules.Language{rules.LangPython}
 }
@@ -170,15 +192,15 @@ func (r *MassAssignPython) Description() string {
 
 func (r *MassAssignPython) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Check for DRF serializer with fields = '__all__'
-	hasSerializerClass := pySerializerNoFields.MatchString(ctx.Content)
-	hasFieldsAll := pyMetaFieldsAll.MatchString(ctx.Content)
+	hasSerializerClass := rules.GMatchFile(pySerializerNoFields, ctx)
+	hasFieldsAll := rules.GMatchFile(pyMetaFieldsAll, ctx)
 
 	if hasSerializerClass && hasFieldsAll {
 		for i, line := range lines {
-			if pyMetaFieldsAll.MatchString(line) {
+			if rules.GMatch(pyMetaFieldsAll, line) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      rules.Medium,
@@ -211,14 +233,14 @@ func (r *MassAssignPython) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var confidence string
 		var title string
 
-		if loc := pyDjangoCreateUnpack.FindString(line); loc != "" {
+		if loc := rules.GFind(pyDjangoCreateUnpack, line); loc != "" {
 			matched = loc
 			confidence = "high"
 			title = "Django ORM create/update with unpacked user input"
 		}
 
 		if matched == "" {
-			if loc := pyModelUnpack.FindString(line); loc != "" {
+			if loc := rules.GFind(pyModelUnpack, line); loc != "" {
 				matched = loc
 				confidence = "medium"
 				title = "Model instantiation with unpacked user input"
@@ -226,7 +248,7 @@ func (r *MassAssignPython) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if matched == "" {
-			if loc := pyFlaskModelUnpack.FindString(line); loc != "" {
+			if loc := rules.GFind(pyFlaskModelUnpack, line); loc != "" {
 				matched = loc
 				confidence = "medium"
 				title = "Model instantiation with unpacked request data"
@@ -234,7 +256,7 @@ func (r *MassAssignPython) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if matched == "" {
-			if loc := pyDictUpdate.FindString(line); loc != "" {
+			if loc := rules.GFind(pyDictUpdate, line); loc != "" {
 				matched = loc
 				confidence = "high"
 				title = "Direct __dict__.update with user input (mass assignment)"
@@ -242,7 +264,7 @@ func (r *MassAssignPython) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if matched == "" {
-			if loc := pySetattrLoop.FindString(line); loc != "" {
+			if loc := rules.GFind(pySetattrLoop, line); loc != "" {
 				// Check if it is in a loop context
 				if isInLoop(lines, i) {
 					matched = loc
@@ -279,9 +301,9 @@ func (r *MassAssignPython) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MassAssignRuby struct{}
 
-func (r *MassAssignRuby) ID() string                        { return "BATOU-MASS-003" }
-func (r *MassAssignRuby) Name() string                      { return "MassAssignRuby" }
-func (r *MassAssignRuby) DefaultSeverity() rules.Severity   { return rules.High }
+func (r *MassAssignRuby) ID() string                      { return "BATOU-MASS-003" }
+func (r *MassAssignRuby) Name() string                    { return "MassAssignRuby" }
+func (r *MassAssignRuby) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MassAssignRuby) Languages() []rules.Language {
 	return []rules.Language{rules.LangRuby}
 }
@@ -292,10 +314,10 @@ func (r *MassAssignRuby) Description() string {
 
 func (r *MassAssignRuby) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Pre-check: does the file use strong params (.permit)?
-	hasStrongParams := rbStrongParams.MatchString(ctx.Content)
+	hasStrongParams := rules.GMatchFile(rbStrongParams, ctx)
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -310,15 +332,28 @@ func (r *MassAssignRuby) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var title string
 
 		// Direct params assignment without permit
-		if loc := rbParamsDirectAssign.FindString(line); loc != "" {
+		if loc := rules.GFind(rbParamsDirectAssign, line); loc != "" {
 			matched = loc
 			confidence = "high"
 			title = "Mass assignment with raw params (no strong parameters)"
 		}
 
+		// permit! / to_unsafe_h — permit-everything / unfiltered-hash enablers.
+		// These ARE the mass-assignment regardless of where the resulting hash
+		// flows, so they fire unconditionally (no strong-params downgrade) —
+		// unless a same-line .slice/.only/.except allowlist already restricts
+		// the hash to developer-chosen keys before permit!.
+		if matched == "" && !rbSliceAllowlistBeforePermit.MatchString(line) {
+			if loc := rules.GFind(rbPermitBangUnsafe, line); loc != "" {
+				matched = loc
+				confidence = "high"
+				title = "Mass assignment via permit! / to_unsafe_h (strong parameters bypassed)"
+			}
+		}
+
 		// Model.new/create(params[:user]) — check if strong params are used elsewhere
 		if matched == "" {
-			if loc := rbModelNewParams.FindString(line); loc != "" {
+			if loc := rules.GFind(rbModelNewParams, line); loc != "" {
 				if !hasStrongParams {
 					matched = loc
 					confidence = "high"
@@ -359,9 +394,9 @@ func (r *MassAssignRuby) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MassAssignJava struct{}
 
-func (r *MassAssignJava) ID() string                        { return "BATOU-MASS-004" }
-func (r *MassAssignJava) Name() string                      { return "MassAssignJava" }
-func (r *MassAssignJava) DefaultSeverity() rules.Severity   { return rules.High }
+func (r *MassAssignJava) ID() string                      { return "BATOU-MASS-004" }
+func (r *MassAssignJava) Name() string                    { return "MassAssignJava" }
+func (r *MassAssignJava) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MassAssignJava) Languages() []rules.Language {
 	return []rules.Language{rules.LangJava}
 }
@@ -372,10 +407,10 @@ func (r *MassAssignJava) Description() string {
 
 func (r *MassAssignJava) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Pre-check: does the file have @InitBinder?
-	hasInitBinder := javaInitBinder.MatchString(ctx.Content)
+	hasInitBinder := rules.GMatchFile(javaInitBinder, ctx)
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -386,7 +421,7 @@ func (r *MassAssignJava) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// @ModelAttribute without @InitBinder
-		if javaModelAttribute.MatchString(line) {
+		if rules.GMatch(javaModelAttribute, line) {
 			if !hasInitBinder {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -408,7 +443,7 @@ func (r *MassAssignJava) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// BeanUtils.copyProperties
-		if javaBeanCopy.MatchString(line) {
+		if rules.GMatch(javaBeanCopy, line) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Medium,

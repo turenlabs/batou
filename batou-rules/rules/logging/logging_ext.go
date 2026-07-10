@@ -22,8 +22,22 @@ var (
 )
 
 // BATOU-LOG-006: Log injection via user input
+//
+// Two important tightenings (2026-05-04, after seeing 310 hits on gitea):
+//
+//  1. The interpolation-marker alternation drops `,` because structured
+//     loggers (slog, zap, winston, Rails.logger) use commas to separate
+//     fields — e.g., `log.Info("event", "key", value)`. Those don't carry
+//     log-injection risk because the structured logger escapes per-field.
+//     Keeping `,` produced FP on every structured-logger call site that
+//     happened to mention `user`/`name`/etc. anywhere later on the line.
+//
+//  2. A leading `\b` is required on the user-input keyword alternation so
+//     `filename` doesn't match `name`, `dirname` doesn't match `name`,
+//     `ageGroup` doesn't match `age`, etc. The trailing `\w*` keeps
+//     `username` / `userID` / `headerLine` matchable.
 var (
-	reLogNewlineConcat = regexp.MustCompile(`(?i)(?:log|logger|logging|console|winston|pino|bunyan|Rails\.logger|slog|zap|LOG)\.\w+\s*\([^)]*(?:\+|,|\$\{|%s|%v|%d|\{[^}]*\}).*(?:user|input|name|param|query|header|cookie|referer|agent)\w*`)
+	reLogNewlineConcat = regexp.MustCompile(`(?i)(?:log|logger|logging|console|winston|pino|bunyan|Rails\.logger|slog|zap|LOG)\.\w+\s*\([^)]*(?:\+|\$\{|%s|%v|%d|\{[^}]*\}).*\b(?:user|input|param|query|header|cookie|referer|agent)\w*`)
 	reNewlineStrip     = regexp.MustCompile(`(?i)(?:\.replace\s*\(\s*[/'"]\s*[\[\\].*[rn]|\.replaceAll\s*\(\s*["']\\[rn]|strings\.Replace.*\\n|\.gsub.*\\n|strip|sanitize_log)`)
 )
 
@@ -51,9 +65,9 @@ var (
 
 // BATOU-LOG-011: Missing audit logging for security events
 var (
-	reSecurityEvent    = regexp.MustCompile(`(?i)(?:login|sign_?in|authenticate|authorize|change_?password|reset_?password|delete_?(?:account|user)|grant_?(?:role|permission)|revoke|escalat|admin_?access|mfa|two_?factor)`)
-	reAuditLog         = regexp.MustCompile(`(?i)(?:audit|security)[\._]?(?:log|event|record|trail)`)
-	reLogCall          = regexp.MustCompile(`(?i)(?:log|logger|logging|console|winston|slog|zap|LOG)\.\w+\s*\(`)
+	reSecurityEvent = regexp.MustCompile(`(?i)(?:login|sign_?in|authenticate|authorize|change_?password|reset_?password|delete_?(?:account|user)|grant_?(?:role|permission)|revoke|escalat|admin_?access|mfa|two_?factor)`)
+	reAuditLog      = regexp.MustCompile(`(?i)(?:audit|security)[\._]?(?:log|event|record|trail)`)
+	reLogCall       = regexp.MustCompile(`(?i)(?:log|logger|logging|console|winston|slog|zap|LOG)\.\w+\s*\(`)
 )
 
 // ---------------------------------------------------------------------------
@@ -62,8 +76,8 @@ var (
 
 type LoggingSecrets struct{}
 
-func (r *LoggingSecrets) ID() string                     { return "BATOU-LOG-004" }
-func (r *LoggingSecrets) Name() string                   { return "LoggingSecrets" }
+func (r *LoggingSecrets) ID() string                      { return "BATOU-LOG-004" }
+func (r *LoggingSecrets) Name() string                    { return "LoggingSecrets" }
 func (r *LoggingSecrets) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LoggingSecrets) Description() string {
 	return "Detects logging statements that include password, secret, token, or API key variables in plaintext."
@@ -73,14 +87,28 @@ func (r *LoggingSecrets) Languages() []rules.Language {
 }
 
 func (r *LoggingSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Translation / i18n JSON files are UI message strings, not credentials.
+	if ctx.Language == rules.LangJSON || strings.HasSuffix(strings.ToLower(ctx.FilePath), ".json") {
+		return nil
+	}
+
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reLogPasswordVar.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reLogPasswordVar, line); loc != nil {
+			// Skip when the credential keyword only appears inside a static log
+			// *message* string, e.g.
+			//   console.debug('[authService] - updating saved access_token')
+			// — "access_token" is in the message text, not a value being
+			// logged. Still fires on interpolation / concatenation / extra-arg
+			// forms: log(`pwd=${password}`), log("secret", apiSecret).
+			if logArgIsOnlyStringMessage(line) {
+				continue
+			}
 			matched := line[loc[0]:loc[1]]
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -112,8 +140,8 @@ func (r *LoggingSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LoggingPII struct{}
 
-func (r *LoggingPII) ID() string                     { return "BATOU-LOG-005" }
-func (r *LoggingPII) Name() string                   { return "LoggingPII" }
+func (r *LoggingPII) ID() string                      { return "BATOU-LOG-005" }
+func (r *LoggingPII) Name() string                    { return "LoggingPII" }
 func (r *LoggingPII) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LoggingPII) Description() string {
 	return "Detects logging statements that include personally identifiable information such as email addresses, SSN, credit card numbers, or phone numbers."
@@ -124,13 +152,13 @@ func (r *LoggingPII) Languages() []rules.Language {
 
 func (r *LoggingPII) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reLogPII.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reLogPII, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -162,8 +190,8 @@ func (r *LoggingPII) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LogInjectionUserInput struct{}
 
-func (r *LogInjectionUserInput) ID() string                     { return "BATOU-LOG-006" }
-func (r *LogInjectionUserInput) Name() string                   { return "LogInjectionUserInput" }
+func (r *LogInjectionUserInput) ID() string                      { return "BATOU-LOG-006" }
+func (r *LogInjectionUserInput) Name() string                    { return "LogInjectionUserInput" }
 func (r *LogInjectionUserInput) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LogInjectionUserInput) Description() string {
 	return "Detects log statements that include user-controlled input without newline stripping, enabling log injection and log forging attacks."
@@ -174,14 +202,14 @@ func (r *LogInjectionUserInput) Languages() []rules.Language {
 
 func (r *LogInjectionUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reLogNewlineConcat.FindStringIndex(line); loc != nil {
-			if reNewlineStrip.MatchString(line) {
+		if loc := rules.GFindIndex(reLogNewlineConcat, line); loc != nil {
+			if rules.GMatch(reNewlineStrip, line) {
 				continue
 			}
 			matched := line[loc[0]:loc[1]]
@@ -215,8 +243,8 @@ func (r *LogInjectionUserInput) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type StackTraceToClient struct{}
 
-func (r *StackTraceToClient) ID() string                     { return "BATOU-LOG-007" }
-func (r *StackTraceToClient) Name() string                   { return "StackTraceToClient" }
+func (r *StackTraceToClient) ID() string                      { return "BATOU-LOG-007" }
+func (r *StackTraceToClient) Name() string                    { return "StackTraceToClient" }
 func (r *StackTraceToClient) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *StackTraceToClient) Description() string {
 	return "Detects stack traces or detailed error information being sent in HTTP responses to clients, leaking internal implementation details."
@@ -227,13 +255,13 @@ func (r *StackTraceToClient) Languages() []rules.Language {
 
 func (r *StackTraceToClient) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reStackToClient.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reStackToClient, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -265,8 +293,8 @@ func (r *StackTraceToClient) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DebugLoggingInProd struct{}
 
-func (r *DebugLoggingInProd) ID() string                     { return "BATOU-LOG-008" }
-func (r *DebugLoggingInProd) Name() string                   { return "DebugLoggingInProd" }
+func (r *DebugLoggingInProd) ID() string                      { return "BATOU-LOG-008" }
+func (r *DebugLoggingInProd) Name() string                    { return "DebugLoggingInProd" }
 func (r *DebugLoggingInProd) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DebugLoggingInProd) Description() string {
 	return "Detects debug or trace log level enabled in production configuration files, which can leak sensitive information through verbose logging."
@@ -277,20 +305,20 @@ func (r *DebugLoggingInProd) Languages() []rules.Language {
 
 func (r *DebugLoggingInProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reDebugLogLevel.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reDebugLogLevel, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
 			}
 			// Higher confidence if file path or content suggests production
 			confidence := "medium"
-			if reProdContext.MatchString(ctx.FilePath) || reProdContext.MatchString(ctx.Content) {
+			if reProdContext.MatchString(ctx.FilePath) || rules.GMatchFile(reProdContext, ctx) {
 				confidence = "high"
 			}
 			findings = append(findings, rules.Finding{
@@ -320,8 +348,8 @@ func (r *DebugLoggingInProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LoggingRequestBodies struct{}
 
-func (r *LoggingRequestBodies) ID() string                     { return "BATOU-LOG-009" }
-func (r *LoggingRequestBodies) Name() string                   { return "LoggingRequestBodies" }
+func (r *LoggingRequestBodies) ID() string                      { return "BATOU-LOG-009" }
+func (r *LoggingRequestBodies) Name() string                    { return "LoggingRequestBodies" }
 func (r *LoggingRequestBodies) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *LoggingRequestBodies) Description() string {
 	return "Detects logging of HTTP request bodies which may contain sensitive data such as passwords, tokens, or personal information."
@@ -332,13 +360,13 @@ func (r *LoggingRequestBodies) Languages() []rules.Language {
 
 func (r *LoggingRequestBodies) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reLogRequestBody.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reLogRequestBody, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -370,8 +398,8 @@ func (r *LoggingRequestBodies) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ExcessiveLogging struct{}
 
-func (r *ExcessiveLogging) ID() string                     { return "BATOU-LOG-010" }
-func (r *ExcessiveLogging) Name() string                   { return "ExcessiveLogging" }
+func (r *ExcessiveLogging) ID() string                      { return "BATOU-LOG-010" }
+func (r *ExcessiveLogging) Name() string                    { return "ExcessiveLogging" }
 func (r *ExcessiveLogging) DefaultSeverity() rules.Severity { return rules.Low }
 func (r *ExcessiveLogging) Description() string {
 	return "Detects patterns of excessive logging such as logging every request or serializing entire request objects, which can cause information disclosure and performance issues."
@@ -382,16 +410,16 @@ func (r *ExcessiveLogging) Languages() []rules.Language {
 
 func (r *ExcessiveLogging) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		matched := ""
-		if loc := reLogFullObject.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reLogFullObject, line); loc != nil {
 			matched = line[loc[0]:loc[1]]
-		} else if loc := reLogEveryRequest.FindStringIndex(line); loc != nil {
+		} else if loc := rules.GFindIndex(reLogEveryRequest, line); loc != nil {
 			matched = line[loc[0]:loc[1]]
 		}
 		if matched != "" {
@@ -425,8 +453,8 @@ func (r *ExcessiveLogging) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingAuditLogging struct{}
 
-func (r *MissingAuditLogging) ID() string                     { return "BATOU-LOG-011" }
-func (r *MissingAuditLogging) Name() string                   { return "MissingAuditLogging" }
+func (r *MissingAuditLogging) ID() string                      { return "BATOU-LOG-011" }
+func (r *MissingAuditLogging) Name() string                    { return "MissingAuditLogging" }
 func (r *MissingAuditLogging) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingAuditLogging) Description() string {
 	return "Detects security-critical functions (login, password change, role assignment) that lack audit logging, making it impossible to detect or investigate security incidents."
@@ -449,21 +477,21 @@ func (r *MissingAuditLogging) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Only check files that contain security-related functions
-	if !reSecurityEvent.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reSecurityEvent, ctx) {
 		return nil
 	}
 
 	// If audit logging is present anywhere in the file, skip
-	if reAuditLog.MatchString(ctx.Content) {
+	if rules.GMatchFile(reAuditLog, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reSecurityEvent.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reSecurityEvent, line); loc != nil {
 			// Check if there's a log call within a window after this line
 			hasLogging := false
 			end := i + 15

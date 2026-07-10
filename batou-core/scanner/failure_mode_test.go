@@ -4,7 +4,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/hook"
 	"github.com/turenlabs/batou-core/reporter"
 	"github.com/turenlabs/batou-rules/rules"

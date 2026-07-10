@@ -3,10 +3,10 @@ package hints_test
 import (
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/findings"
 	"github.com/turenlabs/batou-core/hints"
 	"github.com/turenlabs/batou-core/reporter"
+	"github.com/turenlabs/batou-core/suppress"
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
 )
@@ -891,5 +891,141 @@ func TestInjectLifecycle_NilDeltas(t *testing.T) {
 
 	if output != input {
 		t.Errorf("nil deltas should return input unchanged, got:\n%s", output)
+	}
+}
+
+// TestGenerateHints_FilteredBySuppressions verifies that taint flows whose
+// sink line is covered by a matching batou:ignore directive are filtered out
+// of hint output, not just from result.Findings. Without this filter, hints
+// would leak suppressed flows via additionalContext even though the finding
+// was correctly partitioned into SuppressedFindings.
+func TestGenerateHints_FilteredBySuppressions(t *testing.T) {
+	content := `# batou:ignore-start file_write -- allowed by scanner wrapper
+def scan(path):
+    with open(path) as f:
+        return f.read()
+# batou:ignore-end
+`
+	sup := suppress.Parse(content)
+
+	flow := taint.TaintFlow{
+		Source: taint.SourceDef{Category: taint.SrcUserInput, MethodName: "param", Description: "param"},
+		Sink: taint.SinkDef{
+			Category: taint.SnkFileWrite, MethodName: "open",
+			Severity: rules.High, CWEID: "CWE-22",
+			Description: "File open with potentially tainted path",
+		},
+		SourceLine: 0, SinkLine: 3,
+		FilePath: "/app/scan.py", ScopeName: "scan", Confidence: 0.6,
+	}
+
+	ctx := &hints.HintContext{
+		FilePath:     "/app/scan.py",
+		Language:     rules.LangPython,
+		TaintFlows:   []taint.TaintFlow{flow},
+		Suppressions: sup,
+	}
+	got := hints.GenerateHints(ctx)
+	for _, h := range got {
+		if h.Category == "taint_flow" {
+			t.Errorf("suppressed taint flow leaked into hint: %+v", h)
+		}
+	}
+
+	// Sanity: same flow with nil suppressions should emit a hint.
+	ctx.Suppressions = nil
+	got = hints.GenerateHints(ctx)
+	found := false
+	for _, h := range got {
+		if h.Category == "taint_flow" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected taint flow hint when suppressions is nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Structured taint-path rendering in hints
+// ---------------------------------------------------------------------------
+
+// A taint flow with intermediate steps should surface the structured
+// data-flow path (file:line per step) in the additionalContext output.
+func TestFormatForClaude_RendersTaintFlowPath(t *testing.T) {
+	flow := taint.TaintFlow{
+		Source: taint.SourceDef{
+			Category:    taint.SrcUserInput,
+			MethodName:  "FormValue",
+			Description: "HTTP form parameter",
+		},
+		Sink: taint.SinkDef{
+			Category:      taint.SnkSQLQuery,
+			MethodName:    "Query",
+			Severity:      rules.Critical,
+			CWEID:         "CWE-89",
+			OWASPCategory: "A03:2021-Injection",
+			Description:   "SQL query",
+		},
+		SourceLine: 2,
+		SinkLine:   12,
+		Steps: []taint.FlowStep{
+			{Line: 2, Description: "tainted by FormValue", VarName: "id"},
+			{Line: 6, Description: "assigned from id", VarName: "query"},
+		},
+		FilePath:   "handler.go",
+		ScopeName:  "h",
+		Confidence: 1.0,
+	}
+
+	ctx := &hints.HintContext{
+		FilePath:   "handler.go",
+		Language:   rules.LangGo,
+		TaintFlows: []taint.TaintFlow{flow},
+		Findings:   []rules.Finding{flow.ToFinding()},
+		ScanTimeMs: 1,
+	}
+	out := hints.FormatForClaude(ctx, hints.GenerateHints(ctx))
+	if !strings.Contains(out, "Data-flow path:") {
+		t.Errorf("expected 'Data-flow path:' in hints output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "handler.go:6") {
+		t.Errorf("expected intermediate step location handler.go:6, got:\n%s", out)
+	}
+}
+
+// An interprocedural finding (plain rules.Finding carrying a TaintPath, not a
+// taint.TaintFlow) should still render its cross-file chain.
+func TestFormatForClaude_RendersInterprocTaintPath(t *testing.T) {
+	f := rules.Finding{
+		RuleID:          "BATOU-INTERPROC-SQL_QUERY",
+		Severity:        rules.Critical,
+		SeverityLabel:   "CRITICAL",
+		Title:           "Interprocedural taint",
+		Description:     "cross-function SQL injection",
+		FilePath:        "/app/handler.go",
+		LineNumber:      3,
+		CWEID:           "CWE-89",
+		ConfidenceScore: 0.8,
+		Confidence:      "high",
+		Tags:            []string{"interprocedural", "taint-analysis", "cross-function", "sql_query"},
+		TaintPath: []rules.TaintStep{
+			{File: "/app/handler.go", Line: 3, Kind: rules.TaintStepSource, Label: "tainted argument \"name\" (arg 0)"},
+			{File: "/app/handler.go", Line: 3, Kind: rules.TaintStepPropagation, Label: "passed to processName(...)"},
+			{File: "/app/process.go", Line: 7, Kind: rules.TaintStepSink, Label: "db.Query (in processName)"},
+		},
+	}
+	ctx := &hints.HintContext{
+		FilePath:   "/app/handler.go",
+		Language:   rules.LangGo,
+		Findings:   []rules.Finding{f},
+		ScanTimeMs: 1,
+	}
+	out := hints.FormatForClaude(ctx, hints.GenerateHints(ctx))
+	if !strings.Contains(out, "Data-flow path:") {
+		t.Errorf("expected 'Data-flow path:' for interproc finding, got:\n%s", out)
+	}
+	if !strings.Contains(out, "/app/process.go:7") {
+		t.Errorf("expected cross-file sink location /app/process.go:7, got:\n%s", out)
 	}
 }

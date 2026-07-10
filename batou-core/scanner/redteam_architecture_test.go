@@ -3,12 +3,10 @@ package scanner
 import (
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/fpfilter"
 	"github.com/turenlabs/batou-core/hook"
 	"github.com/turenlabs/batou-core/reporter"
 	"github.com/turenlabs/batou-rules/rules"
-
 	// Import all rule packages and analyzers for full pipeline testing
 	_ "github.com/turenlabs/batou-rules/rules/injection"
 	_ "github.com/turenlabs/batou-rules/rules/secrets"

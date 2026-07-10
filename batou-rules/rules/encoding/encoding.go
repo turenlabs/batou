@@ -19,8 +19,8 @@ var (
 
 // BATOU-ENC-002: Missing output encoding before HTML insertion
 var (
-	reHTMLConcatVar   = regexp.MustCompile(`(?i)(?:html|output|body|page|content|response|markup)\s*(?:\+?=|=)\s*["']<[^"']*>\s*["']\s*\+\s*\w+`)
-	reHTMLFmtInsert   = regexp.MustCompile(`(?i)(?:html|output|body|page|content|response|markup)\s*(?:\+?=|=)\s*(?:f["'].*<.*\{|["'].*<.*["']\s*%\s*|["'].*<.*["']\s*\.format\s*\()`)
+	reHTMLConcatVar    = regexp.MustCompile(`(?i)(?:html|output|body|page|content|response|markup)\s*(?:\+?=|=)\s*["']<[^"']*>\s*["']\s*\+\s*\w+`)
+	reHTMLFmtInsert    = regexp.MustCompile(`(?i)(?:html|output|body|page|content|response|markup)\s*(?:\+?=|=)\s*(?:f["'].*<.*\{|["'].*<.*["']\s*%\s*|["'].*<.*["']\s*\.format\s*\()`)
 	reEscapeFuncNearby = regexp.MustCompile(`(?i)(?:html\.EscapeString|htmlspecialchars|htmlentities|escapeHtml|escape|sanitize|DOMPurify|bleach\.clean|markupsafe\.escape|html\.escape|Encode\.forHtml|strip_tags)`)
 )
 
@@ -45,24 +45,40 @@ var (
 
 // BATOU-ENC-006: Unicode normalization bypass
 var (
-	reUnicodeNormCheck  = regexp.MustCompile(`(?i)(?:normalize|NFC|NFD|NFKC|NFKD|unicodedata\.normalize)`)
-	reHomoglyphPattern  = regexp.MustCompile(`[\x{FF01}-\x{FF5E}]|[\x{2000}-\x{200F}]|[\x{2028}-\x{202F}]|[\x{FEFF}]|[\x{200B}-\x{200D}]`)
+	reUnicodeNormCheck       = regexp.MustCompile(`(?i)(?:normalize|NFC|NFD|NFKC|NFKD|unicodedata\.normalize)`)
+	reHomoglyphPattern       = regexp.MustCompile(`[\x{FF01}-\x{FF5E}]|[\x{2000}-\x{200F}]|[\x{2028}-\x{202F}]|[\x{FEFF}]|[\x{200B}-\x{200D}]`)
 	reSecurityCheckAfterNorm = regexp.MustCompile(`(?i)(?:if|match|test|includes|contains|indexOf|==|!=|filter|block|deny|validate)\b`)
 )
 
 // BATOU-ENC-007: Mixed encoding in SQL
+//
+// Tightening note (2026-04-25): the trailing alternative `X['"]` in
+// reMixedEncodingSQL was matching any `x'` or `x"` byte pair on the line.
+// Combined with case-insensitive `FROM` matching every ES-module
+// `import ... from '.../<word>x'` line (paths ending in 'x' like
+// `from './index'`, `from './suffix'`), it produced 68 FPs in the
+// owncloud/web scan. The intent was to catch SQL hex literals like
+// `X'48656C6C6F'`. The dedicated `reSQLHexLiteral` already covers
+// that case more precisely, so we tighten the bracketed form here to
+// require at least 4 hex digits before the closing quote — matching
+// the spec of an actual SQL hex literal.
 var (
-	reMixedEncodingSQL = regexp.MustCompile(`(?i)(?:SELECT|INSERT|UPDATE|DELETE|WHERE|FROM)\b.*(?:CHAR\s*\(|CHR\s*\(|CONVERT\s*\(|CAST\s*\(|UNHEX\s*\(|X['"])`)
+	reMixedEncodingSQL = regexp.MustCompile(`(?i)(?:SELECT|INSERT|UPDATE|DELETE|WHERE|FROM)\b.*(?:CHAR\s*\(|CHR\s*\(|CONVERT\s*\(|CAST\s*\(|UNHEX\s*\(|X'[0-9a-fA-F]{4,}'|X"[0-9a-fA-F]{4,}")`)
 	reSQLCharConcat    = regexp.MustCompile(`(?i)(?:CHAR|CHR)\s*\(\s*\d+\s*\)\s*(?:\+|\|\|)\s*(?:CHAR|CHR)\s*\(`)
 	reSQLHexLiteral    = regexp.MustCompile(`(?i)(?:0x[0-9a-fA-F]{4,}|X'[0-9a-fA-F]{4,}')`)
+	// reEncSQLKeyword is the word-boundary SQL-keyword check used as the
+	// SQL-context gate for reSQLHexLiteral. Using \b prevents identifiers
+	// that contain a keyword as a substring (e.g. `dimensionsSelector`
+	// containing `select`) from satisfying the gate.
+	reEncSQLKeyword = regexp.MustCompile(`(?i)\b(SELECT|INSERT|UPDATE|DELETE|WHERE|UNION)\b`)
 )
 
 // BATOU-ENC-008: Null byte injection
 var (
-	reNullByteParam    = regexp.MustCompile(`(?i)(?:%00|\\x00|\\0|\\u0000|\x00)`)
-	reNullByteInPath   = regexp.MustCompile(`(?i)(?:open|read|include|require|fopen|file_get_contents|readFile|os\.path|Path\.join)\s*\(.*(?:%00|\\x00|\\0|\\u0000)`)
-	reNullByteInCheck  = regexp.MustCompile(`(?i)(?:endsWith|endswith|ends_with|HasSuffix|match|test|includes)\s*\(.*(?:%00|\\x00|\\0|\\u0000)`)
-	reNullByteInInput  = regexp.MustCompile(`(?i)(?:req\.|request\.|params\.|query\.|body\.|args\.|GET\[|POST\[|\$_).*(?:%00|\\x00|\\0)`)
+	reNullByteParam   = regexp.MustCompile(`(?i)(?:%00|\\x00|\\0|\\u0000|\x00)`)
+	reNullByteInPath  = regexp.MustCompile(`(?i)(?:open|read|include|require|fopen|file_get_contents|readFile|os\.path|Path\.join)\s*\(.*(?:%00|\\x00|\\0|\\u0000)`)
+	reNullByteInCheck = regexp.MustCompile(`(?i)(?:endsWith|endswith|ends_with|HasSuffix|match|test|includes)\s*\(.*(?:%00|\\x00|\\0|\\u0000)`)
+	reNullByteInInput = regexp.MustCompile(`(?i)(?:req\.|request\.|params\.|query\.|body\.|args\.|GET\[|POST\[|\$_).*(?:%00|\\x00|\\0)`)
 )
 
 // ---------------------------------------------------------------------------
@@ -117,8 +133,8 @@ func init() {
 
 type DoubleEncoding struct{}
 
-func (r *DoubleEncoding) ID() string                     { return "BATOU-ENC-001" }
-func (r *DoubleEncoding) Name() string                   { return "DoubleEncoding" }
+func (r *DoubleEncoding) ID() string                      { return "BATOU-ENC-001" }
+func (r *DoubleEncoding) Name() string                    { return "DoubleEncoding" }
 func (r *DoubleEncoding) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DoubleEncoding) Description() string {
 	return "Detects double-encoding patterns where encoding functions are nested, which can cause encoding bypass vulnerabilities or data corruption."
@@ -129,7 +145,7 @@ func (r *DoubleEncoding) Languages() []rules.Language {
 
 func (r *DoubleEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -137,9 +153,9 @@ func (r *DoubleEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		var m string
-		if loc := reDoubleEncode.FindString(line); loc != "" {
+		if loc := rules.GFind(reDoubleEncode, line); loc != "" {
 			m = loc
-		} else if loc := reDoubleEscapeHTML.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reDoubleEscapeHTML, line); loc != "" {
 			m = loc
 		}
 		if m != "" {
@@ -170,8 +186,8 @@ func (r *DoubleEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingOutputEncoding struct{}
 
-func (r *MissingOutputEncoding) ID() string                     { return "BATOU-ENC-002" }
-func (r *MissingOutputEncoding) Name() string                   { return "MissingOutputEncoding" }
+func (r *MissingOutputEncoding) ID() string                      { return "BATOU-ENC-002" }
+func (r *MissingOutputEncoding) Name() string                    { return "MissingOutputEncoding" }
 func (r *MissingOutputEncoding) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MissingOutputEncoding) Description() string {
 	return "Detects variables inserted into HTML strings via concatenation or formatting without output encoding, enabling XSS."
@@ -182,7 +198,7 @@ func (r *MissingOutputEncoding) Languages() []rules.Language {
 
 func (r *MissingOutputEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -190,9 +206,9 @@ func (r *MissingOutputEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		var matched bool
-		if reHTMLConcatVar.MatchString(line) || reHTMLFmtInsert.MatchString(line) {
+		if rules.GMatch(reHTMLConcatVar, line) || rules.GMatch(reHTMLFmtInsert, line) {
 			// Check if encoding is applied nearby
-			if !reEscapeFuncNearby.MatchString(line) && !reEscapeFuncNearby.MatchString(nearbyLines(lines, i, 3)) {
+			if !rules.GMatch(reEscapeFuncNearby, line) && !reEscapeFuncNearby.MatchString(nearbyLines(lines, i, 3)) {
 				matched = true
 			}
 		}
@@ -224,8 +240,8 @@ func (r *MissingOutputEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type IncorrectCharEncoding struct{}
 
-func (r *IncorrectCharEncoding) ID() string                     { return "BATOU-ENC-003" }
-func (r *IncorrectCharEncoding) Name() string                   { return "IncorrectCharEncoding" }
+func (r *IncorrectCharEncoding) ID() string                      { return "BATOU-ENC-003" }
+func (r *IncorrectCharEncoding) Name() string                    { return "IncorrectCharEncoding" }
 func (r *IncorrectCharEncoding) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *IncorrectCharEncoding) Description() string {
 	return "Detects use of legacy or non-UTF-8 character encodings (ISO-8859-1, Shift_JIS, etc.) which can enable encoding-based XSS attacks through character set confusion."
@@ -236,7 +252,7 @@ func (r *IncorrectCharEncoding) Languages() []rules.Language {
 
 func (r *IncorrectCharEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -244,11 +260,11 @@ func (r *IncorrectCharEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		var m string
-		if loc := reContentTypeBadEnc.FindString(line); loc != "" {
+		if loc := rules.GFind(reContentTypeBadEnc, line); loc != "" {
 			m = loc
-		} else if loc := reCharsetHeader.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reCharsetHeader, line); loc != "" {
 			m = loc
-		} else if loc := reCharsetMeta.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reCharsetMeta, line); loc != "" {
 			m = loc
 		}
 		if m != "" {
@@ -279,8 +295,8 @@ func (r *IncorrectCharEncoding) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type URLEncodingBypass struct{}
 
-func (r *URLEncodingBypass) ID() string                     { return "BATOU-ENC-004" }
-func (r *URLEncodingBypass) Name() string                   { return "URLEncodingBypass" }
+func (r *URLEncodingBypass) ID() string                      { return "BATOU-ENC-004" }
+func (r *URLEncodingBypass) Name() string                    { return "URLEncodingBypass" }
 func (r *URLEncodingBypass) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *URLEncodingBypass) Description() string {
 	return "Detects security checks that reference percent-encoded characters, suggesting the check may be bypassable with different encoding forms (double encoding, mixed case, Unicode encoding)."
@@ -291,14 +307,14 @@ func (r *URLEncodingBypass) Languages() []rules.Language {
 
 func (r *URLEncodingBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := rePercentEncodedCheck.FindString(line); m != "" {
+		if m := rules.GFind(rePercentEncodedCheck, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -315,7 +331,7 @@ func (r *URLEncodingBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 				Confidence:    "medium",
 				Tags:          []string{"encoding", "bypass", "url-encoding"},
 			})
-		} else if m := reSecurityCheck.FindString(line); m != "" {
+		} else if m := rules.GFind(reSecurityCheck, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -343,8 +359,8 @@ func (r *URLEncodingBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type Base64AsEncryption struct{}
 
-func (r *Base64AsEncryption) ID() string                     { return "BATOU-ENC-005" }
-func (r *Base64AsEncryption) Name() string                   { return "Base64AsEncryption" }
+func (r *Base64AsEncryption) ID() string                      { return "BATOU-ENC-005" }
+func (r *Base64AsEncryption) Name() string                    { return "Base64AsEncryption" }
 func (r *Base64AsEncryption) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *Base64AsEncryption) Description() string {
 	return "Detects use of Base64 encoding in contexts that suggest it is being used as encryption. Base64 is an encoding scheme, not encryption, and provides zero confidentiality."
@@ -355,7 +371,7 @@ func (r *Base64AsEncryption) Languages() []rules.Language {
 
 func (r *Base64AsEncryption) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -363,9 +379,9 @@ func (r *Base64AsEncryption) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		var m string
-		if loc := reBase64AsEncrypt.FindString(line); loc != "" {
+		if loc := rules.GFind(reBase64AsEncrypt, line); loc != "" {
 			m = loc
-		} else if loc := reBase64FuncCrypto.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reBase64FuncCrypto, line); loc != "" {
 			m = loc
 		}
 		if m != "" {
@@ -396,8 +412,8 @@ func (r *Base64AsEncryption) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnicodeNormBypass struct{}
 
-func (r *UnicodeNormBypass) ID() string                     { return "BATOU-ENC-006" }
-func (r *UnicodeNormBypass) Name() string                   { return "UnicodeNormBypass" }
+func (r *UnicodeNormBypass) ID() string                      { return "BATOU-ENC-006" }
+func (r *UnicodeNormBypass) Name() string                    { return "UnicodeNormBypass" }
 func (r *UnicodeNormBypass) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *UnicodeNormBypass) Description() string {
 	return "Detects security checks that may be bypassable via Unicode normalization or homoglyph attacks, where visually similar Unicode characters bypass character-based filters."
@@ -408,11 +424,11 @@ func (r *UnicodeNormBypass) Languages() []rules.Language {
 
 func (r *UnicodeNormBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// Check if file has security checks but no normalization
-	hasSecurityCheck := reSecurityCheckAfterNorm.MatchString(ctx.Content)
-	hasNormalization := reUnicodeNormCheck.MatchString(ctx.Content)
+	hasSecurityCheck := rules.GMatchFile(reSecurityCheckAfterNorm, ctx)
+	hasNormalization := rules.GMatchFile(reUnicodeNormCheck, ctx)
 
 	if !hasSecurityCheck {
 		return nil
@@ -423,7 +439,7 @@ func (r *UnicodeNormBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if isComment(trimmed) {
 			continue
 		}
-		if reHomoglyphPattern.MatchString(line) {
+		if rules.GMatch(reHomoglyphPattern, line) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -450,7 +466,7 @@ func (r *UnicodeNormBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 			if isComment(trimmed) {
 				continue
 			}
-			if reSecurityCheckAfterNorm.MatchString(line) && strings.Contains(strings.ToLower(line), "unicode") {
+			if rules.GMatch(reSecurityCheckAfterNorm, line) && strings.Contains(strings.ToLower(line), "unicode") {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -479,8 +495,8 @@ func (r *UnicodeNormBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MixedEncodingSQL struct{}
 
-func (r *MixedEncodingSQL) ID() string                     { return "BATOU-ENC-007" }
-func (r *MixedEncodingSQL) Name() string                   { return "MixedEncodingSQL" }
+func (r *MixedEncodingSQL) ID() string                      { return "BATOU-ENC-007" }
+func (r *MixedEncodingSQL) Name() string                    { return "MixedEncodingSQL" }
 func (r *MixedEncodingSQL) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MixedEncodingSQL) Description() string {
 	return "Detects SQL queries that use encoding functions (CHAR, CHR, UNHEX, hex literals) to construct values, which is a common SQL injection obfuscation technique."
@@ -491,7 +507,7 @@ func (r *MixedEncodingSQL) Languages() []rules.Language {
 
 func (r *MixedEncodingSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -500,18 +516,20 @@ func (r *MixedEncodingSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		var m string
 		var desc string
-		if loc := reSQLCharConcat.FindString(line); loc != "" {
+		if loc := rules.GFind(reSQLCharConcat, line); loc != "" {
 			m = loc
 			desc = "CHAR()/CHR() concatenation in SQL (common injection obfuscation)"
-		} else if loc := reMixedEncodingSQL.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reMixedEncodingSQL, line); loc != "" {
 			m = loc
 			desc = "SQL query uses encoding functions (CHAR/CHR/UNHEX/hex) to construct values"
-		} else if loc := reSQLHexLiteral.FindString(line); loc != "" {
-			// Only flag hex literals if they appear in a SQL context
-			lower := strings.ToLower(line)
-			if strings.Contains(lower, "select") || strings.Contains(lower, "insert") ||
-				strings.Contains(lower, "update") || strings.Contains(lower, "where") ||
-				strings.Contains(lower, "union") {
+		} else if loc := rules.GFind(reSQLHexLiteral, line); loc != "" {
+			// Only flag hex literals when they appear alongside an actual
+			// SQL keyword. Use word-boundary regex (not strings.Contains)
+			// so identifiers like `dimensionsSelector` don't match `select`
+			// inside `Selector`. The previous substring check produced
+			// FPs on TS image-dimension strings like '5000x3000' (which
+			// contain `0x3000`) sitting in lines that mentioned `Selector`.
+			if rules.GMatch(reEncSQLKeyword, line) {
 				m = loc
 				desc = "Hex literal in SQL query (potential encoded injection payload)"
 			}
@@ -544,8 +562,8 @@ func (r *MixedEncodingSQL) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NullByteInjection struct{}
 
-func (r *NullByteInjection) ID() string                     { return "BATOU-ENC-008" }
-func (r *NullByteInjection) Name() string                   { return "NullByteInjection" }
+func (r *NullByteInjection) ID() string                      { return "BATOU-ENC-008" }
+func (r *NullByteInjection) Name() string                    { return "NullByteInjection" }
 func (r *NullByteInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NullByteInjection) Description() string {
 	return "Detects null byte sequences (%00, \\x00, \\0) in file operations or security checks, which can truncate strings in C-based runtimes to bypass file extension and path checks."
@@ -556,7 +574,7 @@ func (r *NullByteInjection) Languages() []rules.Language {
 
 func (r *NullByteInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -565,16 +583,16 @@ func (r *NullByteInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		var m string
 		var conf string
-		if loc := reNullByteInPath.FindString(line); loc != "" {
+		if loc := rules.GFind(reNullByteInPath, line); loc != "" {
 			m = loc
 			conf = "high"
-		} else if loc := reNullByteInCheck.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reNullByteInCheck, line); loc != "" {
 			m = loc
 			conf = "high"
-		} else if loc := reNullByteInInput.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reNullByteInInput, line); loc != "" {
 			m = loc
 			conf = "high"
-		} else if loc := reNullByteParam.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reNullByteParam, line); loc != "" {
 			// Only flag generic null bytes in security-relevant contexts
 			lower := strings.ToLower(line)
 			if strings.Contains(lower, "file") || strings.Contains(lower, "path") ||

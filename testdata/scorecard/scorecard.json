@@ -1,0 +1,247 @@
+{
+  "generated_note": "Batou reference-SAST-gap consolidated scorecard. Spine = six committed offline CVE benches (strict CWE match). OWASP rows present only if testdata/owasp-bench was generated.",
+  "reference_sast_comparison_note": "Reference-SAST TPR/FPR is intentionally NOT fabricated. For reference-SAST-supported languages no primary-source OWASP scorecard was confirmable; for PHP/Perl/Lua/Groovy/Zig/Shell the reference SAST tool has no analyzer at all (Batou-only).",
+  "reference_sast_support_source": "reference SAST tool supported-languages documentation (fetched 2026-06-02)",
+  "cve_bench_rows": [
+    {
+      "language": "Go",
+      "corpus": "gocve-bench",
+      "cases": 5,
+      "tp_rate": 0.2,
+      "fp_rate": 0.2,
+      "youden": 0,
+      "matching": "strict",
+      "reference_sast_comparison": "supported (no primary-source number)"
+    },
+    {
+      "language": "JS/TS",
+      "corpus": "jscve-bench",
+      "cases": 9,
+      "tp_rate": 1,
+      "fp_rate": 0,
+      "youden": 1,
+      "matching": "strict",
+      "reference_sast_comparison": "supported (no primary-source number)"
+    },
+    {
+      "language": "Python",
+      "corpus": "pycve-bench",
+      "cases": 15,
+      "tp_rate": 0.9333333333333333,
+      "fp_rate": 0,
+      "youden": 0.9333333333333333,
+      "matching": "strict",
+      "reference_sast_comparison": "supported (no primary-source number)"
+    },
+    {
+      "language": "Java",
+      "corpus": "javacve-bench",
+      "cases": 9,
+      "tp_rate": 0.8888888888888888,
+      "fp_rate": 0,
+      "youden": 0.8888888888888888,
+      "matching": "strict",
+      "reference_sast_comparison": "supported (no primary-source number)"
+    },
+    {
+      "language": "PHP",
+      "corpus": "phpcve-bench",
+      "cases": 9,
+      "tp_rate": 1,
+      "fp_rate": 0,
+      "youden": 1,
+      "matching": "strict",
+      "reference_sast_comparison": "UNSUPPORTED (Batou-only)"
+    },
+    {
+      "language": "Ruby",
+      "corpus": "rubycve-bench",
+      "cases": 10,
+      "tp_rate": 0.9,
+      "fp_rate": 0,
+      "youden": 0.9,
+      "matching": "strict",
+      "reference_sast_comparison": "supported (no primary-source number)"
+    }
+  ],
+  "cve_bench_pooled_totals": {
+    "language": "ALL (pooled)",
+    "corpus": "6 CVE benches",
+    "cases": 57,
+    "tp_rate": 0.8771929824561403,
+    "fp_rate": 0.017543859649122806,
+    "youden": 0.8596491228070176,
+    "matching": "strict",
+    "reference_sast_comparison": "mixed"
+  },
+  "owasp_bench_rows": [
+    {
+      "language": "Java",
+      "corpus": "owasp-bench/java",
+      "cases": 2740,
+      "tp_rate": 0.9130742049469964,
+      "fp_rate": 0.0022641509433962265,
+      "youden": 0.9108100540036002,
+      "matching": "category-cwe",
+      "reference_sast_comparison": "supported (no primary-source number)"
+    },
+    {
+      "language": "Python",
+      "corpus": "owasp-bench/python",
+      "cases": 1230,
+      "tp_rate": 0.9823008849557522,
+      "fp_rate": 0.060411311053984576,
+      "youden": 0.9218895739017676,
+      "matching": "category-cwe",
+      "reference_sast_comparison": "supported (no primary-source number)"
+    }
+  ],
+  "corpus_gap_map": [
+    {
+      "language": "Go",
+      "engine": "astflow",
+      "committed_corpus": "gocve-bench",
+      "cases": 5,
+      "measured": true,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "Python",
+      "engine": "tsflow",
+      "committed_corpus": "pycve-bench",
+      "cases": 15,
+      "measured": true,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "JavaScript",
+      "engine": "tsflow",
+      "committed_corpus": "jscve-bench",
+      "cases": 9,
+      "measured": true,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "TypeScript",
+      "engine": "tsflow",
+      "committed_corpus": "jscve-bench",
+      "cases": 9,
+      "measured": true,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "Java",
+      "engine": "tsflow",
+      "committed_corpus": "javacve-bench",
+      "cases": 9,
+      "measured": true,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "PHP",
+      "engine": "tsflow",
+      "committed_corpus": "phpcve-bench",
+      "cases": 9,
+      "measured": true,
+      "reference_sast_supports": false
+    },
+    {
+      "language": "Ruby",
+      "engine": "tsflow",
+      "committed_corpus": "rubycve-bench",
+      "cases": 10,
+      "measured": true,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "C",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "C++",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "C#",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "Kotlin",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "Swift",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "Rust",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": true
+    },
+    {
+      "language": "Perl",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": false
+    },
+    {
+      "language": "Lua",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": false
+    },
+    {
+      "language": "Groovy",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": false
+    },
+    {
+      "language": "Zig",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": false
+    },
+    {
+      "language": "Shell",
+      "engine": "tsflow",
+      "committed_corpus": "(none)",
+      "cases": 0,
+      "measured": false,
+      "reference_sast_supports": false
+    }
+  ],
+  "languages_with_committed_corpus": 7,
+  "language_slots_total": 18
+}

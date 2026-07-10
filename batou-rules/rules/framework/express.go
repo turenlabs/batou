@@ -12,15 +12,14 @@ import (
 // BATOU-FW-EXPRESS-001: Missing Helmet middleware
 var (
 	expressAppCreate = regexp.MustCompile(`\b(?:express\s*\(\s*\)|require\s*\(\s*['"]express['"]\s*\))`)
-	helmetUse        = regexp.MustCompile(`(?:app|server|router)\s*\.\s*use\s*\(\s*helmet\s*\(`)
 	helmetImport     = regexp.MustCompile(`(?:require\s*\(\s*['"]helmet['"]\s*\)|import\s+.*\bhelmet\b.*from\s+['"]helmet['"])`)
 )
 
 // BATOU-FW-EXPRESS-002: Insecure session configuration
 var (
-	sessionConfig      = regexp.MustCompile(`session\s*\(\s*\{`)
-	sessionSecureFalse = regexp.MustCompile(`secure\s*:\s*false`)
-	sessionHttpOnly    = regexp.MustCompile(`httpOnly\s*:\s*false`)
+	sessionConfig       = regexp.MustCompile(`session\s*\(\s*\{`)
+	sessionSecureFalse  = regexp.MustCompile(`secure\s*:\s*false`)
+	sessionHttpOnly     = regexp.MustCompile(`httpOnly\s*:\s*false`)
 	sessionSameSiteNone = regexp.MustCompile(`sameSite\s*:\s*['"]none['"]`)
 )
 
@@ -33,19 +32,19 @@ var (
 
 // BATOU-FW-EXPRESS-004: Dynamic require with user input
 var (
-	dynamicRequire     = regexp.MustCompile(`require\s*\(\s*(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|` +
+	dynamicRequire = regexp.MustCompile(`require\s*\(\s*(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|` +
 		`[^)]*\+\s*(?:req\s*\.\s*(?:params|query|body)\b|userInput|input|moduleName|modName|name)|` +
 		`[` + "`" + `]['"]?\s*\$\{(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|userInput|input|moduleName)\})`)
-	dynamicImport      = regexp.MustCompile(`import\s*\(\s*(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|` +
+	dynamicImport = regexp.MustCompile(`import\s*\(\s*(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|` +
 		`\w+\s*\+\s*(?:req\s*\.\s*(?:params|query|body)|userInput|input)|` +
 		`[` + "`" + `]\s*\$\{(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|userInput|input)\})`)
-	requireVariable    = regexp.MustCompile(`require\s*\(\s*[a-zA-Z_]\w*\s*\)`)
-	importVariable     = regexp.MustCompile(`(?:await\s+)?import\s*\(\s*[a-zA-Z_]\w*\s*\)`)
+	requireVariable = regexp.MustCompile(`require\s*\(\s*[a-zA-Z_]\w*\s*\)`)
+	importVariable  = regexp.MustCompile(`(?:await\s+)?import\s*\(\s*[a-zA-Z_]\w*\s*\)`)
 )
 
 // BATOU-FW-EXPRESS-005: Static serving sensitive directories
 var (
-	expressStatic = regexp.MustCompile(`express\s*\.\s*static\s*\(\s*['"]([^'"]+)['"]`)
+	expressStatic       = regexp.MustCompile(`express\s*\.\s*static\s*\(\s*['"]([^'"]+)['"]`)
 	sensitiveStaticDirs = []string{
 		"/", ".", "..", "../", "./", "/etc", "/root", "/home",
 		".git", ".env", ".ssh", ".aws", "config", "secrets",
@@ -67,7 +66,7 @@ var (
 
 // BATOU-FW-EXPRESS-008: Process.env leaked to client response
 var (
-	processEnvLeak = regexp.MustCompile(`res\s*\.(?:\s*status\s*\([^)]*\)\s*\.)?\s*(?:send|json|write|render)\s*\(\s*process\s*\.\s*env\s*[),;\s]`)
+	processEnvLeak   = regexp.MustCompile(`res\s*\.(?:\s*status\s*\([^)]*\)\s*\.)?\s*(?:send|json|write|render)\s*\(\s*process\s*\.\s*env\s*[),;\s]`)
 	processEnvSpread = regexp.MustCompile(`(?:\.\.\.process\.env|\bprocess\.env\b)\s*(?:\)|,|\})`)
 )
 
@@ -96,8 +95,8 @@ func isExpressApp(content string) bool {
 
 type MissingHelmet struct{}
 
-func (r *MissingHelmet) ID() string                    { return "BATOU-FW-EXPRESS-001" }
-func (r *MissingHelmet) Name() string                  { return "MissingHelmet" }
+func (r *MissingHelmet) ID() string                      { return "BATOU-FW-EXPRESS-001" }
+func (r *MissingHelmet) Name() string                    { return "MissingHelmet" }
 func (r *MissingHelmet) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingHelmet) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -112,7 +111,7 @@ func (r *MissingHelmet) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// If helmet is imported/required, assume it's being used correctly
-	if helmetImport.MatchString(ctx.Content) {
+	if rules.GMatchFile(helmetImport, ctx) {
 		return nil
 	}
 
@@ -123,9 +122,10 @@ func (r *MissingHelmet) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	// Find the express() call line for the finding location
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if expressAppCreate.MatchString(line) {
+		if rules.GMatchLower(expressAppCreate, line, lowered[i]) {
 			return []rules.Finding{{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -149,8 +149,8 @@ func (r *MissingHelmet) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureSession struct{}
 
-func (r *InsecureSession) ID() string                    { return "BATOU-FW-EXPRESS-002" }
-func (r *InsecureSession) Name() string                  { return "InsecureSession" }
+func (r *InsecureSession) ID() string                      { return "BATOU-FW-EXPRESS-002" }
+func (r *InsecureSession) Name() string                    { return "InsecureSession" }
 func (r *InsecureSession) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureSession) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -161,7 +161,8 @@ func (r *InsecureSession) Description() string {
 
 func (r *InsecureSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inSessionBlock := false
 	sessionStartLine := 0
@@ -174,7 +175,7 @@ func (r *InsecureSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Detect session configuration start
-		if sessionConfig.MatchString(line) {
+		if rules.GMatchLower(sessionConfig, line, lowered[i]) {
 			inSessionBlock = true
 			sessionStartLine = i
 			braceDepth = strings.Count(line, "{") - strings.Count(line, "}")
@@ -184,7 +185,7 @@ func (r *InsecureSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if inSessionBlock {
 			braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 
-			if sessionSecureFalse.MatchString(line) {
+			if rules.GMatchLower(sessionSecureFalse, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -200,7 +201,7 @@ func (r *InsecureSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 				})
 			}
 
-			if sessionHttpOnly.MatchString(line) {
+			if rules.GMatchLower(sessionHttpOnly, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      rules.High,
@@ -216,7 +217,7 @@ func (r *InsecureSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 				})
 			}
 
-			if sessionSameSiteNone.MatchString(line) {
+			if rules.GMatchLower(sessionSameSiteNone, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -246,8 +247,8 @@ func (r *InsecureSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type StackTraceLeak struct{}
 
-func (r *StackTraceLeak) ID() string                    { return "BATOU-FW-EXPRESS-003" }
-func (r *StackTraceLeak) Name() string                  { return "StackTraceLeak" }
+func (r *StackTraceLeak) ID() string                      { return "BATOU-FW-EXPRESS-003" }
+func (r *StackTraceLeak) Name() string                    { return "StackTraceLeak" }
 func (r *StackTraceLeak) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *StackTraceLeak) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -258,7 +259,8 @@ func (r *StackTraceLeak) Description() string {
 
 func (r *StackTraceLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inErrorHandler := false
 	handlerBraceDepth := 0
@@ -270,7 +272,7 @@ func (r *StackTraceLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Detect Express error handler middleware signature: (err, req, res, next)
-		if errorHandlerSig.MatchString(line) {
+		if rules.GMatchLower(errorHandlerSig, line, lowered[i]) {
 			inErrorHandler = true
 			handlerBraceDepth = strings.Count(line, "{") - strings.Count(line, "}")
 			continue
@@ -280,7 +282,7 @@ func (r *StackTraceLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 			handlerBraceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 
 			// Check for direct stack/message leaks
-			if stackTraceLeak.MatchString(line) || stackTraceRender.MatchString(line) {
+			if rules.GMatchLower(stackTraceLeak, line, lowered[i]) || rules.GMatchLower(stackTraceRender, line, lowered[i]) {
 				// Check if there's a production guard
 				hasEnvCheck := false
 				start := i - 10
@@ -324,8 +326,8 @@ func (r *StackTraceLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DynamicRequire struct{}
 
-func (r *DynamicRequire) ID() string                    { return "BATOU-FW-EXPRESS-004" }
-func (r *DynamicRequire) Name() string                  { return "DynamicRequire" }
+func (r *DynamicRequire) ID() string                      { return "BATOU-FW-EXPRESS-004" }
+func (r *DynamicRequire) Name() string                    { return "DynamicRequire" }
 func (r *DynamicRequire) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *DynamicRequire) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -336,7 +338,8 @@ func (r *DynamicRequire) Description() string {
 
 func (r *DynamicRequire) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	hasUserInput := strings.Contains(ctx.Content, "req.params") ||
 		strings.Contains(ctx.Content, "req.query") ||
@@ -354,7 +357,7 @@ func (r *DynamicRequire) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// High confidence: require/import with explicit req.params/query/body
-		if dynamicRequire.MatchString(line) {
+		if rules.GMatchLower(dynamicRequire, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -371,7 +374,7 @@ func (r *DynamicRequire) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if dynamicImport.MatchString(line) {
+		if rules.GMatchLower(dynamicImport, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -389,7 +392,7 @@ func (r *DynamicRequire) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Medium confidence: require(variable) in a file that also has user input
-		if hasUserInput && requireVariable.MatchString(line) {
+		if hasUserInput && rules.GMatchLower(requireVariable, line, lowered[i]) {
 			// Exclude common safe patterns (string literal requires)
 			if strings.Contains(line, "require('") || strings.Contains(line, "require(\"") {
 				continue
@@ -424,7 +427,7 @@ func (r *DynamicRequire) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Dynamic import(variable) in file with user input
-		if hasUserInput && importVariable.MatchString(line) {
+		if hasUserInput && rules.GMatchLower(importVariable, line, lowered[i]) {
 			if strings.Contains(line, "import('") || strings.Contains(line, "import(\"") {
 				continue
 			}
@@ -451,8 +454,8 @@ func (r *DynamicRequire) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SensitiveStaticDir struct{}
 
-func (r *SensitiveStaticDir) ID() string                    { return "BATOU-FW-EXPRESS-005" }
-func (r *SensitiveStaticDir) Name() string                  { return "SensitiveStaticDir" }
+func (r *SensitiveStaticDir) ID() string                      { return "BATOU-FW-EXPRESS-005" }
+func (r *SensitiveStaticDir) Name() string                    { return "SensitiveStaticDir" }
 func (r *SensitiveStaticDir) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SensitiveStaticDir) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -463,7 +466,8 @@ func (r *SensitiveStaticDir) Description() string {
 
 func (r *SensitiveStaticDir) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -471,7 +475,7 @@ func (r *SensitiveStaticDir) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		matches := expressStatic.FindStringSubmatch(line)
+		matches := rules.GFindSubmatchLower(expressStatic, line, lowered[i])
 		if len(matches) < 2 {
 			continue
 		}
@@ -522,8 +526,8 @@ func (r *SensitiveStaticDir) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TrustProxyMisconfig struct{}
 
-func (r *TrustProxyMisconfig) ID() string                    { return "BATOU-FW-EXPRESS-006" }
-func (r *TrustProxyMisconfig) Name() string                  { return "TrustProxyMisconfig" }
+func (r *TrustProxyMisconfig) ID() string                      { return "BATOU-FW-EXPRESS-006" }
+func (r *TrustProxyMisconfig) Name() string                    { return "TrustProxyMisconfig" }
 func (r *TrustProxyMisconfig) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *TrustProxyMisconfig) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -534,7 +538,8 @@ func (r *TrustProxyMisconfig) Description() string {
 
 func (r *TrustProxyMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -542,7 +547,7 @@ func (r *TrustProxyMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if trustProxyTrue.MatchString(line) {
+		if rules.GMatchLower(trustProxyTrue, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -566,8 +571,8 @@ func (r *TrustProxyMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MissingSessionExpiry struct{}
 
-func (r *MissingSessionExpiry) ID() string                    { return "BATOU-FW-EXPRESS-007" }
-func (r *MissingSessionExpiry) Name() string                  { return "MissingSessionExpiry" }
+func (r *MissingSessionExpiry) ID() string                      { return "BATOU-FW-EXPRESS-007" }
+func (r *MissingSessionExpiry) Name() string                    { return "MissingSessionExpiry" }
 func (r *MissingSessionExpiry) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *MissingSessionExpiry) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -578,7 +583,8 @@ func (r *MissingSessionExpiry) Description() string {
 
 func (r *MissingSessionExpiry) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -586,7 +592,7 @@ func (r *MissingSessionExpiry) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if !sessionCookieConfig.MatchString(line) {
+		if !rules.GMatchLower(sessionCookieConfig, line, lowered[i]) {
 			continue
 		}
 
@@ -635,8 +641,8 @@ func (r *MissingSessionExpiry) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type ProcessEnvLeak struct{}
 
-func (r *ProcessEnvLeak) ID() string                    { return "BATOU-FW-EXPRESS-008" }
-func (r *ProcessEnvLeak) Name() string                  { return "ProcessEnvLeak" }
+func (r *ProcessEnvLeak) ID() string                      { return "BATOU-FW-EXPRESS-008" }
+func (r *ProcessEnvLeak) Name() string                    { return "ProcessEnvLeak" }
 func (r *ProcessEnvLeak) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *ProcessEnvLeak) Languages() []rules.Language {
 	return []rules.Language{rules.LangJavaScript, rules.LangTypeScript}
@@ -647,7 +653,8 @@ func (r *ProcessEnvLeak) Description() string {
 
 func (r *ProcessEnvLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -655,7 +662,7 @@ func (r *ProcessEnvLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if processEnvLeak.MatchString(line) {
+		if rules.GMatchLower(processEnvLeak, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -674,7 +681,7 @@ func (r *ProcessEnvLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Check for spread of process.env into response objects
 		if strings.Contains(line, "res.") && (strings.Contains(line, "send") || strings.Contains(line, "json")) {
-			if processEnvSpread.MatchString(line) {
+			if rules.GMatchLower(processEnvSpread, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      rules.High,

@@ -52,7 +52,7 @@ func (r *PrototypePollutionMerge) Description() string {
 
 func (r *PrototypePollutionMerge) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -66,14 +66,14 @@ func (r *PrototypePollutionMerge) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var confidence string
 
 		// Check deep merge with user input (highest confidence)
-		if loc := jsMergeUserInput.FindString(line); loc != "" {
+		if loc := rules.GFind(jsMergeUserInput, line); loc != "" {
 			matched = loc
 			confidence = "high"
 		}
 
 		// Check Object.assign with user input
 		if matched == "" {
-			if loc := jsObjectAssignUser.FindString(line); loc != "" {
+			if loc := rules.GFind(jsObjectAssignUser, line); loc != "" {
 				matched = loc
 				confidence = "medium"
 			}
@@ -81,7 +81,7 @@ func (r *PrototypePollutionMerge) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Check spread with user input
 		if matched == "" {
-			if loc := jsSpreadUserInput.FindString(line); loc != "" {
+			if loc := rules.GFind(jsSpreadUserInput, line); loc != "" {
 				matched = loc
 				confidence = "medium"
 			}
@@ -89,9 +89,9 @@ func (r *PrototypePollutionMerge) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Check generic recursive merge with user input
 		if matched == "" {
-			if loc := jsRecursiveMerge.FindString(line); loc != "" {
+			if loc := rules.GFind(jsRecursiveMerge, line); loc != "" {
 				// Only match if not already caught by more specific patterns
-				if !jsMergeUserInput.MatchString(line) {
+				if !rules.GMatch(jsMergeUserInput, line) {
 					matched = loc
 					confidence = "low"
 				}
@@ -143,7 +143,7 @@ func (r *PrototypePollutionDirect) Description() string {
 
 func (r *PrototypePollutionDirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -158,7 +158,7 @@ func (r *PrototypePollutionDirect) Scan(ctx *rules.ScanContext) []rules.Finding 
 		var title string
 
 		// Check __proto__ bracket access: obj["__proto__"]
-		if loc := jsProtoAssign.FindString(line); loc != "" {
+		if loc := rules.GFind(jsProtoAssign, line); loc != "" {
 			matched = loc
 			confidence = "high"
 			title = "Direct __proto__ property access via bracket notation"
@@ -166,7 +166,7 @@ func (r *PrototypePollutionDirect) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 		// Check __proto__ direct assignment: obj.__proto__ =
 		if matched == "" {
-			if loc := jsProtoDirectAccess.FindString(line); loc != "" {
+			if loc := rules.GFind(jsProtoDirectAccess, line); loc != "" {
 				matched = loc
 				confidence = "high"
 				title = "Direct __proto__ property assignment"
@@ -175,7 +175,7 @@ func (r *PrototypePollutionDirect) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 		// Check constructor.prototype access
 		if matched == "" {
-			if loc := jsConstructorProto.FindString(line); loc != "" {
+			if loc := rules.GFind(jsConstructorProto, line); loc != "" {
 				matched = loc
 				confidence = "medium"
 				title = "Access to constructor.prototype (prototype pollution vector)"
@@ -184,7 +184,7 @@ func (r *PrototypePollutionDirect) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 		// Check dynamic property assignment with user-controlled key
 		if matched == "" {
-			if loc := jsDynPropUserInput.FindString(line); loc != "" {
+			if loc := rules.GFind(jsDynPropUserInput, line); loc != "" {
 				matched = loc
 				confidence = "medium"
 				title = "Dynamic property assignment with user-controlled key"

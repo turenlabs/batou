@@ -13,9 +13,9 @@ import (
 
 var (
 	// BATOU-DESER-005: Java ObjectInputStream.readObject without filter
-	reExtObjInputStream  = regexp.MustCompile(`\bObjectInputStream\s*\(`)
-	reExtReadObject      = regexp.MustCompile(`\.readObject\s*\(`)
-	reExtObjectFilter    = regexp.MustCompile(`(?i)(?:setObjectInputFilter|ObjectInputFilter|serialFilter|ClassFilter|lookAheadObjectInputStream|SafeObjectInputStream|ValidatingObjectInputStream)`)
+	reExtObjInputStream = regexp.MustCompile(`\bObjectInputStream\s*\(`)
+	reExtReadObject     = regexp.MustCompile(`\.readObject\s*\(`)
+	reExtObjectFilter   = regexp.MustCompile(`(?i)(?:setObjectInputFilter|ObjectInputFilter|serialFilter|ClassFilter|lookAheadObjectInputStream|SafeObjectInputStream|ValidatingObjectInputStream)`)
 
 	// BATOU-DESER-006: PHP unserialize with user input
 	reExtPHPUnserialize    = regexp.MustCompile(`\bunserialize\s*\(\s*\$(?:_GET|_POST|_REQUEST|_COOKIE|input|data|body|payload|param|value|raw)`)
@@ -23,13 +23,12 @@ var (
 	reExtPHPUserSource     = regexp.MustCompile(`\$_(?:GET|POST|REQUEST|COOKIE)|file_get_contents\s*\(\s*['"]php://input|json_decode`)
 
 	// BATOU-DESER-007: Python yaml.load without SafeLoader
-	reExtYAMLLoad      = regexp.MustCompile(`\byaml\.(?:load|unsafe_load)\s*\(`)
-	reExtYAMLSafeLoad  = regexp.MustCompile(`\byaml\.(?:safe_load|load\s*\([^)]*Loader\s*=\s*(?:yaml\.)?SafeLoader)`)
-	reExtYAMLFullLoad  = regexp.MustCompile(`\byaml\.(?:full_load|load\s*\([^)]*Loader\s*=\s*(?:yaml\.)?FullLoader)`)
+	reExtYAMLLoad     = regexp.MustCompile(`\byaml\.(?:load|unsafe_load)\s*\(`)
+	reExtYAMLSafeLoad = regexp.MustCompile(`\byaml\.(?:safe_load|load\s*\([^)]*Loader\s*=\s*(?:yaml\.)?SafeLoader)`)
+	reExtYAMLFullLoad = regexp.MustCompile(`\byaml\.(?:full_load|load\s*\([^)]*Loader\s*=\s*(?:yaml\.)?FullLoader)`)
 
 	// BATOU-DESER-008: .NET BinaryFormatter deserialization
 	reExtBinaryFormatter = regexp.MustCompile(`\bBinaryFormatter\s*\(\s*\)`)
-	reExtBinaryDeser     = regexp.MustCompile(`\.Deserialize\s*\(`)
 	reExtDotNetUnsafe    = regexp.MustCompile(`(?:LosFormatter|SoapFormatter|NetDataContractSerializer|ObjectStateFormatter|JavaScriptSerializer)\s*\(`)
 
 	// BATOU-DESER-009: Ruby Marshal.load with untrusted data
@@ -46,7 +45,6 @@ var (
 	reExtXMLDecoderInput = regexp.MustCompile(`\bnew\s+XMLDecoder\s*\(\s*(?:new\s+(?:ByteArrayInputStream|FileInputStream|BufferedInputStream)|request|input|stream|is|body)`)
 
 	// BATOU-DESER-012: Kotlin/JVM serialization of untrusted data
-	reExtKotlinDeser     = regexp.MustCompile(`(?i)(?:ObjectInputStream|readObject|Serializable|Externalizable|Kryo|ObjectMapper\.readValue|Gson\.fromJson|Json\.decodeFromString)`)
 	reExtKotlinUntrusted = regexp.MustCompile(`(?i)(?:ObjectInputStream|readObject)\s*\(.*(?:request|input|stream|socket|body)`)
 )
 
@@ -71,8 +69,8 @@ func init() {
 
 type JavaObjectInputStreamRule struct{}
 
-func (r *JavaObjectInputStreamRule) ID() string                     { return "BATOU-DESER-005" }
-func (r *JavaObjectInputStreamRule) Name() string                   { return "JavaObjectInputStream" }
+func (r *JavaObjectInputStreamRule) ID() string                      { return "BATOU-DESER-005" }
+func (r *JavaObjectInputStreamRule) Name() string                    { return "JavaObjectInputStream" }
 func (r *JavaObjectInputStreamRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JavaObjectInputStreamRule) Description() string {
 	return "Detects Java ObjectInputStream.readObject() usage without an ObjectInputFilter, which enables deserialization RCE."
@@ -82,17 +80,17 @@ func (r *JavaObjectInputStreamRule) Languages() []rules.Language {
 }
 
 func (r *JavaObjectInputStreamRule) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if reExtObjectFilter.MatchString(ctx.Content) {
+	if rules.GMatchFile(reExtObjectFilter, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if m := reExtObjInputStream.FindString(line); m != "" {
+		if m := rules.GFind(reExtObjInputStream, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -109,7 +107,7 @@ func (r *JavaObjectInputStreamRule) Scan(ctx *rules.ScanContext) []rules.Finding
 				Confidence:    "high",
 				Tags:          []string{"deserialization", "rce", "java"},
 			})
-		} else if reExtReadObject.MatchString(line) {
+		} else if rules.GMatch(reExtReadObject, line) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -118,7 +116,7 @@ func (r *JavaObjectInputStreamRule) Scan(ctx *rules.ScanContext) []rules.Finding
 				Description:   "readObject() deserializes Java objects which can trigger arbitrary code execution if the stream contains malicious gadget chains.",
 				FilePath:      ctx.FilePath,
 				LineNumber:    i + 1,
-				MatchedText:   reExtReadObject.FindString(line),
+				MatchedText:   rules.GFind(reExtReadObject, line),
 				Suggestion:    "Add an ObjectInputFilter before calling readObject(). Consider migrating to JSON serialization.",
 				CWEID:         "CWE-502",
 				OWASPCategory: "A08:2021-Software and Data Integrity Failures",
@@ -137,8 +135,8 @@ func (r *JavaObjectInputStreamRule) Scan(ctx *rules.ScanContext) []rules.Finding
 
 type PHPUnserializeRule struct{}
 
-func (r *PHPUnserializeRule) ID() string                     { return "BATOU-DESER-006" }
-func (r *PHPUnserializeRule) Name() string                   { return "PHPUnserialize" }
+func (r *PHPUnserializeRule) ID() string                      { return "BATOU-DESER-006" }
+func (r *PHPUnserializeRule) Name() string                    { return "PHPUnserialize" }
 func (r *PHPUnserializeRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PHPUnserializeRule) Description() string {
 	return "Detects PHP unserialize() with user-controlled input, which can trigger arbitrary object instantiation and code execution."
@@ -149,14 +147,14 @@ func (r *PHPUnserializeRule) Languages() []rules.Language {
 
 func (r *PHPUnserializeRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
-	hasUserSource := reExtPHPUserSource.MatchString(ctx.Content)
+	lines := ctx.SplitLines()
+	hasUserSource := rules.GMatchFile(reExtPHPUserSource, ctx)
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if m := reExtPHPUnserialize.FindString(line); m != "" {
+		if m := rules.GFind(reExtPHPUnserialize, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -174,7 +172,7 @@ func (r *PHPUnserializeRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 				Tags:          []string{"deserialization", "rce", "php"},
 			})
 		} else if hasUserSource {
-			if m := reExtPHPUnserializeGen.FindString(line); m != "" {
+			if m := rules.GFind(reExtPHPUnserializeGen, line); m != "" {
 				if hasNearbyPattern(lines, i, reExtPHPUserSource) {
 					findings = append(findings, rules.Finding{
 						RuleID:        r.ID(),
@@ -205,8 +203,8 @@ func (r *PHPUnserializeRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PythonYAMLLoadRule struct{}
 
-func (r *PythonYAMLLoadRule) ID() string                     { return "BATOU-DESER-007" }
-func (r *PythonYAMLLoadRule) Name() string                   { return "PythonYAMLLoad" }
+func (r *PythonYAMLLoadRule) ID() string                      { return "BATOU-DESER-007" }
+func (r *PythonYAMLLoadRule) Name() string                    { return "PythonYAMLLoad" }
 func (r *PythonYAMLLoadRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *PythonYAMLLoadRule) Description() string {
 	return "Detects Python yaml.load() without SafeLoader, which can execute arbitrary Python code via YAML tags."
@@ -217,15 +215,15 @@ func (r *PythonYAMLLoadRule) Languages() []rules.Language {
 
 func (r *PythonYAMLLoadRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if m := reExtYAMLLoad.FindString(line); m != "" {
+		if m := rules.GFind(reExtYAMLLoad, line); m != "" {
 			// Skip if SafeLoader is used on this line
-			if reExtYAMLSafeLoad.MatchString(line) {
+			if rules.GMatch(reExtYAMLSafeLoad, line) {
 				continue
 			}
 			// Check for Loader=SafeLoader in the call
@@ -238,7 +236,7 @@ func (r *PythonYAMLLoadRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 				continue
 			}
 			confidence := "high"
-			if reExtYAMLFullLoad.MatchString(line) {
+			if rules.GMatch(reExtYAMLFullLoad, line) {
 				confidence = "medium" // FullLoader is less dangerous than default
 			}
 			findings = append(findings, rules.Finding{
@@ -268,8 +266,8 @@ func (r *PythonYAMLLoadRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DotNetBinaryFormatterRule struct{}
 
-func (r *DotNetBinaryFormatterRule) ID() string                     { return "BATOU-DESER-008" }
-func (r *DotNetBinaryFormatterRule) Name() string                   { return "DotNetBinaryFormatter" }
+func (r *DotNetBinaryFormatterRule) ID() string                      { return "BATOU-DESER-008" }
+func (r *DotNetBinaryFormatterRule) Name() string                    { return "DotNetBinaryFormatter" }
 func (r *DotNetBinaryFormatterRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *DotNetBinaryFormatterRule) Description() string {
 	return "Detects .NET BinaryFormatter/LosFormatter/SoapFormatter deserialization, which is inherently insecure."
@@ -280,16 +278,16 @@ func (r *DotNetBinaryFormatterRule) Languages() []rules.Language {
 
 func (r *DotNetBinaryFormatterRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
 		var matched string
-		if m := reExtBinaryFormatter.FindString(line); m != "" {
+		if m := rules.GFind(reExtBinaryFormatter, line); m != "" {
 			matched = m
-		} else if m := reExtDotNetUnsafe.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtDotNetUnsafe, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -320,8 +318,8 @@ func (r *DotNetBinaryFormatterRule) Scan(ctx *rules.ScanContext) []rules.Finding
 
 type RubyMarshalLoadRule struct{}
 
-func (r *RubyMarshalLoadRule) ID() string                     { return "BATOU-DESER-009" }
-func (r *RubyMarshalLoadRule) Name() string                   { return "RubyMarshalLoad" }
+func (r *RubyMarshalLoadRule) ID() string                      { return "BATOU-DESER-009" }
+func (r *RubyMarshalLoadRule) Name() string                    { return "RubyMarshalLoad" }
 func (r *RubyMarshalLoadRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RubyMarshalLoadRule) Description() string {
 	return "Detects Ruby Marshal.load/restore with potentially untrusted data, which can execute arbitrary code."
@@ -332,13 +330,13 @@ func (r *RubyMarshalLoadRule) Languages() []rules.Language {
 
 func (r *RubyMarshalLoadRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if m := reExtRubyMarshalUser.FindString(line); m != "" {
+		if m := rules.GFind(reExtRubyMarshalUser, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -355,7 +353,7 @@ func (r *RubyMarshalLoadRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 				Confidence:    "high",
 				Tags:          []string{"deserialization", "rce", "ruby", "marshal"},
 			})
-		} else if m := reExtRubyMarshalLoad.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtRubyMarshalLoad, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -383,8 +381,8 @@ func (r *RubyMarshalLoadRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NodeSerializeRule struct{}
 
-func (r *NodeSerializeRule) ID() string                     { return "BATOU-DESER-010" }
-func (r *NodeSerializeRule) Name() string                   { return "NodeSerialize" }
+func (r *NodeSerializeRule) ID() string                      { return "BATOU-DESER-010" }
+func (r *NodeSerializeRule) Name() string                    { return "NodeSerialize" }
 func (r *NodeSerializeRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *NodeSerializeRule) Description() string {
 	return "Detects Node.js node-serialize/serialize-javascript unserialize() usage, which allows arbitrary code execution via function serialization."
@@ -395,21 +393,21 @@ func (r *NodeSerializeRule) Languages() []rules.Language {
 
 func (r *NodeSerializeRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Check if the file imports node-serialize or similar
-	hasLib := reExtNodeSerializeLib.MatchString(ctx.Content)
+	hasLib := rules.GMatchFile(reExtNodeSerializeLib, ctx)
 	if !hasLib {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
 		var matched string
-		if m := reExtNodeSerialize.FindString(line); m != "" {
+		if m := rules.GFind(reExtNodeSerialize, line); m != "" {
 			matched = m
-		} else if m := reExtNodeSerializeReq.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtNodeSerializeReq, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -443,8 +441,8 @@ func (r *NodeSerializeRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaXMLDecoderRule struct{}
 
-func (r *JavaXMLDecoderRule) ID() string                     { return "BATOU-DESER-011" }
-func (r *JavaXMLDecoderRule) Name() string                   { return "JavaXMLDecoder" }
+func (r *JavaXMLDecoderRule) ID() string                      { return "BATOU-DESER-011" }
+func (r *JavaXMLDecoderRule) Name() string                    { return "JavaXMLDecoder" }
 func (r *JavaXMLDecoderRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *JavaXMLDecoderRule) Description() string {
 	return "Detects Java XMLDecoder usage with untrusted input, which can execute arbitrary code from XML."
@@ -455,13 +453,13 @@ func (r *JavaXMLDecoderRule) Languages() []rules.Language {
 
 func (r *JavaXMLDecoderRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if m := reExtXMLDecoderInput.FindString(line); m != "" {
+		if m := rules.GFind(reExtXMLDecoderInput, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -478,7 +476,7 @@ func (r *JavaXMLDecoderRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 				Confidence:    "high",
 				Tags:          []string{"deserialization", "rce", "java", "xmldecoder"},
 			})
-		} else if m := reExtXMLDecoder.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtXMLDecoder, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -506,8 +504,8 @@ func (r *JavaXMLDecoderRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type KotlinDeserRule struct{}
 
-func (r *KotlinDeserRule) ID() string                     { return "BATOU-DESER-012" }
-func (r *KotlinDeserRule) Name() string                   { return "KotlinDeserialization" }
+func (r *KotlinDeserRule) ID() string                      { return "BATOU-DESER-012" }
+func (r *KotlinDeserRule) Name() string                    { return "KotlinDeserialization" }
 func (r *KotlinDeserRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *KotlinDeserRule) Description() string {
 	return "Detects Kotlin/JVM deserialization of untrusted data via ObjectInputStream or unfiltered type-based deserialization."
@@ -518,14 +516,14 @@ func (r *KotlinDeserRule) Languages() []rules.Language {
 
 func (r *KotlinDeserRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
-		if m := reExtKotlinUntrusted.FindString(line); m != "" {
-			if reExtObjectFilter.MatchString(ctx.Content) {
+		if m := rules.GFind(reExtKotlinUntrusted, line); m != "" {
+			if rules.GMatchFile(reExtObjectFilter, ctx) {
 				continue
 			}
 			matched := m

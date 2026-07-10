@@ -2,7 +2,6 @@ package languages
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 	"github.com/turenlabs/batou-core/taint"
 )
@@ -54,12 +53,76 @@ func TestNewTaintCatalogEntries(t *testing.T) {
 	requireSinkID(t, pySinks, "py.lxml.etree.xpath", taint.SnkXPath)
 	requireSinkID(t, pySinks, "py.xml.etree.findall", taint.SnkXPath)
 	requireSinkID(t, pySinks, "py.xml.etree.find", taint.SnkXPath)
+	// DuckDB + Polars SQL injection
+	requireSinkID(t, pySinks, "py.duckdb.sql", taint.SnkSQLQuery)
+	requireSinkID(t, pySinks, "py.duckdb.execute", taint.SnkSQLQuery)
+	requireSinkID(t, pySinks, "py.duckdb.query", taint.SnkSQLQuery)
+	requireSinkID(t, pySinks, "py.duckdb.connection.sql", taint.SnkSQLQuery)
+	requireSinkID(t, pySinks, "py.polars.read_database", taint.SnkSQLQuery)
+	requireSinkID(t, pySinks, "py.polars.read_database_uri", taint.SnkSQLQuery)
+	// Cassandra / ScyllaDB CQL injection (CWE-943)
+	requireSinkID(t, pySinks, "py.cassandra.simplestatement", taint.SnkNoSQL)
+	requireSinkID(t, pySinks, "py.cassandra.session.execute_async", taint.SnkNoSQL)
+	requireSinkID(t, pySinks, "py.cassandra.execute_concurrent", taint.SnkNoSQL)
+	requireSinkID(t, pySinks, "py.cassandra.execute_concurrent_with_args", taint.SnkNoSQL)
+	// CSV / spreadsheet formula injection (CWE-1236)
+	requireSinkID(t, pySinks, "py.csv.writer.writerow", taint.SnkCSV)
+	requireSinkID(t, pySinks, "py.csv.writer.writerows", taint.SnkCSV)
+	requireSinkID(t, pySinks, "py.pandas.to_csv", taint.SnkCSV)
+
+	// ---------- Python sanitizers ----------
+	pySans := taint.SanitizersForLanguage(rules.LangPython)
+	requireSanitizerID(t, pySans, "py.defusedcsv.writer", taint.SnkCSV)
+	requireSanitizerID(t, pySans, "py.defusedcsv.dictwriter", taint.SnkCSV)
+
+	// ---------- JavaScript/TypeScript CSV sinks (CWE-1236) ----------
+	requireSinkID(t, jsSinks, "js.papaparse.unparse", taint.SnkCSV)
+	requireSinkID(t, jsSinks, "js.fastcsv.writetostring", taint.SnkCSV)
+	requireSinkID(t, tsSinks, "ts.papaparse.unparse", taint.SnkCSV)
+
+	// ---------- Java CSV sinks (CWE-1236) ----------
+	javaSinks := taint.SinksForLanguage(rules.LangJava)
+	requireSinkID(t, javaSinks, "java.opencsv.csvwriter.writenext", taint.SnkCSV)
+	requireSinkID(t, javaSinks, "java.opencsv.csvwriter.writeall", taint.SnkCSV)
+	requireSinkID(t, javaSinks, "java.commonscsv.csvprinter.printrecord", taint.SnkCSV)
+	requireSinkID(t, javaSinks, "java.commonscsv.csvprinter.printrecords", taint.SnkCSV)
+
+	// ---------- PHP CSV sink (CWE-1236) ----------
+	requireSinkID(t, phpSinks, "php.fputcsv", taint.SnkCSV)
+
+	// ---------- Ruby CSV sink (CWE-1236) ----------
+	rubySinks := taint.SinksForLanguage(rules.LangRuby)
+	requireSinkID(t, rubySinks, "ruby.csv.addrow", taint.SnkCSV)
+
+	// ---------- Unrestricted file upload sinks (CWE-434) — SnkUpload ----------
+	requireSinkID(t, pySinks, "py.werkzeug.filestorage.save", taint.SnkUpload)
+	requireSinkID(t, pySinks, "py.django.storage.save", taint.SnkUpload)
+	requireSinkID(t, pySinks, "py.shutil.copyfileobj", taint.SnkUpload)
+	requireSinkID(t, jsSinks, "js.expressfileupload.mv", taint.SnkUpload)
+	requireSinkID(t, jsSinks, "js.multer.constructor", taint.SnkUpload)
+	requireSinkID(t, tsSinks, "ts.expressfileupload.mv", taint.SnkUpload)
+	requireSinkID(t, javaSinks, "java.spring.multipartfile.transferto", taint.SnkUpload)
+	requireSinkID(t, phpSinks, "php.move_uploaded_file", taint.SnkUpload)
+	requireSinkID(t, rubySinks, "ruby.carrierwave.store", taint.SnkUpload)
+	requireSinkID(t, rubySinks, "ruby.shrine.upload", taint.SnkUpload)
+
+	// ---------- Unrestricted file upload sanitizers (CWE-434) — SnkUpload ----------
+	requireSanitizerID(t, pySans, "py.werkzeug.secure_filename", taint.SnkUpload)
+	requireSanitizerID(t, pySans, "py.magic.from_buffer", taint.SnkUpload)
+	requireSanitizerID(t, pySans, "py.imghdr.what", taint.SnkUpload)
+	jsSanitizers := taint.SanitizersForLanguage(rules.LangJavaScript)
+	requireSanitizerID(t, jsSanitizers, "js.filetype.fromtokenizer", taint.SnkUpload)
+	javaSanitizers := taint.SanitizersForLanguage(rules.LangJava)
+	requireSanitizerID(t, javaSanitizers, "java.tika.detect", taint.SnkUpload)
+	requireSanitizerID(t, javaSanitizers, "java.urlconnection.guesscontenttype", taint.SnkUpload)
 
 	// ---------- Go sinks ----------
 	goSinks := taint.SinksForLanguage(rules.LangGo)
 	requireSinkID(t, goSinks, "go.template.js", taint.SnkTemplate)
 	requireSinkID(t, goSinks, "go.template.css", taint.SnkTemplate)
 	requireSinkID(t, goSinks, "go.template.htmlattr", taint.SnkTemplate)
+	// CSV / spreadsheet formula injection (CWE-1236)
+	requireSinkID(t, goSinks, "go.encoding.csv.writeall", taint.SnkCSV)
 
 	// ---------- Kotlin sinks (XXE + SSRF) ----------
 	ktSinks := taint.SinksForLanguage(rules.LangKotlin)
@@ -71,6 +134,35 @@ func TestNewTaintCatalogEntries(t *testing.T) {
 	requireSinkID(t, ktSinks, "kotlin.fuel.request", taint.SnkURLFetch)
 	requireSinkID(t, ktSinks, "kotlin.retrofit.url", taint.SnkURLFetch)
 	requireSinkID(t, ktSinks, "kotlin.httpurlconnection", taint.SnkURLFetch)
+	// LDAP injection sinks (CWE-90)
+	requireSinkID(t, ktSinks, "kotlin.ldap.dircontext.bind", taint.SnkLDAP)
+	requireSinkID(t, ktSinks, "kotlin.ldap.dircontext.rebind", taint.SnkLDAP)
+	requireSinkID(t, ktSinks, "kotlin.ldap.dircontext.createsubcontext", taint.SnkLDAP)
+	requireSinkID(t, ktSinks, "kotlin.ldap.dircontext.modifyattributes", taint.SnkLDAP)
+	requireSinkID(t, ktSinks, "kotlin.ldap.dircontext.rename", taint.SnkLDAP)
+	requireSinkID(t, ktSinks, "kotlin.ldap.spring.search", taint.SnkLDAP)
+	requireSinkID(t, ktSinks, "kotlin.ldap.spring.bind", taint.SnkLDAP)
+	requireSinkID(t, ktSinks, "kotlin.ldap.spring.authenticate", taint.SnkLDAP)
+	requireSinkID(t, ktSinks, "kotlin.ldap.unboundid.search", taint.SnkLDAP)
+	requireSinkID(t, ktSinks, "kotlin.ldap.unboundid.bind", taint.SnkLDAP)
+
+	// ---------- C# sinks ----------
+	csSinks := taint.SinksForLanguage(rules.LangCSharp)
+	// Elasticsearch / OpenSearch DSL + Painless + Mustache injection (CWE-943, CWE-94)
+	requireSinkID(t, csSinks, "csharp.elasticsearch.client.msearch", taint.SnkNoSQL)
+	requireSinkID(t, csSinks, "csharp.elasticsearch.client.deletebyquery", taint.SnkNoSQL)
+	requireSinkID(t, csSinks, "csharp.elasticsearch.client.updatebyquery", taint.SnkEval)
+	requireSinkID(t, csSinks, "csharp.elasticsearch.client.reindex", taint.SnkEval)
+	requireSinkID(t, csSinks, "csharp.elasticsearch.client.searchtemplate", taint.SnkEval)
+	requireSinkID(t, csSinks, "csharp.elasticsearch.client.rendersearchtemplate", taint.SnkEval)
+	requireSinkID(t, csSinks, "csharp.elasticsearch.client.scriptspainlessexecute", taint.SnkEval)
+	requireSinkID(t, csSinks, "csharp.elasticsearch.client.putscript", taint.SnkEval)
+	// CSV / spreadsheet formula injection (CWE-1236)
+	requireSinkID(t, csSinks, "csharp.csvhelper.writefield", taint.SnkCSV)
+	requireSinkID(t, csSinks, "csharp.csvhelper.writerecord", taint.SnkCSV)
+	requireSinkID(t, csSinks, "csharp.csvhelper.writerecords", taint.SnkCSV)
+	requireSinkID(t, csSinks, "csharp.csvhelper.writerecordsasync", taint.SnkCSV)
+	requireSinkID(t, csSinks, "csharp.servicestack.csvserializer.serializetostring", taint.SnkCSV)
 
 	// ---------- C# sanitizers ----------
 	csSanitizers := taint.SanitizersForLanguage(rules.LangCSharp)
@@ -117,6 +209,9 @@ func TestNewTaintCatalogEntries(t *testing.T) {
 	requireSanitizerID(t, ktSanitizers, "kotlin.inetaddress.issitelocal", taint.SnkURLFetch)
 	requireSanitizerID(t, ktSanitizers, "kotlin.apache.urlvalidator", taint.SnkURLFetch)
 	requireSanitizerID(t, ktSanitizers, "kotlin.uri.host.check", taint.SnkURLFetch)
+	// LDAP
+	requireSanitizerID(t, ktSanitizers, "kotlin.ldap.ldapname", taint.SnkLDAP)
+	requireSanitizerID(t, ktSanitizers, "kotlin.ldap.rdn.escapevalue", taint.SnkLDAP)
 
 	// ---------- Rust sanitizers ----------
 	rustSanitizers := taint.SanitizersForLanguage(rules.LangRust)
@@ -165,7 +260,8 @@ func TestNewTaintCatalogEntries(t *testing.T) {
 	requireSanitizerID(t, luaSanitizers, "lua.pgmoon.escape_identifier", taint.SnkSQLQuery)
 	requireSanitizerID(t, luaSanitizers, "lua.pgmoon.parameterized", taint.SnkSQLQuery)
 	requireSanitizerID(t, luaSanitizers, "lua.url.parse.host_check", taint.SnkURLFetch)
-	requireSanitizerID(t, luaSanitizers, "lua.tostring.sanitizer", taint.SnkSQLQuery)
+	// lua.tostring.sanitizer removed — tostring() returns the string unchanged and
+	// strips no metacharacters; it was an unsound SQL/Command sanitizer (silent FN).
 	requireSanitizerID(t, luaSanitizers, "lua.tarantool.box.execute.params", taint.SnkSQLQuery)
 	requireSanitizerID(t, luaSanitizers, "lua.luasql.prepare", taint.SnkSQLQuery)
 	requireSanitizerID(t, luaSanitizers, "lua.lxp.threat", taint.SnkDeserialize)
@@ -184,6 +280,79 @@ func TestNewTaintCatalogEntries(t *testing.T) {
 	requireSinkID(t, zigSinks, "zig.mem.copyBackwards", taint.SnkCommand)
 	requireSinkID(t, zigSinks, "zig.crypto.Md5", taint.SnkCrypto)
 	requireSinkID(t, zigSinks, "zig.crypto.Sha1", taint.SnkCrypto)
+
+	// ---------- Swift sinks (CryptoSwift + CommonCrypto legacy hashes) ----------
+	swiftSinks := taint.SinksForLanguage(rules.LangSwift)
+	requireSinkID(t, swiftSinks, "swift.cryptoswift.md5", taint.SnkCrypto)
+	requireSinkID(t, swiftSinks, "swift.cryptoswift.sha1", taint.SnkCrypto)
+	requireSinkID(t, swiftSinks, "swift.cryptoswift.des", taint.SnkCrypto)
+	requireSinkID(t, swiftSinks, "swift.cryptoswift.blowfish", taint.SnkCrypto)
+	requireSinkID(t, swiftSinks, "swift.cryptoswift.rc4", taint.SnkCrypto)
+	requireSinkID(t, swiftSinks, "swift.cryptoswift.rc2", taint.SnkCrypto)
+	requireSinkID(t, swiftSinks, "swift.commoncrypto.cc_md2", taint.SnkCrypto)
+	requireSinkID(t, swiftSinks, "swift.commoncrypto.cc_md4", taint.SnkCrypto)
+}
+
+// TestCWE73FileNameControlSinks verifies the path-construction file sinks
+// (rename / move / copy / hard-link) are registered under SnkFileWrite and
+// report CWE-73 (External Control of File Name or Path) — the CWE listed in
+// taintCoverableCWEs that previously had no taint sink, causing negative-
+// taint confirmation to over-suppress regex-only CWE-73 findings.
+func TestCWE73FileNameControlSinks(t *testing.T) {
+	want := []struct {
+		lang rules.Language
+		id   string
+	}{
+		// Python
+		{rules.LangPython, "py.os.rename"},
+		{rules.LangPython, "py.os.link"},
+		{rules.LangPython, "py.shutil.copy"},
+		// JavaScript / TypeScript
+		{rules.LangJavaScript, "js.fs.rename"},
+		{rules.LangJavaScript, "js.fs.link"},
+		{rules.LangJavaScript, "js.fs.copyfile"},
+		{rules.LangJavaScript, "js.fs.promises.rename"},
+		{rules.LangJavaScript, "js.fs.promises.copyfile"},
+		{rules.LangTypeScript, "ts.fs.rename"},
+		{rules.LangTypeScript, "ts.fs.copyfile"},
+		// Java
+		{rules.LangJava, "java.nio.files.move"},
+		{rules.LangJava, "java.nio.files.copy"},
+		{rules.LangJava, "java.nio.files.createlink"},
+		{rules.LangJava, "java.file.renameto"},
+		{rules.LangJava, "java.commons.fileutils.copyfile"},
+		// Go
+		{rules.LangGo, "go.os.rename"},
+		{rules.LangGo, "go.os.link"},
+		// PHP
+		{rules.LangPHP, "php.rename"},
+		{rules.LangPHP, "php.copy"},
+		{rules.LangPHP, "php.link"},
+		// Ruby
+		{rules.LangRuby, "ruby.fileutils.mv"},
+		{rules.LangRuby, "ruby.fileutils.cp"},
+		{rules.LangRuby, "ruby.file.rename"},
+		{rules.LangRuby, "ruby.file.link"},
+	}
+	for _, w := range want {
+		requireSinkWithCWE(t, taint.SinksForLanguage(w.lang), w.id, taint.SnkFileWrite, "CWE-73")
+	}
+}
+
+func requireSinkWithCWE(t *testing.T, sinks []taint.SinkDef, id string, cat taint.SinkCategory, cwe string) {
+	t.Helper()
+	for _, s := range sinks {
+		if s.ID == id {
+			if s.Category != cat {
+				t.Errorf("sink %s: expected category %v, got %v", id, cat, s.Category)
+			}
+			if s.CWEID != cwe {
+				t.Errorf("sink %s: expected CWEID %q, got %q", id, cwe, s.CWEID)
+			}
+			return
+		}
+	}
+	t.Errorf("sink %s not found in catalog (expected category %v, CWE %s)", id, cat, cwe)
 }
 
 func requireSinkID(t *testing.T, sinks []taint.SinkDef, id string, cat taint.SinkCategory) {
@@ -256,6 +425,47 @@ func TestPerlSanitizerEntries(t *testing.T) {
 
 	// Trust boundary sanitizer
 	requireSanitizerID(t, sans, "perl.session.validate", taint.SnkTrustBoundary)
+}
+
+func TestCSharpSanitizerCatalog(t *testing.T) {
+	sans := taint.SanitizersForLanguage(rules.LangCSharp)
+
+	// ReDoS prevention
+	requireSanitizerID(t, sans, "csharp.regex.nonbacktracking", taint.SnkEval)
+
+	// Reflection type allowlist
+	requireSanitizerID(t, sans, "csharp.type.isassignablefrom", taint.SnkEval)
+
+	// Cryptographic PRNG
+	requireSanitizerID(t, sans, "csharp.crypto.randomnumbergenerator", taint.SnkCrypto)
+
+	// HTML sanitization (Ganss.Xss)
+	requireSanitizerID(t, sans, "csharp.ganss.htmlsanitizer", taint.SnkHTMLOutput)
+
+	// FluentValidation
+	requireSanitizerID(t, sans, "csharp.fluentvalidation", taint.SnkSQLQuery)
+
+	// Process shell bypass
+	requireSanitizerID(t, sans, "csharp.process.useshellexecute.false", taint.SnkCommand)
+
+	// Data Protection API
+	requireSanitizerID(t, sans, "csharp.dataprotection.protect", taint.SnkTrustBoundary)
+
+	// Scriban template sandboxing
+	requireSanitizerID(t, sans, "csharp.scriban.memberfilter", taint.SnkTemplate)
+}
+
+func TestCCurlProtocolSanitizers(t *testing.T) {
+	sans := taint.SanitizersForLanguage(rules.LangC)
+
+	// libcurl scheme/protocol restrictions that mitigate SSRF. The string-form
+	// CURLOPT_PROTOCOLS_STR (curl 7.85+) and the redirect-leg restriction
+	// CURLOPT_REDIR_PROTOCOLS[_STR] extend the pre-existing bitmask
+	// CURLOPT_PROTOCOLS entry, which does not match the `_STR` suffix.
+	requireSanitizerID(t, sans, "c.curl.protocols", taint.SnkURLFetch)
+	requireSanitizerID(t, sans, "c.curl.protocols_str", taint.SnkURLFetch)
+	requireSanitizerID(t, sans, "c.curl.redir_protocols", taint.SnkURLFetch)
+	requireSanitizerID(t, sans, "c.curl.redir_protocols", taint.SnkRedirect)
 }
 
 func requireSanitizerID(t *testing.T, sanitizers []taint.SanitizerDef, id string, cat taint.SinkCategory) {

@@ -1,0 +1,7 @@
+-- LuaSQL SQL injection: vulnerable (string concat)
+local luasql = require "luasql.postgres"
+local env = luasql.postgres()
+local conn = env:connect("mydb", "user", "pass", "127.0.0.1", 5432)
+local user_input = ngx.req.get_uri_args()["id"]
+local cur = conn:execute("DELETE FROM sessions WHERE user_id = " .. user_input)
+conn:close()

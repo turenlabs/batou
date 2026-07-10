@@ -11,26 +11,21 @@ import (
 
 // SWIFT-001: Insecure URLSession (TLS validation disabled)
 var (
-	urlSessionDelegate       = regexp.MustCompile(`URLSession\s*\(\s*configuration:.*delegate:`)
-	tlsValidationDisabled    = regexp.MustCompile(`didReceive\s+challenge:.*URLAuthenticationChallenge`)
-	trustAllCerts            = regexp.MustCompile(`\.useCredential\(|\.performDefaultHandling|completionHandler\(\s*\.useCredential`)
-	cancelAuthChallenge      = regexp.MustCompile(`\.cancelAuthenticationChallenge|\.rejectProtectionSpace`)
-	allowsArbitraryLoads     = regexp.MustCompile(`NSAllowsArbitraryLoads\s*</true>|"NSAllowsArbitraryLoads"\s*:\s*true|allowsArbitraryLoads\s*=\s*true`)
-	serverTrustAlwaysAccept  = regexp.MustCompile(`serverTrust.*\.proceed|disposition\s*=\s*\.useCredential|URLCredential\(\s*trust:`)
+	tlsValidationDisabled   = regexp.MustCompile(`didReceive\s+challenge:.*URLAuthenticationChallenge`)
+	serverTrustAlwaysAccept = regexp.MustCompile(`serverTrust.*\.proceed|disposition\s*=\s*\.useCredential|URLCredential\(\s*trust:`)
 )
 
 // SWIFT-002: App Transport Security bypass
 var (
-	atsArbitraryLoads     = regexp.MustCompile(`NSAllowsArbitraryLoads`)
-	atsInsecureHTTPLoads  = regexp.MustCompile(`NSExceptionAllowsInsecureHTTPLoads`)
-	atsTrueValue          = regexp.MustCompile(`<true\s*/?>|:\s*true|=\s*true|YES`)
+	atsArbitraryLoads    = regexp.MustCompile(`NSAllowsArbitraryLoads`)
+	atsInsecureHTTPLoads = regexp.MustCompile(`NSExceptionAllowsInsecureHTTPLoads`)
+	atsTrueValue         = regexp.MustCompile(`<true\s*/?>|:\s*true|=\s*true|YES`)
 )
 
 // SWIFT-003: Insecure Keychain storage
 var (
 	keychainAccessibleAlways = regexp.MustCompile(`kSecAttrAccessibleAlways\b`)
 	keychainAlwaysDevice     = regexp.MustCompile(`kSecAttrAccessibleAlwaysThisDeviceOnly\b`)
-	keychainAfterFirstUnlock = regexp.MustCompile(`kSecAttrAccessibleAfterFirstUnlock\b`)
 )
 
 // SWIFT-004: UIWebView usage (deprecated)
@@ -40,50 +35,40 @@ var (
 
 // SWIFT-005: Hardcoded secrets
 var (
-	hardcodedAPIKey    = regexp.MustCompile(`(?i)(?:api[_-]?key|apikey)\s*[:=]\s*"[A-Za-z0-9_\-]{16,}"`)
 	hardcodedPassword  = regexp.MustCompile(`(?i)(?:password|passwd|pwd)\s*[:=]\s*"[^"]{4,}"`)
-	hardcodedToken     = regexp.MustCompile(`(?i)(?:token|secret|auth[_-]?key|private[_-]?key|access[_-]?key|secret[_-]?key)\s*[:=]\s*"[A-Za-z0-9_\-/.+]{8,}"`)
 	hardcodedAWSKey    = regexp.MustCompile(`(?:AKIA|ABIA|ACCA)[A-Z0-9]{16}`)
 	letVarStringAssign = regexp.MustCompile(`(?:let|var)\s+\w*(?i:(?:key|secret|token|password|credential|auth))\w*\s*[:=]\s*"[^"]{8,}"`)
 )
 
 // SWIFT-006: Insecure random
 var (
-	arc4randomBare    = regexp.MustCompile(`\barc4random\(\)`)
-	srandRand         = regexp.MustCompile(`\bsrand\(|srand48\(|\brand\(\)|\bdrand48\(\)|\brand\(\)\s*%`)
-	gameplayRandom    = regexp.MustCompile(`GKRandomSource\(\)`)
+	arc4randomBare = regexp.MustCompile(`\barc4random\(\)`)
+	srandRand      = regexp.MustCompile(`\bsrand\(|srand48\(|\brand\(\)|\bdrand48\(\)|\brand\(\)\s*%`)
 )
 
 // SWIFT-007: SQL injection in SQLite
 var (
-	sqlite3ExecInterp   = regexp.MustCompile(`sqlite3_exec\s*\(\s*\w+\s*,\s*"[^"]*\\?\(`)
-	sqlite3PrepInterp   = regexp.MustCompile(`sqlite3_prepare(?:_v[23])?\s*\(\s*\w+\s*,\s*"[^"]*\\?\(`)
-	sqlStringConcat     = regexp.MustCompile(`(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s+.*["']\s*\+\s*\w+|` +
-		`(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s+.*\\\(`)
-	sqlStringInterp     = regexp.MustCompile(`"(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s[^"]*\\\([^)]+\)`)
+	sqlStringInterp = regexp.MustCompile(`"(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\s[^"]*\\\([^)]+\)`)
 )
 
 // SWIFT-008: WKWebView JavaScript injection
 var (
-	evaluateJSPattern    = regexp.MustCompile(`\.evaluateJavaScript\(`)
-	loadHTMLStringPattern = regexp.MustCompile(`\.loadHTMLString\(`)
-	jsStringInterp       = regexp.MustCompile(`\.evaluateJavaScript\(\s*"[^"]*\\\(|\.evaluateJavaScript\(\s*\w+\s*\+|\.evaluateJavaScript\(\s*String\(format:`)
-	htmlStringInterp     = regexp.MustCompile(`\.loadHTMLString\(\s*"[^"]*\\\(|\.loadHTMLString\(\s*\w+\s*\+|\.loadHTMLString\(\s*String\(format:`)
+	jsStringInterp   = regexp.MustCompile(`\.evaluateJavaScript\(\s*"[^"]*\\\(|\.evaluateJavaScript\(\s*\w+\s*\+|\.evaluateJavaScript\(\s*String\(format:`)
+	htmlStringInterp = regexp.MustCompile(`\.loadHTMLString\(\s*"[^"]*\\\(|\.loadHTMLString\(\s*\w+\s*\+|\.loadHTMLString\(\s*String\(format:`)
 )
 
 // SWIFT-009: Insecure data storage
 var (
 	userDefaultsSecrets  = regexp.MustCompile(`UserDefaults\.standard\.set\(\s*\w*(?i:(?:password|token|secret|key|credential|auth|session|cookie|pin|ssn|credit))\w*`)
 	userDefaultsKeyStore = regexp.MustCompile(`UserDefaults\.standard\.set\([^,]+,\s*forKey:\s*"(?i:(?:password|token|secret|key|credential|auth|session|cookie|pin|ssn|credit))[^"]*"`)
-	nscodingPattern      = regexp.MustCompile(`NSCoding|NSKeyedArchiver\.archivedData|NSKeyedArchiver\.archiveRootObject`)
 	nscodingSensitive    = regexp.MustCompile(`(?i)(?:password|token|secret|credential|private|auth|session|cookie)\w*.*NSKeyedArchiver|NSKeyedArchiver.*(?i:(?:password|token|secret|credential|private|auth|session|cookie))`)
 )
 
 // SWIFT-010: Jailbreak detection bypass
 var (
-	jailbreakFileCheck    = regexp.MustCompile(`"/Applications/Cydia\.app"|"/Library/MobileSubstrate"|"/usr/sbin/sshd"|"/etc/apt"|"/bin/bash"|"/private/var/stash"`)
-	jailbreakCanOpen      = regexp.MustCompile(`canOpenURL\(\s*URL\(\s*string:\s*"cydia://`)
-	jailbreakWriteTest    = regexp.MustCompile(`"/.installed_turing"|"/private/jailbreak"|try\s*".*"\.write\(\s*toFile:\s*"/private/`)
+	jailbreakFileCheck = regexp.MustCompile(`"/Applications/Cydia\.app"|"/Library/MobileSubstrate"|"/usr/sbin/sshd"|"/etc/apt"|"/bin/bash"|"/private/var/stash"`)
+	jailbreakCanOpen   = regexp.MustCompile(`canOpenURL\(\s*URL\(\s*string:\s*"cydia://`)
+	jailbreakWriteTest = regexp.MustCompile(`"/.installed_turing"|"/private/jailbreak"|try\s*".*"\.write\(\s*toFile:\s*"/private/`)
 )
 
 func init() {
@@ -129,7 +114,8 @@ func (r *InsecureURLSession) Description() string {
 
 func (r *InsecureURLSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inChallengeHandler := false
 	handlerStartLine := 0
@@ -141,7 +127,7 @@ func (r *InsecureURLSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if tlsValidationDisabled.MatchString(line) {
+		if rules.GMatchLower(tlsValidationDisabled, line, lowered[i]) {
 			inChallengeHandler = true
 			handlerStartLine = i
 			braceDepth = strings.Count(line, "{") - strings.Count(line, "}")
@@ -151,7 +137,7 @@ func (r *InsecureURLSession) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if inChallengeHandler {
 			braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 
-			if serverTrustAlwaysAccept.MatchString(line) {
+			if rules.GMatchLower(serverTrustAlwaysAccept, line, lowered[i]) {
 				// Check if there's proper certificate pinning logic nearby
 				hasPinning := false
 				start := handlerStartLine
@@ -219,7 +205,8 @@ func (r *ATSBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -227,7 +214,7 @@ func (r *ATSBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if atsArbitraryLoads.MatchString(line) {
+		if rules.GMatchLower(atsArbitraryLoads, line, lowered[i]) {
 			// Check if the next few lines contain <true/>
 			hasTrue := false
 			end := i + 3
@@ -257,7 +244,7 @@ func (r *ATSBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 		}
 
-		if atsInsecureHTTPLoads.MatchString(line) {
+		if rules.GMatchLower(atsInsecureHTTPLoads, line, lowered[i]) {
 			hasTrue := false
 			end := i + 3
 			if end > len(lines) {
@@ -306,7 +293,8 @@ func (r *InsecureKeychain) Description() string {
 
 func (r *InsecureKeychain) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -314,7 +302,7 @@ func (r *InsecureKeychain) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if keychainAccessibleAlways.MatchString(line) {
+		if rules.GMatchLower(keychainAccessibleAlways, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -330,7 +318,7 @@ func (r *InsecureKeychain) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if keychainAlwaysDevice.MatchString(line) {
+		if rules.GMatchLower(keychainAlwaysDevice, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Medium,
@@ -366,7 +354,8 @@ func (r *UIWebViewUsage) Description() string {
 
 func (r *UIWebViewUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -374,7 +363,7 @@ func (r *UIWebViewUsage) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if uiWebViewUsage.MatchString(line) {
+		if rules.GMatchLower(uiWebViewUsage, line, lowered[i]) {
 			// Skip import statements - only flag actual usage
 			if strings.Contains(trimmed, "import") {
 				continue
@@ -414,7 +403,8 @@ func (r *HardcodedSecrets) Description() string {
 
 func (r *HardcodedSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -432,7 +422,7 @@ func (r *HardcodedSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if hardcodedAWSKey.MatchString(line) {
+		if rules.GMatchLower(hardcodedAWSKey, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -449,11 +439,11 @@ func (r *HardcodedSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if letVarStringAssign.MatchString(line) {
+		if rules.GMatchLower(letVarStringAssign, line, lowered[i]) {
 			severity := rules.High
 			confidence := "high"
 
-			if hardcodedPassword.MatchString(line) {
+			if rules.GMatchLower(hardcodedPassword, line, lowered[i]) {
 				severity = rules.Critical
 			}
 
@@ -492,7 +482,8 @@ func (r *InsecureRandom) Description() string {
 
 func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if the file uses random in a security-sensitive context
 	contentLower := strings.ToLower(ctx.Content)
@@ -514,7 +505,7 @@ func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if srandRand.MatchString(line) {
+		if rules.GMatchLower(srandRand, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.High,
@@ -531,7 +522,7 @@ func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if arc4randomBare.MatchString(line) && isSecurityContext {
+		if rules.GMatchLower(arc4randomBare, line, lowered[i]) && isSecurityContext {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -567,7 +558,8 @@ func (r *SQLiteInjection) Description() string {
 
 func (r *SQLiteInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	hasSQLiteImport := strings.Contains(ctx.Content, "sqlite3") ||
 		strings.Contains(ctx.Content, "SQLite") ||
@@ -585,7 +577,7 @@ func (r *SQLiteInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Check for string interpolation in SQL queries
-		if sqlStringInterp.MatchString(line) {
+		if rules.GMatchLower(sqlStringInterp, line, lowered[i]) {
 			// Check if sqlite3_bind is used nearby (parameterized)
 			hasBind := false
 			end := i + 10
@@ -635,7 +627,8 @@ func (r *WKWebViewInjection) Description() string {
 
 func (r *WKWebViewInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -643,7 +636,7 @@ func (r *WKWebViewInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if jsStringInterp.MatchString(line) {
+		if rules.GMatchLower(jsStringInterp, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -659,7 +652,7 @@ func (r *WKWebViewInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if htmlStringInterp.MatchString(line) {
+		if rules.GMatchLower(htmlStringInterp, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -695,7 +688,8 @@ func (r *InsecureDataStorage) Description() string {
 
 func (r *InsecureDataStorage) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -703,7 +697,7 @@ func (r *InsecureDataStorage) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if userDefaultsSecrets.MatchString(line) || userDefaultsKeyStore.MatchString(line) {
+		if rules.GMatchLower(userDefaultsSecrets, line, lowered[i]) || rules.GMatchLower(userDefaultsKeyStore, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -719,7 +713,7 @@ func (r *InsecureDataStorage) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if nscodingSensitive.MatchString(line) {
+		if rules.GMatchLower(nscodingSensitive, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Medium,
@@ -755,7 +749,8 @@ func (r *JailbreakDetectionBypass) Description() string {
 
 func (r *JailbreakDetectionBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -763,8 +758,8 @@ func (r *JailbreakDetectionBypass) Scan(ctx *rules.ScanContext) []rules.Finding 
 			continue
 		}
 
-		if jailbreakFileCheck.MatchString(line) || jailbreakCanOpen.MatchString(line) ||
-			jailbreakWriteTest.MatchString(line) {
+		if rules.GMatchLower(jailbreakFileCheck, line, lowered[i]) || rules.GMatchLower(jailbreakCanOpen, line, lowered[i]) ||
+			rules.GMatchLower(jailbreakWriteTest, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

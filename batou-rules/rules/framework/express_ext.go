@@ -13,12 +13,12 @@ import (
 
 var (
 	// BATOU-FW-EXPRESS-009: app.use without rate limiting
-	reExpressExtAppListen   = regexp.MustCompile(`(?:app|server)\s*\.\s*listen\s*\(`)
-	reExpressExtRateLimit   = regexp.MustCompile(`(?i)(?:rateLimit|rate[_-]?limit|express[_-]?rate[_-]?limit|slowDown|express[_-]?slow[_-]?down)`)
-	reExpressExtThrottle    = regexp.MustCompile(`(?i)(?:throttle|limiter|rateLimiter)`)
+	reExpressExtAppListen = regexp.MustCompile(`(?:app|server)\s*\.\s*listen\s*\(`)
+	reExpressExtRateLimit = regexp.MustCompile(`(?i)(?:rateLimit|rate[_-]?limit|express[_-]?rate[_-]?limit|slowDown|express[_-]?slow[_-]?down)`)
+	reExpressExtThrottle  = regexp.MustCompile(`(?i)(?:throttle|limiter|rateLimiter)`)
 
 	// BATOU-FW-EXPRESS-010: res.send with user input (XSS)
-	reExpressExtResSendInput = regexp.MustCompile(`res\s*\.\s*send\s*\(\s*(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|req\s*\.\s*(?:params|query|body)\s*\[)`)
+	reExpressExtResSendInput  = regexp.MustCompile(`res\s*\.\s*send\s*\(\s*(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|req\s*\.\s*(?:params|query|body)\s*\[)`)
 	reExpressExtResWriteInput = regexp.MustCompile(`res\s*\.\s*write\s*\(\s*(?:req\s*\.\s*(?:params|query|body)\s*\.\s*\w+|req\s*\.\s*(?:params|query|body)\s*\[)`)
 
 	// BATOU-FW-EXPRESS-011: Session secret hardcoded
@@ -30,9 +30,8 @@ var (
 	reExpressExtMorganReq    = regexp.MustCompile(`morgan\.token\s*\([^)]*(?:req\.(?:body|headers\.authorization|cookies))`)
 
 	// BATOU-FW-EXPRESS-013: Multer file upload without filter
-	reExpressExtMulterUpload  = regexp.MustCompile(`multer\s*\(\s*\{`)
+	reExpressExtMulterUpload   = regexp.MustCompile(`multer\s*\(\s*\{`)
 	reExpressExtMulterNoFilter = regexp.MustCompile(`fileFilter\s*:`)
-	reExpressExtMulterLimits  = regexp.MustCompile(`limits\s*:`)
 
 	// BATOU-FW-EXPRESS-014: Express trust proxy misconfigured
 	reExpressExtTrustProxyTrue = regexp.MustCompile(`(?:app|server)\s*\.\s*set\s*\(\s*["']trust\s+proxy["']\s*,\s*true\s*\)`)
@@ -68,19 +67,20 @@ func (r *ExpressNoRateLimit) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	// Skip if rate limiting is present
-	if reExpressExtRateLimit.MatchString(ctx.Content) || reExpressExtThrottle.MatchString(ctx.Content) {
+	if rules.GMatchFile(reExpressExtRateLimit, ctx) || rules.GMatchFile(reExpressExtThrottle, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reExpressExtAppListen.MatchString(line) {
+		if rules.GMatchLower(reExpressExtAppListen, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -125,7 +125,8 @@ func (r *ExpressResSendXSS) Languages() []rules.Language {
 
 func (r *ExpressResSendXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -134,9 +135,9 @@ func (r *ExpressResSendXSS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reExpressExtResSendInput.FindString(line); m != "" {
+		if m := rules.GFindLower(reExpressExtResSendInput, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reExpressExtResWriteInput.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reExpressExtResWriteInput, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -183,7 +184,8 @@ func (r *ExpressHardcodedSecret) Languages() []rules.Language {
 
 func (r *ExpressHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inSessionBlock := false
 	braceDepth := 0
@@ -194,14 +196,14 @@ func (r *ExpressHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reExpressExtSessionBlock.MatchString(line) {
+		if rules.GMatchLower(reExpressExtSessionBlock, line, lowered[i]) {
 			inSessionBlock = true
 			braceDepth = strings.Count(line, "{") - strings.Count(line, "}")
 		}
 
 		if inSessionBlock {
 			braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
-			if reExpressExtSessionSecret.MatchString(line) {
+			if rules.GMatchLower(reExpressExtSessionSecret, line, lowered[i]) {
 				// Skip if it references process.env
 				if strings.Contains(line, "process.env") {
 					continue
@@ -253,7 +255,8 @@ func (r *ExpressMorganSensitive) Languages() []rules.Language {
 
 func (r *ExpressMorganSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -262,9 +265,9 @@ func (r *ExpressMorganSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reExpressExtMorganCustom.FindString(line); m != "" {
+		if m := rules.GFindLower(reExpressExtMorganCustom, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reExpressExtMorganReq.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reExpressExtMorganReq, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -311,14 +314,15 @@ func (r *ExpressMulterNoFilter) Languages() []rules.Language {
 
 func (r *ExpressMulterNoFilter) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if !reExpressExtMulterUpload.MatchString(line) {
+		if !rules.GMatchLower(reExpressExtMulterUpload, line, lowered[i]) {
 			continue
 		}
 
@@ -373,14 +377,15 @@ func (r *ExpressTrustProxyExt) Languages() []rules.Language {
 
 func (r *ExpressTrustProxyExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reExpressExtTrustProxyTrue.MatchString(line) {
+		if rules.GMatchLower(reExpressExtTrustProxyTrue, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

@@ -535,3 +535,102 @@ func TestGEN010_Fixture_B2BOrder(t *testing.T) {
 		t.Errorf("expected VM sandbox escape finding in vm_sandbox_escape.ts, got: %v", testutil.FindingRuleIDs(result))
 	}
 }
+
+// --- BATOU-GEN-019: Disabled Security Feature (FP gates from owncloud/web) ---
+
+func TestGEN019_TLSRejectUnauthorized_AppCode_Fires(t *testing.T) {
+	// Real misconfiguration in application code must still fire.
+	content := `const agent = new https.Agent({ rejectUnauthorized: false });
+const client = tls.connect({ host, port, rejectUnauthorized: false });`
+	result := testutil.ScanContent(t, "/app/httpClient.ts", content)
+	testutil.MustFindRule(t, result, "BATOU-GEN-019")
+}
+
+func TestGEN019_DisabledCsrf_AppCode_Fires(t *testing.T) {
+	content := `app.use(csrf({ enabled: false }))
+const config = { csrfProtection: false };`
+	result := testutil.ScanContent(t, "/app/server.js", content)
+	testutil.MustFindRule(t, result, "BATOU-GEN-019")
+}
+
+func TestGEN019_Safe_PackageJsonScript(t *testing.T) {
+	// NODE_TLS_REJECT_UNAUTHORIZED=0 inside a package.json test script is
+	// build/test tooling config, not production application config.
+	content := `{
+  "name": "web",
+  "scripts": {
+    "test:e2e": "NODE_TLS_REJECT_UNAUTHORIZED=0 cucumber-js --profile=e2e",
+    "test:pw": "NODE_TLS_REJECT_UNAUTHORIZED=0 npx playwright test"
+  }
+}`
+	result := testutil.ScanContent(t, "/app/package.json", content)
+	testutil.MustNotFindRule(t, result, "BATOU-GEN-019")
+}
+
+func TestGEN019_Safe_LockFile(t *testing.T) {
+	content := `lockfileVersion: '6.0'
+settings:
+  autoInstallPeers: true
+dependencies:
+  some-pkg:
+    auth: false`
+	result := testutil.ScanContent(t, "/app/pnpm-lock.yaml", content)
+	testutil.MustNotFindRule(t, result, "BATOU-GEN-019")
+}
+
+func TestGEN019_Safe_VueRouterPublicRoute(t *testing.T) {
+	// `auth: false` on a vue-router route `meta` block marks a PUBLIC route —
+	// a legitimate config value, not a disabled security feature.
+	content := `import { RouteRecordRaw } from 'vue-router'
+
+export const buildRoutes = (): RouteRecordRaw[] => [
+  {
+    path: '/link',
+    component: PublicLink,
+    meta: {
+      auth: false
+    }
+  },
+  {
+    path: '/upload',
+    component: FilesDrop,
+    meta: {
+      auth: false,
+      isUploadSnackbarHidden: true
+    }
+  }
+]`
+	result := testutil.ScanContent(t, "/app/router/public.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-GEN-019")
+}
+
+func TestGEN019_DockerCompose_LowConfidence(t *testing.T) {
+	// docker-compose dev/example config still flags, but at low confidence.
+	content := `services:
+  proxy:
+    environment:
+      PROXY_TLS: 'false'`
+	result := testutil.ScanContent(t, "/app/docker-compose.yml", content)
+	testutil.MustFindRule(t, result, "BATOU-GEN-019")
+	found := false
+	for _, f := range result.Findings {
+		if f.RuleID == "BATOU-GEN-019" {
+			found = true
+			if f.Confidence != "low" {
+				t.Errorf("expected low confidence for docker-compose GEN-019, got %q", f.Confidence)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected BATOU-GEN-019 finding")
+	}
+}
+
+func TestGEN019_AuthFalse_NonRouteFile_Fires(t *testing.T) {
+	// `auth: false` outside a route/meta context still fires (e.g. disabling
+	// auth on an API middleware config).
+	content := `const apiOptions = { rateLimit: true, auth: false };
+registerApi(apiOptions);`
+	result := testutil.ScanContent(t, "/app/api.js", content)
+	testutil.MustFindRule(t, result, "BATOU-GEN-019")
+}

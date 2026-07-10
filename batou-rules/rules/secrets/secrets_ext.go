@@ -19,7 +19,7 @@ var (
 	reExtSlackWebhook = regexp.MustCompile(`https://hooks\.slack\.com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[A-Za-z0-9]{20,}`)
 
 	// BATOU-SEC-009: Twilio API key or Account SID
-	reExtTwilioSID = regexp.MustCompile(`(?:^|[^A-Za-z0-9])((?:AC|SK)[0-9a-fA-F]{32})(?:[^A-Za-z0-9]|$)`)
+	reExtTwilioSID  = regexp.MustCompile(`(?:^|[^A-Za-z0-9])((?:AC|SK)[0-9a-fA-F]{32})(?:[^A-Za-z0-9]|$)`)
 	reExtTwilioAuth = regexp.MustCompile(`(?i)twilio.*(?:auth_token|authtoken|api_?secret)\s*[:=]\s*["']([A-Za-z0-9]{32})["']`)
 
 	// BATOU-SEC-010: SendGrid API key (SG...)
@@ -68,8 +68,8 @@ func init() {
 
 type GoogleAPIKeyRule struct{}
 
-func (r *GoogleAPIKeyRule) ID() string                     { return "BATOU-SEC-007" }
-func (r *GoogleAPIKeyRule) Name() string                   { return "GoogleAPIKey" }
+func (r *GoogleAPIKeyRule) ID() string                      { return "BATOU-SEC-007" }
+func (r *GoogleAPIKeyRule) Name() string                    { return "GoogleAPIKey" }
 func (r *GoogleAPIKeyRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GoogleAPIKeyRule) Description() string {
 	return "Detects Google API keys (AIza...) hardcoded in source code."
@@ -83,12 +83,13 @@ func (r *GoogleAPIKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		m := reExtGoogleAPIKey.FindStringSubmatch(line)
+		m := rules.GFindSubmatchLower(reExtGoogleAPIKey, line, lowered[i])
 		if m == nil {
 			continue
 		}
@@ -119,8 +120,8 @@ func (r *GoogleAPIKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SlackWebhookRule struct{}
 
-func (r *SlackWebhookRule) ID() string                     { return "BATOU-SEC-008" }
-func (r *SlackWebhookRule) Name() string                   { return "SlackWebhookURL" }
+func (r *SlackWebhookRule) ID() string                      { return "BATOU-SEC-008" }
+func (r *SlackWebhookRule) Name() string                    { return "SlackWebhookURL" }
 func (r *SlackWebhookRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SlackWebhookRule) Description() string {
 	return "Detects Slack webhook URLs hardcoded in source code."
@@ -134,12 +135,13 @@ func (r *SlackWebhookRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtSlackWebhook.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtSlackWebhook, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -171,8 +173,8 @@ func (r *SlackWebhookRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TwilioKeyRule struct{}
 
-func (r *TwilioKeyRule) ID() string                     { return "BATOU-SEC-009" }
-func (r *TwilioKeyRule) Name() string                   { return "TwilioAPIKey" }
+func (r *TwilioKeyRule) ID() string                      { return "BATOU-SEC-009" }
+func (r *TwilioKeyRule) Name() string                    { return "TwilioAPIKey" }
 func (r *TwilioKeyRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TwilioKeyRule) Description() string {
 	return "Detects Twilio Account SIDs (AC...) and API keys (SK...) hardcoded in source code."
@@ -186,13 +188,14 @@ func (r *TwilioKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	seen := make(map[int]bool)
 	for i, line := range lines {
 		if isCommentLine(line) || seen[i+1] {
 			continue
 		}
-		if m := reExtTwilioSID.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatchLower(reExtTwilioSID, line, lowered[i]); m != nil {
 			seen[i+1] = true
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
@@ -212,7 +215,7 @@ func (r *TwilioKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 		if !seen[i+1] {
-			if m := reExtTwilioAuth.FindStringSubmatch(line); m != nil {
+			if m := rules.GFindSubmatchLower(reExtTwilioAuth, line, lowered[i]); m != nil {
 				seen[i+1] = true
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
@@ -242,8 +245,8 @@ func (r *TwilioKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SendGridKeyRule struct{}
 
-func (r *SendGridKeyRule) ID() string                     { return "BATOU-SEC-010" }
-func (r *SendGridKeyRule) Name() string                   { return "SendGridAPIKey" }
+func (r *SendGridKeyRule) ID() string                      { return "BATOU-SEC-010" }
+func (r *SendGridKeyRule) Name() string                    { return "SendGridAPIKey" }
 func (r *SendGridKeyRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SendGridKeyRule) Description() string {
 	return "Detects SendGrid API keys (SG...) hardcoded in source code."
@@ -257,12 +260,13 @@ func (r *SendGridKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtSendGridKey.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatchLower(reExtSendGridKey, line, lowered[i]); m != nil {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -290,8 +294,8 @@ func (r *SendGridKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MailgunKeyRule struct{}
 
-func (r *MailgunKeyRule) ID() string                     { return "BATOU-SEC-011" }
-func (r *MailgunKeyRule) Name() string                   { return "MailgunAPIKey" }
+func (r *MailgunKeyRule) ID() string                      { return "BATOU-SEC-011" }
+func (r *MailgunKeyRule) Name() string                    { return "MailgunAPIKey" }
 func (r *MailgunKeyRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MailgunKeyRule) Description() string {
 	return "Detects Mailgun API keys (key-...) hardcoded in source code."
@@ -305,12 +309,13 @@ func (r *MailgunKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtMailgunKey.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatchLower(reExtMailgunKey, line, lowered[i]); m != nil {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -338,8 +343,8 @@ func (r *MailgunKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DBConnStringExtRule struct{}
 
-func (r *DBConnStringExtRule) ID() string                     { return "BATOU-SEC-012" }
-func (r *DBConnStringExtRule) Name() string                   { return "DBConnectionStringExt" }
+func (r *DBConnStringExtRule) ID() string                      { return "BATOU-SEC-012" }
+func (r *DBConnStringExtRule) Name() string                    { return "DBConnectionStringExt" }
 func (r *DBConnStringExtRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *DBConnStringExtRule) Description() string {
 	return "Detects database connection strings with embedded passwords in URI format."
@@ -353,12 +358,13 @@ func (r *DBConnStringExtRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtDBConnString.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtDBConnString, line, lowered[i]); m != "" {
 			lower := strings.ToLower(line)
 			// Exclude placeholder URIs
 			if strings.Contains(lower, "username:password@") ||
@@ -400,8 +406,8 @@ func (r *DBConnStringExtRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PrivateKeyBlockRule struct{}
 
-func (r *PrivateKeyBlockRule) ID() string                     { return "BATOU-SEC-013" }
-func (r *PrivateKeyBlockRule) Name() string                   { return "PrivateKeyBlock" }
+func (r *PrivateKeyBlockRule) ID() string                      { return "BATOU-SEC-013" }
+func (r *PrivateKeyBlockRule) Name() string                    { return "PrivateKeyBlock" }
 func (r *PrivateKeyBlockRule) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *PrivateKeyBlockRule) Description() string {
 	return "Detects PEM-encoded private keys embedded in source code, including encrypted private keys."
@@ -412,10 +418,11 @@ func (r *PrivateKeyBlockRule) Languages() []rules.Language {
 
 func (r *PrivateKeyBlockRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if reExtPrivateKeyBlock.MatchString(line) {
-			match := reExtPrivateKeyBlock.FindString(line)
+		if rules.GMatchLower(reExtPrivateKeyBlock, line, lowered[i]) {
+			match := rules.GFindLower(reExtPrivateKeyBlock, line, lowered[i])
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -443,8 +450,8 @@ func (r *PrivateKeyBlockRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AzureStorageKeyRule struct{}
 
-func (r *AzureStorageKeyRule) ID() string                     { return "BATOU-SEC-014" }
-func (r *AzureStorageKeyRule) Name() string                   { return "AzureStorageKey" }
+func (r *AzureStorageKeyRule) ID() string                      { return "BATOU-SEC-014" }
+func (r *AzureStorageKeyRule) Name() string                    { return "AzureStorageKey" }
 func (r *AzureStorageKeyRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AzureStorageKeyRule) Description() string {
 	return "Detects Azure Storage account keys hardcoded in source code."
@@ -458,12 +465,13 @@ func (r *AzureStorageKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtAzureStorageKey.FindStringSubmatch(line); m != nil {
+		if m := rules.GFindSubmatchLower(reExtAzureStorageKey, line, lowered[i]); m != nil {
 			if isPlaceholder(m[1]) {
 				continue
 			}
@@ -494,8 +502,8 @@ func (r *AzureStorageKeyRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GCPServiceAccountRule struct{}
 
-func (r *GCPServiceAccountRule) ID() string                     { return "BATOU-SEC-015" }
-func (r *GCPServiceAccountRule) Name() string                   { return "GCPServiceAccountKey" }
+func (r *GCPServiceAccountRule) ID() string                      { return "BATOU-SEC-015" }
+func (r *GCPServiceAccountRule) Name() string                    { return "GCPServiceAccountKey" }
 func (r *GCPServiceAccountRule) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GCPServiceAccountRule) Description() string {
 	return "Detects GCP service account JSON key files embedded in source code."
@@ -507,15 +515,16 @@ func (r *GCPServiceAccountRule) Languages() []rules.Language {
 func (r *GCPServiceAccountRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 	// Check if the content matches service account JSON structure
-	if !reExtGCPServiceAccount.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reExtGCPServiceAccount, ctx) {
 		return nil
 	}
-	if !reExtGCPPrivateKeyID.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reExtGCPPrivateKeyID, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
-		if reExtGCPServiceAccount.MatchString(line) {
+		if rules.GMatchLower(reExtGCPServiceAccount, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -544,8 +553,8 @@ func (r *GCPServiceAccountRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HighEntropySecretRule struct{}
 
-func (r *HighEntropySecretRule) ID() string                     { return "BATOU-SEC-016" }
-func (r *HighEntropySecretRule) Name() string                   { return "HighEntropySecret" }
+func (r *HighEntropySecretRule) ID() string                      { return "BATOU-SEC-016" }
+func (r *HighEntropySecretRule) Name() string                    { return "HighEntropySecret" }
 func (r *HighEntropySecretRule) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *HighEntropySecretRule) Description() string {
 	return "Detects high-entropy strings assigned to variables with secret-indicating names."
@@ -559,12 +568,13 @@ func (r *HighEntropySecretRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		m := reExtSecretAssignment.FindStringSubmatch(line)
+		m := rules.GFindSubmatchLower(reExtSecretAssignment, line, lowered[i])
 		if m == nil {
 			continue
 		}

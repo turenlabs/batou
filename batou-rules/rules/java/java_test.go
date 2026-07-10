@@ -604,3 +604,39 @@ func TestJAVA018_ThreadLocal_SimpleDateFormat_Safe(t *testing.T) {
 	result := testutil.ScanContent(t, "/app/DateUtil.java", content)
 	testutil.MustNotFindRule(t, result, "BATOU-JAVA-018")
 }
+
+// ==========================================================================
+// BATOU-JAVA-031: MyBatis ${} String-Substitution SQL Injection
+// ==========================================================================
+
+func TestJAVA031_MyBatisAnnotation_DollarSub(t *testing.T) {
+	content := `public interface UserMapper {
+    @Select("SELECT * FROM users WHERE name = '${name}'")
+    List<String> findByName(@Param("name") String name);
+}`
+	result := testutil.ScanContent(t, "/app/UserMapper.java", content)
+	testutil.MustFindRule(t, result, "BATOU-JAVA-031")
+}
+
+func TestJAVA031_MyBatisAnnotation_DollarSub_MultiLine(t *testing.T) {
+	// The @Select annotation and the ${} interpolation are on separate lines;
+	// detection relies on the nearby-line lookback.
+	content := `public interface OrderMapper {
+    @Select({
+        "SELECT * FROM orders",
+        "ORDER BY ${sortColumn}"
+    })
+    List<String> findAll(@Param("sortColumn") String sortColumn);
+}`
+	result := testutil.ScanContent(t, "/app/OrderMapper.java", content)
+	testutil.MustFindRule(t, result, "BATOU-JAVA-031")
+}
+
+func TestJAVA031_MyBatisAnnotation_HashParam_Safe(t *testing.T) {
+	content := `public interface UserMapper {
+    @Select("SELECT * FROM users WHERE name = #{name}")
+    List<String> findByName(@Param("name") String name);
+}`
+	result := testutil.ScanContent(t, "/app/UserMapper.java", content)
+	testutil.MustNotFindRule(t, result, "BATOU-JAVA-031")
+}

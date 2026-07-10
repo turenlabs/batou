@@ -26,33 +26,30 @@ var (
 
 // BATOU-GQL-005: GraphQL field-level authorization missing
 var (
-	reGQLResolverFunc     = regexp.MustCompile(`(?i)(?:resolve\s*[:=]\s*(?:async\s+)?(?:function|\()|\w+\s*:\s*\{\s*(?:type|resolve)|def\s+resolve_\w+|@ResolveField|func\s+\(\w+\s+\*\w+Resolver\))`)
-	reGQLAuthCheck        = regexp.MustCompile(`(?i)(?:authorize|auth|permission|isAuthenticated|currentUser|context\.user|ctx\.user|@Authorized|@PreAuthorize|@Secured|requireAuth|checkAuth|hasPermission|@login_required|@permission_required|authenticate)`)
-	reGQLLibraryEvidence  = regexp.MustCompile(`(?i)(?:graphql|graphene|ariadne|strawberry|apollo|gqlgen|@Query|@Mutation|@Resolver|@ObjectType|type\s+Query|type\s+Mutation|schema\s*\{)`)
+	reGQLResolverFunc    = regexp.MustCompile(`(?i)(?:resolve\s*[:=]\s*(?:async\s+)?(?:function|\()|\w+\s*:\s*\{\s*(?:type|resolve)|def\s+resolve_\w+|@ResolveField|func\s+\(\w+\s+\*\w+Resolver\))`)
+	reGQLAuthCheck       = regexp.MustCompile(`(?i)(?:authorize|auth|permission|isAuthenticated|currentUser|context\.user|ctx\.user|@Authorized|@PreAuthorize|@Secured|requireAuth|checkAuth|hasPermission|@login_required|@permission_required|authenticate)`)
+	reGQLLibraryEvidence = regexp.MustCompile(`(?i)(?:graphql|graphene|ariadne|strawberry|apollo|gqlgen|@Query|@Mutation|@Resolver|@ObjectType|type\s+Query|type\s+Mutation|schema\s*\{)`)
 )
 
 // BATOU-GQL-006: GraphQL batch query attack
 var (
-	reGQLBatchEnabled  = regexp.MustCompile(`(?i)(?:batch\s*[:=]\s*true|batching\s*[:=]\s*true|allowBatchedHttpRequests\s*[:=]\s*true)`)
-	reGQLBatchLimit    = regexp.MustCompile(`(?i)(?:batchLimit|batch_limit|maxBatch|max_batch|BatchLimit|maxOperationsPerRequest)`)
+	reGQLBatchEnabled = regexp.MustCompile(`(?i)(?:batch\s*[:=]\s*true|batching\s*[:=]\s*true|allowBatchedHttpRequests\s*[:=]\s*true)`)
+	reGQLBatchLimit   = regexp.MustCompile(`(?i)(?:batchLimit|batch_limit|maxBatch|max_batch|BatchLimit|maxOperationsPerRequest)`)
 )
 
 // BATOU-GQL-007: GraphQL SQL injection via resolver
 var (
-	reGQLResolverSQL = regexp.MustCompile(`(?i)(?:resolve|resolver)\b[^}]*(?:query|execute|raw|rawQuery|executeQuery)\s*\([^)]*(?:\$\{|` + "`" + `|\+\s*(?:args|input|parent|root|context|info)\b|%s|%v|format|f['"])`)
-	reGQLRawQuery    = regexp.MustCompile(`(?i)(?:db\.query|connection\.query|pool\.query|\.raw|\.execute|cursor\.execute|\.rawQuery)\s*\(\s*(?:` + "`" + `[^` + "`" + `]*\$\{|['"][^'"]*['"]\s*\+|f['"])`)
+	reGQLRawQuery = regexp.MustCompile(`(?i)(?:db\.query|connection\.query|pool\.query|\.raw|\.execute|cursor\.execute|\.rawQuery)\s*\(\s*(?:` + "`" + `[^` + "`" + `]*\$\{|['"][^'"]*['"]\s*\+|f['"])`)
 )
 
 // BATOU-GQL-008: GraphQL mutation without authentication
 var (
-	reGQLMutation        = regexp.MustCompile(`(?i)(?:type\s+Mutation|Mutation\s*[:=]|\.mutation\s*\(|@Mutation|mutation_type|MutationType)`)
-	reGQLMutationResolve = regexp.MustCompile(`(?i)(?:Mutation\s*[:=]\s*\{|mutation\s*[:=]\s*new|mutationType\s*[:=])`)
+	reGQLMutation = regexp.MustCompile(`(?i)(?:type\s+Mutation|Mutation\s*[:=]|\.mutation\s*\(|@Mutation|mutation_type|MutationType)`)
 )
 
 // BATOU-GQL-009: GraphQL persisted queries disabled
 var (
-	reGQLPersistedOff    = regexp.MustCompile(`(?i)(?:persistedQueries\s*[:=]\s*false|persisted[_-]?queries\s*[:=]\s*false|automaticPersistedQueries\s*[:=]\s*false)`)
-	reGQLPersistedOn     = regexp.MustCompile(`(?i)(?:persistedQueries|persisted_queries|automaticPersistedQueries|PersistedQueryLink|persistedQueries\s*[:=]\s*true)`)
+	reGQLPersistedOff = regexp.MustCompile(`(?i)(?:persistedQueries\s*[:=]\s*false|persisted[_-]?queries\s*[:=]\s*false|automaticPersistedQueries\s*[:=]\s*false)`)
 )
 
 // BATOU-GQL-010: GraphQL error message information disclosure
@@ -68,8 +65,8 @@ var (
 
 type IntrospectionEnabledProd struct{}
 
-func (r *IntrospectionEnabledProd) ID() string                     { return "BATOU-GQL-003" }
-func (r *IntrospectionEnabledProd) Name() string                   { return "IntrospectionEnabledProd" }
+func (r *IntrospectionEnabledProd) ID() string                      { return "BATOU-GQL-003" }
+func (r *IntrospectionEnabledProd) Name() string                    { return "IntrospectionEnabledProd" }
 func (r *IntrospectionEnabledProd) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *IntrospectionEnabledProd) Description() string {
 	return "Detects GraphQL introspection enabled unconditionally (not guarded by environment check), likely active in production."
@@ -80,15 +77,15 @@ func (r *IntrospectionEnabledProd) Languages() []rules.Language {
 
 func (r *IntrospectionEnabledProd) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reIntrospectionProd.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reIntrospectionProd, line); loc != nil {
 			// Skip if guarded by environment check
-			if reIntrospectionGuarded.MatchString(line) {
+			if rules.GMatch(reIntrospectionGuarded, line) {
 				continue
 			}
 			// Higher confidence if file looks like production config
@@ -124,8 +121,8 @@ func (r *IntrospectionEnabledProd) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type GQLQueryDepthNotLimited struct{}
 
-func (r *GQLQueryDepthNotLimited) ID() string                     { return "BATOU-GQL-004" }
-func (r *GQLQueryDepthNotLimited) Name() string                   { return "GQLQueryDepthNotLimited" }
+func (r *GQLQueryDepthNotLimited) ID() string                      { return "BATOU-GQL-004" }
+func (r *GQLQueryDepthNotLimited) Name() string                    { return "GQLQueryDepthNotLimited" }
 func (r *GQLQueryDepthNotLimited) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GQLQueryDepthNotLimited) Description() string {
 	return "Detects GraphQL schema setup without query depth limiting, allowing deeply nested queries that cause denial of service."
@@ -138,16 +135,16 @@ func (r *GQLQueryDepthNotLimited) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// If depth limiting is present anywhere, skip
-	if reGQLDepthCheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reGQLDepthCheck, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reGQLSchemaSetup.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reGQLSchemaSetup, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
@@ -177,8 +174,8 @@ func (r *GQLQueryDepthNotLimited) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GQLFieldAuthMissing struct{}
 
-func (r *GQLFieldAuthMissing) ID() string                     { return "BATOU-GQL-005" }
-func (r *GQLFieldAuthMissing) Name() string                   { return "GQLFieldAuthMissing" }
+func (r *GQLFieldAuthMissing) ID() string                      { return "BATOU-GQL-005" }
+func (r *GQLFieldAuthMissing) Name() string                    { return "GQLFieldAuthMissing" }
 func (r *GQLFieldAuthMissing) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GQLFieldAuthMissing) Description() string {
 	return "Detects GraphQL resolvers without authorization checks, potentially exposing data to unauthenticated or unauthorized users."
@@ -191,21 +188,21 @@ func (r *GQLFieldAuthMissing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only flag in files with actual GraphQL library usage
-	if !reGQLLibraryEvidence.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reGQLLibraryEvidence, ctx) {
 		return nil
 	}
 
 	// Skip if file has auth patterns globally
-	if reGQLAuthCheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reGQLAuthCheck, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reGQLResolverFunc.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reGQLResolverFunc, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
@@ -235,8 +232,8 @@ func (r *GQLFieldAuthMissing) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GQLBatchQueryAttack struct{}
 
-func (r *GQLBatchQueryAttack) ID() string                     { return "BATOU-GQL-006" }
-func (r *GQLBatchQueryAttack) Name() string                   { return "GQLBatchQueryAttack" }
+func (r *GQLBatchQueryAttack) ID() string                      { return "BATOU-GQL-006" }
+func (r *GQLBatchQueryAttack) Name() string                    { return "GQLBatchQueryAttack" }
 func (r *GQLBatchQueryAttack) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GQLBatchQueryAttack) Description() string {
 	return "Detects GraphQL batch query support enabled without a batch size limit, allowing attackers to send hundreds of queries in a single request."
@@ -247,10 +244,10 @@ func (r *GQLBatchQueryAttack) Languages() []rules.Language {
 
 func (r *GQLBatchQueryAttack) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	// If batch limit is configured, skip
-	if reGQLBatchLimit.MatchString(ctx.Content) {
+	if rules.GMatchFile(reGQLBatchLimit, ctx) {
 		return nil
 	}
 
@@ -258,7 +255,7 @@ func (r *GQLBatchQueryAttack) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reGQLBatchEnabled.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reGQLBatchEnabled, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
@@ -287,8 +284,8 @@ func (r *GQLBatchQueryAttack) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GQLSQLInjection struct{}
 
-func (r *GQLSQLInjection) ID() string                     { return "BATOU-GQL-007" }
-func (r *GQLSQLInjection) Name() string                   { return "GQLSQLInjection" }
+func (r *GQLSQLInjection) ID() string                      { return "BATOU-GQL-007" }
+func (r *GQLSQLInjection) Name() string                    { return "GQLSQLInjection" }
 func (r *GQLSQLInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GQLSQLInjection) Description() string {
 	return "Detects SQL queries in GraphQL resolvers that use string concatenation or interpolation with resolver arguments, enabling SQL injection."
@@ -299,13 +296,13 @@ func (r *GQLSQLInjection) Languages() []rules.Language {
 
 func (r *GQLSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reGQLRawQuery.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reGQLRawQuery, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -337,8 +334,8 @@ func (r *GQLSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GQLMutationNoAuth struct{}
 
-func (r *GQLMutationNoAuth) ID() string                     { return "BATOU-GQL-008" }
-func (r *GQLMutationNoAuth) Name() string                   { return "GQLMutationNoAuth" }
+func (r *GQLMutationNoAuth) ID() string                      { return "BATOU-GQL-008" }
+func (r *GQLMutationNoAuth) Name() string                    { return "GQLMutationNoAuth" }
 func (r *GQLMutationNoAuth) DefaultSeverity() rules.Severity { return rules.High }
 func (r *GQLMutationNoAuth) Description() string {
 	return "Detects GraphQL mutation definitions without authentication checks, allowing unauthenticated users to modify data."
@@ -351,16 +348,16 @@ func (r *GQLMutationNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if auth checks are present in the file
-	if reGQLAuthCheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reGQLAuthCheck, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reGQLMutation.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reGQLMutation, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
@@ -390,8 +387,8 @@ func (r *GQLMutationNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type GQLPersistedQueriesDisabled struct{}
 
-func (r *GQLPersistedQueriesDisabled) ID() string                     { return "BATOU-GQL-009" }
-func (r *GQLPersistedQueriesDisabled) Name() string                   { return "GQLPersistedQueriesDisabled" }
+func (r *GQLPersistedQueriesDisabled) ID() string                      { return "BATOU-GQL-009" }
+func (r *GQLPersistedQueriesDisabled) Name() string                    { return "GQLPersistedQueriesDisabled" }
 func (r *GQLPersistedQueriesDisabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GQLPersistedQueriesDisabled) Description() string {
 	return "Detects GraphQL configurations that explicitly disable persisted queries, allowing arbitrary queries from untrusted clients."
@@ -402,13 +399,13 @@ func (r *GQLPersistedQueriesDisabled) Languages() []rules.Language {
 
 func (r *GQLPersistedQueriesDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if loc := reGQLPersistedOff.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reGQLPersistedOff, line); loc != nil {
 			matched := line[loc[0]:loc[1]]
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
@@ -437,8 +434,8 @@ func (r *GQLPersistedQueriesDisabled) Scan(ctx *rules.ScanContext) []rules.Findi
 
 type GQLErrorDisclosure struct{}
 
-func (r *GQLErrorDisclosure) ID() string                     { return "BATOU-GQL-010" }
-func (r *GQLErrorDisclosure) Name() string                   { return "GQLErrorDisclosure" }
+func (r *GQLErrorDisclosure) ID() string                      { return "BATOU-GQL-010" }
+func (r *GQLErrorDisclosure) Name() string                    { return "GQLErrorDisclosure" }
 func (r *GQLErrorDisclosure) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *GQLErrorDisclosure) Description() string {
 	return "Detects GraphQL error formatting that exposes stack traces, internal error details, or original error messages to clients."
@@ -449,16 +446,16 @@ func (r *GQLErrorDisclosure) Languages() []rules.Language {
 
 func (r *GQLErrorDisclosure) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		matched := ""
-		if loc := reGQLDebugErrors.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reGQLDebugErrors, line); loc != nil {
 			matched = line[loc[0]:loc[1]]
-		} else if reGQLErrorDetail.MatchString(line) {
+		} else if rules.GMatch(reGQLErrorDetail, line) {
 			// Check if the error formatter returns stack traces
 			end := i + 10
 			if end > len(lines) {

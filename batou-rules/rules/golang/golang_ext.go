@@ -14,7 +14,6 @@ import (
 // GO-015: Unhandled error from security-critical function
 var (
 	reSecurityFuncCall = regexp.MustCompile(`\b(?:tls|crypto|auth|x509|cipher|aes|rsa|ecdsa|ed25519|hmac|sha256|sha512|bcrypt|scrypt|argon2|pbkdf2)\.`)
-	reErrIgnored       = regexp.MustCompile(`[^,\s]\s*=\s*(?:tls|crypto|auth|x509|cipher|aes|rsa|ecdsa|ed25519|hmac|sha256|sha512|bcrypt|scrypt|argon2|pbkdf2)\.`)
 	reBlankErrAssign   = regexp.MustCompile(`_\s*(?:,\s*_\s*)?=\s*(?:tls|crypto|auth|x509|cipher|aes|rsa|ecdsa|ed25519|hmac|sha256|sha512|bcrypt|scrypt|argon2|pbkdf2)\.`)
 )
 
@@ -28,7 +27,6 @@ var (
 // GO-017: Unsafe reflect.Value usage
 var (
 	reReflectMethodByName = regexp.MustCompile(`\.MethodByName\s*\(\s*[a-zA-Z_]\w*\s*\)`)
-	reReflectCall         = regexp.MustCompile(`\.Call\s*\(`)
 	reReflectFieldByName  = regexp.MustCompile(`reflect\.ValueOf\s*\([^)]+\)\s*\.\s*(?:MethodByName|FieldByName)\s*\(`)
 )
 
@@ -48,8 +46,6 @@ var (
 
 // GO-020: Unsafe use of unsafe.Pointer
 var (
-	reUnsafePointer     = regexp.MustCompile(`unsafe\.Pointer\s*\(`)
-	reUintptrConversion = regexp.MustCompile(`uintptr\s*\(\s*unsafe\.Pointer`)
 	rePointerArith      = regexp.MustCompile(`unsafe\.Pointer\s*\(\s*uintptr\s*\(`)
 )
 
@@ -57,6 +53,14 @@ var (
 var (
 	reForLoop        = regexp.MustCompile(`\bfor\s+(?:\{|.*;.*;)`)
 	reForRange       = regexp.MustCompile(`\bfor\s+.*range\b`)
+	// Tightening 2026-04-26: GO-021 was firing on every bounded range
+	// loop (`for _, x := range slice {`) in any file with a ctx param.
+	// 82 FPs in owncloud/ocis. Real concern is unbounded loops that
+	// don't yield to context cancellation — `for {`, `for ;;`,
+	// `for-select` patterns, range over channels. Bounded slice/map
+	// iteration is safe.
+	reForUnbounded     = regexp.MustCompile(`\bfor\s*\{|\bfor\s*;\s*;\s*\{`)
+	reForRangeChannel  = regexp.MustCompile(`\bfor\s+.*\brange\s+(?:<-|chan\b|\w*[Cc]hannel\b|\w*[Cc]h\b)`)
 	reCtxCheck       = regexp.MustCompile(`ctx\.(?:Done|Err|Deadline)\s*\(|select\s*\{|case\s*<-\s*ctx`)
 	reCtxParam       = regexp.MustCompile(`\bctx\s+context\.Context\b`)
 )
@@ -64,7 +68,6 @@ var (
 // GO-022: ResponseWriter used after handler returns
 var (
 	reGoWriteAfterReturn = regexp.MustCompile(`go\s+func\s*\([^)]*\)\s*\{[^}]*(?:w\.Write|w\.WriteHeader|w\.Header|fmt\.Fprint)`)
-	reDeferResp          = regexp.MustCompile(`\bdefer\s+.*(?:w\.Write|w\.WriteHeader|ResponseWriter)`)
 )
 
 // GO-023: Unbounded goroutine creation
@@ -90,9 +93,6 @@ var (
 
 // GO-026: os.Exec with unsanitized environment
 var (
-	reExecCmdEnv     = regexp.MustCompile(`exec\.Command\s*\([^)]*\)\s*\.\s*Env\s*=`)
-	reExecEnvAppend  = regexp.MustCompile(`\.Env\s*=\s*append\s*\(\s*os\.Environ\s*\(\s*\)`)
-	reExecCmdRun     = regexp.MustCompile(`exec\.Command\s*\(`)
 	reExecCmdUserVar = regexp.MustCompile(`exec\.Command\s*\(\s*(?:r\.(?:URL\.Query|FormValue|PostFormValue|Header\.Get)|(?:c|ctx)\.(?:Query|Param|QueryParam|FormValue))\s*\(`)
 )
 
@@ -127,16 +127,16 @@ func (r *UnhandledSecurityError) Languages() []rules.Language { return []rules.L
 
 func (r *UnhandledSecurityError) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if !reSecurityFuncCall.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reSecurityFuncCall, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reBlankErrAssign.FindString(line); m != "" {
+		if m := rules.GFind(reBlankErrAssign, line); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -179,18 +179,18 @@ func (r *SQLXInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "sqlx") && !strings.Contains(ctx.Content, "NamedExec") && !strings.Contains(ctx.Content, "NamedQuery") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
 		var matched string
-		if m := reSQLXNamedFmt.FindString(line); m != "" {
+		if m := rules.GFind(reSQLXNamedFmt, line); m != "" {
 			matched = m
-		} else if m := reSQLXNamedConcat.FindString(line); m != "" {
+		} else if m := rules.GFind(reSQLXNamedConcat, line); m != "" {
 			matched = m
-		} else if m := reSQLXGetConcat.FindString(line); m != "" {
+		} else if m := rules.GFind(reSQLXGetConcat, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -235,16 +235,16 @@ func (r *UnsafeReflect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "reflect") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
 		var matched string
-		if m := reReflectMethodByName.FindString(line); m != "" {
+		if m := rules.GFind(reReflectMethodByName, line); m != "" {
 			matched = m
-		} else if m := reReflectFieldByName.FindString(line); m != "" {
+		} else if m := rules.GFind(reReflectFieldByName, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -286,19 +286,19 @@ func (r *NetDialNoTimeout) Languages() []rules.Language { return []rules.Languag
 
 func (r *NetDialNoTimeout) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if reDialTimeout.MatchString(ctx.Content) || reDialerTimeout.MatchString(ctx.Content) {
+	if rules.GMatchFile(reDialTimeout, ctx) || rules.GMatchFile(reDialerTimeout, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
 		var matched string
-		if m := reNetDial.FindString(line); m != "" {
+		if m := rules.GFind(reNetDial, line); m != "" {
 			matched = m
-		} else if m := reNetDialTLS.FindString(line); m != "" {
+		} else if m := rules.GFind(reNetDialTLS, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -340,16 +340,16 @@ func (r *WeakFilePerms) Languages() []rules.Language { return []rules.Language{r
 
 func (r *WeakFilePerms) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
 		var matched string
-		if m := reWriteFilePerm666.FindString(line); m != "" {
+		if m := rules.GFind(reWriteFilePerm666, line); m != "" {
 			matched = m
-		} else if m := reOpenFilePerm666.FindString(line); m != "" {
+		} else if m := rules.GFind(reOpenFilePerm666, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -394,13 +394,13 @@ func (r *UnsafePointerUse) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "unsafe.Pointer") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := rePointerArith.FindString(line); m != "" {
+		if m := rules.GFind(rePointerArith, line); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -440,19 +440,19 @@ func (r *ContextNotChecked) Languages() []rules.Language { return []rules.Langua
 
 func (r *ContextNotChecked) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if !reCtxParam.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reCtxParam, ctx) {
 		return nil
 	}
-	if reCtxCheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reCtxCheck, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reForLoop.MatchString(line) || reForRange.MatchString(line) {
+		if rules.GMatch(reForUnbounded, line) || rules.GMatch(reForRangeChannel, line) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -493,16 +493,16 @@ func (r *ResponseWriterRace) Languages() []rules.Language { return []rules.Langu
 
 func (r *ResponseWriterRace) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if !isInHTTPHandler(ctx.Content) {
+	if !isInHTTPHandler(ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reGoWriteAfterReturn.FindString(line); m != "" {
+		if m := rules.GFind(reGoWriteAfterReturn, line); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -542,20 +542,20 @@ func (r *UnboundedGoroutine) Description() string {
 
 func (r *UnboundedGoroutine) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if reSemaphore.MatchString(ctx.Content) {
+	if rules.GMatchFile(reSemaphore, ctx) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	inLoop := false
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reForLoop.MatchString(line) || reForRange.MatchString(line) {
+		if rules.GMatch(reForLoop, line) || rules.GMatch(reForRange, line) {
 			inLoop = true
 		}
-		if inLoop && reGoInLoop.MatchString(line) {
+		if inLoop && rules.GMatch(reGoInLoop, line) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -599,19 +599,19 @@ func (r *SSRFDefaultClient) Languages() []rules.Language { return []rules.Langua
 
 func (r *SSRFDefaultClient) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	if reHTTPClientConfig.MatchString(ctx.Content) && reCheckRedirect.MatchString(ctx.Content) {
+	if rules.GMatchFile(reHTTPClientConfig, ctx) && rules.GMatchFile(reCheckRedirect, ctx) {
 		return nil
 	}
-	if !hasNearbyUserInput(strings.Split(ctx.Content, "\n"), 0, len(strings.Split(ctx.Content, "\n"))) {
+	if !hasNearbyUserInput(ctx.SplitLines(), 0, len(ctx.SplitLines())) {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reHTTPDefaultClient.FindString(line); m != "" {
+		if m := rules.GFind(reHTTPDefaultClient, line); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -654,7 +654,7 @@ func (r *GRPCWithoutTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "grpc") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
@@ -662,13 +662,13 @@ func (r *GRPCWithoutTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 		var matched string
 		var desc string
-		if m := reGRPCDialInsecure.FindString(line); m != "" {
+		if m := rules.GFind(reGRPCDialInsecure, line); m != "" {
 			matched = m
 			desc = "grpc.Dial with grpc.WithInsecure() (deprecated, plaintext)"
-		} else if m := reGRPCDialNoTransport.FindString(line); m != "" {
+		} else if m := rules.GFind(reGRPCDialNoTransport, line); m != "" {
 			matched = m
 			desc = "gRPC client with insecure.NewCredentials() (plaintext)"
-		} else if reGRPCNewServerNoTLS.MatchString(line) && !reGRPCServerCreds.MatchString(ctx.Content) {
+		} else if rules.GMatch(reGRPCNewServerNoTLS, line) && !rules.GMatchFile(reGRPCServerCreds, ctx) {
 			matched = strings.TrimSpace(line)
 			desc = "gRPC server without TLS credentials"
 		}
@@ -714,13 +714,13 @@ func (r *ExecUnsanitizedEnv) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.Content, "exec.Command") {
 		return nil
 	}
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reExecCmdUserVar.FindString(line); m != "" {
+		if m := rules.GFind(reExecCmdUserVar, line); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

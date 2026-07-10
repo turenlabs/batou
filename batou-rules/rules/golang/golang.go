@@ -38,14 +38,12 @@ var (
 var (
 	reGinBind       = regexp.MustCompile(`\.(?:Bind|BindJSON|BindXML|BindQuery|BindYAML|BindHeader|BindUri|ShouldBind|ShouldBindJSON|ShouldBindXML|ShouldBindQuery|ShouldBindYAML|ShouldBindHeader|ShouldBindUri)\s*\(`)
 	reGinValidate   = regexp.MustCompile(`(?i)(?:validate|validator|binding:"[^"]*required)`)
-	reEchoBind      = regexp.MustCompile(`\.\s*Bind\s*\(\s*&`)
 	reEchoValidate  = regexp.MustCompile(`(?i)(?:validate|validator|Validate\s*\()`)
 )
 
 // GO-005: filepath.Clean traversal
 var (
 	reFilepathJoin      = regexp.MustCompile(`filepath\.Join\s*\(`)
-	reFilepathClean     = regexp.MustCompile(`filepath\.Clean\s*\(`)
 	reHasPrefix         = regexp.MustCompile(`strings\.HasPrefix\s*\(`)
 	reUserInputHTTP     = regexp.MustCompile(`r\.(?:URL\.Query|FormValue|PostFormValue|Header\.Get|PathValue)\s*\(|mux\.Vars|chi\.URLParam|c\.(?:Param|Query|DefaultQuery|PostForm)|ctx\.(?:Param|QueryParam|FormValue)`)
 )
@@ -67,7 +65,6 @@ var (
 
 // GO-008: Race condition in HTTP handler
 var (
-	rePackageVarAssign = regexp.MustCompile(`^\s*var\s+\w+\s`)
 	reGlobalMapAccess  = regexp.MustCompile(`\b(cache|store|counter|count|visitors|sessions|connections|state|data|registry|handlers|routes)\s*\[`)
 	reMutexUsage       = regexp.MustCompile(`(?i)(?:sync\.(?:Mutex|RWMutex)|\.Lock\(\)|\.RLock\(\)|\.Unlock\(\)|\.RUnlock\(\)|sync\.Map|atomic\.)`)
 )
@@ -88,9 +85,7 @@ var (
 
 // GO-011: Hardcoded JWT secret
 var (
-	reJWTNewWithClaims = regexp.MustCompile(`jwt\.(?:NewWithClaims|New)\s*\(`)
 	reJWTSigningKey    = regexp.MustCompile(`\.(?:SignedString|SigningKey)\s*\(\s*\[\]byte\s*\(\s*["']`)
-	reJWTParseKey      = regexp.MustCompile(`jwt\.Parse\s*\([^,]+,\s*func`)
 	reJWTKeyLiteral    = regexp.MustCompile(`\[\]byte\s*\(\s*["'][^"']{4,}["']\s*\)`)
 	reJWTKeyVariable   = regexp.MustCompile(`(?i)(jwt_secret|jwt_key|signing_key|token_secret|jwtSecret|signingKey|tokenSecret)\s*[:=]\s*["'][^"']{4,}["']`)
 )
@@ -105,11 +100,8 @@ var (
 
 // GO-013: Gin/Echo trusted proxy misconfiguration
 var (
-	reGinTrustAllProxies   = regexp.MustCompile(`\.TrustedPlatform\s*=\s*""`)
 	reGinSetTrustedProxies = regexp.MustCompile(`\.SetTrustedProxies\s*\(\s*nil\s*\)`)
-	reGinForwardedByClient = regexp.MustCompile(`\.ForwardedByClientIP\s*=\s*true`)
 	reEchoIPExtractor      = regexp.MustCompile(`IPExtractor\s*=\s*echo\.ExtractIPFromXFFHeader`)
-	reGinNoTrustedProxies  = regexp.MustCompile(`SetTrustedProxies`)
 )
 
 // GO-014: Unsafe HTTP response (writing user input without Content-Type)
@@ -175,7 +167,7 @@ func hasNearbyUserInput(lines []string, idx, window int) bool {
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if reUserInputHTTP.MatchString(l) {
+		if rules.GMatch(reUserInputHTTP, l) {
 			return true
 		}
 	}
@@ -183,8 +175,10 @@ func hasNearbyUserInput(lines []string, idx, window int) bool {
 }
 
 // isInHTTPHandler checks if context suggests an HTTP handler function.
-func isInHTTPHandler(content string) bool {
-	return reHTTPHandlerSig.MatchString(content)
+// The whole-file regex is gated by the fold-aware file pre-gate so it only runs
+// on files whose lowercased content can contain the handler signature.
+func isInHTTPHandler(ctx *rules.ScanContext) bool {
+	return rules.GMatchFile(reHTTPHandlerSig, ctx)
 }
 
 // isLocalOrParamVar checks if varName is a function parameter or local variable
@@ -223,7 +217,7 @@ func (r *GORMSQLInjection) Languages() []rules.Language     { return []rules.Lan
 
 func (r *GORMSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -241,7 +235,7 @@ func (r *GORMSQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -277,7 +271,7 @@ func (r *TemplateHTMLBypass) Languages() []rules.Language     { return []rules.L
 
 func (r *TemplateHTMLBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -297,9 +291,9 @@ func (r *TemplateHTMLBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				// Skip if the argument is a string literal (safe)
-				if reTemplateTypeLiteral.MatchString(line) {
+				if rules.GMatch(reTemplateTypeLiteral, line) {
 					continue
 				}
 				confidence := "medium"
@@ -343,17 +337,17 @@ func (r *ListenAndServeNoTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if TLS is configured elsewhere in the file
-	if reListenAndServeTLS.MatchString(ctx.Content) || reTLSConfig.MatchString(ctx.Content) {
+	if rules.GMatchFile(reListenAndServeTLS, ctx) || rules.GMatchFile(reTLSConfig, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if loc := reListenAndServe.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reListenAndServe, line); loc != nil {
 			// Skip if binding to localhost only
 			if strings.Contains(line, `"localhost:`) || strings.Contains(line, `"127.0.0.1:`) || strings.Contains(line, `":0"`) {
 				continue
@@ -393,17 +387,17 @@ func (r *BindWithoutValidation) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if validation is used in the file
-	if reGinValidate.MatchString(ctx.Content) || reEchoValidate.MatchString(ctx.Content) {
+	if rules.GMatchFile(reGinValidate, ctx) || rules.GMatchFile(reEchoValidate, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if loc := reGinBind.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reGinBind, line); loc != nil {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -439,17 +433,17 @@ func (r *FilepathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if HasPrefix check is present (proper mitigation)
-	if reHasPrefix.MatchString(ctx.Content) {
+	if rules.GMatchFile(reHasPrefix, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reFilepathJoin.MatchString(line) && hasNearbyUserInput(lines, i, 10) {
+		if rules.GMatch(reFilepathJoin, line) && hasNearbyUserInput(lines, i, 10) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -485,18 +479,18 @@ func (r *MathRandCrypto) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only applies if math/rand is imported
-	if !reGoMathRandImport.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reGoMathRandImport, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if loc := reGoRandCryptoUse.FindStringIndex(line); loc != nil {
-			if reGoCryptoContext.MatchString(line) || reGoCryptoContext.MatchString(surroundingContext(lines, i, 5)) {
+		if loc := rules.GFindIndex(reGoRandCryptoUse, line); loc != nil {
+			if rules.GMatch(reGoCryptoContext, line) || reGoCryptoContext.MatchString(surroundingContext(lines, i, 5)) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -533,25 +527,25 @@ func (r *GoroutineLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only flag in HTTP handlers
-	if !isInHTTPHandler(ctx.Content) {
+	if !isInHTTPHandler(ctx) {
 		return nil
 	}
 
 	// Skip if context cancellation patterns are present
-	if reContextDone.MatchString(ctx.Content) {
+	if rules.GMatchFile(reContextDone, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		var matched string
-		if loc := reGoFuncInHandler.FindString(line); loc != "" {
+		if loc := rules.GFind(reGoFuncInHandler, line); loc != "" {
 			matched = loc
-		} else if loc := reGoFuncNamed.FindString(line); loc != "" {
+		} else if loc := rules.GFind(reGoFuncNamed, line); loc != "" {
 			// Avoid matching "go build", "go test", etc. in strings
 			if !strings.Contains(line, `"go `) && !strings.Contains(line, "'go ") {
 				matched = loc
@@ -594,24 +588,24 @@ func (r *RaceConditionHandler) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Only flag in HTTP handler contexts
-	if !isInHTTPHandler(ctx.Content) {
+	if !isInHTTPHandler(ctx) {
 		return nil
 	}
 
 	// Skip if synchronization primitives are used
-	if reMutexUsage.MatchString(ctx.Content) {
+	if rules.GMatchFile(reMutexUsage, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if loc := reGlobalMapAccess.FindStringIndex(line); loc != nil {
+		if loc := rules.GFindIndex(reGlobalMapAccess, line); loc != nil {
 			// Extract matched variable name and skip if it's a function parameter or local variable
-			if match := reGlobalMapAccess.FindStringSubmatch(line); len(match) > 1 {
+			if match := rules.GFindSubmatch(reGlobalMapAccess, line); len(match) > 1 {
 				if isLocalOrParamVar(lines, i, match[1]) {
 					continue
 				}
@@ -649,7 +643,7 @@ func (r *UnvalidatedRedirect) Languages() []rules.Language     { return []rules.
 
 func (r *UnvalidatedRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -667,7 +661,7 @@ func (r *UnvalidatedRedirect) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -705,20 +699,20 @@ func (r *MissingCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// Skip if CSRF middleware is present anywhere in the file
-	if reCSRFMiddleware.MatchString(ctx.Content) {
+	if rules.GMatchFile(reCSRFMiddleware, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reFormHandler.MatchString(line) {
+		if rules.GMatch(reFormHandler, line) {
 			// Check if the handler parses form data
 			context := surroundingContext(lines, i, 15)
-			if reFormParse.MatchString(context) {
+			if rules.GMatch(reFormParse, context) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -759,7 +753,7 @@ func (r *HardcodedJWTSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -769,13 +763,13 @@ func (r *HardcodedJWTSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched bool
 		var desc string
 
-		if reJWTSigningKey.MatchString(line) {
+		if rules.GMatch(reJWTSigningKey, line) {
 			matched = true
 			desc = "JWT SignedString with hardcoded []byte key"
-		} else if reJWTKeyVariable.MatchString(line) {
+		} else if rules.GMatch(reJWTKeyVariable, line) {
 			matched = true
 			desc = "JWT secret assigned as string literal"
-		} else if reJWTKeyLiteral.MatchString(line) {
+		} else if rules.GMatch(reJWTKeyLiteral, line) {
 			// Only flag []byte("literal") near JWT context
 			context := surroundingContext(lines, i, 5)
 			if strings.Contains(context, "jwt") || strings.Contains(context, "JWT") || strings.Contains(context, "SignedString") || strings.Contains(context, "token") {
@@ -818,7 +812,7 @@ func (r *PermissiveFileMode) Languages() []rules.Language     { return []rules.L
 
 func (r *PermissiveFileMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	type pattern struct {
 		re   *regexp.Regexp
@@ -837,7 +831,7 @@ func (r *PermissiveFileMode) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, p := range patterns {
-			if loc := p.re.FindStringIndex(line); loc != nil {
+			if loc := rules.GFindIndex(p.re, line); loc != nil {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -873,7 +867,7 @@ func (r *TrustedProxyMisconfig) Languages() []rules.Language     { return []rule
 
 func (r *TrustedProxyMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -883,10 +877,10 @@ func (r *TrustedProxyMisconfig) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched bool
 		var desc string
 
-		if reGinSetTrustedProxies.MatchString(line) {
+		if rules.GMatch(reGinSetTrustedProxies, line) {
 			matched = true
 			desc = "Gin SetTrustedProxies(nil) trusts all proxies"
-		} else if reEchoIPExtractor.MatchString(line) {
+		} else if rules.GMatch(reEchoIPExtractor, line) {
 			// Echo: extracting IP from X-Forwarded-For without trusted proxy config
 			matched = true
 			desc = "Echo ExtractIPFromXFFHeader trusts all X-Forwarded-For values"
@@ -926,7 +920,7 @@ func (r *UnsafeHTTPResponse) Languages() []rules.Language     { return []rules.L
 
 func (r *UnsafeHTTPResponse) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isComment(line) {
@@ -936,10 +930,10 @@ func (r *UnsafeHTTPResponse) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched bool
 		var desc string
 
-		if reResponseWrite.MatchString(line) {
+		if rules.GMatch(reResponseWrite, line) {
 			matched = true
 			desc = "w.Write() with user input"
-		} else if reFprintfResponse.MatchString(line) {
+		} else if rules.GMatch(reFprintfResponse, line) {
 			matched = true
 			desc = "fmt.Fprintf(w, ...) with user input"
 		}
@@ -950,7 +944,7 @@ func (r *UnsafeHTTPResponse) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Suppress if Content-Type is set nearby (proper mitigation)
 		context := surroundingContext(lines, i, 5)
-		if reSetContentType.MatchString(context) {
+		if rules.GMatch(reSetContentType, context) {
 			continue
 		}
 

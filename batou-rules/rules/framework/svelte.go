@@ -16,10 +16,10 @@ var (
 	reSvelteHtmlTag = regexp.MustCompile(`\{@html\s+`)
 
 	// BATOU-FW-SVELTE-002: SvelteKit load function exposing secrets
-	reSvelteLoadFunction    = regexp.MustCompile(`export\s+(?:async\s+)?function\s+load\s*\(`)
-	reSvelteLoadArrow       = regexp.MustCompile(`export\s+const\s+load\s*[=:]\s*(?:async\s*)?\(`)
-	reSvelteSecretPattern   = regexp.MustCompile(`(?i)(?:process\.env\.|import\.meta\.env\.)(?:SECRET|PRIVATE|API_KEY|DATABASE|DB_|TOKEN|PASSWORD|AUTH)`)
-	reSveltePrivateEnv      = regexp.MustCompile(`\$env/static/private|\$env/dynamic/private`)
+	reSvelteLoadFunction  = regexp.MustCompile(`export\s+(?:async\s+)?function\s+load\s*\(`)
+	reSvelteLoadArrow     = regexp.MustCompile(`export\s+const\s+load\s*[=:]\s*(?:async\s*)?\(`)
+	reSvelteSecretPattern = regexp.MustCompile(`(?i)(?:process\.env\.|import\.meta\.env\.)(?:SECRET|PRIVATE|API_KEY|DATABASE|DB_|TOKEN|PASSWORD|AUTH)`)
+	reSveltePrivateEnv    = regexp.MustCompile(`\$env/static/private|\$env/dynamic/private`)
 
 	// BATOU-FW-SVELTE-003: SvelteKit form action without CSRF
 	reSvelteFormAction = regexp.MustCompile(`export\s+const\s+actions\s*[=:]`)
@@ -63,14 +63,15 @@ func (r *SvelteHtmlTag) Languages() []rules.Language {
 
 func (r *SvelteHtmlTag) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "#") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") || strings.HasPrefix(t, "<!--") {
 			continue
 		}
-		if m := reSvelteHtmlTag.FindString(line); m != "" {
+		if m := rules.GFindLower(reSvelteHtmlTag, line, lowered[i]); m != "" {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -114,20 +115,21 @@ func (r *SvelteLoadSecrets) Languages() []rules.Language {
 
 func (r *SvelteLoadSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 	// Only check files that contain a load function
-	hasLoad := reSvelteLoadFunction.MatchString(ctx.Content) || reSvelteLoadArrow.MatchString(ctx.Content)
+	hasLoad := rules.GMatchFile(reSvelteLoadFunction, ctx) || rules.GMatchFile(reSvelteLoadArrow, ctx)
 	if !hasLoad {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reSvelteSecretPattern.MatchString(line) || (reSveltePrivateEnv.MatchString(line) && strings.Contains(ctx.FilePath, "+page.")) {
+		if rules.GMatchLower(reSvelteSecretPattern, line, lowered[i]) || (rules.GMatchLower(reSveltePrivateEnv, line, lowered[i]) && strings.Contains(ctx.FilePath, "+page.")) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -171,7 +173,8 @@ func (r *SvelteFormCSRF) Languages() []rules.Language {
 
 func (r *SvelteFormCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if CSRF check is disabled in svelte config
 	hasCSRFDisable := strings.Contains(ctx.Content, "csrf") && (strings.Contains(ctx.Content, "false") || strings.Contains(ctx.Content, "checkOrigin"))
@@ -181,7 +184,7 @@ func (r *SvelteFormCSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reSvelteFormAction.MatchString(line) && hasCSRFDisable {
+		if rules.GMatchLower(reSvelteFormAction, line, lowered[i]) && hasCSRFDisable {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -237,14 +240,15 @@ func (r *SvelteAPINoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reSvelteApiHandler.FindString(line); m != "" {
+		if m := rules.GFindLower(reSvelteApiHandler, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -288,14 +292,15 @@ func (r *SvelteStoreSensitive) Languages() []rules.Language {
 
 func (r *SvelteStoreSensitive) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reSvelteWritableStore.MatchString(line) && reSvelteStoreSensitive.MatchString(line) {
+		if rules.GMatchLower(reSvelteWritableStore, line, lowered[i]) && rules.GMatchLower(reSvelteStoreSensitive, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -339,14 +344,15 @@ func (r *SvelteEnvLeak) Languages() []rules.Language {
 
 func (r *SvelteEnvLeak) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reSveltePublicEnvImport.MatchString(line) && reSvelteEnvSensitive.MatchString(line) {
+		if rules.GMatchLower(reSveltePublicEnvImport, line, lowered[i]) && rules.GMatchLower(reSvelteEnvSensitive, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."

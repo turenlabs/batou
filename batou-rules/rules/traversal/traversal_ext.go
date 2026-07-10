@@ -13,7 +13,6 @@ import (
 
 var (
 	// BATOU-TRV-011: Zip slip vulnerability (archive extraction)
-	reExtZipSlipGo     = regexp.MustCompile(`(?:zip\.File|tar\.Header|zip\.Reader|tar\.Reader)`)
 	reExtZipSlipCreate = regexp.MustCompile(`(?:os\.Create|os\.OpenFile|os\.MkdirAll|ioutil\.WriteFile)\s*\([^)]*(?:\.Name\b|header\.Name|entry|f\.Name|file\.Name)`)
 	reExtZipSlipJava   = regexp.MustCompile(`(?:ZipEntry|TarArchiveEntry|JarEntry)\s*.*(?:getName|getPath)\s*\(`)
 	reExtZipSlipPy     = regexp.MustCompile(`\.(?:extractall|extract)\s*\([^)]*\)`)
@@ -31,8 +30,8 @@ var (
 	reExtTemplateInclude = regexp.MustCompile(`(?i)(?:include|require|require_once|include_once|load|render)\s*[\(]?\s*(?:\$(?:_GET|_POST|_REQUEST)|req\.(?:query|params|body)|request\.(?:GET|POST|args|form)|params\[)`)
 
 	// BATOU-TRV-015: Directory listing enabled
-	reExtDirListing     = regexp.MustCompile(`(?i)(?:express\.static|serveStatic|directory_listing|autoindex\s+on|Options\s+\+?Indexes|DirectoryIndex|enable_dir_listing|browse\s*=\s*true|list_?directory|FancyIndexing)`)
-	reExtDirListingPy   = regexp.MustCompile(`(?i)(?:send_from_directory|SimpleHTTPServer|http\.server|directory_listing\s*=\s*True)`)
+	reExtDirListing   = regexp.MustCompile(`(?i)(?:express\.static|serveStatic|directory_listing|autoindex\s+on|Options\s+\+?Indexes|DirectoryIndex|enable_dir_listing|browse\s*=\s*true|list_?directory|FancyIndexing)`)
+	reExtDirListingPy = regexp.MustCompile(`(?i)(?:send_from_directory|SimpleHTTPServer|http\.server|directory_listing\s*=\s*True)`)
 
 	// BATOU-TRV-016: Absolute path traversal (user controls full path)
 	reExtAbsPathTraversal = regexp.MustCompile(`(?i)(?:os\.(?:Open|ReadFile|Create|Remove)|ioutil\.ReadFile|fs\.(?:readFile|writeFile|readFileSync|writeFileSync)|open|fopen|file_get_contents|File\.(?:read|open|write))\s*\(\s*(?:req\.(?:query|params|body)\s*[\[.]|request\.(?:GET|POST|args|form)\s*[\[.]|params\[|\$_(?:GET|POST|REQUEST)\[)`)
@@ -66,8 +65,8 @@ func init() {
 
 type ZipSlipExt struct{}
 
-func (r *ZipSlipExt) ID() string                     { return "BATOU-TRV-011" }
-func (r *ZipSlipExt) Name() string                   { return "ZipSlipExt" }
+func (r *ZipSlipExt) ID() string                      { return "BATOU-TRV-011" }
+func (r *ZipSlipExt) Name() string                    { return "ZipSlipExt" }
 func (r *ZipSlipExt) DefaultSeverity() rules.Severity { return rules.High }
 func (r *ZipSlipExt) Description() string {
 	return "Detects archive extraction patterns without path validation that may allow zip-slip attacks."
@@ -78,7 +77,8 @@ func (r *ZipSlipExt) Languages() []rules.Language {
 
 func (r *ZipSlipExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
@@ -87,19 +87,19 @@ func (r *ZipSlipExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		switch ctx.Language {
 		case rules.LangGo:
-			if m := reExtZipSlipCreate.FindString(line); m != "" {
+			if m := rules.GFindLower(reExtZipSlipCreate, line, lowered[i]); m != "" {
 				if !hasTraversalGuard(lines, i) {
 					matched = m
 				}
 			}
 		case rules.LangJava:
-			if m := reExtZipSlipJava.FindString(line); m != "" {
+			if m := rules.GFindLower(reExtZipSlipJava, line, lowered[i]); m != "" {
 				if !hasZipSlipValidation(lines, i) {
 					matched = m
 				}
 			}
 		case rules.LangPython:
-			if m := reExtZipSlipPy.FindString(line); m != "" {
+			if m := rules.GFindLower(reExtZipSlipPy, line, lowered[i]); m != "" {
 				if !strings.Contains(line, "members=") && !strings.Contains(line, "filter=") {
 					if !hasTraversalGuard(lines, i) {
 						matched = m
@@ -107,7 +107,7 @@ func (r *ZipSlipExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if m := reExtZipSlipJS.FindString(line); m != "" {
+			if m := rules.GFindLower(reExtZipSlipJS, line, lowered[i]); m != "" {
 				if strings.Contains(line, "write") || strings.Contains(line, "create") || strings.Contains(line, "path.join") {
 					if !hasTraversalGuard(lines, i) {
 						matched = m
@@ -143,8 +143,8 @@ func (r *ZipSlipExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type URLEncodedTraversal struct{}
 
-func (r *URLEncodedTraversal) ID() string                     { return "BATOU-TRV-012" }
-func (r *URLEncodedTraversal) Name() string                   { return "URLEncodedTraversal" }
+func (r *URLEncodedTraversal) ID() string                      { return "BATOU-TRV-012" }
+func (r *URLEncodedTraversal) Name() string                    { return "URLEncodedTraversal" }
 func (r *URLEncodedTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *URLEncodedTraversal) Description() string {
 	return "Detects URL-encoded path traversal sequences (%2e%2e) or URL decoding followed by file operations."
@@ -155,13 +155,14 @@ func (r *URLEncodedTraversal) Languages() []rules.Language {
 
 func (r *URLEncodedTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtURLEncodedTraversal.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtURLEncodedTraversal, line, lowered[i]); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -180,7 +181,7 @@ func (r *URLEncodedTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 		// Also detect URL decoding followed by file I/O
-		if m := reExtDecodeURI.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtDecodeURI, line, lowered[i]); m != "" {
 			// Check if file operations follow nearby
 			end := i + 10
 			if end > len(lines) {
@@ -222,8 +223,8 @@ func (r *URLEncodedTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SymlinkFollowingExt struct{}
 
-func (r *SymlinkFollowingExt) ID() string                     { return "BATOU-TRV-013" }
-func (r *SymlinkFollowingExt) Name() string                   { return "SymlinkFollowingExt" }
+func (r *SymlinkFollowingExt) ID() string                      { return "BATOU-TRV-013" }
+func (r *SymlinkFollowingExt) Name() string                    { return "SymlinkFollowingExt" }
 func (r *SymlinkFollowingExt) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *SymlinkFollowingExt) Description() string {
 	return "Detects symlink resolution without subsequent path validation, which may allow symlink-based file access attacks."
@@ -234,13 +235,14 @@ func (r *SymlinkFollowingExt) Languages() []rules.Language {
 
 func (r *SymlinkFollowingExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtSymlinkFollow.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtSymlinkFollow, line, lowered[i]); m != "" {
 			// Check if validation follows
 			end := i + 10
 			if end > len(lines) {
@@ -277,8 +279,8 @@ func (r *SymlinkFollowingExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TemplateIncludeTraversal struct{}
 
-func (r *TemplateIncludeTraversal) ID() string                     { return "BATOU-TRV-014" }
-func (r *TemplateIncludeTraversal) Name() string                   { return "TemplateIncludeTraversal" }
+func (r *TemplateIncludeTraversal) ID() string                      { return "BATOU-TRV-014" }
+func (r *TemplateIncludeTraversal) Name() string                    { return "TemplateIncludeTraversal" }
 func (r *TemplateIncludeTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TemplateIncludeTraversal) Description() string {
 	return "Detects file include/require operations with user-controlled paths, enabling Local File Inclusion (LFI)."
@@ -289,13 +291,14 @@ func (r *TemplateIncludeTraversal) Languages() []rules.Language {
 
 func (r *TemplateIncludeTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtTemplateInclude.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtTemplateInclude, line, lowered[i]); m != "" {
 			if hasTraversalGuard(lines, i) {
 				continue
 			}
@@ -330,8 +333,8 @@ func (r *TemplateIncludeTraversal) Scan(ctx *rules.ScanContext) []rules.Finding 
 
 type DirectoryListingEnabled struct{}
 
-func (r *DirectoryListingEnabled) ID() string                     { return "BATOU-TRV-015" }
-func (r *DirectoryListingEnabled) Name() string                   { return "DirectoryListingEnabled" }
+func (r *DirectoryListingEnabled) ID() string                      { return "BATOU-TRV-015" }
+func (r *DirectoryListingEnabled) Name() string                    { return "DirectoryListingEnabled" }
 func (r *DirectoryListingEnabled) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DirectoryListingEnabled) Description() string {
 	return "Detects web server configuration that enables directory listing, exposing file structure to attackers."
@@ -342,17 +345,25 @@ func (r *DirectoryListingEnabled) Languages() []rules.Language {
 
 func (r *DirectoryListingEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
 		var matched string
-		if m := reExtDirListing.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtDirListing, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reExtDirListingPy.FindString(line); m != "" {
-			matched = m
+		} else if ctx.Language == rules.LangPython {
+			// reExtDirListingPy uses (?i) and includes `http\.server`
+			// (Python's stdlib module). With case-insensitive matching,
+			// it collides with Go's `http.Server{}` struct constructor
+			// (capitalized) — produced 65 FPs in owncloud/ocis. Gate
+			// the Python-specific regex to Python files only.
+			if m := rules.GFindLower(reExtDirListingPy, line, lowered[i]); m != "" {
+				matched = m
+			}
 		}
 		if matched != "" {
 			if len(matched) > 120 {
@@ -385,8 +396,8 @@ func (r *DirectoryListingEnabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type AbsolutePathTraversal struct{}
 
-func (r *AbsolutePathTraversal) ID() string                     { return "BATOU-TRV-016" }
-func (r *AbsolutePathTraversal) Name() string                   { return "AbsolutePathTraversal" }
+func (r *AbsolutePathTraversal) ID() string                      { return "BATOU-TRV-016" }
+func (r *AbsolutePathTraversal) Name() string                    { return "AbsolutePathTraversal" }
 func (r *AbsolutePathTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *AbsolutePathTraversal) Description() string {
 	return "Detects file operations where the full path comes from user input, enabling absolute path traversal."
@@ -397,13 +408,14 @@ func (r *AbsolutePathTraversal) Languages() []rules.Language {
 
 func (r *AbsolutePathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtAbsPathTraversal.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtAbsPathTraversal, line, lowered[i]); m != "" {
 			if hasTraversalGuard(lines, i) {
 				continue
 			}
@@ -438,8 +450,8 @@ func (r *AbsolutePathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type NullByteTraversal struct{}
 
-func (r *NullByteTraversal) ID() string                     { return "BATOU-TRV-017" }
-func (r *NullByteTraversal) Name() string                   { return "NullByteTraversal" }
+func (r *NullByteTraversal) ID() string                      { return "BATOU-TRV-017" }
+func (r *NullByteTraversal) Name() string                    { return "NullByteTraversal" }
 func (r *NullByteTraversal) DefaultSeverity() rules.Severity { return rules.High }
 func (r *NullByteTraversal) Description() string {
 	return "Detects null byte sequences in file paths that can truncate file extensions and bypass validation."
@@ -450,15 +462,16 @@ func (r *NullByteTraversal) Languages() []rules.Language {
 
 func (r *NullByteTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtNullByteInPath.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtNullByteInPath, line, lowered[i]); m != "" {
 			// Only flag if near file operations
-			if reExtFileOpWithInput.MatchString(line) || hasUserInputIndicator(lines, i) {
+			if rules.GMatchLower(reExtFileOpWithInput, line, lowered[i]) || hasUserInputIndicator(lines, i) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -487,8 +500,8 @@ func (r *NullByteTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnsafeFileServe struct{}
 
-func (r *UnsafeFileServe) ID() string                     { return "BATOU-TRV-018" }
-func (r *UnsafeFileServe) Name() string                   { return "UnsafeFileServe" }
+func (r *UnsafeFileServe) ID() string                      { return "BATOU-TRV-018" }
+func (r *UnsafeFileServe) Name() string                    { return "UnsafeFileServe" }
 func (r *UnsafeFileServe) DefaultSeverity() rules.Severity { return rules.High }
 func (r *UnsafeFileServe) Description() string {
 	return "Detects file serving functions (sendFile, download, send_file) with user-controlled paths."
@@ -499,13 +512,14 @@ func (r *UnsafeFileServe) Languages() []rules.Language {
 
 func (r *UnsafeFileServe) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if isComment(trimmed) {
 			continue
 		}
-		if m := reExtUnsafeServe.FindString(line); m != "" {
+		if m := rules.GFindLower(reExtUnsafeServe, line, lowered[i]); m != "" {
 			if hasTraversalGuard(lines, i) {
 				continue
 			}

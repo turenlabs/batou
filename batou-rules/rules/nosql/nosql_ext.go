@@ -13,7 +13,6 @@ import (
 
 var (
 	// BATOU-NOSQL-004: MongoDB $where with user input
-	reExtMongoWhere      = regexp.MustCompile(`(?i)\$where\s*['":]`)
 	reExtMongoWhereConcat = regexp.MustCompile(`(?i)['"]\$where['"]\s*(?::|=>)\s*(?:[^"'\n]*\+|[^"'\n]*\$\{|f["']|[^"'\n]*\.format|[^"'\n]*%\s)`)
 	reExtMongoWhereFunc  = regexp.MustCompile(`(?i)['"]\$where['"]\s*(?::|=>)\s*['"](?:function|this\.)`)
 
@@ -22,13 +21,10 @@ var (
 	reExtRedisEvalConcat = regexp.MustCompile(`(?i)(?:redis|client|r|conn)\s*\.\s*eval\s*\([^)]*(?:\+|req\.|request\.|params|user_?input|\$_)`)
 
 	// BATOU-NOSQL-006: CouchDB Mango query injection
-	reExtCouchDBFind     = regexp.MustCompile(`(?i)(?:couch|couchdb|nano|cradle).*\.(?:find|view|query)\s*\(`)
 	reExtCouchDBUserInput = regexp.MustCompile(`(?i)(?:couch|couchdb|nano|cradle).*\.(?:find|view|query)\s*\(\s*(?:req\.(?:body|query|params)|request\.|JSON\.parse|params\[)`)
 
 	// BATOU-NOSQL-007: Elasticsearch query_string with user input
-	reExtESQueryString    = regexp.MustCompile(`(?i)(?:query_string|query_?string)\s*['":]`)
 	reExtESQueryUserInput = regexp.MustCompile(`(?i)(?:query_string|query_?string)\s*['":]\s*[^}]*(?:req\.|request\.|params|user_?input|query|input|\$_|\+\s*[a-zA-Z_])`)
-	reExtESSearch         = regexp.MustCompile(`(?i)(?:elastic|es|client)\s*\.\s*search\s*\(`)
 
 	// BATOU-NOSQL-008: Cassandra CQL injection via concat
 	reExtCQLConcat = regexp.MustCompile(`(?i)(?:session|cassandra|cluster)\s*\.\s*execute\s*\(\s*(?:["'][^"']*["']\s*\+|f["']|["'][^"']*["']\s*%\s*|["'][^"']*["']\s*\.format\s*\()`)
@@ -40,11 +36,9 @@ var (
 
 	// BATOU-NOSQL-010: Firebase Realtime DB rules bypass
 	reExtFirebaseNoAuth  = regexp.MustCompile(`(?i)['"]\s*\.(?:read|write)['"]\s*:\s*['"]?\s*true\s*['"]?`)
-	reExtFirebaseRules   = regexp.MustCompile(`(?i)(?:database\.rules|firestore\.rules|security\s*rules|firebase.*rules)`)
 
 	// BATOU-NOSQL-011: Neo4j Cypher injection via concat
 	reExtCypherConcat = regexp.MustCompile(`(?i)(?:session|driver|neo4j|tx)\s*\.\s*(?:run|query|execute|cypher)\s*\(\s*(?:["'][^"']*["']\s*\+|f["']|["'][^"']*["']\s*%\s*|["'][^"']*["']\s*\.format\s*\()`)
-	reExtCypherParam  = regexp.MustCompile(`(?i)(?:session|driver|neo4j|tx)\s*\.\s*(?:run|query|execute)\s*\(\s*["'][^"']*\$[a-zA-Z_]`)
 )
 
 // ---------------------------------------------------------------------------
@@ -80,15 +74,15 @@ func (r *MongoWhereExt) Languages() []rules.Language {
 
 func (r *MongoWhereExt) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 		var matched string
-		if m := reExtMongoWhereConcat.FindString(line); m != "" {
+		if m := rules.GFind(reExtMongoWhereConcat, line); m != "" {
 			matched = m
-		} else if m := reExtMongoWhereFunc.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtMongoWhereFunc, line); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -131,12 +125,12 @@ func (r *RedisEvalRule) Languages() []rules.Language {
 
 func (r *RedisEvalRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtRedisEvalConcat.FindString(line); m != "" {
+		if m := rules.GFind(reExtRedisEvalConcat, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -153,7 +147,7 @@ func (r *RedisEvalRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 				Confidence:    "high",
 				Tags:          []string{"nosql", "injection", "redis", "lua"},
 			})
-		} else if m := reExtRedisEval.FindString(line); m != "" {
+		} else if m := rules.GFind(reExtRedisEval, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Medium,
@@ -193,12 +187,12 @@ func (r *CouchDBInjection) Languages() []rules.Language {
 
 func (r *CouchDBInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtCouchDBUserInput.FindString(line); m != "" {
+		if m := rules.GFind(reExtCouchDBUserInput, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -238,12 +232,12 @@ func (r *ESQueryStringRule) Languages() []rules.Language {
 
 func (r *ESQueryStringRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtESQueryUserInput.FindString(line); m != "" {
+		if m := rules.GFind(reExtESQueryUserInput, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -283,14 +277,14 @@ func (r *CQLInjection) Languages() []rules.Language {
 
 func (r *CQLInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtCQLConcat.FindString(line); m != "" {
+		if m := rules.GFind(reExtCQLConcat, line); m != "" {
 			// Skip if prepared statements are used
-			if reExtCQLPrepared.MatchString(line) {
+			if rules.GMatch(reExtCQLPrepared, line) {
 				continue
 			}
 			findings = append(findings, rules.Finding{
@@ -332,12 +326,12 @@ func (r *DynamoFilterRule) Languages() []rules.Language {
 
 func (r *DynamoFilterRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtDynamoFilter.FindString(line); m != "" {
+		if m := rules.GFind(reExtDynamoFilter, line); m != "" {
 			// Check if ExpressionAttributeValues is used nearby
 			end := i + 10
 			if end > len(lines) {
@@ -386,13 +380,13 @@ func (r *FirebaseRulesRule) Languages() []rules.Language {
 
 func (r *FirebaseRulesRule) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtFirebaseNoAuth.FindString(line); m != "" {
+		if m := rules.GFind(reExtFirebaseNoAuth, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -432,12 +426,12 @@ func (r *CypherInjection) Languages() []rules.Language {
 
 func (r *CypherInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if m := reExtCypherConcat.FindString(line); m != "" {
+		if m := rules.GFind(reExtCypherConcat, line); m != "" {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

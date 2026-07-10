@@ -11,19 +11,29 @@ import (
 
 // BATOU-CRY-001: Weak hashing
 var (
-	reGoMD5      = regexp.MustCompile(`\bmd5\.(New|Sum)\b`)
-	reGoSHA1     = regexp.MustCompile(`\bsha1\.(New|Sum)\b`)
-	rePyMD5      = regexp.MustCompile(`\bhashlib\.md5\s*\(`)
-	rePySHA1     = regexp.MustCompile(`\bhashlib\.sha1\s*\(`)
+	reGoMD5  = regexp.MustCompile(`\bmd5\.(New|Sum)\b`)
+	reGoSHA1 = regexp.MustCompile(`\bsha1\.(New|Sum)\b`)
+	rePyMD5  = regexp.MustCompile(`\bhashlib\.md5\s*\(`)
+	rePySHA1 = regexp.MustCompile(`\bhashlib\.sha1\s*\(`)
 	// hashlib.new() with weak algorithm specified as string argument
 	rePyHashlibNew = regexp.MustCompile(`\bhashlib\.new\s*\(\s*["'](?:md5|sha1)["']`)
-	reJSMD5      = regexp.MustCompile(`crypto\.createHash\s*\(\s*['"]md5['"]`)
-	reJSSHA1     = regexp.MustCompile(`crypto\.createHash\s*\(\s*['"]sha1['"]`)
-	reJavaMD5    = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*"MD5"`)
-	reJavaSHA1   = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*"SHA-?1"`)
+	reJSMD5        = regexp.MustCompile(`crypto\.createHash\s*\(\s*['"]md5['"]`)
+	reJSSHA1       = regexp.MustCompile(`crypto\.createHash\s*\(\s*['"]sha1['"]`)
+	reJavaMD5      = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*"MD5"`)
+	reJavaSHA1     = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*"SHA-?1"`)
 	// Indirect: MessageDigest.getInstance(variable) — algorithm from external source
 	reJavaDigestVar = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*([a-zA-Z_]\w*)[\s,)]`)
-	reSecurityCtx = regexp.MustCompile(`(?i)(password|secret|token|auth|sign|hmac|credential|cert)`)
+	reSecurityCtx   = regexp.MustCompile(`(?i)(password|secret|token|auth|sign|hmac|credential|cert)`)
+	// reNonSecurityCtx markers that strongly suggest the hash is used as
+	// an identifier / cache key / protocol primitive, not a security
+	// primitive. When detected on the line OR the surrounding ±5 lines,
+	// the rule is suppressed because the algorithm choice is dictated by
+	// protocol (e.g. Git's SHA-1 commit IDs, HIBP's SHA-1 hashprefix
+	// API) or non-security purpose (Etag, avatar fingerprint, cache key).
+	// Note: deliberately omitting common words like `identifier`, `digest`,
+	// `id` — they collide with security contexts ("session identifier",
+	// "message digest"). Stick to terms that are strongly non-security.
+	reNonSecurityCtx = regexp.MustCompile(`(?i)(?:\bgit[/_.]|\bcommit\b|\bblob\b|\btree\b|\bobject_format\b|\bavatar\b|\bgravatar\b|\bcache_key\b|\bcacheKey\b|\betag\b|\bfingerprint\b|\bhibp\b|haveibeenpwned)`)
 )
 
 // BATOU-CRY-002: Insecure random
@@ -46,6 +56,15 @@ var (
 	reJavaRC4    = regexp.MustCompile(`Cipher\.getInstance\s*\(\s*"(RC4|ARCFOUR)`)
 	reECBMode    = regexp.MustCompile(`(?i)(?:\b|_)ECB\b`)
 	reWeakCipher = regexp.MustCompile(`(?i)\b(DES|3DES|TripleDES|RC4|RC2|Blowfish|ARCFOUR)\b`)
+	// The generic reWeakCipher fallback matches a bare `des`/`rc4` token — which the
+	// French article "des" in l10n JSON bundles and the `browserify-des` / `des.js`
+	// dependency lines in `pnpm-lock.yaml` trip (10 FPs in owncloud/web). Only fire
+	// the fallback when a crypto-API context is present on the same line, and never
+	// inside dependency lockfiles or string-pair data bundles.
+	reWeakCipherCryptoCtx = regexp.MustCompile(`(?i)(cipher|crypto|encrypt|decrypt|getInstance|new\s+\w*(?:DES|RC4|RC2|Blowfish)|KeySpec|EVP_|MODE_|/ECB|/CBC|PKCS\d|padding|secret_?key|algorithm\b|\balgo\b)`)
+	// File paths where CRY-003's generic token fallback must not fire: dependency
+	// lockfiles (transitive package names mention `des`/`rc4`) and data bundles.
+	reWeakCipherSkipPath = regexp.MustCompile(`(?i)(?:^|/)(?:[^/]*-lock\.(?:ya?ml|json)|package-lock\.json|pnpm-lock\.ya?ml|yarn\.lock|composer\.lock|Cargo\.lock|Gemfile\.lock|poetry\.lock|go\.sum|go\.mod)$`)
 )
 
 // BATOU-CRY-004: Hardcoded IV / nonce
@@ -58,8 +77,8 @@ var (
 
 // BATOU-CRY-005: Insecure TLS
 var (
-	reGoInsecureSkip  = regexp.MustCompile(`InsecureSkipVerify\s*:\s*true`)
-	rePyVerifyFalse   = regexp.MustCompile(`verify\s*=\s*False`)
+	reGoInsecureSkip   = regexp.MustCompile(`InsecureSkipVerify\s*:\s*true`)
+	rePyVerifyFalse    = regexp.MustCompile(`verify\s*=\s*False`)
 	reNodeRejectUnauth = regexp.MustCompile(`rejectUnauthorized\s*:\s*false`)
 	reNodeTLSEnv       = regexp.MustCompile(`NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['"]?0['"]?`)
 	reTLS10            = regexp.MustCompile(`(?:MinVersion|min_version|minVersion)\s*[:=]\s*(?:tls\.VersionTLS10|tls\.VersionTLS11|['"]TLSv1(?:\.0|\.1)?['"]|0x0301|0x0302)`)
@@ -80,6 +99,11 @@ var (
 	reHTTPLocalhost = regexp.MustCompile(`http://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])`)
 	reHTTPExample   = regexp.MustCompile(`http://(example\.com|example\.org|test\.)`)
 	reHTTPSensitive = regexp.MustCompile(`(?i)http://[^"'\s]*(api|auth|login|webhook|payment|token|oauth|callback)`)
+	// reCryptoTestFile mirrors rules/secrets/secrets.go:reTestFile so we
+	// can skip CRY-007 (and other crypto FPs) on test fixtures. Test
+	// files routinely use throwaway `'http://some-image.jpg'`-style URLs
+	// as DOM-attribute fixtures — those produced 18 FPs in owncloud/web.
+	reCryptoTestFile = regexp.MustCompile(`(?i)(_test\.go|_test\.py|\.test\.[jt]sx?|\.spec\.[jt]sx?|test_.*\.py|tests?/|__tests__/|spec/|fixtures?/|mock|fake|stub|example)`)
 )
 
 // BATOU-CRY-008: Math.random() in security context (JS/TS specific, broader than CRY-002)
@@ -97,17 +121,16 @@ var (
 // BATOU-CRY-010: Weak PRNG across languages
 var (
 	// Java
-	reJavaUtilRandom = regexp.MustCompile(`\bnew\s+Random\s*\(`)
+	reJavaUtilRandom   = regexp.MustCompile(`\bnew\s+Random\s*\(`)
 	reJavaRandomImport = regexp.MustCompile(`\bjava\.util\.Random\b`)
 	// PHP
-	rePHPRand   = regexp.MustCompile(`\b(rand|mt_rand|srand|mt_srand)\s*\(`)
-	rePHPArray  = regexp.MustCompile(`\barray_rand\s*\(`)
+	rePHPRand  = regexp.MustCompile(`\b(rand|mt_rand|srand|mt_srand)\s*\(`)
+	rePHPArray = regexp.MustCompile(`\barray_rand\s*\(`)
 	// Ruby
-	reRubyRand = regexp.MustCompile(`\brand\s*\(`)
+	reRubyRand    = regexp.MustCompile(`\brand\s*\(`)
 	reRubyRandObj = regexp.MustCompile(`\bRandom\.(new|rand|srand)\b`)
 	// C#
 	reCSharpRandom = regexp.MustCompile(`\bnew\s+Random\s*\(`)
-	reCSharpSystemRandom = regexp.MustCompile(`\bSystem\.Random\b`)
 	// Go (broader: any math/rand usage in security context)
 	reGoMathRandImport = regexp.MustCompile(`"math/rand`)
 	// Weak PRNG security context (shared across languages in CRY-010)
@@ -116,17 +139,17 @@ var (
 
 // BATOU-CRY-011: Predictable seeds
 var (
-	rePySeedTime   = regexp.MustCompile(`\brandom\.seed\s*\(\s*(time|int\s*\(\s*time|datetime)`)
-	rePySeedFixed  = regexp.MustCompile(`\brandom\.seed\s*\(\s*\d+\s*\)`)
-	reCSeedTime    = regexp.MustCompile(`\bsrand\s*\(\s*time\s*\(`)
-	reJavaSeedTime = regexp.MustCompile(`\.setSeed\s*\(\s*(System\.currentTimeMillis|System\.nanoTime|new\s+Date)`)
-	reJavaSeedFixed = regexp.MustCompile(`\.setSeed\s*\(\s*\d+L?\s*\)`)
-	reJavaFixedSeed = regexp.MustCompile(`\bnew\s+Random\s*\(\s*\d+L?\s*\)`)
-	reGoSeedTime   = regexp.MustCompile(`\brand\.Seed\s*\(\s*time\.`)
-	reGoSeedFixed  = regexp.MustCompile(`\brand\.Seed\s*\(\s*\d+\s*\)`)
-	reGoNewSource  = regexp.MustCompile(`\brand\.NewSource\s*\(\s*\d+\s*\)`)
-	rePHPSrandTime = regexp.MustCompile(`\b(srand|mt_srand)\s*\(\s*time\s*\(`)
-	rePHPSrandFixed = regexp.MustCompile(`\b(srand|mt_srand)\s*\(\s*\d+\s*\)`)
+	rePySeedTime     = regexp.MustCompile(`\brandom\.seed\s*\(\s*(time|int\s*\(\s*time|datetime)`)
+	rePySeedFixed    = regexp.MustCompile(`\brandom\.seed\s*\(\s*\d+\s*\)`)
+	reCSeedTime      = regexp.MustCompile(`\bsrand\s*\(\s*time\s*\(`)
+	reJavaSeedTime   = regexp.MustCompile(`\.setSeed\s*\(\s*(System\.currentTimeMillis|System\.nanoTime|new\s+Date)`)
+	reJavaSeedFixed  = regexp.MustCompile(`\.setSeed\s*\(\s*\d+L?\s*\)`)
+	reJavaFixedSeed  = regexp.MustCompile(`\bnew\s+Random\s*\(\s*\d+L?\s*\)`)
+	reGoSeedTime     = regexp.MustCompile(`\brand\.Seed\s*\(\s*time\.`)
+	reGoSeedFixed    = regexp.MustCompile(`\brand\.Seed\s*\(\s*\d+\s*\)`)
+	reGoNewSource    = regexp.MustCompile(`\brand\.NewSource\s*\(\s*\d+\s*\)`)
+	rePHPSrandTime   = regexp.MustCompile(`\b(srand|mt_srand)\s*\(\s*time\s*\(`)
+	rePHPSrandFixed  = regexp.MustCompile(`\b(srand|mt_srand)\s*\(\s*\d+\s*\)`)
 	reRubySrandFixed = regexp.MustCompile(`\bsrand\s*\(\s*\d+\s*\)`)
 )
 
@@ -146,7 +169,32 @@ var (
 	reGenericHardcodedKey = regexp.MustCompile(`(?i)\b(aes_key|encryption_key|secret_key|cipher_key|crypto_key|hmac_key|signing_key)\s*[:=]\s*["'][^"']{4,}["']`)
 	// Context: near crypto operations
 	reCryptoKeyCtx = regexp.MustCompile(`(?i)(encrypt|decrypt|cipher|aes|hmac|sign|SecretKey|crypto|seal|open)`)
+
+	// Vue/HTML/JSX template-attribute false-positive guards for reJSHardcodedKey.
+	// `.vue` SFCs are scanned as JavaScript, so `:key="item.id"`, `key="modal-btn"`,
+	// `<li v-for="..." :key="idx">` etc. all match `key=` / `secret=` against a string
+	// literal — but they are list-render keys / DOM attributes, never hardcoded secrets.
+	// (123 FPs in owncloud/web.)
+	//   1. `:key=` / `v-bind:key=` / `v-bind:secret=` — Vue bound attribute, never a JS var.
+	reVueBoundKeyAttr = regexp.MustCompile(`(?i)(?::|\bv-bind:)(?:key|secret)\s*=`)
+	//   2. The line carries HTML/Vue/JSX markup: an opening/closing element tag, a
+	//      self-closing tag, a Vue structural directive, an event binding (@click),
+	//      or another bound attribute (:class=).
+	reHTMLMarkupLine = regexp.MustCompile(`</?[A-Za-z][\w.-]*[\s/>]|/>|\bv-(?:for|if|else|else-if|show|model|slot|bind|on|html|text)\b|@[\w.:-]+\s*=|:[\w.-]+\s*=`)
+	//   3. The line is *only* an unbound `key=`/`secret=` HTML attribute (no spaces around
+	//      `=`, the HTML convention) — i.e. a multi-line element's attribute on its own line.
+	//      JS assignments conventionally read `key = "..."` with spaces and keep firing.
+	reBareHTMLKeyAttr = regexp.MustCompile(`(?i)^\s*:?(?:key|secret)=["'][^"']*["']\s*/?>?\s*$`)
 )
+
+// isVueOrHTMLKeyAttr reports whether a `key=`/`secret=` string-literal match on the
+// given line is an HTML/Vue/JSX element attribute rather than a JS variable assignment.
+// Used to suppress reJSHardcodedKey false positives in `.vue`/JSX templates.
+func isVueOrHTMLKeyAttr(line string) bool {
+	return rules.GMatch(reVueBoundKeyAttr, line) ||
+		rules.GMatch(reHTMLMarkupLine, line) ||
+		rules.GMatch(reBareHTMLKeyAttr, line)
+}
 
 // BATOU-CRY-013: Unauthenticated encryption (CBC without HMAC)
 var (
@@ -170,17 +218,17 @@ var (
 
 // BATOU-CRY-015: Weak password hashing (MD5/SHA for passwords)
 var (
-	rePasswordCtx        = regexp.MustCompile(`(?i)(password|passwd|pass_hash|pwd|user_pass)`)
+	rePasswordCtx = regexp.MustCompile(`(?i)(password|passwd|pass_hash|pwd|user_pass)`)
 	// Python: hashlib.md5/sha1/sha256 with password nearby
-	rePyHashPassword     = regexp.MustCompile(`hashlib\.(md5|sha1|sha256|sha224)\s*\(`)
+	rePyHashPassword = regexp.MustCompile(`hashlib\.(md5|sha1|sha256|sha224)\s*\(`)
 	// Go: md5.Sum or sha256.Sum256 with password nearby
-	reGoHashPassword     = regexp.MustCompile(`(md5\.Sum|sha1\.Sum|sha256\.Sum256|sha256\.New|sha512\.New)\s*\(`)
+	reGoHashPassword = regexp.MustCompile(`(md5\.Sum|sha1\.Sum|sha256\.Sum256|sha256\.New|sha512\.New)\s*\(`)
 	// Java: MessageDigest for password context
 	reJavaDigestPassword = regexp.MustCompile(`MessageDigest\.getInstance\s*\(\s*["'](MD5|SHA-?1|SHA-?256|SHA-?512)["']`)
 	// JS/TS: createHash for password context
-	reJSHashPassword     = regexp.MustCompile(`crypto\.createHash\s*\(\s*['"](?:md5|sha1|sha256|sha512)['"]`)
+	reJSHashPassword = regexp.MustCompile(`crypto\.createHash\s*\(\s*['"](?:md5|sha1|sha256|sha512)['"]`)
 	// PHP: md5($password) or sha1($password)
-	rePHPHashPassword    = regexp.MustCompile(`\b(md5|sha1)\s*\(\s*\$`)
+	rePHPHashPassword = regexp.MustCompile(`\b(md5|sha1)\s*\(\s*\$`)
 	// Proper password hashing (suppress if present)
 	reProperPasswordHash = regexp.MustCompile(`(?i)(bcrypt|scrypt|argon2|pbkdf2|password_hash|PBKDF2WithHmacSHA|Rfc2898DeriveBytes)`)
 )
@@ -191,38 +239,83 @@ var (
 	reRubyRandSec    = regexp.MustCompile(`\brand\s*\(`)
 	reRubyRandObjSec = regexp.MustCompile(`\bRandom\.(new|rand)\b`)
 	// PHP
-	rePHPRandSec     = regexp.MustCompile(`\b(rand|mt_rand)\s*\(`)
+	rePHPRandSec = regexp.MustCompile(`\b(rand|mt_rand)\s*\(`)
 	// Shared security context for CRY-016
-	reCRY016SecCtx   = regexp.MustCompile(`(?i)(token|session|password|secret|nonce|otp|csrf|key|salt|iv|auth|uuid|api[_\-]?key)`)
+	reCRY016SecCtx = regexp.MustCompile(`(?i)(token|session|password|secret|nonce|otp|csrf|key|salt|iv|auth|uuid|api[_\-]?key)`)
 )
 
 // BATOU-CRY-017: Timing-unsafe string comparison
+//
+// Tightening note (2026-04-26): the previous patterns matched any
+// `<name with secret-keyword> == \w+` — including nil/zero/existence
+// checks like `cfg.TokenManager == nil`, `if password == ""`,
+// `if hash == nil`. 61 FPs in owncloud/ocis. Added reTimingNilOrZero
+// to skip those — they're existence checks, not secret comparisons.
 var (
 	// Pattern: if (someVar == otherVar) where vars have security-related names
 	reTimingCompareJS   = regexp.MustCompile(`(?:===?)\s*\w*(?i:token|secret|hash|password|digest|signature|hmac|api[_\-]?key|nonce|csrf)\w*`)
 	reTimingComparePy   = regexp.MustCompile(`(?i)\w*(token|secret|hash|password|digest|signature|hmac|api_key|nonce|csrf)\w*\s*==\s*\w+`)
 	reTimingCompareGo   = regexp.MustCompile(`(?i)\w*(token|secret|hash|password|digest|signature|hmac|apiKey|nonce|csrf)\w*\s*==\s*\w+`)
 	reTimingCompareRuby = regexp.MustCompile(`(?i)\w*(token|secret|hash|password|digest|signature|hmac|api_key|nonce|csrf)\w*\s*==\s*\w+`)
+	// Existence / nil / empty / literal checks — these aren't secret-value
+	// comparisons. Match the RHS of `==` to skip:
+	//   foo == nil / null / undefined / true / false / <integer> / "" / ''
+	reTimingNilOrZero = regexp.MustCompile(`==\s*(?:nil|null|undefined|true|false|\d+|""|''|\(\s*\)|\[\s*\])\b?`)
+	// Length comparisons (`token.length === expected.length`) leak length, not
+	// content — not the timing channel CRY-017 targets, and a constant-time
+	// rewrite is not the fix. Require `.length`/`.size`/`.len` immediately on one
+	// side of the comparison operator so an unrelated `.length` elsewhere on the
+	// line doesn't suppress a real finding.
+	reTimingLengthCompare = regexp.MustCompile(`\.\s*(?:length|size|len)(?:\s*\(\s*\))?\s*[!=]==?|[!=]==?\s*\w[\w.$\[\]'"]*\.\s*(?:length|size|len)\b`)
 	// Reverse pattern: variable == securityThing
-	reTimingCompareRev  = regexp.MustCompile(`\w+\s*===?\s*\w*(?i:token|secret|hash|password|digest|signature|hmac|api[_\-]?key|nonce|csrf)\w*`)
+	reTimingCompareRev = regexp.MustCompile(`\w+\s*===?\s*\w*(?i:token|secret|hash|password|digest|signature|hmac|api[_\-]?key|nonce|csrf)\w*`)
+	// Operand extractor: the two operands either side of an (in)equality operator.
+	// Used to detect reflexive comparisons (`token === token`) which can't be a
+	// timing leak — both sides are the same in-memory value. (7 FPs in owncloud/web,
+	// client-side store comparisons of a value against itself.)
+	reTimingEqOperands = regexp.MustCompile(`([\w.$\['"\]]+)\s*[!=]==?\s*([\w.$\['"\]]+)`)
 	// Safe comparison functions (suppress if present on same line)
 	reTimingSafeCompare = regexp.MustCompile(`(?i)(timingSafeEqual|compare_digest|ConstantTimeCompare|secure_compare|constant_time_compare|MessageDigest\.isEqual|crypto\.subtle\.timingSafeEqual|Rack::Utils\.secure_compare)`)
 )
 
+// isReflexiveCompare reports whether the line contains an (in)equality comparison
+// whose two operands are lexically identical (e.g. `token === token`, `a.id === a.id`).
+// Such a comparison always evaluates the same value on both sides, so it cannot leak a
+// secret through timing — suppressing it for CRY-017.
+func isReflexiveCompare(line string) bool {
+	// Fold-aware OR-set pre-gate. reTimingEqOperands requires the operator
+	// `[!=]==?`, every match of which is `==`, `===`, `!=`, or `!==` — each
+	// containing `==` or `!=` as a substring. A line with neither provably
+	// cannot match, so the (backtracking) FindAllStringSubmatch is skipped.
+	// (CompilePrefilter yields an always-run gate for this char-class operator,
+	// so the required OR-set is asserted by hand; the operators are ASCII so no
+	// lowercasing is needed.) Finding-preserving: never skips a line the regex
+	// would actually match.
+	if !strings.Contains(line, "==") && !strings.Contains(line, "!=") {
+		return false
+	}
+	for _, m := range reTimingEqOperands.FindAllStringSubmatch(line, -1) {
+		if m[1] != "" && m[1] == m[2] {
+			return true
+		}
+	}
+	return false
+}
+
 // BATOU-CRY-018: Hardcoded IV (Java IvParameterSpec and broader patterns)
 var (
-	reJavaIvParameterSpec      = regexp.MustCompile(`new\s+IvParameterSpec\s*\(\s*(?:new\s+byte\s*\[\]\s*\{|"[^"]+"\s*\.getBytes)`)
-	reJavaIvHexBytes           = regexp.MustCompile(`new\s+IvParameterSpec\s*\(\s*(?:javax\.xml\.bind\.DatatypeConverter|DatatypeConverter|Hex|Base64)`)
-	rePyFixedIVAES             = regexp.MustCompile(`AES\.new\s*\([^)]*,\s*[^,)]*,\s*(?:b["'][^"']+["']|bytes\s*\()`)
-	reGoFixedNonceSeal         = regexp.MustCompile(`\.\s*(?:Seal|Open)\s*\(\s*nil\s*,\s*(?:\[\]byte\s*\{|make\s*\(\s*\[\]byte)`)
+	reJavaIvParameterSpec = regexp.MustCompile(`new\s+IvParameterSpec\s*\(\s*(?:new\s+byte\s*\[\]\s*\{|"[^"]+"\s*\.getBytes)`)
+	reJavaIvHexBytes      = regexp.MustCompile(`new\s+IvParameterSpec\s*\(\s*(?:javax\.xml\.bind\.DatatypeConverter|DatatypeConverter|Hex|Base64)`)
+	rePyFixedIVAES        = regexp.MustCompile(`AES\.new\s*\([^)]*,\s*[^,)]*,\s*(?:b["'][^"']+["']|bytes\s*\()`)
+	reGoFixedNonceSeal    = regexp.MustCompile(`\.\s*(?:Seal|Open)\s*\(\s*nil\s*,\s*(?:\[\]byte\s*\{|make\s*\(\s*\[\]byte)`)
 )
 
 // BATOU-CRY-019: Java weak random (broad detection without requiring security context)
 var (
 	// new Random() or new java.util.Random() — NOT SecureRandom
-	reJavaNewRandom    = regexp.MustCompile(`\bnew\s+(?:java\.util\.)?Random\s*\(`)
+	reJavaNewRandom = regexp.MustCompile(`\bnew\s+(?:java\.util\.)?Random\s*\(`)
 	// Math.random() or java.lang.Math.random()
-	reJavaMathRandom   = regexp.MustCompile(`\b(?:java\.lang\.)?Math\.random\s*\(`)
+	reJavaMathRandom = regexp.MustCompile(`\b(?:java\.lang\.)?Math\.random\s*\(`)
 	// SecureRandom on the same line (safe — do not flag)
 	reSecureRandomLine = regexp.MustCompile(`SecureRandom`)
 )
@@ -253,8 +346,8 @@ func init() {
 
 type WeakHashing struct{}
 
-func (r *WeakHashing) ID() string          { return "BATOU-CRY-001" }
-func (r *WeakHashing) Name() string        { return "WeakHashing" }
+func (r *WeakHashing) ID() string                      { return "BATOU-CRY-001" }
+func (r *WeakHashing) Name() string                    { return "WeakHashing" }
 func (r *WeakHashing) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *WeakHashing) Description() string {
@@ -267,7 +360,8 @@ func (r *WeakHashing) Languages() []rules.Language {
 
 func (r *WeakHashing) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -276,21 +370,21 @@ func (r *WeakHashing) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if loc := reGoMD5.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reGoMD5, line, lowered[i]); loc != "" {
 				matched = loc
 				algo = "MD5"
-			} else if loc := reGoSHA1.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reGoSHA1, line, lowered[i]); loc != "" {
 				matched = loc
 				algo = "SHA-1"
 			}
 		case rules.LangPython:
-			if loc := rePyMD5.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePyMD5, line, lowered[i]); loc != "" {
 				matched = loc
 				algo = "MD5"
-			} else if loc := rePySHA1.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(rePySHA1, line, lowered[i]); loc != "" {
 				matched = loc
 				algo = "SHA-1"
-			} else if loc := rePyHashlibNew.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(rePyHashlibNew, line, lowered[i]); loc != "" {
 				matched = loc
 				if strings.Contains(loc, "md5") {
 					algo = "MD5"
@@ -299,21 +393,21 @@ func (r *WeakHashing) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := reJSMD5.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJSMD5, line, lowered[i]); loc != "" {
 				matched = loc
 				algo = "MD5"
-			} else if loc := reJSSHA1.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJSSHA1, line, lowered[i]); loc != "" {
 				matched = loc
 				algo = "SHA-1"
 			}
 		case rules.LangJava:
-			if loc := reJavaMD5.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJavaMD5, line, lowered[i]); loc != "" {
 				matched = loc
 				algo = "MD5"
-			} else if loc := reJavaSHA1.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJavaSHA1, line, lowered[i]); loc != "" {
 				matched = loc
 				algo = "SHA-1"
-			} else if loc := reJavaDigestVar.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJavaDigestVar, line, lowered[i]); loc != "" {
 				// Indirect: getInstance(variable) — algorithm from config/properties.
 				// Suppress if the variable resolves to a strong algorithm.
 				if !rules.JavaDigestVarIsSafe(lines, i) {
@@ -327,8 +421,16 @@ func (r *WeakHashing) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
+		// Suppress when surrounding context (±5 lines or file path) clearly
+		// identifies a non-security use of the hash: Git commit IDs, avatar
+		// fingerprints, Etag/cache keys, HIBP protocol, etc. The algorithm
+		// is dictated by protocol or has no security boundary.
+		if hasNonSecurityContext(lines, i, ctx.FilePath) {
+			continue
+		}
+
 		confidence := "medium"
-		if reSecurityCtx.MatchString(line) {
+		if rules.GMatchLower(reSecurityCtx, line, lowered[i]) {
 			confidence = "high"
 		}
 
@@ -357,8 +459,8 @@ func (r *WeakHashing) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureRandom struct{}
 
-func (r *InsecureRandom) ID() string          { return "BATOU-CRY-002" }
-func (r *InsecureRandom) Name() string        { return "InsecureRandom" }
+func (r *InsecureRandom) ID() string                      { return "BATOU-CRY-002" }
+func (r *InsecureRandom) Name() string                    { return "InsecureRandom" }
 func (r *InsecureRandom) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *InsecureRandom) Description() string {
@@ -371,12 +473,13 @@ func (r *InsecureRandom) Languages() []rules.Language {
 
 func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// For Go, check if math/rand is imported
 	goHasMathRand := false
 	if ctx.Language == rules.LangGo {
-		goHasMathRand = reGoMathRand.MatchString(ctx.Content)
+		goHasMathRand = rules.GMatchFile(reGoMathRand, ctx)
 	}
 
 	for i, line := range lines {
@@ -387,23 +490,23 @@ func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 		switch ctx.Language {
 		case rules.LangGo:
 			if goHasMathRand {
-				if loc := reGoRandCall.FindString(line); loc != "" {
-					if reSecRandCtx.MatchString(line) || reSecRandCtx.MatchString(safeSurroundingLines(lines, i, 3)) {
+				if loc := rules.GFindLower(reGoRandCall, line, lowered[i]); loc != "" {
+					if rules.GMatchLower(reSecRandCtx, line, lowered[i]) || reSecRandCtx.MatchString(safeSurroundingLines(lines, i, 3)) {
 						matched = loc
 						suggestion = "Use crypto/rand for security-sensitive random values."
 					}
 				}
 			}
 		case rules.LangPython:
-			if loc := rePyRandom.FindString(line); loc != "" {
-				if reSecRandCtx.MatchString(line) || reSecRandCtx.MatchString(safeSurroundingLines(lines, i, 3)) {
+			if loc := rules.GFindLower(rePyRandom, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reSecRandCtx, line, lowered[i]) || reSecRandCtx.MatchString(safeSurroundingLines(lines, i, 3)) {
 					matched = loc
 					suggestion = "Use the secrets module (secrets.token_hex, secrets.token_urlsafe) for security-sensitive random values."
 				}
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := reJSMathRandom.FindString(line); loc != "" {
-				if reSecRandCtx.MatchString(line) || reSecRandCtx.MatchString(safeSurroundingLines(lines, i, 3)) {
+			if loc := rules.GFindLower(reJSMathRandom, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reSecRandCtx, line, lowered[i]) || reSecRandCtx.MatchString(safeSurroundingLines(lines, i, 3)) {
 					matched = loc
 					suggestion = "Use crypto.randomBytes() or crypto.getRandomValues() for security-sensitive random values."
 				}
@@ -439,8 +542,8 @@ func (r *InsecureRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WeakCipher struct{}
 
-func (r *WeakCipher) ID() string          { return "BATOU-CRY-003" }
-func (r *WeakCipher) Name() string        { return "WeakCipher" }
+func (r *WeakCipher) ID() string                      { return "BATOU-CRY-003" }
+func (r *WeakCipher) Name() string                    { return "WeakCipher" }
 func (r *WeakCipher) DefaultSeverity() rules.Severity { return rules.Critical }
 
 func (r *WeakCipher) Description() string {
@@ -453,7 +556,8 @@ func (r *WeakCipher) Languages() []rules.Language {
 
 func (r *WeakCipher) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -462,29 +566,29 @@ func (r *WeakCipher) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if loc := reGoDES.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reGoDES, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "DES/3DES"
-			} else if loc := reGoRC4.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reGoRC4, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "RC4"
 			}
 		case rules.LangPython:
-			if loc := rePyDES.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePyDES, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "DES/3DES"
-			} else if loc := rePyARC4.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(rePyARC4, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "RC4"
-			} else if loc := rePyBlowfish.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(rePyBlowfish, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "Blowfish"
 			}
 		case rules.LangJava:
-			if loc := reJavaDES.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJavaDES, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "DES/3DES"
-			} else if loc := reJavaRC4.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJavaRC4, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "RC4"
 			}
@@ -492,7 +596,7 @@ func (r *WeakCipher) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// ECB mode check applies to all languages
 		if matched == "" {
-			if loc := reECBMode.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reECBMode, line, lowered[i]); loc != "" {
 				// Java: suppress ECB in getProperty defaults where cipher is AES (strong).
 				// FP pattern: getProperty("cryptoAlg2", "AES/ECB/PKCS5Padding")
 				// TP pattern: getProperty("cryptoAlg1", "DESede/ECB/PKCS5Padding")
@@ -509,9 +613,13 @@ func (r *WeakCipher) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 		}
 
-		// Generic weak cipher reference (if not already caught by a language-specific pattern)
-		if matched == "" {
-			if loc := reWeakCipher.FindString(line); loc != "" {
+		// Generic weak cipher reference (if not already caught by a language-specific pattern).
+		// This fallback matches a bare `des`/`rc4` token, so it requires a crypto-API
+		// context on the line and never fires inside dependency lockfiles — otherwise the
+		// French article "des" in l10n bundles and `browserify-des`-style lockfile entries
+		// produce false positives (10 FPs in owncloud/web).
+		if matched == "" && !reWeakCipherSkipPath.MatchString(ctx.FilePath) {
+			if loc := rules.GFindLower(reWeakCipher, line, lowered[i]); loc != "" && rules.GMatchLower(reWeakCipherCryptoCtx, line, lowered[i]) {
 				// Avoid matching in comments that merely mention the algorithm name
 				trimmed := strings.TrimSpace(line)
 				if !strings.HasPrefix(trimmed, "//") && !strings.HasPrefix(trimmed, "#") && !strings.HasPrefix(trimmed, "*") {
@@ -550,8 +658,8 @@ func (r *WeakCipher) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HardcodedIV struct{}
 
-func (r *HardcodedIV) ID() string          { return "BATOU-CRY-004" }
-func (r *HardcodedIV) Name() string        { return "HardcodedIV" }
+func (r *HardcodedIV) ID() string                      { return "BATOU-CRY-004" }
+func (r *HardcodedIV) Name() string                    { return "HardcodedIV" }
 func (r *HardcodedIV) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *HardcodedIV) Description() string {
@@ -564,7 +672,8 @@ func (r *HardcodedIV) Languages() []rules.Language {
 
 func (r *HardcodedIV) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	patterns := []*regexp.Regexp{reGoByteIV, reStringIV, reFixedIVBytes, reByteArrayIV}
 
@@ -572,7 +681,7 @@ func (r *HardcodedIV) Scan(ctx *rules.ScanContext) []rules.Finding {
 		lineNum := i + 1
 
 		for _, pat := range patterns {
-			if loc := pat.FindString(line); loc != "" {
+			if loc := rules.GFindLower(pat, line, lowered[i]); loc != "" {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -601,8 +710,8 @@ func (r *HardcodedIV) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureTLS struct{}
 
-func (r *InsecureTLS) ID() string          { return "BATOU-CRY-005" }
-func (r *InsecureTLS) Name() string        { return "InsecureTLS" }
+func (r *InsecureTLS) ID() string                      { return "BATOU-CRY-005" }
+func (r *InsecureTLS) Name() string                    { return "InsecureTLS" }
 func (r *InsecureTLS) DefaultSeverity() rules.Severity { return rules.Critical }
 
 func (r *InsecureTLS) Description() string {
@@ -615,7 +724,8 @@ func (r *InsecureTLS) Languages() []rules.Language {
 
 func (r *InsecureTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -627,31 +737,31 @@ func (r *InsecureTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if loc := reGoInsecureSkip.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reGoInsecureSkip, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "TLS certificate verification disabled"
 				desc = "InsecureSkipVerify: true disables certificate validation, enabling man-in-the-middle attacks."
 				suggestion = "Remove InsecureSkipVerify or set it to false. Use a custom VerifyPeerCertificate if you need custom validation."
 			}
 		case rules.LangPython:
-			if loc := rePyVerifyFalse.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePyVerifyFalse, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "TLS certificate verification disabled"
 				desc = "verify=False disables certificate validation for HTTPS requests."
 				suggestion = "Use verify=True (the default) or provide a CA bundle path."
-			} else if loc := rePySSlNoVerify.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(rePySSlNoVerify, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "TLS certificate verification disabled"
 				desc = "Disabling SSL certificate verification enables man-in-the-middle attacks."
 				suggestion = "Use ssl.create_default_context() instead."
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := reNodeRejectUnauth.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reNodeRejectUnauth, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "TLS certificate verification disabled"
 				desc = "rejectUnauthorized: false disables certificate validation for TLS connections."
 				suggestion = "Remove rejectUnauthorized: false to enable certificate verification."
-			} else if loc := reNodeTLSEnv.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reNodeTLSEnv, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "TLS certificate verification disabled via environment"
 				desc = "NODE_TLS_REJECT_UNAUTHORIZED=0 globally disables TLS verification for the Node.js process."
@@ -661,7 +771,7 @@ func (r *InsecureTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// TLS version check applies to all languages
 		if matched == "" {
-			if loc := reTLS10.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reTLS10, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Deprecated TLS version"
 				desc = "TLS 1.0 and 1.1 have known vulnerabilities (BEAST, POODLE) and are deprecated by RFC 8996."
@@ -699,8 +809,8 @@ func (r *InsecureTLS) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WeakKeySize struct{}
 
-func (r *WeakKeySize) ID() string          { return "BATOU-CRY-006" }
-func (r *WeakKeySize) Name() string        { return "WeakKeySize" }
+func (r *WeakKeySize) ID() string                      { return "BATOU-CRY-006" }
+func (r *WeakKeySize) Name() string                    { return "WeakKeySize" }
 func (r *WeakKeySize) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *WeakKeySize) Description() string {
@@ -713,7 +823,8 @@ func (r *WeakKeySize) Languages() []rules.Language {
 
 func (r *WeakKeySize) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -723,13 +834,13 @@ func (r *WeakKeySize) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if loc := reGoRSAKeySize.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reGoRSAKeySize, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "RSA key size too small"
 				desc = "RSA keys smaller than 2048 bits can be factored with current computing resources."
 			}
 		case rules.LangJava:
-			if loc := reJavaRSAKeySize.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJavaRSAKeySize, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "RSA key size too small"
 				desc = "RSA keys smaller than 2048 bits can be factored with current computing resources."
@@ -738,7 +849,7 @@ func (r *WeakKeySize) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Generic key size check for all languages
 		if matched == "" {
-			if loc := reRSASmallKey.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reRSASmallKey, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Potentially weak key size"
 				desc = "Key sizes of 1024 bits or less are considered insufficient for modern security requirements."
@@ -747,7 +858,7 @@ func (r *WeakKeySize) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Weak EC curve check for all languages
 		if matched == "" {
-			if loc := reWeakCurve.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reWeakCurve, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Weak elliptic curve"
 				desc = "P-192 and equivalent curves provide less than 128 bits of security and should not be used."
@@ -783,8 +894,8 @@ func (r *WeakKeySize) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PlaintextProtocol struct{}
 
-func (r *PlaintextProtocol) ID() string          { return "BATOU-CRY-007" }
-func (r *PlaintextProtocol) Name() string        { return "PlaintextProtocol" }
+func (r *PlaintextProtocol) ID() string                      { return "BATOU-CRY-007" }
+func (r *PlaintextProtocol) Name() string                    { return "PlaintextProtocol" }
 func (r *PlaintextProtocol) DefaultSeverity() rules.Severity { return rules.Medium }
 
 func (r *PlaintextProtocol) Description() string {
@@ -796,24 +907,32 @@ func (r *PlaintextProtocol) Languages() []rules.Language {
 }
 
 func (r *PlaintextProtocol) Scan(ctx *rules.ScanContext) []rules.Finding {
+	// Skip test/spec/fixture files — `'http://...'` literals there are
+	// DOM-attribute fixtures, mock URLs, or example values, not real
+	// network calls. (Mirrors the secrets-rule treatment.)
+	if reCryptoTestFile.MatchString(ctx.FilePath) {
+		return nil
+	}
+
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
 
-		loc := reHTTPURL.FindString(line)
+		loc := rules.GFindLower(reHTTPURL, line, lowered[i])
 		if loc == "" {
 			continue
 		}
 
 		// Skip localhost/loopback addresses
-		if reHTTPLocalhost.MatchString(line) {
+		if rules.GMatchLower(reHTTPLocalhost, line, lowered[i]) {
 			continue
 		}
 
 		// Skip example/test domains
-		if reHTTPExample.MatchString(line) {
+		if rules.GMatchLower(reHTTPExample, line, lowered[i]) {
 			continue
 		}
 
@@ -825,7 +944,7 @@ func (r *PlaintextProtocol) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		confidence := "medium"
 		title := "HTTP URL used instead of HTTPS"
-		if reHTTPSensitive.MatchString(line) {
+		if rules.GMatchLower(reHTTPSensitive, line, lowered[i]) {
 			confidence = "high"
 			title = "HTTP URL used for sensitive endpoint"
 		}
@@ -855,8 +974,8 @@ func (r *PlaintextProtocol) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JSMathRandomSecurity struct{}
 
-func (r *JSMathRandomSecurity) ID() string          { return "BATOU-CRY-008" }
-func (r *JSMathRandomSecurity) Name() string        { return "JSMathRandomSecurity" }
+func (r *JSMathRandomSecurity) ID() string                      { return "BATOU-CRY-008" }
+func (r *JSMathRandomSecurity) Name() string                    { return "JSMathRandomSecurity" }
 func (r *JSMathRandomSecurity) DefaultSeverity() rules.Severity { return rules.Critical }
 
 func (r *JSMathRandomSecurity) Description() string {
@@ -869,14 +988,15 @@ func (r *JSMathRandomSecurity) Languages() []rules.Language {
 
 func (r *JSMathRandomSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
 
-		if loc := reJSMathRandomBroad.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reJSMathRandomBroad, line, lowered[i]); loc != "" {
 			// Check current line and surrounding context for security-sensitive terms
-			if reJSSecurityCtx.MatchString(line) || reJSSecurityCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			if rules.GMatchLower(reJSSecurityCtx, line, lowered[i]) || reJSSecurityCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -904,8 +1024,8 @@ func (r *JSMathRandomSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PythonRandomSecurity struct{}
 
-func (r *PythonRandomSecurity) ID() string          { return "BATOU-CRY-009" }
-func (r *PythonRandomSecurity) Name() string        { return "PythonRandomSecurity" }
+func (r *PythonRandomSecurity) ID() string                      { return "BATOU-CRY-009" }
+func (r *PythonRandomSecurity) Name() string                    { return "PythonRandomSecurity" }
 func (r *PythonRandomSecurity) DefaultSeverity() rules.Severity { return rules.Critical }
 
 func (r *PythonRandomSecurity) Description() string {
@@ -918,13 +1038,14 @@ func (r *PythonRandomSecurity) Languages() []rules.Language {
 
 func (r *PythonRandomSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
 
-		if loc := rePyRandomBroad.FindString(line); loc != "" {
-			if rePySecurityCtx.MatchString(line) || rePySecurityCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+		if loc := rules.GFindLower(rePyRandomBroad, line, lowered[i]); loc != "" {
+			if rules.GMatchLower(rePySecurityCtx, line, lowered[i]) || rePySecurityCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -952,8 +1073,8 @@ func (r *PythonRandomSecurity) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WeakPRNG struct{}
 
-func (r *WeakPRNG) ID() string          { return "BATOU-CRY-010" }
-func (r *WeakPRNG) Name() string        { return "WeakPRNG" }
+func (r *WeakPRNG) ID() string                      { return "BATOU-CRY-010" }
+func (r *WeakPRNG) Name() string                    { return "WeakPRNG" }
 func (r *WeakPRNG) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *WeakPRNG) Description() string {
@@ -966,18 +1087,19 @@ func (r *WeakPRNG) Languages() []rules.Language {
 
 func (r *WeakPRNG) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// For Go, check if math/rand is imported
 	goHasMathRand := false
 	if ctx.Language == rules.LangGo {
-		goHasMathRand = reGoMathRandImport.MatchString(ctx.Content)
+		goHasMathRand = rules.GMatchFile(reGoMathRandImport, ctx)
 	}
 
 	// For Java, check if java.util.Random is imported
 	javaHasUtilRandom := false
 	if ctx.Language == rules.LangJava {
-		javaHasUtilRandom = reJavaRandomImport.MatchString(ctx.Content)
+		javaHasUtilRandom = rules.GMatchFile(reJavaRandomImport, ctx)
 	}
 
 	for i, line := range lines {
@@ -988,9 +1110,9 @@ func (r *WeakPRNG) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangJava:
-			if javaHasUtilRandom || reJavaUtilRandom.MatchString(line) {
-				if loc := reJavaUtilRandom.FindString(line); loc != "" {
-					if reWeakPRNGSecCtx.MatchString(line) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			if javaHasUtilRandom || rules.GMatchLower(reJavaUtilRandom, line, lowered[i]) {
+				if loc := rules.GFindLower(reJavaUtilRandom, line, lowered[i]); loc != "" {
+					if rules.GMatchLower(reWeakPRNGSecCtx, line, lowered[i]) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 						matched = loc
 						detail = "java.util.Random"
 						suggestion = "Use java.security.SecureRandom for security-sensitive random values."
@@ -998,36 +1120,36 @@ func (r *WeakPRNG) Scan(ctx *rules.ScanContext) []rules.Finding {
 				}
 			}
 		case rules.LangPHP:
-			if loc := rePHPRand.FindString(line); loc != "" {
-				if reWeakPRNGSecCtx.MatchString(line) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			if loc := rules.GFindLower(rePHPRand, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reWeakPRNGSecCtx, line, lowered[i]) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 					matched = loc
 					detail = "PHP rand()/mt_rand()"
 					suggestion = "Use random_bytes() or random_int() for security-sensitive random values."
 				}
-			} else if loc := rePHPArray.FindString(line); loc != "" {
-				if reWeakPRNGSecCtx.MatchString(line) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			} else if loc := rules.GFindLower(rePHPArray, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reWeakPRNGSecCtx, line, lowered[i]) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 					matched = loc
 					detail = "PHP array_rand()"
 					suggestion = "Use random_int() for index selection or random_bytes() for security-sensitive random values."
 				}
 			}
 		case rules.LangRuby:
-			if loc := reRubyRand.FindString(line); loc != "" {
-				if reWeakPRNGSecCtx.MatchString(line) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			if loc := rules.GFindLower(reRubyRand, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reWeakPRNGSecCtx, line, lowered[i]) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 					matched = loc
 					detail = "Ruby rand()"
 					suggestion = "Use SecureRandom.hex, SecureRandom.uuid, or SecureRandom.random_bytes for security-sensitive random values."
 				}
-			} else if loc := reRubyRandObj.FindString(line); loc != "" {
-				if reWeakPRNGSecCtx.MatchString(line) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			} else if loc := rules.GFindLower(reRubyRandObj, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reWeakPRNGSecCtx, line, lowered[i]) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 					matched = loc
 					detail = "Ruby Random"
 					suggestion = "Use SecureRandom.hex, SecureRandom.uuid, or SecureRandom.random_bytes for security-sensitive random values."
 				}
 			}
 		case rules.LangCSharp:
-			if loc := reCSharpRandom.FindString(line); loc != "" {
-				if reWeakPRNGSecCtx.MatchString(line) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			if loc := rules.GFindLower(reCSharpRandom, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reWeakPRNGSecCtx, line, lowered[i]) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 					matched = loc
 					detail = "System.Random"
 					suggestion = "Use System.Security.Cryptography.RNGCryptoServiceProvider or RandomNumberGenerator.Create() for security-sensitive random values."
@@ -1035,8 +1157,8 @@ func (r *WeakPRNG) Scan(ctx *rules.ScanContext) []rules.Finding {
 			}
 		case rules.LangGo:
 			if goHasMathRand {
-				if loc := reGoRandCall.FindString(line); loc != "" {
-					if reWeakPRNGSecCtx.MatchString(line) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+				if loc := rules.GFindLower(reGoRandCall, line, lowered[i]); loc != "" {
+					if rules.GMatchLower(reWeakPRNGSecCtx, line, lowered[i]) || reWeakPRNGSecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 						matched = loc
 						detail = "math/rand"
 						suggestion = "Use crypto/rand for security-sensitive random values."
@@ -1074,8 +1196,8 @@ func (r *WeakPRNG) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type PredictableSeed struct{}
 
-func (r *PredictableSeed) ID() string          { return "BATOU-CRY-011" }
-func (r *PredictableSeed) Name() string        { return "PredictableSeed" }
+func (r *PredictableSeed) ID() string                      { return "BATOU-CRY-011" }
+func (r *PredictableSeed) Name() string                    { return "PredictableSeed" }
 func (r *PredictableSeed) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *PredictableSeed) Description() string {
@@ -1088,7 +1210,8 @@ func (r *PredictableSeed) Languages() []rules.Language {
 
 func (r *PredictableSeed) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -1099,72 +1222,72 @@ func (r *PredictableSeed) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangPython:
-			if loc := rePySeedTime.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePySeedTime, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Time-based random seed"
 				desc = "Seeding random with time makes output predictable to anyone who can estimate when the code runs."
 				suggestion = "Use the secrets module instead of seeding random. If random is needed for non-security purposes, omit the seed to use OS entropy."
-			} else if loc := rePySeedFixed.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(rePySeedFixed, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Fixed random seed"
 				desc = "A constant seed makes random output completely deterministic and reproducible."
 				suggestion = "Remove the fixed seed. Use the secrets module for security-sensitive values."
 			}
 		case rules.LangJava:
-			if loc := reJavaSeedTime.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJavaSeedTime, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Time-based random seed"
 				desc = "Seeding Random with system time makes output predictable to anyone who can estimate when the code runs."
 				suggestion = "Use java.security.SecureRandom which seeds itself from OS entropy."
-			} else if loc := reJavaSeedFixed.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJavaSeedFixed, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Fixed random seed"
 				desc = "A constant seed makes Random output completely deterministic and reproducible."
 				suggestion = "Use java.security.SecureRandom for security-sensitive values. Remove fixed seeds."
-			} else if loc := reJavaFixedSeed.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJavaFixedSeed, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Fixed random seed in constructor"
 				desc = "Constructing Random with a constant seed makes output completely deterministic and reproducible."
 				suggestion = "Use java.security.SecureRandom for security-sensitive values."
 			}
 		case rules.LangGo:
-			if loc := reGoSeedTime.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reGoSeedTime, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Time-based random seed"
 				desc = "Seeding math/rand with time.Now() makes output predictable. In Go 1.20+ math/rand auto-seeds, but still is not cryptographically secure."
 				suggestion = "Use crypto/rand for security-sensitive values."
-			} else if loc := reGoSeedFixed.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reGoSeedFixed, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Fixed random seed"
 				desc = "A constant seed makes math/rand output completely deterministic and reproducible."
 				suggestion = "Use crypto/rand for security-sensitive values. Remove fixed seeds."
-			} else if loc := reGoNewSource.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reGoNewSource, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Fixed seed in rand.NewSource"
 				desc = "Creating a rand source with a constant seed makes output completely deterministic and reproducible."
 				suggestion = "Use crypto/rand for security-sensitive values."
 			}
 		case rules.LangPHP:
-			if loc := rePHPSrandTime.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePHPSrandTime, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Time-based random seed"
 				desc = "Seeding with time() makes output predictable to anyone who can estimate when the code runs."
 				suggestion = "Use random_bytes() or random_int() for security-sensitive values. PHP 7+ auto-seeds, so explicit seeding is rarely needed."
-			} else if loc := rePHPSrandFixed.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(rePHPSrandFixed, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Fixed random seed"
 				desc = "A constant seed makes rand()/mt_rand() output completely deterministic and reproducible."
 				suggestion = "Use random_bytes() or random_int() for security-sensitive values. Remove fixed seeds."
 			}
 		case rules.LangRuby:
-			if loc := reRubySrandFixed.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reRubySrandFixed, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Fixed random seed"
 				desc = "A constant seed makes rand() output completely deterministic and reproducible."
 				suggestion = "Use SecureRandom for security-sensitive values. Remove fixed seeds."
 			}
 		case rules.LangC, rules.LangCPP:
-			if loc := reCSeedTime.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reCSeedTime, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Time-based random seed"
 				desc = "srand(time(NULL)) makes output predictable to anyone who can estimate when the code runs."
@@ -1174,7 +1297,7 @@ func (r *PredictableSeed) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Generic fallback: check for srand(time( in any language
 		if matched == "" {
-			if loc := reCSeedTime.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reCSeedTime, line, lowered[i]); loc != "" {
 				matched = loc
 				title = "Time-based random seed"
 				desc = "srand(time()) makes random output predictable to anyone who can estimate when the code runs."
@@ -1211,8 +1334,8 @@ func (r *PredictableSeed) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HardcodedKey struct{}
 
-func (r *HardcodedKey) ID() string                    { return "BATOU-CRY-012" }
-func (r *HardcodedKey) Name() string                  { return "HardcodedKey" }
+func (r *HardcodedKey) ID() string                      { return "BATOU-CRY-012" }
+func (r *HardcodedKey) Name() string                    { return "HardcodedKey" }
 func (r *HardcodedKey) DefaultSeverity() rules.Severity { return rules.Critical }
 
 func (r *HardcodedKey) Description() string {
@@ -1225,7 +1348,8 @@ func (r *HardcodedKey) Languages() []rules.Language {
 
 func (r *HardcodedKey) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -1241,22 +1365,25 @@ func (r *HardcodedKey) Scan(ctx *rules.ScanContext) []rules.Finding {
 		switch ctx.Language {
 		case rules.LangGo:
 			// key/secret := []byte("literal")
-			if reGoByteStringKey.MatchString(line) {
+			if rules.GMatchLower(reGoByteStringKey, line, lowered[i]) {
 				matched = true
 			}
 		case rules.LangPython:
-			if rePyHardcodedKey.MatchString(line) {
+			if rules.GMatchLower(rePyHardcodedKey, line, lowered[i]) {
 				matched = true
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if reJSBufferFromKey.MatchString(line) && reCryptoKeyCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			if rules.GMatchLower(reJSBufferFromKey, line, lowered[i]) && reCryptoKeyCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 				matched = true
-			} else if reJSHardcodedKey.MatchString(line) {
+			} else if rules.GMatchLower(reJSHardcodedKey, line, lowered[i]) && !isVueOrHTMLKeyAttr(line) {
+				// `.vue` SFCs are scanned as JS — skip `:key=`/`key=` template
+				// attributes (list-render keys, DOM attrs), keep firing on
+				// real `key = "sk_live_..."` / `secret = "..."` assignments.
 				matched = true
 			}
 		case rules.LangJava:
-			if reJavaSecretKeySpec.MatchString(line) || reJavaGetBytesKey.MatchString(line) {
-				if reCryptoKeyCtx.MatchString(line) || reCryptoKeyCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			if rules.GMatchLower(reJavaSecretKeySpec, line, lowered[i]) || rules.GMatchLower(reJavaGetBytesKey, line, lowered[i]) {
+				if rules.GMatchLower(reCryptoKeyCtx, line, lowered[i]) || reCryptoKeyCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 					matched = true
 				}
 			}
@@ -1264,7 +1391,7 @@ func (r *HardcodedKey) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		// Generic check for all languages: explicitly named crypto key variables
 		if !matched {
-			if reGenericHardcodedKey.MatchString(line) {
+			if rules.GMatchLower(reGenericHardcodedKey, line, lowered[i]) {
 				matched = true
 			}
 		}
@@ -1298,8 +1425,8 @@ func (r *HardcodedKey) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type UnauthenticatedEncryption struct{}
 
-func (r *UnauthenticatedEncryption) ID() string                    { return "BATOU-CRY-013" }
-func (r *UnauthenticatedEncryption) Name() string                  { return "UnauthenticatedEncryption" }
+func (r *UnauthenticatedEncryption) ID() string                      { return "BATOU-CRY-013" }
+func (r *UnauthenticatedEncryption) Name() string                    { return "UnauthenticatedEncryption" }
 func (r *UnauthenticatedEncryption) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *UnauthenticatedEncryption) Description() string {
@@ -1312,10 +1439,11 @@ func (r *UnauthenticatedEncryption) Languages() []rules.Language {
 
 func (r *UnauthenticatedEncryption) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check if any authentication is present in the entire file
-	hasAuth := reAuthCheck.MatchString(ctx.Content)
+	hasAuth := rules.GMatchFile(reAuthCheck, ctx)
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -1323,19 +1451,19 @@ func (r *UnauthenticatedEncryption) Scan(ctx *rules.ScanContext) []rules.Finding
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if loc := reGoCBCEncrypt.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reGoCBCEncrypt, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		case rules.LangPython:
-			if loc := rePyCBCMode.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePyCBCMode, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		case rules.LangJava:
-			if loc := reJavaCBC.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJavaCBC, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := reJSCBCCipher.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJSCBCCipher, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		}
@@ -1374,8 +1502,8 @@ func (r *UnauthenticatedEncryption) Scan(ctx *rules.ScanContext) []rules.Finding
 
 type InsecureRSAPadding struct{}
 
-func (r *InsecureRSAPadding) ID() string                    { return "BATOU-CRY-014" }
-func (r *InsecureRSAPadding) Name() string                  { return "InsecureRSAPadding" }
+func (r *InsecureRSAPadding) ID() string                      { return "BATOU-CRY-014" }
+func (r *InsecureRSAPadding) Name() string                    { return "InsecureRSAPadding" }
 func (r *InsecureRSAPadding) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *InsecureRSAPadding) Description() string {
@@ -1388,7 +1516,8 @@ func (r *InsecureRSAPadding) Languages() []rules.Language {
 
 func (r *InsecureRSAPadding) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -1397,28 +1526,28 @@ func (r *InsecureRSAPadding) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangGo:
-			if loc := reGoRSAPKCS1Encrypt.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reGoRSAPKCS1Encrypt, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "rsa.EncryptPKCS1v15"
-			} else if loc := reGoRSAPKCS1Decrypt.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reGoRSAPKCS1Decrypt, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "rsa.DecryptPKCS1v15"
 			}
 		case rules.LangJava:
-			if loc := reJavaRSAPKCS1.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJavaRSAPKCS1, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "RSA/PKCS1Padding"
-			} else if loc := reJavaRSANoPadding.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJavaRSANoPadding, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "RSA with no explicit mode (defaults to insecure padding)"
 			}
 		case rules.LangPython:
-			if loc := rePyPKCS1v15Encrypt.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePyPKCS1v15Encrypt, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "PKCS1_v1_5"
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := reJSRSAPKCS1Padding.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJSRSAPKCS1Padding, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "RSA_PKCS1_PADDING"
 			}
@@ -1453,8 +1582,8 @@ func (r *InsecureRSAPadding) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WeakPasswordHash struct{}
 
-func (r *WeakPasswordHash) ID() string                    { return "BATOU-CRY-015" }
-func (r *WeakPasswordHash) Name() string                  { return "WeakPasswordHash" }
+func (r *WeakPasswordHash) ID() string                      { return "BATOU-CRY-015" }
+func (r *WeakPasswordHash) Name() string                    { return "WeakPasswordHash" }
 func (r *WeakPasswordHash) DefaultSeverity() rules.Severity { return rules.Critical }
 
 func (r *WeakPasswordHash) Description() string {
@@ -1469,41 +1598,42 @@ func (r *WeakPasswordHash) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
 
 	// If proper password hashing is used in the file, suppress
-	if reProperPasswordHash.MatchString(ctx.Content) {
+	if rules.GMatchFile(reProperPasswordHash, ctx) {
 		return nil
 	}
 
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
 		var matched string
 
 		// Only flag if password context exists on the line or nearby
-		hasPasswordCtx := rePasswordCtx.MatchString(line) || rePasswordCtx.MatchString(safeSurroundingLines(lines, i, 3))
+		hasPasswordCtx := rules.GMatchLower(rePasswordCtx, line, lowered[i]) || rePasswordCtx.MatchString(safeSurroundingLines(lines, i, 3))
 		if !hasPasswordCtx {
 			continue
 		}
 
 		switch ctx.Language {
 		case rules.LangPython:
-			if loc := rePyHashPassword.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePyHashPassword, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		case rules.LangGo:
-			if loc := reGoHashPassword.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reGoHashPassword, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		case rules.LangJava:
-			if loc := reJavaDigestPassword.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJavaDigestPassword, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if loc := reJSHashPassword.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJSHashPassword, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		case rules.LangPHP:
-			if loc := rePHPHashPassword.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePHPHashPassword, line, lowered[i]); loc != "" {
 				matched = loc
 			}
 		}
@@ -1537,8 +1667,8 @@ func (r *WeakPasswordHash) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureRandomBroad struct{}
 
-func (r *InsecureRandomBroad) ID() string                    { return "BATOU-CRY-016" }
-func (r *InsecureRandomBroad) Name() string                  { return "InsecureRandomBroad" }
+func (r *InsecureRandomBroad) ID() string                      { return "BATOU-CRY-016" }
+func (r *InsecureRandomBroad) Name() string                    { return "InsecureRandomBroad" }
 func (r *InsecureRandomBroad) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *InsecureRandomBroad) Description() string {
@@ -1551,7 +1681,8 @@ func (r *InsecureRandomBroad) Languages() []rules.Language {
 
 func (r *InsecureRandomBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -1561,22 +1692,22 @@ func (r *InsecureRandomBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangRuby:
-			if loc := reRubyRandSec.FindString(line); loc != "" {
-				if reCRY016SecCtx.MatchString(line) || reCRY016SecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			if loc := rules.GFindLower(reRubyRandSec, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reCRY016SecCtx, line, lowered[i]) || reCRY016SecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 					matched = loc
 					detail = "Ruby rand()"
 					suggestion = "Use SecureRandom.hex, SecureRandom.uuid, or SecureRandom.random_bytes for security-sensitive random values."
 				}
-			} else if loc := reRubyRandObjSec.FindString(line); loc != "" {
-				if reCRY016SecCtx.MatchString(line) || reCRY016SecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			} else if loc := rules.GFindLower(reRubyRandObjSec, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reCRY016SecCtx, line, lowered[i]) || reCRY016SecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 					matched = loc
 					detail = "Ruby Random"
 					suggestion = "Use SecureRandom.hex, SecureRandom.uuid, or SecureRandom.random_bytes for security-sensitive random values."
 				}
 			}
 		case rules.LangPHP:
-			if loc := rePHPRandSec.FindString(line); loc != "" {
-				if reCRY016SecCtx.MatchString(line) || reCRY016SecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
+			if loc := rules.GFindLower(rePHPRandSec, line, lowered[i]); loc != "" {
+				if rules.GMatchLower(reCRY016SecCtx, line, lowered[i]) || reCRY016SecCtx.MatchString(safeSurroundingLines(lines, i, 5)) {
 					matched = loc
 					detail = "PHP rand()/mt_rand()"
 					suggestion = "Use random_bytes() or random_int() for security-sensitive random values."
@@ -1613,8 +1744,8 @@ func (r *InsecureRandomBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TimingUnsafeCompare struct{}
 
-func (r *TimingUnsafeCompare) ID() string                    { return "BATOU-CRY-017" }
-func (r *TimingUnsafeCompare) Name() string                  { return "TimingUnsafeCompare" }
+func (r *TimingUnsafeCompare) ID() string                      { return "BATOU-CRY-017" }
+func (r *TimingUnsafeCompare) Name() string                    { return "TimingUnsafeCompare" }
 func (r *TimingUnsafeCompare) DefaultSeverity() rules.Severity { return rules.Medium }
 
 func (r *TimingUnsafeCompare) Description() string {
@@ -1627,7 +1758,8 @@ func (r *TimingUnsafeCompare) Languages() []rules.Language {
 
 func (r *TimingUnsafeCompare) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -1639,7 +1771,27 @@ func (r *TimingUnsafeCompare) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Skip lines that already use safe comparison
-		if reTimingSafeCompare.MatchString(line) {
+		if rules.GMatchLower(reTimingSafeCompare, line, lowered[i]) {
+			continue
+		}
+
+		// Skip nil / zero / empty / literal existence checks — these
+		// are not secret-value comparisons even if the variable name
+		// contains a security keyword.
+		if rules.GMatchLower(reTimingNilOrZero, line, lowered[i]) {
+			continue
+		}
+
+		// Skip length/size comparisons — they leak length, not content, and
+		// a constant-time rewrite is not the fix.
+		if rules.GMatchLower(reTimingLengthCompare, line, lowered[i]) {
+			continue
+		}
+
+		// Skip reflexive comparisons (`token === token`) — both sides are the
+		// same in-memory value, so there is no timing leak. (Seen in
+		// client-side stores in owncloud/web.)
+		if isReflexiveCompare(line) {
 			continue
 		}
 
@@ -1648,22 +1800,22 @@ func (r *TimingUnsafeCompare) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangJavaScript, rules.LangTypeScript:
-			if reTimingCompareJS.MatchString(line) || reTimingCompareRev.MatchString(line) {
+			if rules.GMatchLower(reTimingCompareJS, line, lowered[i]) || rules.GMatchLower(reTimingCompareRev, line, lowered[i]) {
 				matched = true
 				suggestion = "Use crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b)) for constant-time comparison."
 			}
 		case rules.LangPython:
-			if reTimingComparePy.MatchString(line) {
+			if rules.GMatchLower(reTimingComparePy, line, lowered[i]) {
 				matched = true
 				suggestion = "Use hmac.compare_digest(a, b) for constant-time comparison."
 			}
 		case rules.LangGo:
-			if reTimingCompareGo.MatchString(line) {
+			if rules.GMatchLower(reTimingCompareGo, line, lowered[i]) {
 				matched = true
 				suggestion = "Use subtle.ConstantTimeCompare([]byte(a), []byte(b)) from crypto/subtle for constant-time comparison."
 			}
 		case rules.LangRuby:
-			if reTimingCompareRuby.MatchString(line) {
+			if rules.GMatchLower(reTimingCompareRuby, line, lowered[i]) {
 				matched = true
 				suggestion = "Use Rack::Utils.secure_compare(a, b) or ActiveSupport::SecurityUtils.secure_compare(a, b) for constant-time comparison."
 			}
@@ -1698,8 +1850,8 @@ func (r *TimingUnsafeCompare) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type HardcodedIVBroad struct{}
 
-func (r *HardcodedIVBroad) ID() string                    { return "BATOU-CRY-018" }
-func (r *HardcodedIVBroad) Name() string                  { return "HardcodedIVBroad" }
+func (r *HardcodedIVBroad) ID() string                      { return "BATOU-CRY-018" }
+func (r *HardcodedIVBroad) Name() string                    { return "HardcodedIVBroad" }
 func (r *HardcodedIVBroad) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *HardcodedIVBroad) Description() string {
@@ -1712,7 +1864,8 @@ func (r *HardcodedIVBroad) Languages() []rules.Language {
 
 func (r *HardcodedIVBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		lineNum := i + 1
@@ -1721,20 +1874,20 @@ func (r *HardcodedIVBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		switch ctx.Language {
 		case rules.LangJava:
-			if loc := reJavaIvParameterSpec.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reJavaIvParameterSpec, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "IvParameterSpec with hardcoded bytes"
-			} else if loc := reJavaIvHexBytes.FindString(line); loc != "" {
+			} else if loc := rules.GFindLower(reJavaIvHexBytes, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "IvParameterSpec with hardcoded hex/base64"
 			}
 		case rules.LangPython:
-			if loc := rePyFixedIVAES.FindString(line); loc != "" {
+			if loc := rules.GFindLower(rePyFixedIVAES, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "AES with hardcoded IV bytes"
 			}
 		case rules.LangGo:
-			if loc := reGoFixedNonceSeal.FindString(line); loc != "" {
+			if loc := rules.GFindLower(reGoFixedNonceSeal, line, lowered[i]); loc != "" {
 				matched = loc
 				detail = "AEAD Seal/Open with fixed nonce"
 			}
@@ -1769,8 +1922,8 @@ func (r *HardcodedIVBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type JavaWeakRandomBroad struct{}
 
-func (r *JavaWeakRandomBroad) ID() string                    { return "BATOU-CRY-019" }
-func (r *JavaWeakRandomBroad) Name() string                  { return "JavaWeakRandomBroad" }
+func (r *JavaWeakRandomBroad) ID() string                      { return "BATOU-CRY-019" }
+func (r *JavaWeakRandomBroad) Name() string                    { return "JavaWeakRandomBroad" }
 func (r *JavaWeakRandomBroad) DefaultSeverity() rules.Severity { return rules.High }
 
 func (r *JavaWeakRandomBroad) Description() string {
@@ -1787,7 +1940,8 @@ func (r *JavaWeakRandomBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -1796,7 +1950,7 @@ func (r *JavaWeakRandomBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		// Skip lines that use SecureRandom
-		if reSecureRandomLine.MatchString(line) {
+		if rules.GMatchLower(reSecureRandomLine, line, lowered[i]) {
 			continue
 		}
 
@@ -1808,10 +1962,10 @@ func (r *JavaWeakRandomBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var detail string
 
-		if loc := reJavaNewRandom.FindString(line); loc != "" {
+		if loc := rules.GFindLower(reJavaNewRandom, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "java.util.Random is not cryptographically secure"
-		} else if loc := reJavaMathRandom.FindString(line); loc != "" {
+		} else if loc := rules.GFindLower(reJavaMathRandom, line, lowered[i]); loc != "" {
 			matched = loc
 			detail = "Math.random() is not cryptographically secure"
 		}
@@ -1842,6 +1996,18 @@ func (r *JavaWeakRandomBroad) Scan(ctx *rules.ScanContext) []rules.Finding {
 }
 
 // --- Helpers ---
+
+// hasNonSecurityContext reports true when CRY-001 should be suppressed
+// because the use is clearly an identifier / cache key / protocol primitive
+// rather than a security boundary. Checks ±5 lines around the matched line
+// and the file path.
+func hasNonSecurityContext(lines []string, idx int, filePath string) bool {
+	if reNonSecurityCtx.MatchString(filePath) {
+		return true
+	}
+	window := safeSurroundingLines(lines, idx, 5)
+	return reNonSecurityCtx.MatchString(window)
+}
 
 // safeSurroundingLines returns a window of lines around the given index for context analysis.
 func safeSurroundingLines(lines []string, idx, window int) string {

@@ -133,7 +133,9 @@ func FormatBlockMessage(result *ScanResult) string {
 				}
 				fmt.Fprintf(&b, "  Location: %s\n", loc)
 			}
-			if f.MatchedText != "" {
+			if path := f.FormatTaintPath(); path != "" {
+				b.WriteString(path)
+			} else if f.MatchedText != "" {
 				snippet := f.MatchedText
 				if len(snippet) > 120 {
 					snippet = snippet[:120] + "..."

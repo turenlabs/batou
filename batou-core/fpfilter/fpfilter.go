@@ -212,6 +212,18 @@ var testDirSegments = []string{
 	"/test_data/",
 	"/src/test/",  // Maven/Gradle convention
 	"/src/it/",    // Maven integration tests
+	"/unittest/",  // Gitea / xorm convention (models/unittest/)
+	"/testutil/",  // Go convention for test helpers
+	"/testutils/", // Go convention for test helpers
+	"/testhelper/",
+	"/testhelpers/",
+	"/integration/", // /integration/ test suites
+	"/integrations/",
+	"/e2e/",       // end-to-end tests
+	"/scaletest/", // Coder convention: load/scale-testing tooling
+	"/scaletests/",
+	"/test_fixtures/", // ad-hoc fixture trees
+	"/test-fixtures/",
 }
 
 // testFileSuffixes are filename suffixes that indicate test files.
@@ -241,7 +253,7 @@ var testFileSuffixes = []string{
 var javaTestSuffixes = []string{
 	"Test.java",
 	"Tests.java",
-	"IT.java",        // integration tests
+	"IT.java", // integration tests
 	"ITCase.java",
 	"Spec.java",
 	"Test.kt",
@@ -252,6 +264,7 @@ var javaTestSuffixes = []string{
 // testFileNames are exact base filenames that indicate test/config files.
 var testFileNames = []string{
 	"conftest.py",
+	"tests.py", // Django convention: single-file tests module
 	"setup_test.go",
 	"cypress.config.ts",
 	"cypress.config.js",
@@ -267,9 +280,9 @@ var vendoredJSLibPrefixes = []string{
 	"underscore",
 	"lodash",
 	"moment",
-	"angular.",   // Angular 1.x vendored builds
-	"react.",     // vendored React builds
-	"vue.",       // vendored Vue builds
+	"angular.", // Angular 1.x vendored builds
+	"react.",   // vendored React builds
+	"vue.",     // vendored Vue builds
 	"bootstrap",
 	"d3.",
 	"three.",
@@ -305,9 +318,134 @@ var vendoredDirPatterns = []string{
 	"/third_party/",
 	"/3rdparty/",
 	"/external/",
-	"/codefixes/",    // intentionally vulnerable challenge snippets
+	"/codefixes/", // intentionally vulnerable challenge snippets
 	"/codefix/",
 	"/snippets/challenge/",
+	// Composer's generated autoloader runtime. The canonical layout is
+	// vendor/composer/ (skipped via the /vendor/ generatedPathPatterns
+	// entry), but per-component autoloaders land at
+	// <component>/composer/composer/ — Nextcloud ships one under every
+	// apps/<app>/composer/composer/ and under lib/composer/composer/. Every
+	// file under this doubled segment is a Composer-generated artifact
+	// (ClassLoader.php, InstalledVersions.php, autoload_*.php, installed.php,
+	// platform_check.php), never the app's own code, so the whole directory
+	// is third-party. The doubled segment is required (both slashes), so a
+	// project's own /composer/ dir holding composer.json is not matched.
+	"/composer/composer/",
+}
+
+// infraDirSegments are directory names that indicate infrastructure /
+// scaffolding code (DB migrations, build tooling, code generators).
+//
+// These paths intentionally contain patterns that look unsafe to a generic
+// scanner — DDL string-interpolation in migrations, exec-with-variable in
+// build tools, dynamic code construction in generators — but are not part
+// of the request-handling surface and operate on internal, trusted inputs.
+var infraDirSegments = []string{
+	"/migrations/",
+	"/migration/",
+	"/migrate/",
+	"/db/migrate/", // Rails / Sequel convention
+	"/schema/migrations/",
+	"/cmd/tools/",
+	"/build/tools/",
+	"/tools/", // build-time tooling (linters, codegen runners)
+	"/generator/",
+	"/generators/",
+	"/codegen/",
+	"/script/",
+	"/scripts/",
+	"/devtest/", // Gitea convention: developer-only test endpoints
+	"/devtests/",
+	"/devtools/",
+	// ember-cli-mirage: a client-side MOCK SERVER that only runs in dev/test
+	// (route handlers backed by an in-memory fake ORM). Its `request.params`
+	// -> `schema.find()` handlers read as NoSQL/SQL injection to a generic
+	// scanner but never touch a production datastore. Path-segment match so it
+	// only fires on a real `mirage/` directory, not a substring.
+	"/mirage/",
+	// Python infrastructure / vendored environments.
+	// These contain library, build, or dev-only code that intentionally
+	// uses patterns that look unsafe (eval in stubs, subprocess in
+	// setup hooks, dynamic imports in migrations) but aren't part of
+	// the request-handling surface.
+	"/__pycache__/",   // Python bytecode cache
+	"/.tox/",          // tox virtual envs (test matrices)
+	"/.nox/",          // nox virtual envs
+	"/venv/",          // conventional virtualenv directory
+	"/.venv/",         // PEP-405 / poetry convention
+	"/site-packages/", // installed third-party Python packages
+	"/dist-packages/", // Debian-style installed Python packages
+	"/.eggs/",         // setuptools egg cache
+	"/eggs/",          // setuptools egg cache (older layout)
+	"/.pytest_cache/", // pytest cache
+	"/.mypy_cache/",   // mypy cache
+	"/.ruff_cache/",   // ruff cache
+	"/docs/",          // documentation trees (Sphinx, MkDocs, etc.)
+	// Benchmarking harness paths. These intentionally exec child
+	// processes, eval arbitrary code, parse untrusted-looking input,
+	// etc. — the whole point of a benchmark is to drive the system
+	// under test with a workload, which often looks like an attacker
+	// to a SAST. node.js, V8, fastlane, etc. all have a benchmark/
+	// directory with these patterns. Surfaced via scan_harness on
+	// nodejs/node — 5/5 BATOU-JSAST-004 hits at CRITICAL were in
+	// benchmark/_http-benchmarkers.js etc.
+	"/benchmark/",
+	"/benchmarks/",
+	"/bench/",
+	"/perf/",
+	"/perf_test/",
+	"/performance/",
+	// Code-generation / language-server deps trees. These ship
+	// stub or fixture code that often contains unsafe-looking
+	// patterns for parser testing.
+	"/deps/v8/test/",
+	"/test-cases/",
+	"/test_cases/",
+	// Documentation example trees ship code snippets that intentionally
+	// demonstrate API usage — they're sample fixtures, not the
+	// project's request surface. FastAPI's /docs_src/ tree is the
+	// canonical example. scan_harness sample: 47.5 hits/repo of
+	// BATOU-FW-FASTAPI-008 on FastAPI's own docs_src/.
+	"/docs_src/",
+	"/example/",
+	"/examples/",
+	"/sample/",
+	"/samples/",
+	"/demo/",
+	"/demos/",
+}
+
+// infraFileSuffixes are filename suffixes that indicate generated or
+// generator code (the file that emits generated code, not the output).
+var infraFileSuffixes = []string{
+	"_gen.go", // Go generator output
+	".gen.go",
+	".pb.go", // protobuf generated
+	"_generated.go",
+	"_generated.ts",
+	"_generated.js",
+}
+
+// infraFileNames are exact base filenames that indicate generator scripts
+// (the file is itself a code generator, run via `go generate` / `make gen`)
+// OR test/dev-environment setup files that ship in production packages
+// but only execute under test/dev conditions.
+var infraFileNames = []string{
+	"generate.go",
+	"gen.go",
+	"main_generate.go",
+	"testenv.go", // Gitea / Go convention: test-environment setup
+	"test_env.go",
+	"devenv.go",
+	"dev_env.go",
+	// Python build / packaging / management scripts. These run at install
+	// or admin time, not in response to user requests, so dynamic-exec or
+	// path-construction patterns inside them aren't request-surface bugs.
+	// (conftest.py is covered by testFileNames; not duplicated here.)
+	"setup.py",
+	"setup.cfg",
+	"manage.py", // Django entry point (runs subprocesses, exec'd from CLI)
 }
 
 // testPathKeywords are case-insensitive substrings that indicate test-like files.
@@ -361,6 +499,18 @@ func IsTestFile(filePath string) bool {
 		return true
 	}
 
+	// CI test-runner shell scripts that live at the repo root (so the
+	// /tests/ and /benchmarks/ directory segments don't catch them).
+	// Nextcloud / ownCloud ship autotest.sh, autotest-external.sh,
+	// autotest-checkers.sh at the project root — these drive the test suite
+	// (spin up DBs, exec phpunit, etc.) and intentionally contain shell
+	// patterns that read as command-injection to a SAST but operate on
+	// internal, trusted inputs. The "autotest" prefix + .sh suffix is a
+	// narrow, well-known convention.
+	if strings.HasPrefix(baseLower, "autotest") && strings.HasSuffix(baseLower, ".sh") {
+		return true
+	}
+
 	// Keywords in the path.
 	for _, kw := range testPathKeywords {
 		if strings.Contains(lower, kw) {
@@ -369,6 +519,49 @@ func IsTestFile(filePath string) bool {
 	}
 
 	return false
+}
+
+// IsInfraFile returns true if the file looks like infrastructure /
+// scaffolding code (DB migrations, build-time tooling, code generators).
+//
+// These paths run with internal, trusted inputs and intentionally contain
+// patterns that read as unsafe in user-facing code — for example, DDL
+// string-interpolation in migrations or exec-with-variable in build tools.
+// Treat findings here like test-file findings: keep them as hints, not blocks.
+func IsInfraFile(filePath string) bool {
+	norm := filepath.ToSlash(filePath)
+	lower := strings.ToLower("/" + norm)
+
+	for _, seg := range infraDirSegments {
+		if strings.Contains(lower, seg) {
+			return true
+		}
+	}
+
+	for _, suf := range infraFileSuffixes {
+		if strings.HasSuffix(lower, suf) {
+			return true
+		}
+	}
+
+	baseLower := strings.ToLower(filepath.Base(filePath))
+	for _, name := range infraFileNames {
+		if baseLower == name {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsInfraOrTestPath returns true if a path looks like test code, fixtures,
+// build tooling, code generators, scale-testing harnesses, or any other
+// non-production "support" path. It is the union of IsTestFile and
+// IsInfraFile and exists as a single helper because both kinds of paths
+// get the same confidence-cap treatment in the scanner: findings on them
+// drop to 0.3 so they don't reach the 0.7 block threshold.
+func IsInfraOrTestPath(filePath string) bool {
+	return IsTestFile(filePath) || IsInfraFile(filePath)
 }
 
 // ---------------------------------------------------------------------------

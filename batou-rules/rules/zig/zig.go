@@ -24,7 +24,6 @@ var reAlignCast = regexp.MustCompile(`@alignCast\s*\(`)
 var (
 	reChildProcess = regexp.MustCompile(`std\.process\.Child|std\.ChildProcess`)
 	reOsExecve     = regexp.MustCompile(`std\.os\.execve\s*\(`)
-	reSpawn        = regexp.MustCompile(`\.spawn\s*\(\s*\)`)
 )
 
 // ZIG-005: Path traversal
@@ -53,7 +52,7 @@ var reWeakCrypto = regexp.MustCompile(`std\.crypto\.hash\.(?:Md5|Sha1)`)
 var reLineComment = regexp.MustCompile(`^\s*//`)
 
 func isCommentLine(line string) bool {
-	return reLineComment.MatchString(line)
+	return rules.GMatch(reLineComment, line)
 }
 
 func truncate(s string, maxLen int) string {
@@ -82,13 +81,14 @@ func (r UnsafePtrCast) Languages() []rules.Language {
 
 func (r UnsafePtrCast) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if rePtrCast.MatchString(line) {
+		if rules.GMatchLower(rePtrCast, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -128,13 +128,14 @@ func (r UnsafeIntToPtr) Languages() []rules.Language {
 
 func (r UnsafeIntToPtr) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if reIntToPtr.MatchString(line) {
+		if rules.GMatchLower(reIntToPtr, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -174,13 +175,14 @@ func (r UnsafeAlignCast) Languages() []rules.Language {
 
 func (r UnsafeAlignCast) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if reAlignCast.MatchString(line) {
+		if rules.GMatchLower(reAlignCast, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -220,14 +222,15 @@ func (r CommandInjection) Languages() []rules.Language {
 
 func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if reOsExecve.MatchString(line) {
+		if rules.GMatchLower(reOsExecve, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -247,7 +250,7 @@ func (r CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reChildProcess.MatchString(line) {
+		if rules.GMatchLower(reChildProcess, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      rules.Critical,
@@ -287,7 +290,8 @@ func (r PathTraversal) Languages() []rules.Language {
 
 func (r PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	// Check for path validation in the file
 	hasRealPath := strings.Contains(ctx.Content, "realpathZ") || strings.Contains(ctx.Content, "realpath")
@@ -302,8 +306,8 @@ func (r PathTraversal) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		hasFsOpen := reFsOpenFile.MatchString(line) || reDirOpenFile.MatchString(line)
-		hasConcat := rePathConcat.MatchString(line)
+		hasFsOpen := rules.GMatchLower(reFsOpenFile, line, lowered[i]) || rules.GMatchLower(reDirOpenFile, line, lowered[i])
+		hasConcat := rules.GMatchLower(rePathConcat, line, lowered[i])
 
 		// File open with string concat/format on the same or adjacent lines
 		if hasFsOpen {
@@ -367,14 +371,15 @@ func (r UnsafeErrorSuppression) Languages() []rules.Language {
 
 func (r UnsafeErrorSuppression) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
 
-		if reCatchUnreachable.MatchString(line) {
+		if rules.GMatchLower(reCatchUnreachable, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -394,7 +399,7 @@ func (r UnsafeErrorSuppression) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reCatchUndefined.MatchString(line) {
+		if rules.GMatchLower(reCatchUndefined, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -434,13 +439,14 @@ func (r UnsafeBitCast) Languages() []rules.Language {
 
 func (r UnsafeBitCast) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if reBitCast.MatchString(line) {
+		if rules.GMatchLower(reBitCast, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -480,13 +486,14 @@ func (r WeakCrypto) Languages() []rules.Language {
 
 func (r WeakCrypto) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		if isCommentLine(line) {
 			continue
 		}
-		if reWeakCrypto.MatchString(line) {
+		if rules.GMatchLower(reWeakCrypto, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),

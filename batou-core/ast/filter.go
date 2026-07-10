@@ -1,7 +1,7 @@
 package ast
 
 import (
-	"strings"
+	"bytes"
 
 	"github.com/turenlabs/batou-rules/rules"
 )
@@ -72,10 +72,18 @@ func findingOffset(f rules.Finding, lineOffsets []int, content []byte) (uint32, 
 	// If we have matched text, find its position within the line for a
 	// more precise offset.
 	if f.MatchedText != "" {
-		// Search from line start for the matched text.
-		remaining := string(content[lineStart:])
-		idx := strings.Index(remaining, f.MatchedText)
-		if idx >= 0 {
+		// Only accept a MatchedText occurrence that BEGINS on the finding's own
+		// line. The previous code searched to END OF FILE (and copied the whole
+		// file tail via string(content[lineStart:])), so a short/common
+		// MatchedText absent from its own line matched a later-line occurrence —
+		// possibly inside a comment many lines down — and IsInComment was then
+		// evaluated at the wrong offset, mis-suppressing a real finding. bytes
+		// .Index on the slice avoids the per-finding file-tail copy.
+		lineEnd := len(content)
+		if f.LineNumber < len(lineOffsets) {
+			lineEnd = lineOffsets[f.LineNumber]
+		}
+		if idx := bytes.Index(content[lineStart:], []byte(f.MatchedText)); idx >= 0 && lineStart+idx < lineEnd {
 			return uint32(lineStart + idx), true
 		}
 	}

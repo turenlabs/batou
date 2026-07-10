@@ -214,7 +214,6 @@ Batou recognizes 28 sanitizer patterns for Python.
 
 | Sanitizer ID | Pattern | Neutralizes |
 |--------------|---------|-------------|
-| `py.parameterized` | Parameterized query placeholders (`%s` with tuple) | SQL query |
 | `py.sqlalchemy.bindparams` | `.params()` / `bindparam()` | SQL query |
 | `py.int` | `int()` | SQL query, command |
 
@@ -514,7 +513,7 @@ def get_user():
     cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
 ```
 
-The `py.parameterized` sanitizer recognizes this pattern and neutralizes the SQL injection taint.
+The tsflow walker's `isParameterizedQuery()` check recognizes this pattern (placeholders such as `?`, `$N`, `:name`, or `%s` with a separate bind-args argument) and neutralizes the SQL injection taint.
 
 ### Subprocess with List Arguments
 

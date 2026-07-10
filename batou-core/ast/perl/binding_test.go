@@ -3,7 +3,6 @@ package perl
 import (
 	"context"
 	"testing"
-
 	sitter "github.com/smacker/go-tree-sitter"
 )
 

@@ -1,0 +1,255 @@
+# Python CVE Ground-Truth Corpus Manifest
+#
+# Each entry describes one Python CVE: where to fetch the vulnerable and
+# fixed source, which file(s) carry the bug, and what CWE the harness
+# should expect. Mirrors the structure of tools/gocve_manifest.yaml.
+#
+# Two modes are supported:
+#
+#   mode: stage    -- copy hand-crafted fixtures from `staged_path/{vuln,safe}`
+#                     in this repo into testdata/pycve-bench/CVE-*/{vuln,safe}.
+#                     Used when an authoritative reduced reproducer is easier
+#                     to vet than cloning a full upstream repo.
+#
+#   mode: clone    -- shallow-clone `repo`, check out `vuln_commit` and
+#                     `fixed_commit`, copy the listed files into the vuln
+#                     and safe trees respectively. Skipped if `git` or the
+#                     network is unavailable.
+#
+# Either way, the script writes expected.json with the CWE the harness looks
+# for. The harness in batou-core/scanner/pycve_bench_test.go does not assert
+# specific detection rates — it just measures.
+
+- cve: CVE-2024-22195
+  description: >-
+    Jinja2 server-side template injection via the xmlattr filter and, more
+    generally, via any code path that constructs jinja2.Template(...) or
+    flask.render_template_string(...) from attacker-controlled source text.
+    Once user input becomes template *source* (not data) the attacker
+    gets RCE on the Python process.
+  cwe: CWE-94
+  category: ssti
+  file: render.py
+  function: preview
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2024-22195
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2024-22195
+
+- cve: CVE-2022-29217
+  description: >-
+    PyJWT key/algorithm confusion: jwt.decode() callers that accept both
+    HMAC (HS*) and asymmetric (RS*/ES*/PS*) algorithms let an attacker who
+    knows the asymmetric public key forge tokens by signing them with HMAC
+    using the public key as the secret.
+  cwe: CWE-327
+  category: jwt
+  file: auth.py
+  function: verify_id_token
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2022-29217
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2022-29217
+
+- cve: CVE-2023-24329
+  description: >-
+    urllib.parse scheme bypass on Python < 3.11.4 / 3.10.12 / 3.9.17 that
+    let an attacker get past naive parsed.scheme allow-lists by prefixing a
+    URL with a blank character. The downstream-vulnerable pattern is a web
+    service that urlparses an attacker-controlled URL, checks the scheme,
+    then calls urllib.request.urlopen() — a textbook SSRF sink.
+  cwe: CWE-918
+  category: ssrf
+  file: fetch.py
+  function: fetch
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2023-24329
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2023-24329
+
+- cve: CVE-2017-18342
+  description: >-
+    PyYAML yaml.load() without an explicit SafeLoader deserialises
+    !!python/object/apply tags as live Python calls, turning the loader
+    into an arbitrary code-execution sink. The downstream-vulnerable
+    pattern is any service that reads YAML from untrusted input — request
+    body, uploaded config, S3 object — and passes it to yaml.load() without
+    Loader=SafeLoader.
+  cwe: CWE-502
+  category: deser
+  file: loader.py
+  function: upload_config
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2017-18342
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2017-18342
+
+- cve: CVE-2022-24439
+  description: >-
+    GitPython < 3.1.30 forwarded Repo.clone_from() URLs straight to the git
+    subprocess argv. An attacker-supplied URL beginning with "--" was
+    parsed by git as a flag and executed (--upload-pack=...). The
+    downstream-vulnerable pattern is broader: assembling argv (or a shell
+    string) from attacker-controlled input without rejecting flag-like
+    leaders or pinning to shell=False.
+  cwe: CWE-78
+  category: injection
+  file: cloner.py
+  function: clone
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2022-24439
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2022-24439
+
+- cve: CVE-2023-37271
+  description: >-
+    snowflake-sqlalchemy < 1.4.7 did not escape the account (and a handful
+    of adjacent identifier) parameters when building the connection URL.
+    The downstream-vulnerable pattern that lights up Batou's SQL-injection
+    sinks is the broader one: taking a request parameter, concatenating it
+    into a SQL string, and handing the result to cursor.execute() or
+    SQLAlchemy text() — a textbook CWE-89.
+  cwe: CWE-89
+  category: sqli
+  file: db.py
+  function: lookup
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2023-37271
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2023-37271
+
+- cve: CVE-2024-1561
+  description: >-
+    Gradio's component file-routing endpoints accepted a relative path from
+    the client and joined it onto the upload root without resolving "..",
+    enabling arbitrary file read (CWE-22 path traversal). The downstream
+    pattern Batou catches is os.path.join(BASE_DIR, request_filename)
+    flowing into open()/send_file() without a Path.resolve()+is_relative_to
+    check.
+  cwe: CWE-22
+  category: traversal
+  file: files.py
+  function: download
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2024-1561
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2024-1561
+
+- cve: CVE-2023-39418
+  description: >-
+    PyTorch's default torch.load path uses Python pickle, which is an
+    arbitrary-code-execution sink (CWE-502). A service that unpickles
+    attacker-controlled bytes — model upload, remote checkpoint, multi-
+    tenant cache — yields RCE the moment torch.load / pickle.loads walks
+    a malicious REDUCE opcode.
+  cwe: CWE-502
+  category: deser
+  file: model.py
+  function: load_model
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2023-39418
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2023-39418
+
+- cve: CVE-2023-50447
+  description: >-
+    Pillow < 10.2.0 let an attacker escape ImageMath.eval's expression
+    allow-list and reach Python builtins, giving RCE (CWE-94 code
+    injection). The broader downstream pattern is any handler that takes
+    an expression string from the request and feeds it to a dynamic
+    evaluator — ImageMath.eval, eval, exec, or compile.
+  cwe: CWE-94
+  category: ssti
+  file: transform.py
+  function: op
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2023-50447
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2023-50447
+
+- cve: CVE-2023-30536
+  description: >-
+    Cookiecutter at one point rendered the *prompt* string for a template
+    variable as a Jinja2 expression before showing it to the user, which
+    let a malicious cookiecutter.json reach Python builtins via the
+    standard {{ ... }} chains — SSTI / CWE-1336. The downstream pattern
+    Batou catches is the broader one: request input flowing into
+    jinja2.Environment().from_string() or render_template_string() as
+    the template *source*.
+  cwe: CWE-1336
+  category: ssti
+  file: prompt.py
+  function: prompt
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2023-30536
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2023-30536
+
+- cve: CVE-2022-21712
+  description: >-
+    Twisted < 22.1.0 mis-parsed duplicated / obfuscated Transfer-Encoding
+    values, enabling HTTP request smuggling (CWE-444) through a Twisted
+    proxy. The library-level bug itself maps to CWE-444; the downstream
+    pattern Batou actually catches in an application proxy is the *SSRF*
+    facet (CWE-918) — a handler that takes the upstream URL from the
+    request and forwards client-supplied headers verbatim. Expected CWE
+    is set to 918 to reflect what Batou's Python catalog can detect on
+    this shape; CWE-444 detection is a known gap.
+  cwe: CWE-918
+  category: ssrf
+  file: proxy.py
+  function: proxy
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2022-21712
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2022-21712
+
+- cve: CVE-2023-32681
+  description: >-
+    Requests < 2.31.0 leaked the Proxy-Authorization header across cross-
+    origin redirects. The downstream pattern Batou catches is the same
+    one that drives every redirect/SSRF rule: a handler that calls
+    requests.get(target, allow_redirects=True) with attacker-controlled
+    target, plus a Flask redirect() that forwards an unvalidated ?next=
+    URL — CWE-601 open redirect alongside CWE-918 SSRF.
+  cwe: CWE-601
+  category: redirect
+  file: fetcher.py
+  function: follow
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2023-32681
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2023-32681
+
+- cve: CVE-2024-21503
+  description: >-
+    black < 24.3.0 had a regex in its import-sorting logic that backtracked
+    catastrophically on crafted input — CWE-1333 ReDoS. The downstream
+    pattern Batou catches is broader: a service that compiles or matches
+    a regex whose *pattern* is influenced by request input (re.compile,
+    re.search, re.match on a tainted pattern string).
+  cwe: CWE-1333
+  category: regex_dos
+  file: lint.py
+  function: format_code
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2024-21503
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2024-21503
+
+- cve: CVE-2022-40898
+  description: >-
+    The wheel package < 0.38.1 had a metadata-parsing regex that backtracked
+    catastrophically on crafted distribution names — CWE-1333 ReDoS. A
+    package index or upload endpoint that fed attacker-supplied wheel
+    metadata into the parser could be CPU-wedged. Downstream pattern:
+    re.findall / re.match on user-controlled pattern strings.
+  cwe: CWE-1333
+  category: regex_dos
+  file: parser.py
+  function: parse_wheel
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2022-40898
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2022-40898
+
+- cve: CVE-2022-24839
+  description: >-
+    mistune < 0.8.4 / 2.0.3 contained block-level Markdown regexes that
+    backtracked super-linearly on crafted input, allowing a Markdown
+    renderer to be CPU-wedged with a small payload — CWE-1333 ReDoS.
+    Downstream pattern Batou catches: re.compile / re.search on a
+    user-controlled pattern argument.
+  cwe: CWE-1333
+  category: regex_dos
+  file: markdown.py
+  function: render
+  reference: https://nvd.nist.gov/vuln/detail/CVE-2022-24839
+  mode: stage
+  staged_path: tools/pycve_fixtures/CVE-2022-24839

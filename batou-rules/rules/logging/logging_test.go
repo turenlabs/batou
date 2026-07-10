@@ -222,3 +222,53 @@ func TestLOG003_Safe_CommentContainsSensitive(t *testing.T) {
 	result := testutil.ScanContent(t, "/app/handler.ts", content)
 	testutil.MustNotFindRule(t, result, "BATOU-LOG-003")
 }
+
+// --- LOG-003 / LOG-004 FP gates: keyword only in static log message (owncloud/web) ---
+
+func TestLOG003_Safe_KeywordInMessageLiteral_JS(t *testing.T) {
+	// The credential keyword ("token") appears only inside a static log
+	// message literal, not as a value being logged.
+	content := `console.debug('Generating share token for the current resource')`
+	result := testutil.ScanContent(t, "/app/share.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-LOG-003")
+	testutil.MustNotFindRule(t, result, "BATOU-LOG-004")
+}
+
+func TestLOG004_Safe_AccessTokenInDebugMessage_JS(t *testing.T) {
+	content := `console.debug('[authService:initializeContext] - updating context with saved access_token')`
+	result := testutil.ScanContent(t, "/app/authService.ts", content)
+	testutil.MustNotFindRule(t, result, "BATOU-LOG-004")
+	testutil.MustNotFindRule(t, result, "BATOU-LOG-003")
+}
+
+func TestLOG004_Fires_TokenInterpolatedInLog_JS(t *testing.T) {
+	// An actual token VALUE interpolated into the log message — still fires.
+	content := "console.debug(`New user loaded. access_token=${user.access_token}`)"
+	result := testutil.ScanContent(t, "/app/authService.ts", content)
+	testutil.MustFindAnyRule(t, result, "BATOU-LOG-003", "BATOU-LOG-004")
+}
+
+func TestLOG004_Fires_SecretAsSeparateArg_Go(t *testing.T) {
+	// log.Printf-style: the credential is a separate argument, not message text.
+	content := `log.Printf("auth failed for %s with secret %s", user, apiSecret)`
+	result := testutil.ScanContent(t, "/app/auth.go", content)
+	testutil.MustFindAnyRule(t, result, "BATOU-LOG-003", "BATOU-LOG-004")
+}
+
+func TestLOG004_Fires_PasswordConcat_JS(t *testing.T) {
+	content := `logger.info('token: ' + accessToken)`
+	result := testutil.ScanContent(t, "/app/auth.js", content)
+	testutil.MustFindAnyRule(t, result, "BATOU-LOG-003", "BATOU-LOG-004")
+}
+
+func TestLOG003_LOG004_Safe_TranslationJSON(t *testing.T) {
+	// i18n / l10n JSON files: UI message strings, not credentials.
+	content := `{
+  "loginWithToken": "Log in with token",
+  "resetPassword": "Reset password",
+  "logout": "Log out"
+}`
+	result := testutil.ScanContent(t, "/app/l10n/en.json", content)
+	testutil.MustNotFindRule(t, result, "BATOU-LOG-003")
+	testutil.MustNotFindRule(t, result, "BATOU-LOG-004")
+}

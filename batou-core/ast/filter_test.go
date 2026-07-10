@@ -2,7 +2,6 @@ package ast
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 )
 

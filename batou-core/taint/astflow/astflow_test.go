@@ -3,9 +3,7 @@ package astflow
 import (
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/taint"
-
 	// Import taint languages catalog so Go sources/sinks/sanitizers are registered.
 	_ "github.com/turenlabs/batou-core/taint/languages"
 )
@@ -1173,6 +1171,1159 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		t.Error("expected LDAP injection taint flow for FormValue -> string concat -> ldap.NewAddRequest")
 		for _, f := range flows {
 			t.Logf("  flow: %s -> %s", f.Source.Category, f.Sink.Category)
+		}
+	}
+}
+
+// =========================================================================
+// Sanitizer tests — command injection
+// =========================================================================
+
+func TestAnalyzeGo_ShellesscapeQuote_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os/exec"
+
+	"github.com/alessio/shellescape"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	arg := r.FormValue("arg")
+	safe := shellescape.Quote(arg)
+	exec.Command("echo", safe)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkCommand {
+			t.Error("expected NO command injection flow when shellescape.Quote is used")
+		}
+	}
+}
+
+func TestAnalyzeGo_ShlexSplit_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os/exec"
+
+	"github.com/google/shlex"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	input := r.FormValue("cmd")
+	args, _ := shlex.Split(input)
+	exec.Command(args[0], args[1:]...)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkCommand {
+			t.Error("expected NO command injection flow when shlex.Split is used")
+		}
+	}
+}
+
+// =========================================================================
+// Sanitizer tests — UUID validation
+// =========================================================================
+
+func TestAnalyzeGo_UUIDParse_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"database/sql"
+	"net/http"
+
+	"github.com/google/uuid"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	id := r.FormValue("id")
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return
+	}
+	db.Query("SELECT * FROM users WHERE id = '" + parsed.String() + "'")
+}
+
+var db *sql.DB
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkSQLQuery {
+			t.Error("expected NO SQL injection flow when uuid.Parse validates input")
+		}
+	}
+}
+
+// =========================================================================
+// Sanitizer tests — hex encoding
+// =========================================================================
+
+func TestAnalyzeGo_HexEncodeToString_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"encoding/hex"
+	"fmt"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	data := r.FormValue("data")
+	safe := hex.EncodeToString([]byte(data))
+	fmt.Fprintf(w, "<div>%s</div>", safe)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkHTMLOutput {
+			t.Error("expected NO XSS flow when hex.EncodeToString produces safe alphanumeric output")
+		}
+	}
+}
+
+// =========================================================================
+// Sanitizer tests — JSON marshal (HTML safe)
+// =========================================================================
+
+func TestAnalyzeGo_JSONMarshal_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	safe, _ := json.Marshal(name)
+	fmt.Fprintf(w, "<script>var x = %s;</script>", safe)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkHTMLOutput {
+			t.Error("expected NO XSS flow when json.Marshal escapes <, >, &")
+		}
+	}
+}
+
+// =========================================================================
+// Sanitizer tests — filepath.Rel and filepath.Match
+// =========================================================================
+
+func TestAnalyzeGo_FilepathRel_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("file")
+	rel, err := filepath.Rel("/base", name)
+	if err != nil {
+		return
+	}
+	os.Stat(rel)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkFileRead {
+			t.Error("expected NO file read flow when filepath.Rel constrains path")
+		}
+	}
+}
+
+// =========================================================================
+// Sanitizer tests — deserialization (DisallowUnknownFields)
+// =========================================================================
+
+func TestAnalyzeGo_JSONDisallowUnknownFields_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"encoding/json"
+	"net/http"
+)
+
+type Config struct {
+	Name string
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	var cfg Config
+	dec.Decode(&cfg)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkDeserialize {
+			t.Error("expected NO deserialization flow when DisallowUnknownFields is used")
+		}
+	}
+}
+
+// =========================================================================
+// Sanitizer tests — trust boundary (CSRF, JWT)
+// =========================================================================
+
+func TestAnalyzeGo_CSRFProtect_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+
+	"github.com/gorilla/csrf"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	token := csrf.Token(r)
+	_ = csrf.Protect([]byte("secret"))
+	_ = token
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkTrustBoundary {
+			t.Error("expected NO trust boundary flow when csrf.Protect/Token is used")
+		}
+	}
+}
+
+func TestAnalyzeGo_JWTParse_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+
+	"github.com/golang-jwt/jwt/v5"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	tokenStr := r.Header.Get("Authorization")
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		return []byte("secret"), nil
+	})
+	if err != nil || !token.Valid {
+		return
+	}
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkTrustBoundary {
+			t.Error("expected NO trust boundary flow when jwt.Parse validates token")
+		}
+	}
+}
+
+// =========================================================================
+// Sanitizer tests — query builders (squirrel)
+// =========================================================================
+
+func TestAnalyzeGo_SquirrelSelect_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"database/sql"
+	"net/http"
+
+	sq "github.com/Masterminds/squirrel"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	query, args, _ := sq.Select("*").From("users").Where(sq.Eq{"name": name}).ToSql()
+	db.Query(query, args...)
+}
+
+var db *sql.DB
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkSQLQuery {
+			t.Error("expected NO SQL injection flow when squirrel query builder is used")
+		}
+	}
+}
+
+// =========================================================================
+// Negative tests — verify flows still detected WITHOUT sanitizers
+// =========================================================================
+
+func TestAnalyzeGo_CommandInjection_Unsanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os/exec"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	cmd := r.FormValue("cmd")
+	exec.Command("sh", "-c", cmd)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkCommand) {
+		t.Error("expected command injection flow for FormValue -> exec.Command without sanitizer")
+	}
+}
+
+// =========================================================================
+// MongoDB NoSQL Injection (CWE-943) tests
+// =========================================================================
+
+func TestAnalyzeGo_MongoDBFindOne_NoSQLInjection(t *testing.T) {
+	code := `package main
+
+import "net/http"
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("user")
+	collection.FindOne(ctx, bson.D{{"username", username}})
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkNoSQL) {
+		t.Error("expected NoSQL injection flow for FormValue -> collection.FindOne")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.ID, f.Sink.ID, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_MongoDBAggregate_NoSQLInjection(t *testing.T) {
+	code := `package main
+
+import "net/http"
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	field := r.FormValue("field")
+	collection.Aggregate(ctx, bson.D{{"$group", bson.D{{"_id", field}}}})
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkNoSQL) {
+		t.Error("expected NoSQL injection flow for FormValue -> collection.Aggregate")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.ID, f.Sink.ID, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_MongoDBFindOne_Safe_Hardcoded(t *testing.T) {
+	code := `package main
+
+func handler() {
+	collection.FindOne(ctx, bson.D{{"status", "active"}})
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.ID == "go.mongo.findone" {
+			t.Errorf("expected no NoSQL injection for hardcoded query, got src=%s", f.Source.ID)
+		}
+	}
+}
+
+// =========================================================================
+// AWS DynamoDB PartiQL NoSQL Injection (CWE-943) tests
+// =========================================================================
+
+func TestAnalyzeGo_DynamoDBExecuteStatement_PartiQLInjection(t *testing.T) {
+	code := `package main
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+)
+
+func handler(svc *dynamodb.Client, r *http.Request) {
+	userID := r.URL.Query().Get("id")
+	stmt := "SELECT * FROM users WHERE id = '" + userID + "'"
+	svc.ExecuteStatement(context.TODO(), &dynamodb.ExecuteStatementInput{
+		Statement: aws.String(stmt),
+	})
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	found := false
+	for _, f := range flows {
+		if f.Sink.ID == "go.dynamodb.executestatement" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected PartiQL injection flow for query param -> ExecuteStatement")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.ID, f.Sink.ID, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_DynamoDBBatchExecuteStatement_PartiQLInjection(t *testing.T) {
+	code := `package main
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+)
+
+func handler(client *dynamodb.Client, r *http.Request) {
+	name := r.FormValue("name")
+	stmt := "SELECT * FROM users WHERE name = '" + name + "'"
+	client.BatchExecuteStatement(context.TODO(), &dynamodb.BatchExecuteStatementInput{
+		Statements: []types.BatchStatementRequest{
+			{Statement: aws.String(stmt)},
+		},
+	})
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	found := false
+	for _, f := range flows {
+		if f.Sink.ID == "go.dynamodb.batchexecutestatement" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected PartiQL injection flow for FormValue -> BatchExecuteStatement")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.ID, f.Sink.ID, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_DynamoDBExecuteTransaction_PartiQLInjection(t *testing.T) {
+	code := `package main
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+)
+
+func handler(ddb *dynamodb.Client, r *http.Request) {
+	table := r.URL.Query().Get("table")
+	stmt := "DELETE FROM " + table + " WHERE id = '1'"
+	ddb.ExecuteTransaction(context.TODO(), &dynamodb.ExecuteTransactionInput{
+		TransactStatements: []types.ParameterizedStatement{
+			{Statement: aws.String(stmt)},
+		},
+	})
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	found := false
+	for _, f := range flows {
+		if f.Sink.ID == "go.dynamodb.executetransaction" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected PartiQL injection flow for query param -> ExecuteTransaction")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.ID, f.Sink.ID, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_DynamoDBExecuteStatement_Safe_Hardcoded(t *testing.T) {
+	code := `package main
+
+import (
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+)
+
+func handler(svc *dynamodb.Client) {
+	svc.ExecuteStatement(context.TODO(), &dynamodb.ExecuteStatementInput{
+		Statement: aws.String("SELECT * FROM users WHERE status = 'active'"),
+	})
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.ID == "go.dynamodb.executestatement" {
+			t.Errorf("expected no PartiQL injection for hardcoded statement, got src=%s", f.Source.ID)
+		}
+	}
+}
+
+// =========================================================================
+// Apache Cassandra / ScyllaDB CQL Injection via gocql (CWE-943) tests
+// =========================================================================
+
+func TestAnalyzeGo_GocqlSessionQuery_CQLInjection(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+
+	"github.com/gocql/gocql"
+)
+
+func handler(session *gocql.Session, r *http.Request) {
+	userID := r.URL.Query().Get("id")
+	stmt := "SELECT * FROM users WHERE id = '" + userID + "'"
+	session.Query(stmt).Exec()
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	found := false
+	for _, f := range flows {
+		if f.Sink.ID == "go.gocql.session.query" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected CQL injection flow for query param -> gocql Session.Query")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.ID, f.Sink.ID, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_GocqlBatchQuery_CQLInjection(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+
+	"github.com/gocql/gocql"
+)
+
+func handler(batch *gocql.Batch, r *http.Request) {
+	name := r.FormValue("name")
+	stmt := "INSERT INTO users (name) VALUES ('" + name + "')"
+	batch.Query(stmt)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	found := false
+	for _, f := range flows {
+		if f.Sink.ID == "go.gocql.batch.query" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected CQL injection flow for FormValue -> gocql Batch.Query")
+		for _, f := range flows {
+			t.Logf("  flow: %s -> %s (conf: %.2f)", f.Source.ID, f.Sink.ID, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_GocqlSessionQuery_Safe_Hardcoded(t *testing.T) {
+	code := `package main
+
+import (
+	"github.com/gocql/gocql"
+)
+
+func handler(session *gocql.Session) {
+	session.Query("SELECT * FROM users WHERE status = 'active'").Exec()
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.ID == "go.gocql.session.query" {
+			t.Errorf("expected no CQL injection for hardcoded statement, got src=%s", f.Source.ID)
+		}
+	}
+}
+
+// =========================================================================
+// Sanitizer tests — base64, pq, sha256, path.Clean
+// =========================================================================
+
+func TestAnalyzeGo_Base64Encode_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"encoding/base64"
+	"fmt"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	safe := base64.StdEncoding.EncodeToString([]byte(name))
+	fmt.Fprintf(w, "<div>%s</div>", safe)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkHTMLOutput {
+			t.Error("expected NO XSS flow when base64.StdEncoding.EncodeToString encodes data")
+		}
+	}
+}
+
+func TestAnalyzeGo_PqQuoteLiteral_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	safe := pq.QuoteLiteral(name)
+	db.Query("SELECT * FROM users WHERE name = " + safe)
+}
+
+var db *sql.DB
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkSQLQuery {
+			t.Error("expected NO SQL injection when pq.QuoteLiteral escapes input")
+		}
+	}
+}
+
+func TestAnalyzeGo_SHA256_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"crypto/sha256"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	password := r.FormValue("password")
+	hash := sha256.Sum256([]byte(password))
+	_ = hash
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkCrypto {
+			t.Error("expected NO weak crypto flow when sha256.Sum256 is used")
+		}
+	}
+}
+
+func TestAnalyzeGo_URLJoinPath_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"net/url"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	target := r.FormValue("path")
+	safe, _ := url.JoinPath("https://example.com", target)
+	http.Redirect(w, r, safe, http.StatusFound)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkRedirect {
+			t.Error("expected NO redirect flow when url.JoinPath safely constructs the URL")
+		}
+	}
+}
+
+func TestAnalyzeGo_FileRead_Unsanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("file")
+	os.Stat(name)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkFileRead) {
+		t.Error("expected file read flow for FormValue -> os.Stat without sanitizer")
+	}
+}
+
+// =========================================================================
+// Trust boundary — unsanitized flows
+// =========================================================================
+
+func TestAnalyzeGo_TrustBoundary_OsSetenv_Unsanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	val := r.FormValue("config")
+	os.Setenv("APP_CONFIG", val)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkTrustBoundary) {
+		t.Error("expected trust boundary flow for FormValue -> os.Setenv without sanitizer")
+	}
+}
+
+func TestAnalyzeGo_TrustBoundary_ContextWithValue_Unsanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"context"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	userID := r.FormValue("user_id")
+	ctx := context.WithValue(r.Context(), "userID", userID)
+	_ = ctx
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	if !hasTaintFlow(flows, taint.SnkTrustBoundary) {
+		t.Error("expected trust boundary flow for FormValue -> context.WithValue without sanitizer")
+	}
+}
+
+// =========================================================================
+// Trust boundary — sanitized flows (strconv, uuid, mail, validator)
+// =========================================================================
+
+func TestAnalyzeGo_TrustBoundary_StrconvAtoi_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"context"
+	"net/http"
+	"strconv"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.FormValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return
+	}
+	ctx := context.WithValue(r.Context(), "userID", id)
+	_ = ctx
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkTrustBoundary {
+			t.Error("expected NO trust boundary flow when strconv.Atoi sanitizes input before context.WithValue")
+		}
+	}
+}
+
+func TestAnalyzeGo_TrustBoundary_UUIDParse_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/sessions"
+)
+
+var store = sessions.NewCookieStore([]byte("secret"))
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "session")
+	idStr := r.FormValue("session_id")
+	parsed, err := uuid.Parse(idStr)
+	if err != nil {
+		return
+	}
+	session.Values["session_id"] = parsed.String()
+	session.Save(r, w)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkTrustBoundary {
+			t.Error("expected NO trust boundary flow when uuid.Parse validates input before session storage")
+		}
+	}
+}
+
+func TestAnalyzeGo_TrustBoundary_MailParseAddress_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"net/mail"
+
+	"github.com/gorilla/sessions"
+)
+
+var store2 = sessions.NewCookieStore([]byte("secret"))
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store2.Get(r, "session")
+	emailStr := r.FormValue("email")
+	addr, err := mail.ParseAddress(emailStr)
+	if err != nil {
+		return
+	}
+	session.Values["email"] = addr.Address
+	session.Save(r, w)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkTrustBoundary {
+			t.Error("expected NO trust boundary flow when mail.ParseAddress validates input before session storage")
+		}
+	}
+}
+
+func TestAnalyzeGo_TrustBoundary_Validator_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/go-playground/validator/v10"
+)
+
+var validate = validator.New()
+
+type UserInput struct {
+	Name string
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	input := UserInput{Name: r.FormValue("name")}
+	if err := validate.Struct(input); err != nil {
+		return
+	}
+	ctx := context.WithValue(r.Context(), "input", input)
+	_ = ctx
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkTrustBoundary {
+			t.Error("expected NO trust boundary flow when validate.Struct validates input before context.WithValue")
+		}
+	}
+}
+
+// --- New sanitizer tests (PR #282) ---
+
+func TestAnalyzeGo_TemplateHTMLEscapeString_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"fmt"
+	"net/http"
+	"text/template"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	safe := template.HTMLEscapeString(name)
+	fmt.Fprintf(w, "<h1>Hello, %s</h1>", safe)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkHTMLOutput {
+			t.Error("expected NO XSS flow when template.HTMLEscapeString is used")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_TemplateJSEscapeString_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"fmt"
+	"net/http"
+	"text/template"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	input := r.FormValue("callback")
+	safe := template.JSEscapeString(input)
+	fmt.Fprintf(w, "<script>var cb = '%s';</script>", safe)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkHTMLOutput {
+			t.Error("expected NO XSS flow when template.JSEscapeString is used")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_TemplateURLQueryEscaper_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"text/template"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	next := r.FormValue("next")
+	safe := template.URLQueryEscaper(next)
+	http.Redirect(w, r, "/login?next="+safe, http.StatusFound)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkRedirect {
+			t.Error("expected NO redirect flow when template.URLQueryEscaper is used")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_StrconvItoa_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"database/sql"
+	"net/http"
+	"strconv"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(r.FormValue("id"))
+	idStr := strconv.Itoa(id)
+	query := "SELECT * FROM users WHERE id = " + idStr
+	db.Query(query)
+}
+
+var db *sql.DB
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkSQLQuery {
+			t.Error("expected NO SQL injection flow when strconv.Itoa is used")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_FilepathEvalSymlinks_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("file")
+	clean := filepath.Clean(name)
+	real, _ := filepath.EvalSymlinks(clean)
+	data, _ := os.ReadFile(real)
+	_ = data
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkFileRead {
+			t.Error("expected NO file read flow when filepath.EvalSymlinks is used")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_NetipParseAddr_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"net/netip"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	host := r.FormValue("host")
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return
+	}
+	http.Get("http://" + addr.String() + "/api")
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkURLFetch {
+			t.Error("expected NO SSRF flow when netip.ParseAddr validates the IP")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_NetipParsePrefix_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"net/netip"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	cidr := r.FormValue("cidr")
+	prefix, err := netip.ParsePrefix(cidr)
+	if err != nil {
+		return
+	}
+	http.Get("http://" + prefix.Addr().String() + "/api")
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkURLFetch {
+			t.Error("expected NO SSRF flow when netip.ParsePrefix validates the CIDR")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_PathJoin_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"net/http"
+	"path"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	next := r.FormValue("next")
+	safe := path.Join("/app", next)
+	http.Redirect(w, r, safe, http.StatusFound)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkRedirect {
+			t.Error("expected NO redirect flow when path.Join normalizes the path")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_SqlNamed_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	arg := sql.Named("name", name)
+	db.Query("SELECT * FROM users WHERE name = @name", arg)
+}
+
+var db *sql.DB
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkSQLQuery {
+			t.Error("expected NO SQL injection flow when sql.Named is used for parameterized query")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_ChaCha20Poly1305_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"crypto/rand"
+	"net/http"
+
+	"golang.org/x/crypto/chacha20poly1305"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	secret := r.FormValue("secret")
+	key := make([]byte, chacha20poly1305.KeySize)
+	rand.Read(key)
+	aead, _ := chacha20poly1305.New(key)
+	nonce := make([]byte, aead.NonceSize())
+	rand.Read(nonce)
+	_ = aead.Seal(nil, nonce, []byte(secret), nil)
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkCrypto {
+			t.Error("expected NO weak crypto flow when chacha20poly1305 is used")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
+		}
+	}
+}
+
+func TestAnalyzeGo_HKDF_Sanitized(t *testing.T) {
+	code := `package main
+
+import (
+	"crypto/sha256"
+	"net/http"
+
+	"golang.org/x/crypto/hkdf"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	passphrase := r.FormValue("passphrase")
+	reader := hkdf.New(sha256.New, []byte(passphrase), nil, nil)
+	key := make([]byte, 32)
+	reader.Read(key)
+	_ = key
+}
+`
+	flows := AnalyzeGo(code, "/app/handler.go")
+	for _, f := range flows {
+		if f.Sink.Category == taint.SnkCrypto {
+			t.Error("expected NO weak crypto flow when hkdf.New is used for key derivation")
+			t.Logf("  flow: %s -> %s (confidence: %.2f)", f.Source.Category, f.Sink.Category, f.Confidence)
 		}
 	}
 }

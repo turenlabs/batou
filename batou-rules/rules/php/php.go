@@ -38,9 +38,13 @@ var (
 
 // PHP-004: mail() header injection
 var (
-	reMailHeader      = regexp.MustCompile(`\bmail\s*\(\s*\$`)
+	reMailHeader       = regexp.MustCompile(`\bmail\s*\(\s*\$`)
 	reMailHeaderConcat = regexp.MustCompile(`\bmail\s*\([^,]*,\s*[^,]*,\s*[^,]*,\s*(?:["'][^"']*["']\s*\.\s*\$|\$_(?:GET|POST|REQUEST|COOKIE))`)
-	reMailHeaderParam = regexp.MustCompile(`\bmail\s*\([^)]*\$_(?:GET|POST|REQUEST|COOKIE)`)
+	reMailHeaderParam  = regexp.MustCompile(`\bmail\s*\([^)]*\$_(?:GET|POST|REQUEST|COOKIE)`)
+	// Superglobal proximity probe for the bare mail($var, ...) case. Hoisted to
+	// a package var (was an inline MustCompile in the scan loop) so the per-line
+	// gate's pointer-keyed prefilter cache has a single stable entry.
+	reMailSuperglobalNear = regexp.MustCompile(`\$_(?:GET|POST|REQUEST)`)
 )
 
 // PHP-005: exec/system/passthru/shell_exec with user input (already partly in injection.go, more specific here)
@@ -51,8 +55,8 @@ var (
 
 // PHP-006: mysqli_query/pg_query without prepared statements
 var (
-	rePHPRawQuery      = regexp.MustCompile(`\b(?:mysqli_query|mysql_query|pg_query|pg_exec)\s*\(\s*\$\w+\s*,\s*(?:"[^"]*\$|'[^']*'\s*\.\s*\$)`)
-	rePHPRawQueryConcat = regexp.MustCompile(`\b(?:mysqli_query|mysql_query|pg_query|pg_exec)\s*\(\s*\$\w+\s*,\s*\$`)
+	rePHPRawQuery          = regexp.MustCompile(`\b(?:mysqli_query|mysql_query|pg_query|pg_exec)\s*\(\s*\$\w+\s*,\s*(?:"[^"]*\$|'[^']*'\s*\.\s*\$)`)
+	rePHPRawQueryConcat    = regexp.MustCompile(`\b(?:mysqli_query|mysql_query|pg_query|pg_exec)\s*\(\s*\$\w+\s*,\s*\$`)
 	rePHPRawQueryDotConcat = regexp.MustCompile(`\b(?:mysqli_query|mysql_query|pg_query|pg_exec)\s*\([^,]+,\s*"[^"]*"\s*\.\s*\$`)
 )
 
@@ -67,8 +71,8 @@ var (
 
 // PHP-008: Symfony Process injection
 var (
-	reSymfonyProcess     = regexp.MustCompile(`new\s+Process\s*\(\s*\[?\s*\$`)
-	reSymfonyProcessRun  = regexp.MustCompile(`Process::fromShellCommandline\s*\(\s*\$`)
+	reSymfonyProcess    = regexp.MustCompile(`new\s+Process\s*\(\s*\[?\s*\$`)
+	reSymfonyProcessRun = regexp.MustCompile(`Process::fromShellCommandline\s*\(\s*\$`)
 )
 
 // PHP-009: Twig autoescape disabled / |raw filter
@@ -80,15 +84,15 @@ var (
 
 // PHP-010: LDAP injection (ldap_search with unescaped filter)
 var (
-	reLDAPSearchPHP     = regexp.MustCompile(`\bldap_search\s*\([^,]+,\s*[^,]+,\s*(?:\$|["'][^"']*["']\s*\.\s*\$)`)
-	reLDAPBindPHP       = regexp.MustCompile(`\bldap_bind\s*\([^,]+,\s*(?:\$|["'][^"']*["']\s*\.\s*\$)`)
-	reLDAPSafeEscape    = regexp.MustCompile(`ldap_escape\s*\(`)
+	reLDAPSearchPHP  = regexp.MustCompile(`\bldap_search\s*\([^,]+,\s*[^,]+,\s*(?:\$|["'][^"']*["']\s*\.\s*\$)`)
+	reLDAPBindPHP    = regexp.MustCompile(`\bldap_bind\s*\([^,]+,\s*(?:\$|["'][^"']*["']\s*\.\s*\$)`)
+	reLDAPSafeEscape = regexp.MustCompile(`ldap_escape\s*\(`)
 )
 
 // PHP-011: Weak random number generation
 var (
-	rePHPWeakRand     = regexp.MustCompile(`\b(?:rand|mt_rand|array_rand|shuffle|str_shuffle)\s*\(`)
-	rePHPSecureRand   = regexp.MustCompile(`\b(?:random_int|random_bytes|openssl_random_pseudo_bytes)\s*\(`)
+	rePHPWeakRand   = regexp.MustCompile(`\b(?:rand|mt_rand|array_rand|shuffle|str_shuffle)\s*\(`)
+	rePHPSecureRand = regexp.MustCompile(`\b(?:random_int|random_bytes|openssl_random_pseudo_bytes)\s*\(`)
 	// Context: security-sensitive usage
 	rePHPRandSecurity = regexp.MustCompile(`(?i)(?:token|password|secret|key|nonce|csrf|otp|salt|iv|session|reset|verify|auth)`)
 )
@@ -129,7 +133,10 @@ func hasNearbyPattern(lines []string, idx int, pat *regexp.Regexp) bool {
 		end = len(lines)
 	}
 	for _, l := range lines[start:end] {
-		if pat.MatchString(l) {
+		// Gated form of pat.MatchString(l): the fold-aware required-literal
+		// pre-gate skips the backtracking engine on window lines that can't
+		// match. Finding-preserving (never skips a line pat would match).
+		if rules.GMatch(pat, l) {
 			return true
 		}
 	}
@@ -142,9 +149,11 @@ func hasNearbyPattern(lines []string, idx int, pat *regexp.Regexp) bool {
 
 type TypeJuggling struct{}
 
-func (r *TypeJuggling) ID() string                      { return "BATOU-PHP-001" }
-func (r *TypeJuggling) Name() string                    { return "PHPTypeJuggling" }
-func (r *TypeJuggling) Description() string             { return "Detects PHP loose comparison (== / !=) on security-sensitive values that should use strict comparison (=== / !==)." }
+func (r *TypeJuggling) ID() string   { return "BATOU-PHP-001" }
+func (r *TypeJuggling) Name() string { return "PHPTypeJuggling" }
+func (r *TypeJuggling) Description() string {
+	return "Detects PHP loose comparison (== / !=) on security-sensitive values that should use strict comparison (=== / !==)."
+}
 func (r *TypeJuggling) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TypeJuggling) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -153,16 +162,17 @@ func (r *TypeJuggling) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		// Skip lines with strict comparison
-		if reTypeJuggleStrict.MatchString(line) {
+		if rules.GMatchLower(reTypeJuggleStrict, line, lowered[i]) {
 			continue
 		}
-		if reTypeJuggleLoose.MatchString(line) || reTypeJuggleLooseRev.MatchString(line) {
+		if rules.GMatchLower(reTypeJuggleLoose, line, lowered[i]) || rules.GMatchLower(reTypeJuggleLooseRev, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -190,9 +200,11 @@ func (r *TypeJuggling) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SSRF struct{}
 
-func (r *SSRF) ID() string                      { return "BATOU-PHP-002" }
-func (r *SSRF) Name() string                    { return "PHPSSRF" }
-func (r *SSRF) Description() string             { return "Detects PHP file_get_contents/fopen/curl_setopt with user-controlled URL, enabling SSRF." }
+func (r *SSRF) ID() string   { return "BATOU-PHP-002" }
+func (r *SSRF) Name() string { return "PHPSSRF" }
+func (r *SSRF) Description() string {
+	return "Detects PHP file_get_contents/fopen/curl_setopt with user-controlled URL, enabling SSRF."
+}
 func (r *SSRF) DefaultSeverity() rules.Severity { return rules.High }
 func (r *SSRF) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -201,26 +213,27 @@ func (r *SSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
 		// Skip file path patterns (not URLs)
-		if reSSRFSafeFilePath.MatchString(line) {
+		if rules.GMatchLower(reSSRFSafeFilePath, line, lowered[i]) {
 			continue
 		}
 
 		var matched string
 		var desc string
 
-		if m := reSSRFFileGet.FindString(line); m != "" {
+		if m := rules.GFindLower(reSSRFFileGet, line, lowered[i]); m != "" {
 			matched = m
 			desc = "file_get_contents() with user-controlled URL"
-		} else if m := reSSRFFopen.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSSRFFopen, line, lowered[i]); m != "" {
 			matched = m
 			desc = "fopen() with user-controlled URL"
-		} else if m := reSSRFCurl.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSSRFCurl, line, lowered[i]); m != "" {
 			matched = m
 			desc = "curl_setopt CURLOPT_URL with user-controlled value"
 		}
@@ -253,9 +266,11 @@ func (r *SSRF) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type FileInclusion struct{}
 
-func (r *FileInclusion) ID() string                      { return "BATOU-PHP-003" }
-func (r *FileInclusion) Name() string                    { return "PHPFileInclusion" }
-func (r *FileInclusion) Description() string             { return "Detects PHP include/require with user input, enabling LFI/RFI." }
+func (r *FileInclusion) ID() string   { return "BATOU-PHP-003" }
+func (r *FileInclusion) Name() string { return "PHPFileInclusion" }
+func (r *FileInclusion) Description() string {
+	return "Detects PHP include/require with user input, enabling LFI/RFI."
+}
 func (r *FileInclusion) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *FileInclusion) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -264,7 +279,8 @@ func (r *FileInclusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -273,11 +289,11 @@ func (r *FileInclusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		confidence := "high"
 
-		if m := reIncludeUser.FindString(line); m != "" {
+		if m := rules.GFindLower(reIncludeUser, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reIncludeConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reIncludeConcat, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reIncludeDynamic.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reIncludeDynamic, line, lowered[i]); m != "" {
 			matched = m
 			confidence = "medium"
 		}
@@ -310,9 +326,11 @@ func (r *FileInclusion) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type MailHeaderInjection struct{}
 
-func (r *MailHeaderInjection) ID() string                      { return "BATOU-PHP-004" }
-func (r *MailHeaderInjection) Name() string                    { return "PHPMailHeaderInjection" }
-func (r *MailHeaderInjection) Description() string             { return "Detects PHP mail() with user-controlled headers, enabling email header injection." }
+func (r *MailHeaderInjection) ID() string   { return "BATOU-PHP-004" }
+func (r *MailHeaderInjection) Name() string { return "PHPMailHeaderInjection" }
+func (r *MailHeaderInjection) Description() string {
+	return "Detects PHP mail() with user-controlled headers, enabling email header injection."
+}
 func (r *MailHeaderInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *MailHeaderInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -321,7 +339,8 @@ func (r *MailHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -330,13 +349,13 @@ func (r *MailHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched bool
 		confidence := "high"
 
-		if reMailHeaderParam.MatchString(line) {
+		if rules.GMatchLower(reMailHeaderParam, line, lowered[i]) {
 			matched = true
-		} else if reMailHeaderConcat.MatchString(line) {
+		} else if rules.GMatchLower(reMailHeaderConcat, line, lowered[i]) {
 			matched = true
-		} else if reMailHeader.MatchString(line) {
+		} else if rules.GMatchLower(reMailHeader, line, lowered[i]) {
 			// Only flag bare mail($var, ...) if superglobals nearby
-			if hasNearbyPattern(lines, i, regexp.MustCompile(`\$_(?:GET|POST|REQUEST)`)) {
+			if hasNearbyPattern(lines, i, reMailSuperglobalNear) {
 				matched = true
 				confidence = "medium"
 			}
@@ -370,9 +389,11 @@ func (r *MailHeaderInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type CommandInjection struct{}
 
-func (r *CommandInjection) ID() string                      { return "BATOU-PHP-005" }
-func (r *CommandInjection) Name() string                    { return "PHPCommandInjection" }
-func (r *CommandInjection) Description() string             { return "Detects PHP shell execution with user input from superglobals." }
+func (r *CommandInjection) ID() string   { return "BATOU-PHP-005" }
+func (r *CommandInjection) Name() string { return "PHPCommandInjection" }
+func (r *CommandInjection) Description() string {
+	return "Detects PHP shell execution with user input from superglobals."
+}
 func (r *CommandInjection) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *CommandInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -381,7 +402,8 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -390,10 +412,10 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := rePHPShellUser.FindString(line); m != "" {
+		if m := rules.GFindLower(rePHPShellUser, line, lowered[i]); m != "" {
 			matched = m
 			desc = "shell function with user input variable"
-		} else if m := rePHPBacktick.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePHPBacktick, line, lowered[i]); m != "" {
 			matched = m
 			desc = "backtick operator with user input"
 		}
@@ -426,9 +448,11 @@ func (r *CommandInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type RawSQLQuery struct{}
 
-func (r *RawSQLQuery) ID() string                      { return "BATOU-PHP-006" }
-func (r *RawSQLQuery) Name() string                    { return "PHPRawSQLQuery" }
-func (r *RawSQLQuery) Description() string             { return "Detects PHP mysqli_query/pg_query with variable interpolation instead of prepared statements." }
+func (r *RawSQLQuery) ID() string   { return "BATOU-PHP-006" }
+func (r *RawSQLQuery) Name() string { return "PHPRawSQLQuery" }
+func (r *RawSQLQuery) Description() string {
+	return "Detects PHP mysqli_query/pg_query with variable interpolation instead of prepared statements."
+}
 func (r *RawSQLQuery) DefaultSeverity() rules.Severity { return rules.Critical }
 func (r *RawSQLQuery) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -437,7 +461,8 @@ func (r *RawSQLQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -446,11 +471,11 @@ func (r *RawSQLQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		confidence := "high"
 
-		if m := rePHPRawQuery.FindString(line); m != "" {
+		if m := rules.GFindLower(rePHPRawQuery, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := rePHPRawQueryDotConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePHPRawQueryDotConcat, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := rePHPRawQueryConcat.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePHPRawQueryConcat, line, lowered[i]); m != "" {
 			matched = m
 			confidence = "medium"
 		}
@@ -483,9 +508,11 @@ func (r *RawSQLQuery) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type InsecureSessionCookie struct{}
 
-func (r *InsecureSessionCookie) ID() string                      { return "BATOU-PHP-007" }
-func (r *InsecureSessionCookie) Name() string                    { return "PHPInsecureSessionCookie" }
-func (r *InsecureSessionCookie) Description() string             { return "Detects PHP session cookie configuration with httponly, secure, or samesite disabled." }
+func (r *InsecureSessionCookie) ID() string   { return "BATOU-PHP-007" }
+func (r *InsecureSessionCookie) Name() string { return "PHPInsecureSessionCookie" }
+func (r *InsecureSessionCookie) Description() string {
+	return "Detects PHP session cookie configuration with httponly, secure, or samesite disabled."
+}
 func (r *InsecureSessionCookie) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *InsecureSessionCookie) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -497,7 +524,8 @@ func (r *InsecureSessionCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	type check struct {
 		re         *regexp.Regexp
@@ -544,7 +572,7 @@ func (r *InsecureSessionCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		for _, c := range checks {
-			if c.re.MatchString(line) {
+			if rules.GMatchLower(c.re, line, lowered[i]) {
 				findings = append(findings, rules.Finding{
 					RuleID:        r.ID(),
 					Severity:      r.DefaultSeverity(),
@@ -574,18 +602,23 @@ func (r *InsecureSessionCookie) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type SymfonyProcessInjection struct{}
 
-func (r *SymfonyProcessInjection) ID() string                      { return "BATOU-PHP-008" }
-func (r *SymfonyProcessInjection) Name() string                    { return "PHPSymfonyProcessInjection" }
-func (r *SymfonyProcessInjection) Description() string             { return "Detects Symfony Process class with user input, enabling command injection." }
+func (r *SymfonyProcessInjection) ID() string   { return "BATOU-PHP-008" }
+func (r *SymfonyProcessInjection) Name() string { return "PHPSymfonyProcessInjection" }
+func (r *SymfonyProcessInjection) Description() string {
+	return "Detects Symfony Process class with user input, enabling command injection."
+}
 func (r *SymfonyProcessInjection) DefaultSeverity() rules.Severity { return rules.Critical }
-func (r *SymfonyProcessInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
+func (r *SymfonyProcessInjection) Languages() []rules.Language {
+	return []rules.Language{rules.LangPHP}
+}
 
 func (r *SymfonyProcessInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if ctx.Language != rules.LangPHP {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -594,10 +627,10 @@ func (r *SymfonyProcessInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reSymfonyProcessRun.FindString(line); m != "" {
+		if m := rules.GFindLower(reSymfonyProcessRun, line, lowered[i]); m != "" {
 			matched = m
 			desc = "Process::fromShellCommandline() with user-controlled input"
-		} else if m := reSymfonyProcess.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reSymfonyProcess, line, lowered[i]); m != "" {
 			matched = m
 			desc = "new Process() with user-controlled arguments"
 		}
@@ -630,9 +663,11 @@ func (r *SymfonyProcessInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type TwigRawFilter struct{}
 
-func (r *TwigRawFilter) ID() string                      { return "BATOU-PHP-009" }
-func (r *TwigRawFilter) Name() string                    { return "PHPTwigRawFilter" }
-func (r *TwigRawFilter) Description() string             { return "Detects Twig |raw filter or autoescape disabled, which bypasses XSS protection." }
+func (r *TwigRawFilter) ID() string   { return "BATOU-PHP-009" }
+func (r *TwigRawFilter) Name() string { return "PHPTwigRawFilter" }
+func (r *TwigRawFilter) Description() string {
+	return "Detects Twig |raw filter or autoescape disabled, which bypasses XSS protection."
+}
 func (r *TwigRawFilter) DefaultSeverity() rules.Severity { return rules.High }
 func (r *TwigRawFilter) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -641,7 +676,8 @@ func (r *TwigRawFilter) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -650,15 +686,15 @@ func (r *TwigRawFilter) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched bool
 		var title, desc string
 
-		if reTwigRawFilter.MatchString(line) {
+		if rules.GMatchLower(reTwigRawFilter, line, lowered[i]) {
 			matched = true
 			title = "Twig |raw filter bypasses XSS auto-escaping"
 			desc = "The |raw filter in Twig marks content as safe HTML, bypassing auto-escaping. If user input flows through this filter, it creates an XSS vulnerability."
-		} else if reTwigAutoescOff.MatchString(line) {
+		} else if rules.GMatchLower(reTwigAutoescOff, line, lowered[i]) {
 			matched = true
 			title = "Twig autoescape disabled"
 			desc = "Disabling autoescape in a Twig block outputs all variables as raw HTML, creating XSS vulnerabilities for any user-controlled data in the block."
-		} else if reTwigAutoescConf.MatchString(line) {
+		} else if rules.GMatchLower(reTwigAutoescConf, line, lowered[i]) {
 			matched = true
 			title = "Twig autoescape disabled in configuration"
 			desc = "Setting 'autoescape' => false in Twig configuration disables HTML escaping globally, creating XSS vulnerabilities throughout the application."
@@ -692,9 +728,11 @@ func (r *TwigRawFilter) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type LDAPInjection struct{}
 
-func (r *LDAPInjection) ID() string                      { return "BATOU-PHP-010" }
-func (r *LDAPInjection) Name() string                    { return "PHPLDAPInjection" }
-func (r *LDAPInjection) Description() string             { return "Detects PHP ldap_search/ldap_bind with unescaped user input, enabling LDAP injection." }
+func (r *LDAPInjection) ID() string   { return "BATOU-PHP-010" }
+func (r *LDAPInjection) Name() string { return "PHPLDAPInjection" }
+func (r *LDAPInjection) Description() string {
+	return "Detects PHP ldap_search/ldap_bind with unescaped user input, enabling LDAP injection."
+}
 func (r *LDAPInjection) DefaultSeverity() rules.Severity { return rules.High }
 func (r *LDAPInjection) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -703,7 +741,8 @@ func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
@@ -716,10 +755,10 @@ func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 		var matched string
 		var desc string
 
-		if m := reLDAPSearchPHP.FindString(line); m != "" {
+		if m := rules.GFindLower(reLDAPSearchPHP, line, lowered[i]); m != "" {
 			matched = m
 			desc = "ldap_search() with user-controlled filter"
-		} else if m := reLDAPBindPHP.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reLDAPBindPHP, line, lowered[i]); m != "" {
 			matched = m
 			desc = "ldap_bind() with user-controlled DN"
 		}
@@ -752,9 +791,11 @@ func (r *LDAPInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type WeakRandom struct{}
 
-func (r *WeakRandom) ID() string                      { return "BATOU-PHP-011" }
-func (r *WeakRandom) Name() string                    { return "PHPWeakRandom" }
-func (r *WeakRandom) Description() string             { return "Detects PHP weak random functions (rand, mt_rand) used in security-sensitive contexts." }
+func (r *WeakRandom) ID() string   { return "BATOU-PHP-011" }
+func (r *WeakRandom) Name() string { return "PHPWeakRandom" }
+func (r *WeakRandom) Description() string {
+	return "Detects PHP weak random functions (rand, mt_rand) used in security-sensitive contexts."
+}
 func (r *WeakRandom) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *WeakRandom) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -763,20 +804,21 @@ func (r *WeakRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 		return nil
 	}
 	// Skip if secure random functions are used in the file
-	if rePHPSecureRand.MatchString(ctx.Content) {
+	if rules.GMatchFile(rePHPSecureRand, ctx) {
 		return nil
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if !rePHPWeakRand.MatchString(line) {
+		if !rules.GMatchLower(rePHPWeakRand, line, lowered[i]) {
 			continue
 		}
 		// Only flag in security-sensitive contexts
-		if !rePHPRandSecurity.MatchString(line) && !hasNearbyPattern(lines, i, rePHPRandSecurity) {
+		if !rules.GMatchLower(rePHPRandSecurity, line, lowered[i]) && !hasNearbyPattern(lines, i, rePHPRandSecurity) {
 			continue
 		}
 		findings = append(findings, rules.Finding{
@@ -805,9 +847,11 @@ func (r *WeakRandom) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 type DisplayErrors struct{}
 
-func (r *DisplayErrors) ID() string                      { return "BATOU-PHP-012" }
-func (r *DisplayErrors) Name() string                    { return "PHPDisplayErrors" }
-func (r *DisplayErrors) Description() string             { return "Detects PHP display_errors enabled, which exposes stack traces and sensitive information." }
+func (r *DisplayErrors) ID() string   { return "BATOU-PHP-012" }
+func (r *DisplayErrors) Name() string { return "PHPDisplayErrors" }
+func (r *DisplayErrors) Description() string {
+	return "Detects PHP display_errors enabled, which exposes stack traces and sensitive information."
+}
 func (r *DisplayErrors) DefaultSeverity() rules.Severity { return rules.Medium }
 func (r *DisplayErrors) Languages() []rules.Language     { return []rules.Language{rules.LangPHP} }
 
@@ -818,12 +862,13 @@ func (r *DisplayErrors) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 	}
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		if isComment(line) {
 			continue
 		}
-		if reDisplayErrors.MatchString(line) || reIniSetDisplay.MatchString(line) {
+		if rules.GMatchLower(reDisplayErrors, line, lowered[i]) || rules.GMatchLower(reIniSetDisplay, line, lowered[i]) {
 			findings = append(findings, rules.Finding{
 				RuleID:        r.ID(),
 				Severity:      r.DefaultSeverity(),
@@ -862,4 +907,10 @@ func init() {
 	rules.Register(&LDAPInjection{})
 	rules.Register(&WeakRandom{})
 	rules.Register(&DisplayErrors{})
+	// Variable-indirection rules (PR-CATphp-strict — bench-phpcve uplift).
+	rules.Register(&CommandInjectionIndirect{})
+	rules.Register(&RawSQLQueryIndirect{})
+	rules.Register(&PathTraversalIndirect{})
+	rules.Register(&XXELoadXML{})
+	rules.Register(&EvalIndirect{})
 }

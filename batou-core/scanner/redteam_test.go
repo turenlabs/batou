@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
 	"github.com/turenlabs/batou-core/testutil"
-
 	// Register all rule packages.
 	_ "github.com/turenlabs/batou-rules/rules/injection"
 	_ "github.com/turenlabs/batou-rules/rules/secrets"
@@ -19,7 +17,6 @@ import (
 	_ "github.com/turenlabs/batou-rules/rules/logging"
 	_ "github.com/turenlabs/batou-rules/rules/validation"
 	_ "github.com/turenlabs/batou-rules/rules/memory"
-
 	// Taint analysis.
 	_ "github.com/turenlabs/batou-core/taint"
 	_ "github.com/turenlabs/batou-core/taint/languages"

@@ -24,7 +24,6 @@ var (
 	// BATOU-FW-PHOENIX-003: CSRF protection disabled
 	rePhoenixCSRFDisable   = regexp.MustCompile(`(?:protect_from_forgery|:put_csrf_token).*false`)
 	rePhoenixDeleteCSRF    = regexp.MustCompile(`delete_csrf_token\s*\(`)
-	rePhoenixPlugCSRF      = regexp.MustCompile(`plug\s+:protect_from_forgery`)
 
 	// BATOU-FW-PHOENIX-004: secret_key_base hardcoded
 	rePhoenixSecretKey     = regexp.MustCompile(`secret_key_base\s*:\s*"[A-Za-z0-9+/=]{20,}"`)
@@ -72,7 +71,8 @@ func (r *PhoenixRaw) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -80,9 +80,9 @@ func (r *PhoenixRaw) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 		var matched string
-		if m := rePhoenixRaw.FindString(line); m != "" {
+		if m := rules.GFindLower(rePhoenixRaw, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := rePhoenixRawPipe.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePhoenixRawPipe, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -133,7 +133,8 @@ func (r *PhoenixEctoSQLi) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -143,13 +144,13 @@ func (r *PhoenixEctoSQLi) Scan(ctx *rules.ScanContext) []rules.Finding {
 
 		var matched string
 		var title string
-		if m := rePhoenixEctoFragment.FindString(line); m != "" {
+		if m := rules.GFindLower(rePhoenixEctoFragment, line, lowered[i]); m != "" {
 			matched = m
 			title = "Ecto fragment() with string interpolation (SQL injection)"
-		} else if m := rePhoenixEctoRawSQL.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePhoenixEctoRawSQL, line, lowered[i]); m != "" {
 			matched = m
 			title = "Ecto.Adapters.SQL.query with string interpolation (SQL injection)"
-		} else if m := rePhoenixRepoQuery.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePhoenixRepoQuery, line, lowered[i]); m != "" {
 			matched = m
 			title = "Repo.query with string interpolation (SQL injection)"
 		}
@@ -201,7 +202,8 @@ func (r *PhoenixCSRFDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -209,7 +211,7 @@ func (r *PhoenixCSRFDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if m := rePhoenixCSRFDisable.FindString(line); m != "" {
+		if m := rules.GFindLower(rePhoenixCSRFDisable, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -232,7 +234,7 @@ func (r *PhoenixCSRFDisabled) Scan(ctx *rules.ScanContext) []rules.Finding {
 			})
 		}
 
-		if m := rePhoenixDeleteCSRF.FindString(line); m != "" {
+		if m := rules.GFindLower(rePhoenixDeleteCSRF, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -280,7 +282,8 @@ func (r *PhoenixHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -289,9 +292,9 @@ func (r *PhoenixHardcodedSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := rePhoenixSecretKey.FindString(line); m != "" {
+		if m := rules.GFindLower(rePhoenixSecretKey, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := rePhoenixSecretKeyBase.FindString(line); m != "" {
+		} else if m := rules.GFindLower(rePhoenixSecretKeyBase, line, lowered[i]); m != "" {
 			matched = m
 		}
 
@@ -352,14 +355,15 @@ func (r *PhoenixLiveViewAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "#") {
 			continue
 		}
-		if rePhoenixHandleEvent.MatchString(line) {
+		if rules.GMatchLower(rePhoenixHandleEvent, line, lowered[i]) {
 			matched := t
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -411,7 +415,8 @@ func (r *PhoenixRouterNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inPipeline := false
 	pipelineLine := 0
@@ -425,7 +430,7 @@ func (r *PhoenixRouterNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if rePhoenixPipeline.MatchString(line) {
+		if rules.GMatchLower(rePhoenixPipeline, line, lowered[i]) {
 			inPipeline = true
 			pipelineLine = i
 			hasAuth = false
@@ -438,7 +443,7 @@ func (r *PhoenixRouterNoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		if inPipeline {
-			if rePhoenixPlugAuth.MatchString(line) || strings.Contains(line, "authenticate") || strings.Contains(line, "require_auth") {
+			if rules.GMatchLower(rePhoenixPlugAuth, line, lowered[i]) || strings.Contains(line, "authenticate") || strings.Contains(line, "require_auth") {
 				hasAuth = true
 			}
 			if strings.TrimSpace(line) == "end" {

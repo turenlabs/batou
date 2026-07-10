@@ -2,7 +2,6 @@ package taint
 
 import (
 	"testing"
-
 	"github.com/turenlabs/batou-rules/rules"
 )
 

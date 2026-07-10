@@ -32,7 +32,6 @@ var reNextImageDomainWildcard = regexp.MustCompile(`(?:domains|remotePatterns)\s
 var reNextImagePermissive = regexp.MustCompile(`remotePatterns\s*:\s*\[\s*\{[^}]*hostname\s*:\s*['"]?\*\*['"]?`)
 
 // BATOU-FW-NEXTJS-006: Middleware bypass
-var reNextMiddlewareSkip = regexp.MustCompile(`config\s*=\s*\{[^}]*matcher\s*:\s*\[`)
 var reNextMiddlewarePathCheck = regexp.MustCompile(`request\.nextUrl\.pathname\.startsWith\s*\(`)
 var reNextMiddlewareBypass = regexp.MustCompile(`(?:_next|static|favicon|api|_vercel)\b`)
 
@@ -40,7 +39,6 @@ var reNextMiddlewareBypass = regexp.MustCompile(`(?:_next|static|favicon|api|_ve
 var reNextPublicSensitive = regexp.MustCompile(`NEXT_PUBLIC_(?:SECRET|PRIVATE|KEY|PASSWORD|TOKEN|API_SECRET|DATABASE|DB_PASS|STRIPE_SECRET|AWS_SECRET)`)
 
 // BATOU-FW-NEXTJS-008: CSP not configured
-var reNextHeaders = regexp.MustCompile(`(?:headers\s*\(\s*\)|headers\s*:\s*\[|Content-Security-Policy)`)
 
 func init() {
 	rules.Register(&NextJSDangerousHTML{})
@@ -71,14 +69,15 @@ func (r *NextJSDangerousHTML) Languages() []rules.Language {
 
 func (r *NextJSDangerousHTML) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reNextDangerousHTML.FindString(line); m != "" {
+		if m := rules.GFindLower(reNextDangerousHTML, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -125,21 +124,22 @@ func (r *NextJSAPINoAuth) Scan(ctx *rules.ScanContext) []rules.Finding {
 	if !strings.Contains(ctx.FilePath, "/api/") && !strings.Contains(ctx.FilePath, "route.ts") && !strings.Contains(ctx.FilePath, "route.js") {
 		return nil
 	}
-	if !reNextAPIHandler.MatchString(ctx.Content) && !reNextAPIRoute.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNextAPIHandler, ctx) && !rules.GMatchFile(reNextAPIRoute, ctx) {
 		return nil
 	}
-	if reNextAuthCheck.MatchString(ctx.Content) {
+	if rules.GMatchFile(reNextAuthCheck, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reNextAPIHandler.MatchString(line) {
+		if rules.GMatchLower(reNextAPIHandler, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -183,15 +183,16 @@ func (r *NextJSPropsSecrets) Languages() []rules.Language {
 }
 
 func (r *NextJSPropsSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
-	if !reNextGSSP.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNextGSSP, ctx) {
 		return nil
 	}
-	if !reNextPropsReturn.MatchString(ctx.Content) {
+	if !rules.GMatchFile(reNextPropsReturn, ctx) {
 		return nil
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	inGSSP := false
 	braceDepth := 0
@@ -202,7 +203,7 @@ func (r *NextJSPropsSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 			continue
 		}
 
-		if reNextGSSP.MatchString(line) {
+		if rules.GMatchLower(reNextGSSP, line, lowered[i]) {
 			inGSSP = true
 			braceDepth = strings.Count(line, "{") - strings.Count(line, "}")
 			continue
@@ -211,7 +212,7 @@ func (r *NextJSPropsSecrets) Scan(ctx *rules.ScanContext) []rules.Finding {
 		if inGSSP {
 			braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 
-			if reNextPropsSecret.MatchString(line) && strings.Contains(line, "props") {
+			if rules.GMatchLower(reNextPropsSecret, line, lowered[i]) && strings.Contains(line, "props") {
 				matched := strings.TrimSpace(line)
 				if len(matched) > 120 {
 					matched = matched[:120] + "..."
@@ -260,14 +261,15 @@ func (r *NextJSRewriteInjection) Languages() []rules.Language {
 
 func (r *NextJSRewriteInjection) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if m := reNextRewriteUserInput.FindString(line); m != "" {
+		if m := rules.GFindLower(reNextRewriteUserInput, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -311,7 +313,8 @@ func (r *NextJSImagePermissive) Languages() []rules.Language {
 
 func (r *NextJSImagePermissive) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -320,9 +323,9 @@ func (r *NextJSImagePermissive) Scan(ctx *rules.ScanContext) []rules.Finding {
 		}
 
 		var matched string
-		if m := reNextImageDomainWildcard.FindString(line); m != "" {
+		if m := rules.GFindLower(reNextImageDomainWildcard, line, lowered[i]); m != "" {
 			matched = m
-		} else if m := reNextImagePermissive.FindString(line); m != "" {
+		} else if m := rules.GFindLower(reNextImagePermissive, line, lowered[i]); m != "" {
 			matched = m
 		}
 		if matched != "" {
@@ -373,14 +376,15 @@ func (r *NextJSMiddlewareBypass) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
 			continue
 		}
-		if reNextMiddlewarePathCheck.MatchString(line) && reNextMiddlewareBypass.MatchString(line) {
+		if rules.GMatchLower(reNextMiddlewarePathCheck, line, lowered[i]) && rules.GMatchLower(reNextMiddlewareBypass, line, lowered[i]) {
 			matched := strings.TrimSpace(line)
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -424,14 +428,15 @@ func (r *NextJSPublicSecret) Languages() []rules.Language {
 
 func (r *NextJSPublicSecret) Scan(ctx *rules.ScanContext) []rules.Finding {
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
+	lowered := ctx.LowerLines()
 
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") || strings.HasPrefix(t, "#") {
 			continue
 		}
-		if m := reNextPublicSensitive.FindString(line); m != "" {
+		if m := rules.GFindLower(reNextPublicSensitive, line, lowered[i]); m != "" {
 			matched := m
 			if len(matched) > 120 {
 				matched = matched[:120] + "..."
@@ -483,7 +488,7 @@ func (r *NextJSNoCSP) Scan(ctx *rules.ScanContext) []rules.Finding {
 	}
 
 	var findings []rules.Finding
-	lines := strings.Split(ctx.Content, "\n")
+	lines := ctx.SplitLines()
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
